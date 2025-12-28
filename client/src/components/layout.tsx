@@ -46,6 +46,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Button>
         </Link>
 
+        {user.role === "admin" && (
+           <Button
+            variant="ghost"
+            className="w-full justify-start h-12 text-lg font-medium opacity-50 cursor-not-allowed"
+          >
+            <UserIcon className="mr-3 h-5 w-5" />
+            Engineers
+          </Button>
+        )}
+
         <Link href="/completed-jobs">
           <Button
             variant={location === "/completed-jobs" ? "secondary" : "ghost"}
@@ -56,16 +66,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
             Completed Jobs
           </Button>
         </Link>
-        
-        {user.role === "admin" && (
-           <Button
-            variant="ghost"
-            className="w-full justify-start h-12 text-lg font-medium opacity-50 cursor-not-allowed"
-          >
-            <UserIcon className="mr-3 h-5 w-5" />
-            Engineers
-          </Button>
-        )}
       </nav>
 
       <div className="border-t pt-4 mt-auto">
@@ -130,16 +130,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 Jobs List
               </Button>
             </Link>
-             <Link href="/completed-jobs">
-              <Button variant={location === "/completed-jobs" ? "secondary" : "ghost"}>
-                Completed Jobs
-              </Button>
-            </Link>
              {user.role === "admin" && (
               <Button variant="ghost" className="opacity-50 cursor-not-allowed">
                 Engineers
               </Button>
             )}
+             <Link href="/completed-jobs">
+              <Button variant={location === "/completed-jobs" ? "secondary" : "ghost"}>
+                Completed Jobs
+              </Button>
+            </Link>
           </nav>
 
           <div className="ml-auto flex items-center gap-4">
