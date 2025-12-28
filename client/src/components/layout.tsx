@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, FilePlus, User as UserIcon, Menu, Building2 as Building2Icon } from "lucide-react";
+import { LogOut, LayoutDashboard, FilePlus, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 
@@ -43,6 +43,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
           >
             <LayoutDashboard className="mr-3 h-5 w-5" />
             Jobs List
+          </Button>
+        </Link>
+
+        <Link href="/completed-jobs">
+          <Button
+            variant={location === "/completed-jobs" ? "secondary" : "ghost"}
+            className="w-full justify-start h-12 text-lg font-medium"
+            onClick={() => setIsOpen(false)}
+          >
+            <CheckCircle2 className="mr-3 h-5 w-5" />
+            Completed Jobs
           </Button>
         </Link>
         
@@ -117,6 +128,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
              <Link href="/">
               <Button variant={location === "/" ? "secondary" : "ghost"}>
                 Jobs List
+              </Button>
+            </Link>
+             <Link href="/completed-jobs">
+              <Button variant={location === "/completed-jobs" ? "secondary" : "ghost"}>
+                Completed Jobs
               </Button>
             </Link>
              {user.role === "admin" && (
