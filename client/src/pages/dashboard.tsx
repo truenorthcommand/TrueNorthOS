@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Calendar, MapPin, User, ArrowRight } from "lucide-react";
+import { Plus, Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -66,9 +67,9 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Jobs</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Jobs in Progress</h1>
           <p className="text-muted-foreground">
-            {user.role === "admin" ? "Manage all field operations" : "Your assigned tasks"}
+            {user.role === "admin" ? "Track all field operations and completion status" : "Track your assigned jobs"}
           </p>
         </div>
         
@@ -88,14 +89,26 @@ export default function Dashboard() {
         />
       </div>
 
-      <Tabs defaultValue="all" className="w-full">
+      <Tabs defaultValue="active" className="w-full">
         <TabsList className="grid w-full grid-cols-4 lg:w-[400px]">
-          <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="active">Active</TabsTrigger>
+          <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="signatures">Review</TabsTrigger>
           <TabsTrigger value="done">Done</TabsTrigger>
         </TabsList>
         
+        <TabsContent value="active" className="mt-6">
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredJobs.filter(j => j.status === "In Progress" || j.status === "Draft").length === 0 ? (
+              <div className="col-span-full text-center py-12 text-muted-foreground">
+                No active jobs. Great work!
+              </div>
+            ) : filteredJobs.filter(j => j.status === "In Progress" || j.status === "Draft").map(job => (
+               <JobCard key={job.id} job={job} statusColor={getStatusColor(job.status)} />
+            ))}
+          </div>
+        </TabsContent>
+
         <TabsContent value="all" className="mt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredJobs.length === 0 ? (
@@ -108,13 +121,6 @@ export default function Dashboard() {
           </div>
         </TabsContent>
         
-        <TabsContent value="active" className="mt-6">
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredJobs.filter(j => j.status === "In Progress" || j.status === "Draft").map(job => (
-               <JobCard key={job.id} job={job} statusColor={getStatusColor(job.status)} />
-            ))}
-          </div>
-        </TabsContent>
 
         <TabsContent value="signatures" className="mt-6">
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -137,8 +143,22 @@ export default function Dashboard() {
 }
 
 function JobCard({ job, statusColor }: { job: Job, statusColor: string }) {
+  // Calculate progress based on completion requirements
+  const photosComplete = job.photos.length > 0;
+  const engineerSignatureComplete = job.signatures.some(s => s.type === "engineer");
+  const customerSignatureComplete = job.signatures.some(s => s.type === "customer");
+  
+  const progressItems = [
+    { label: "Photos", complete: photosComplete, icon: Camera },
+    { label: "Engineer Sig", complete: engineerSignatureComplete, icon: Signature },
+    { label: "Customer Sig", complete: customerSignatureComplete, icon: Signature },
+  ];
+  
+  const completedCount = progressItems.filter(item => item.complete).length;
+  const progressPercentage = (completedCount / progressItems.length) * 100;
+
   return (
-    <Card className="hover:shadow-md transition-shadow cursor-pointer group border-l-4" style={{ borderLeftColor: statusColor.includes('blue') ? 'var(--primary)' : undefined }}>
+    <Card className="hover:shadow-lg transition-all cursor-pointer group border-l-4 overflow-hidden" style={{ borderLeftColor: statusColor.includes('blue') ? 'rgb(59, 130, 246)' : statusColor.includes('amber') ? 'rgb(217, 119, 6)' : statusColor.includes('emerald') ? 'rgb(16, 185, 129)' : 'rgb(100, 116, 139)' }}>
       <Link href={`/jobs/${job.id}`}>
         <div className="h-full flex flex-col">
           <CardHeader className="pb-3">
@@ -150,19 +170,52 @@ function JobCard({ job, statusColor }: { job: Job, statusColor: string }) {
               {job.customerName}
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex-1 pb-3">
-            <div className="space-y-2 text-sm text-muted-foreground">
-              <div className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
-                <span className="line-clamp-2">{job.address || "No address set"}</span>
+          <CardContent className="flex-1 pb-4">
+            <div className="space-y-4">
+              {/* Basic Info */}
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <div className="flex items-start gap-2">
+                  <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span className="line-clamp-2">{job.address || "No address set"}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 shrink-0" />
+                  <span>{format(new Date(job.date), "dd MMM yyyy")} • {job.startTime}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 shrink-0" />
+                  <span>{job.contactName || "No contact"}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 shrink-0" />
-                <span>{format(new Date(job.date), "dd MMM yyyy")} • {job.startTime}</span>
+
+              {/* Progress Bar */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Progress</span>
+                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{completedCount}/{progressItems.length}</span>
+                </div>
+                <Progress value={progressPercentage} className="h-2" />
               </div>
-              <div className="flex items-center gap-2">
-                <User className="w-4 h-4 shrink-0" />
-                <span>{job.contactName || "No contact"}</span>
+
+              {/* Progress Indicators */}
+              <div className="flex gap-2">
+                {progressItems.map((item, idx) => {
+                  const Icon = item.icon;
+                  return (
+                    <div 
+                      key={idx}
+                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                        item.complete 
+                          ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' 
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                      }`}
+                    >
+                      <Icon className="w-3 h-3" />
+                      <span>{item.label}</span>
+                      {item.complete && <CheckCircle2 className="w-3 h-3 ml-0.5" />}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </CardContent>
