@@ -49,13 +49,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </Link>
 
         {user.role === "admin" && (
-           <Button
-            variant="ghost"
-            className="w-full justify-start h-12 text-lg font-medium opacity-50 cursor-not-allowed"
-          >
-            <UserIcon className="mr-3 h-5 w-5" />
-            Engineers
-          </Button>
+          <Link href="/engineers">
+            <Button
+              variant={location === "/engineers" ? "secondary" : "ghost"}
+              className="w-full justify-start h-12 text-lg font-medium"
+              onClick={() => setIsOpen(false)}
+            >
+              <UserIcon className="mr-3 h-5 w-5" />
+              Engineers
+            </Button>
+          </Link>
         )}
 
         {user.role === "admin" && (
@@ -137,9 +140,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </Button>
             </Link>
              {user.role === "admin" && (
-              <Button variant="ghost" className="opacity-50 cursor-not-allowed">
-                Engineers
-              </Button>
+              <Link href="/engineers">
+                <Button variant={location === "/engineers" ? "secondary" : "ghost"}>
+                  Engineers
+                </Button>
+              </Link>
             )}
              {user.role === "admin" && (
               <Link href="/completed-jobs">
