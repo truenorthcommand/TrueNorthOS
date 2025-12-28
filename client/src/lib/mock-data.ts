@@ -25,6 +25,7 @@ export const MOCK_JOBS: Job[] = [
   {
     id: "job-101",
     jobNo: "J-2024-101",
+    client: "BuildTech Solutions",
     customerName: "Acme Corp",
     address: "123 Industrial Way, Tech Park",
     postcode: "TP1 2AB",
@@ -49,6 +50,7 @@ export const MOCK_JOBS: Job[] = [
   {
     id: "job-102",
     jobNo: "J-2024-102",
+    client: "HomeAssure Ltd",
     customerName: "Residential Client",
     address: "42 Maple Drive",
     postcode: "MD4 5XY",
@@ -70,6 +72,7 @@ export const MOCK_JOBS: Job[] = [
   {
     id: "job-103",
     jobNo: "J-2024-103",
+    client: "NetCable Installations",
     customerName: "TechHub Offices",
     address: "Unit 5, Innovation Centre",
     postcode: "IC9 9ZZ",

@@ -104,6 +104,16 @@ export default function JobDetail() {
           <CardContent className="grid md:grid-cols-2 gap-6 pt-6 print:pt-0">
             <div className="space-y-4">
               <div className="space-y-2">
+                <Label>Client/Service Provider</Label>
+                <Input 
+                  value={job.client} 
+                  onChange={(e) => updateJob(job.id, { client: e.target.value })}
+                  disabled={isReadOnly}
+                  className="print:border-none print:p-0 print:font-semibold"
+                  placeholder="Your company name"
+                />
+              </div>
+              <div className="space-y-2">
                 <Label>Customer Name</Label>
                 <Input 
                   value={job.customerName} 

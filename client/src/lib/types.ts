@@ -32,6 +32,7 @@ export type Signature = {
 export type Job = {
   id: string;
   jobNo: string;
+  client: string;
   customerName: string;
   address: string;
   postcode: string;

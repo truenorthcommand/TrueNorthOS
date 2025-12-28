@@ -43,6 +43,7 @@ export default function Dashboard() {
     // Quick create for prototype
     addJob({
       jobNo: `J-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`,
+      client: "",
       customerName: "New Customer",
       address: "",
       postcode: "",
