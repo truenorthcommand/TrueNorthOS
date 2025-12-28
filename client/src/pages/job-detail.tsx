@@ -23,20 +23,30 @@ export default function JobDetail() {
   const { user } = useAuth();
   const [match, params] = useRoute("/jobs/:id");
   const [, setLocation] = useLocation();
-  const { getJob, updateJob, addMaterial, removeMaterial, addPhoto, removePhoto, deleteJob, jobs } = useStore();
+  const { getJob, updateJob, addMaterial, removeMaterial, addPhoto, removePhoto, deleteJob, jobs, refreshJobs } = useStore();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [actionDescription, setActionDescription] = useState("");
   const [selectedPriority, setSelectedPriority] = useState<ActionPriority>("medium");
+  const [engineers, setEngineers] = useState<{id: string; name: string}[]>([]);
 
-  const MOCK_ENGINEERS = [
-    { id: "eng-1", name: "John Smith" },
-    { id: "eng-2", name: "Sarah Jones" },
-    { id: "eng-3", name: "Mike Davis" },
-  ];
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      fetch('/api/users', { credentials: 'include' })
+        .then(res => res.json())
+        .then(data => setEngineers(data.map((u: any) => ({ id: u.id, name: u.name }))))
+        .catch(() => {});
+    }
+  }, [user]);
 
   const jobId = params?.id;
   const job = jobId ? getJob(jobId) : undefined;
+  
+  useEffect(() => {
+    if (jobId) {
+      refreshJobs();
+    }
+  }, [jobId]);
 
   if (!job) {
     return (
@@ -99,7 +109,7 @@ export default function JobDetail() {
 
   const handleRemoveAction = (actionId: string) => {
     updateJob(job.id, {
-      furtherActions: job.furtherActions.filter(a => a.id !== actionId)
+      furtherActions: (job.furtherActions || []).filter(a => a.id !== actionId)
     });
     toast({
       title: "Action Removed",
@@ -186,7 +196,7 @@ export default function JobDetail() {
               <div className="space-y-2">
                 <Label>Client/Service Provider</Label>
                 <Input 
-                  value={job.client} 
+                  value={job.client || ""} 
                   onChange={(e) => updateJob(job.id, { client: e.target.value })}
                   disabled={isReadOnly}
                   className="print:border-none print:p-0 print:font-semibold"
@@ -205,7 +215,7 @@ export default function JobDetail() {
               <div className="space-y-2">
                 <Label>Address</Label>
                 <Textarea 
-                  value={job.address} 
+                  value={job.address || ""} 
                   onChange={(e) => updateJob(job.id, { address: e.target.value })}
                   disabled={isReadOnly}
                   className="min-h-[80px] print:border-none print:p-0"
@@ -214,7 +224,7 @@ export default function JobDetail() {
               <div className="space-y-2">
                 <Label>Postcode</Label>
                 <Input 
-                  value={job.postcode} 
+                  value={job.postcode || ""} 
                   onChange={(e) => updateJob(job.id, { postcode: e.target.value })}
                   disabled={isReadOnly}
                   className="print:border-none print:p-0"
@@ -228,7 +238,7 @@ export default function JobDetail() {
                 <div className="relative">
                   <UserIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground print:hidden" />
                   <Input 
-                    value={job.contactName} 
+                    value={job.contactName || ""} 
                     onChange={(e) => updateJob(job.id, { contactName: e.target.value })}
                     disabled={isReadOnly}
                     className="pl-9 print:pl-0 print:border-none"
@@ -241,7 +251,7 @@ export default function JobDetail() {
                 <div className="relative">
                   <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground print:hidden" />
                   <Input 
-                    value={job.contactPhone} 
+                    value={job.contactPhone || ""} 
                     onChange={(e) => updateJob(job.id, { contactPhone: e.target.value })}
                     disabled={isReadOnly}
                     className="pl-9 print:pl-0 print:border-none"
@@ -254,7 +264,7 @@ export default function JobDetail() {
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground print:hidden" />
                   <Input 
-                    value={job.contactEmail} 
+                    value={job.contactEmail || ""} 
                     onChange={(e) => updateJob(job.id, { contactEmail: e.target.value })}
                     disabled={isReadOnly}
                     className="pl-9 print:pl-0 print:border-none"
@@ -280,7 +290,7 @@ export default function JobDetail() {
                   <Label>Time</Label>
                   <Input 
                     type="time"
-                    value={job.startTime} 
+                    value={job.startTime || ""} 
                     onChange={(e) => updateJob(job.id, { startTime: e.target.value })}
                     disabled={isReadOnly}
                     className="print:border-none print:p-0"
@@ -297,7 +307,7 @@ export default function JobDetail() {
                   Assign to Engineer
                 </Label>
                 <Select 
-                  value={job.assignedToId} 
+                  value={job.assignedToId || ""} 
                   onValueChange={(value) => updateJob(job.id, { assignedToId: value })}
                   disabled={isReadOnly}
                 >
@@ -305,7 +315,7 @@ export default function JobDetail() {
                     <SelectValue placeholder="Select an engineer..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {MOCK_ENGINEERS.map((engineer) => (
+                    {engineers.map((engineer) => (
                       <SelectItem key={engineer.id} value={engineer.id}>
                         {engineer.name}
                       </SelectItem>
@@ -314,7 +324,7 @@ export default function JobDetail() {
                 </Select>
                 {job.assignedToId && (
                   <p className="text-xs text-muted-foreground">
-                    Currently assigned to {MOCK_ENGINEERS.find(e => e.id === job.assignedToId)?.name}
+                    Currently assigned to {engineers.find(e => e.id === job.assignedToId)?.name || "Unknown"}
                   </p>
                 )}
               </div>
@@ -334,7 +344,7 @@ export default function JobDetail() {
             <div className="space-y-2">
               <Label>Description of Works</Label>
               <Textarea 
-                value={job.description} 
+                value={job.description || ""} 
                 onChange={(e) => updateJob(job.id, { description: e.target.value })}
                 disabled={isReadOnly}
                 className="min-h-[120px] text-base print:border-none print:p-0"
@@ -345,7 +355,7 @@ export default function JobDetail() {
             <div className="space-y-2">
               <Label>Internal Notes</Label>
               <Textarea 
-                value={job.notes} 
+                value={job.notes || ""} 
                 onChange={(e) => updateJob(job.id, { notes: e.target.value })}
                 disabled={isReadOnly}
                 className="min-h-[80px] print:hidden"
@@ -367,7 +377,7 @@ export default function JobDetail() {
           </CardHeader>
           <CardContent className="pt-6 print:pt-0">
             <div className="space-y-4">
-              {job.materials.length > 0 && (
+              {(job.materials || []).length > 0 && (
                 <div className="border rounded-md overflow-hidden print:border-none">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-slate-100 dark:bg-slate-800 text-muted-foreground print:bg-transparent print:border-b">
@@ -378,7 +388,7 @@ export default function JobDetail() {
                       </tr>
                     </thead>
                     <tbody className="divide-y print:divide-y-0">
-                      {job.materials.map((item) => (
+                      {(job.materials || []).map((item) => (
                         <tr key={item.id}>
                           <td className="p-3">{item.name}</td>
                           <td className="p-3">{item.quantity}</td>
@@ -461,13 +471,13 @@ export default function JobDetail() {
             </div>
           </CardHeader>
           <CardContent className="pt-6 print:pt-0">
-             {job.photos.length === 0 ? (
+             {(job.photos || []).length === 0 ? (
                <div className="text-center py-8 border-2 border-dashed rounded-lg text-muted-foreground bg-slate-50/50">
                  <p>No photos uploaded yet.</p>
                </div>
              ) : (
                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                 {job.photos.map((photo) => (
+                 {(job.photos || []).map((photo) => (
                    <div key={photo.id} className="relative group aspect-square bg-slate-100 rounded-md overflow-hidden border">
                      <img src={photo.url} alt="Job photo" className="w-full h-full object-cover" />
                      {!isReadOnly && (
@@ -491,14 +501,14 @@ export default function JobDetail() {
         </Card>
 
         {/* Signatures Preview (if signed off) */}
-        {job.signatures.length > 0 && (
+        {(job.signatures || []).length > 0 && (
           <Card className="print:shadow-none print:border-none break-inside-avoid">
             <CardHeader className="bg-slate-50 dark:bg-slate-900/50 print:bg-transparent print:p-0 print:mb-4">
               <CardTitle className="text-lg">Signatures</CardTitle>
             </CardHeader>
             <CardContent className="pt-6 print:pt-0">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {job.signatures.map((sig) => (
+                {(job.signatures || []).map((sig) => (
                   <div key={sig.id} className="border rounded-md p-4 bg-slate-50/50 print:border-black print:bg-transparent">
                     <p className="text-sm font-medium mb-2 capitalize text-muted-foreground">{sig.type} Signature</p>
                     <div className="bg-white border-b-2 border-dashed border-slate-300 h-24 mb-2 flex items-center justify-center print:bg-transparent print:border-black">

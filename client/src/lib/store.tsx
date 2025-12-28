@@ -1,105 +1,219 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { Job, Material, Photo, Signature, JobStatus } from "./types";
-import { MOCK_JOBS } from "./mock-data";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { Job, Material, Photo, Signature, FurtherAction } from "./types";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "./auth";
 
 interface StoreContextType {
   jobs: Job[];
+  isLoading: boolean;
+  refreshJobs: () => Promise<void>;
   getJob: (id: string) => Job | undefined;
-  addJob: (job: Omit<Job, "id" | "createdAt" | "updatedAt">) => void;
-  updateJob: (id: string, updates: Partial<Job>) => void;
-  addMaterial: (jobId: string, material: Omit<Material, "id">) => void;
-  removeMaterial: (jobId: string, materialId: string) => void;
-  addPhoto: (jobId: string, url: string) => void;
-  removePhoto: (jobId: string, photoId: string) => void;
-  addSignature: (jobId: string, signature: Omit<Signature, "id" | "timestamp">) => void;
-  deleteJob: (id: string) => void;
+  addJob: (job: Partial<Job>) => Promise<Job | null>;
+  updateJob: (id: string, updates: Partial<Job>) => Promise<void>;
+  addMaterial: (jobId: string, material: Omit<Material, "id">) => Promise<void>;
+  removeMaterial: (jobId: string, materialId: string) => Promise<void>;
+  addPhoto: (jobId: string, url: string) => Promise<void>;
+  removePhoto: (jobId: string, photoId: string) => Promise<void>;
+  addSignature: (jobId: string, signature: Omit<Signature, "id" | "timestamp">) => Promise<void>;
+  addFurtherAction: (jobId: string, action: Omit<FurtherAction, "id" | "timestamp">) => Promise<void>;
+  removeFurtherAction: (jobId: string, actionId: string) => Promise<void>;
+  deleteJob: (id: string) => Promise<void>;
+  signOffJob: (id: string, lat: number, lng: number, address: string) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
-  const [jobs, setJobs] = useState<Job[]>(MOCK_JOBS);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  // Load from local storage on mount (if we wanted persistence across reloads)
-  // For now, we stick to memory + MOCK_JOBS init
-  
+  const refreshJobs = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const url = user?.role === 'engineer' 
+        ? `/api/jobs?engineerId=${user.id}` 
+        : '/api/jobs';
+      const response = await fetch(url, { credentials: 'include' });
+      if (response.ok) {
+        const data = await response.json();
+        const normalizedJobs = data.map((job: any) => ({
+          ...job,
+          materials: job.materials || [],
+          photos: job.photos || [],
+          signatures: job.signatures || [],
+          furtherActions: job.furtherActions || [],
+        }));
+        setJobs(normalizedJobs);
+      }
+    } catch (error) {
+      console.error("Failed to fetch jobs:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      refreshJobs();
+    }
+  }, [user, refreshJobs]);
+
   const getJob = (id: string) => jobs.find((j) => j.id === id);
 
-  const addJob = (newJobData: Omit<Job, "id" | "createdAt" | "updatedAt">) => {
-    const newJob: Job = {
-      ...newJobData,
-      id: `job-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setJobs((prev) => [newJob, ...prev]);
-    toast({ title: "Job Created", description: `Job ${newJob.jobNo} has been created.` });
+  const addJob = async (jobData: Partial<Job>): Promise<Job | null> => {
+    try {
+      const response = await fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify(jobData),
+      });
+      if (response.ok) {
+        const newJob = await response.json();
+        await refreshJobs();
+        toast({ title: "Job Created", description: `Job ${newJob.jobNo} has been created.` });
+        return newJob;
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to create job", variant: "destructive" });
+    }
+    return null;
   };
 
-  const updateJob = (id: string, updates: Partial<Job>) => {
-    setJobs((prev) =>
-      prev.map((job) =>
-        job.id === id ? { ...job, ...updates, updatedAt: new Date().toISOString() } : job
-      )
-    );
+  const updateJob = async (id: string, updates: Partial<Job>) => {
+    try {
+      const response = await fetch(`/api/jobs/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify(updates),
+      });
+      if (response.ok) {
+        await refreshJobs();
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update job", variant: "destructive" });
+    }
   };
 
-  const deleteJob = (id: string) => {
-    setJobs((prev) => prev.filter((job) => job.id !== id));
-    toast({ title: "Job Deleted", variant: "destructive" });
+  const deleteJob = async (id: string) => {
+    try {
+      const response = await fetch(`/api/jobs/${id}`, { method: "DELETE", credentials: 'include' });
+      if (response.ok) {
+        await refreshJobs();
+        toast({ title: "Job Deleted", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete job", variant: "destructive" });
+    }
   };
 
-  const addMaterial = (jobId: string, material: Omit<Material, "id">) => {
-    const newMaterial: Material = { ...material, id: `mat-${Date.now()}` };
-    updateJob(jobId, {
-      materials: [...(getJob(jobId)?.materials || []), newMaterial],
-    });
-  };
-
-  const removeMaterial = (jobId: string, materialId: string) => {
+  const addMaterial = async (jobId: string, material: Omit<Material, "id">) => {
     const job = getJob(jobId);
     if (!job) return;
-    updateJob(jobId, {
-      materials: job.materials.filter((m) => m.id !== materialId),
+    const newMaterial: Material = { ...material, id: `mat-${Date.now()}` };
+    await updateJob(jobId, {
+      materials: [...(job.materials || []), newMaterial],
     });
   };
 
-  const addPhoto = (jobId: string, url: string) => {
+  const removeMaterial = async (jobId: string, materialId: string) => {
+    const job = getJob(jobId);
+    if (!job) return;
+    await updateJob(jobId, {
+      materials: (job.materials || []).filter((m) => m.id !== materialId),
+    });
+  };
+
+  const addPhoto = async (jobId: string, url: string) => {
+    const job = getJob(jobId);
+    if (!job) return;
     const newPhoto: Photo = {
       id: `p-${Date.now()}`,
       url,
       timestamp: new Date().toISOString(),
     };
-    updateJob(jobId, {
-      photos: [...(getJob(jobId)?.photos || []), newPhoto],
+    await updateJob(jobId, {
+      photos: [...(job.photos || []), newPhoto],
     });
   };
 
-  const removePhoto = (jobId: string, photoId: string) => {
+  const removePhoto = async (jobId: string, photoId: string) => {
     const job = getJob(jobId);
     if (!job) return;
-    updateJob(jobId, {
-      photos: job.photos.filter((p) => p.id !== photoId),
+    await updateJob(jobId, {
+      photos: (job.photos || []).filter((p) => p.id !== photoId),
     });
   };
 
-  const addSignature = (jobId: string, signature: Omit<Signature, "id" | "timestamp">) => {
+  const addSignature = async (jobId: string, signature: Omit<Signature, "id" | "timestamp">) => {
+    const job = getJob(jobId);
+    if (!job) return;
     const newSig: Signature = {
       ...signature,
       id: `sig-${Date.now()}`,
       timestamp: new Date().toISOString(),
     };
-    updateJob(jobId, {
-      signatures: [...(getJob(jobId)?.signatures || []), newSig],
+    await updateJob(jobId, {
+      signatures: [...(job.signatures || []), newSig],
     });
+  };
+
+  const addFurtherAction = async (jobId: string, action: Omit<FurtherAction, "id" | "timestamp">) => {
+    const job = getJob(jobId);
+    if (!job) return;
+    const newAction: FurtherAction = {
+      ...action,
+      id: `fa-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+    };
+    await updateJob(jobId, {
+      furtherActions: [...(job.furtherActions || []), newAction],
+    });
+  };
+
+  const removeFurtherAction = async (jobId: string, actionId: string) => {
+    const job = getJob(jobId);
+    if (!job) return;
+    await updateJob(jobId, {
+      furtherActions: (job.furtherActions || []).filter((a) => a.id !== actionId),
+    });
+  };
+
+  const signOffJob = async (id: string, lat: number, lng: number, address: string) => {
+    try {
+      const job = getJob(id);
+      const response = await fetch(`/api/jobs/${id}/sign-off`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          latitude: lat, 
+          longitude: lng, 
+          address,
+          signatures: job?.signatures 
+        }),
+      });
+      if (response.ok) {
+        await refreshJobs();
+        toast({
+          title: "Job Signed Off",
+          description: "Location and signatures recorded successfully.",
+        });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to sign off job", variant: "destructive" });
+    }
   };
 
   return (
     <StoreContext.Provider
       value={{
         jobs,
+        isLoading,
+        refreshJobs,
         getJob,
         addJob,
         updateJob,
@@ -108,7 +222,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         addPhoto,
         removePhoto,
         addSignature,
-        deleteJob
+        addFurtherAction,
+        removeFurtherAction,
+        deleteJob,
+        signOffJob,
       }}
     >
       {children}

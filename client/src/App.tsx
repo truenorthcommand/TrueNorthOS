@@ -18,7 +18,7 @@ import { Loader2 } from "lucide-react";
 
 function PrivateRoute({ component: Component, ...rest }: any) {
   const { user, isLoading } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
 
   if (isLoading) {
     return (
@@ -29,7 +29,9 @@ function PrivateRoute({ component: Component, ...rest }: any) {
   }
 
   if (!user) {
-    setLocation("/auth");
+    if (location !== "/auth") {
+      setTimeout(() => setLocation("/auth"), 0);
+    }
     return null;
   }
 

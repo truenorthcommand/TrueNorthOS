@@ -23,7 +23,7 @@ export default function Dashboard() {
     const matchesSearch = 
       job.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       job.jobNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.address.toLowerCase().includes(searchTerm.toLowerCase());
+      (job.address || "").toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesRole = user.role === "admin" || job.assignedToId === user.id;
 
@@ -144,10 +144,12 @@ export default function Dashboard() {
 }
 
 function JobCard({ job, statusColor }: { job: Job, statusColor: string }) {
-  // Calculate progress based on completion requirements
-  const photosComplete = job.photos.length > 0;
-  const engineerSignatureComplete = job.signatures.some(s => s.type === "engineer");
-  const customerSignatureComplete = job.signatures.some(s => s.type === "customer");
+  const photos = job.photos || [];
+  const signatures = job.signatures || [];
+  
+  const photosComplete = photos.length > 0;
+  const engineerSignatureComplete = signatures.some(s => s.type === "engineer");
+  const customerSignatureComplete = signatures.some(s => s.type === "customer");
   
   const progressItems = [
     { label: "Photos", complete: photosComplete, icon: Camera },
@@ -181,7 +183,7 @@ function JobCard({ job, statusColor }: { job: Job, statusColor: string }) {
                 </div>
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 shrink-0" />
-                  <span>{format(new Date(job.date), "dd MMM yyyy")} • {job.startTime}</span>
+                  <span>{job.date ? format(new Date(job.date), "dd MMM yyyy") : "No date"} • {job.startTime || "No time"}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <User className="w-4 h-4 shrink-0" />

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
@@ -6,14 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ArrowLeft, Eraser, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Eraser, CheckCircle2, AlertTriangle, MapPin, Loader2 } from "lucide-react";
 import SignatureCanvas from "react-signature-canvas";
 import { useToast } from "@/hooks/use-toast";
 
 export default function SignOff() {
   const [match, params] = useRoute("/jobs/:id/sign-off");
   const [, setLocation] = useLocation();
-  const { getJob, updateJob, addSignature } = useStore();
+  const { getJob, updateJob, addSignature, signOffJob, refreshJobs } = useStore();
   const { toast } = useToast();
   
   const engSigRef = useRef<SignatureCanvas>(null);
@@ -21,50 +21,132 @@ export default function SignOff() {
   
   const [engName, setEngName] = useState("");
   const [custName, setCustName] = useState("");
-  const [step, setStep] = useState(1); // 1 = Review, 2 = Engineer, 3 = Customer
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [gpsStatus, setGpsStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [location, setLocationData] = useState<{lat: number; lng: number; address: string} | null>(null);
 
   const jobId = params?.id;
   const job = jobId ? getJob(jobId) : undefined;
 
+  useEffect(() => {
+    if (jobId) {
+      refreshJobs();
+    }
+  }, [jobId]);
+
+  const captureLocation = async () => {
+    setGpsStatus('loading');
+    
+    if (!navigator.geolocation) {
+      setGpsStatus('error');
+      toast({
+        title: "GPS Not Available",
+        description: "Geolocation is not supported by your browser.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude, accuracy } = position.coords;
+        
+        let address = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+        
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            if (data.display_name) {
+              address = data.display_name;
+            }
+          }
+        } catch (e) {
+          console.log("Geocoding failed, using coordinates");
+        }
+
+        setLocationData({ lat: latitude, lng: longitude, address });
+        setGpsStatus('success');
+        toast({
+          title: "Location Captured",
+          description: `Accuracy: ${accuracy?.toFixed(0)}m`,
+        });
+      },
+      (error) => {
+        setGpsStatus('error');
+        toast({
+          title: "Location Error",
+          description: error.message || "Failed to get your location.",
+          variant: "destructive",
+        });
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
   if (!job) return null;
 
-  const hasPhotos = job.photos.length > 0;
+  const hasPhotos = (job.photos || []).length > 0;
+  const hasEngineerSig = !!(engSigRef.current && !engSigRef.current.isEmpty() && engName);
+  const hasCustomerSig = !!(custSigRef.current && !custSigRef.current.isEmpty() && custName);
+  const canSubmit = hasPhotos && engName && custName && location && !isSubmitting;
 
-  const handleComplete = () => {
-    // Save Engineer Signature
-    if (engSigRef.current && !engSigRef.current.isEmpty()) {
-       addSignature(job.id, {
-         type: "engineer",
-         name: engName,
-         url: engSigRef.current.toDataURL(),
-       });
+  const handleComplete = async () => {
+    if (!location) {
+      toast({
+        title: "Location Required",
+        description: "Please capture your GPS location before signing off.",
+        variant: "destructive",
+      });
+      return;
     }
 
-    // Save Customer Signature
-    if (custSigRef.current && !custSigRef.current.isEmpty()) {
-       addSignature(job.id, {
-         type: "customer",
-         name: custName,
-         url: custSigRef.current.toDataURL(),
-       });
+    setIsSubmitting(true);
+
+    try {
+      if (engSigRef.current && !engSigRef.current.isEmpty()) {
+        await addSignature(job.id, {
+          type: "engineer",
+          name: engName,
+          url: engSigRef.current.toDataURL(),
+        });
+      }
+
+      if (custSigRef.current && !custSigRef.current.isEmpty()) {
+        await addSignature(job.id, {
+          type: "customer",
+          name: custName,
+          url: custSigRef.current.toDataURL(),
+        });
+      }
+
+      await signOffJob(job.id, location.lat, location.lng, location.address);
+      
+      toast({
+        title: "Job Completed!",
+        description: "Job has been signed off with GPS location.",
+      });
+
+      setLocation(`/jobs/${job.id}`);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to complete sign-off. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // Update Status
-    updateJob(job.id, { status: "Signed Off" });
-    
-    toast({
-      title: "Job Completed!",
-      description: "Job has been signed off successfully.",
-    });
-
-    setLocation(`/jobs/${job.id}`);
   };
 
   return (
-    <div className="max-w-2xl mx-auto pb-20 pt-8">
+    <div className="max-w-2xl mx-auto pb-20 pt-8 px-4">
       <div className="mb-6 flex items-center gap-4">
         <Link href={`/jobs/${job.id}`}>
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" data-testid="button-back">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
@@ -75,7 +157,7 @@ export default function SignOff() {
       </div>
 
       {!hasPhotos && (
-        <Alert variant="destructive" className="mb-6">
+        <Alert variant="destructive" className="mb-6" data-testid="alert-missing-photos">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Missing Evidence</AlertTitle>
           <AlertDescription>
@@ -84,9 +166,51 @@ export default function SignOff() {
         </Alert>
       )}
 
-      <div className="space-y-8">
-        {/* Step 1: Engineer Signature */}
-        <Card className={!hasPhotos ? "opacity-50 pointer-events-none" : ""}>
+      <div className="space-y-6">
+        <Card data-testid="card-location">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5" />
+              GPS Location
+            </CardTitle>
+            <CardDescription>
+              Capture your current location to verify sign-off location.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {location ? (
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm font-medium text-green-800 mb-1">Location Captured</p>
+                <p className="text-xs text-green-600 break-words">{location.address}</p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Coordinates: {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+                </p>
+              </div>
+            ) : (
+              <Button 
+                onClick={captureLocation} 
+                disabled={gpsStatus === 'loading'}
+                className="w-full h-12"
+                variant={gpsStatus === 'error' ? 'destructive' : 'default'}
+                data-testid="button-capture-location"
+              >
+                {gpsStatus === 'loading' ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Getting Location...
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="mr-2 h-4 w-4" />
+                    Capture GPS Location
+                  </>
+                )}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className={!hasPhotos ? "opacity-50 pointer-events-none" : ""} data-testid="card-engineer-signature">
           <CardHeader>
             <CardTitle>Engineer Sign-off</CardTitle>
             <CardDescription>
@@ -100,6 +224,7 @@ export default function SignOff() {
                 value={engName} 
                 onChange={(e) => setEngName(e.target.value)} 
                 placeholder="Type your name"
+                data-testid="input-engineer-name"
               />
             </div>
             <div className="space-y-2">
@@ -107,7 +232,7 @@ export default function SignOff() {
               <div className="border-2 border-dashed border-slate-300 rounded-md bg-slate-50 h-40 relative">
                 <SignatureCanvas 
                   ref={engSigRef}
-                  canvasProps={{ className: "sigCanvas" }}
+                  canvasProps={{ className: "sigCanvas w-full h-full" }}
                   backgroundColor="rgba(255,255,255,0)"
                 />
                 <Button 
@@ -115,6 +240,7 @@ export default function SignOff() {
                   variant="ghost" 
                   className="absolute bottom-2 right-2 text-xs"
                   onClick={() => engSigRef.current?.clear()}
+                  data-testid="button-clear-engineer-sig"
                 >
                   <Eraser className="mr-1 h-3 w-3" /> Clear
                 </Button>
@@ -123,8 +249,7 @@ export default function SignOff() {
           </CardContent>
         </Card>
 
-        {/* Step 2: Customer Signature */}
-        <Card className={!hasPhotos ? "opacity-50 pointer-events-none" : ""}>
+        <Card className={!hasPhotos ? "opacity-50 pointer-events-none" : ""} data-testid="card-customer-signature">
           <CardHeader>
             <CardTitle>Customer Acceptance</CardTitle>
             <CardDescription>
@@ -138,6 +263,7 @@ export default function SignOff() {
                 value={custName} 
                 onChange={(e) => setCustName(e.target.value)} 
                 placeholder="Customer Representative Name"
+                data-testid="input-customer-name"
               />
             </div>
             <div className="space-y-2">
@@ -145,7 +271,7 @@ export default function SignOff() {
               <div className="border-2 border-dashed border-slate-300 rounded-md bg-slate-50 h-40 relative">
                  <SignatureCanvas 
                   ref={custSigRef}
-                  canvasProps={{ className: "sigCanvas" }}
+                  canvasProps={{ className: "sigCanvas w-full h-full" }}
                   backgroundColor="rgba(255,255,255,0)"
                 />
                 <Button 
@@ -153,6 +279,7 @@ export default function SignOff() {
                   variant="ghost" 
                   className="absolute bottom-2 right-2 text-xs"
                   onClick={() => custSigRef.current?.clear()}
+                  data-testid="button-clear-customer-sig"
                 >
                   <Eraser className="mr-1 h-3 w-3" /> Clear
                 </Button>
@@ -164,12 +291,28 @@ export default function SignOff() {
         <Button 
           size="lg" 
           className="w-full h-14 text-lg bg-emerald-600 hover:bg-emerald-700"
-          disabled={!hasPhotos || !engName || !custName}
+          disabled={!canSubmit}
           onClick={handleComplete}
+          data-testid="button-complete-signoff"
         >
-          <CheckCircle2 className="mr-2 h-6 w-6" />
-          Complete & Sign Off Job
+          {isSubmitting ? (
+            <>
+              <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+              Completing...
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="mr-2 h-6 w-6" />
+              Complete & Sign Off Job
+            </>
+          )}
         </Button>
+
+        {!location && (
+          <p className="text-center text-sm text-muted-foreground">
+            GPS location capture is required before sign-off
+          </p>
+        )}
       </div>
     </div>
   );

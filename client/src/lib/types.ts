@@ -5,6 +5,10 @@ export type User = {
   name: string;
   email: string;
   role: Role;
+  username?: string;
+  currentLat?: number;
+  currentLng?: number;
+  lastLocationUpdate?: string;
 };
 
 export type JobStatus = 'Draft' | 'In Progress' | 'Awaiting Signatures' | 'Signed Off';
@@ -25,7 +29,7 @@ export type Signature = {
   id: string;
   type: 'engineer' | 'customer';
   name: string;
-  url: string; // base64
+  url: string;
   timestamp: string;
 };
 
@@ -41,23 +45,27 @@ export type FurtherAction = {
 export type Job = {
   id: string;
   jobNo: string;
-  client: string;
+  client: string | null;
   customerName: string;
-  address: string;
-  postcode: string;
-  contactName: string;
-  contactPhone: string;
-  contactEmail: string;
-  date: string; // ISO string
-  startTime: string;
-  description: string;
-  notes: string;
+  address: string | null;
+  postcode: string | null;
+  contactName: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
+  date: string | null;
+  startTime: string | null;
+  description: string | null;
+  notes: string | null;
   status: JobStatus;
-  assignedToId: string;
+  assignedToId: string | null;
   materials: Material[];
   photos: Photo[];
   signatures: Signature[];
   furtherActions: FurtherAction[];
-  createdAt: string;
-  updatedAt: string;
+  signOffLat?: number | null;
+  signOffLng?: number | null;
+  signOffAddress?: string | null;
+  signOffTimestamp?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 };

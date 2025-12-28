@@ -1,11 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, Role } from "./types";
-import { MOCK_USERS } from "./mock-data";
 import { useLocation } from "wouter";
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string) => Promise<boolean>;
+  login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -18,33 +17,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    // Check local storage for persisted session
-    const storedUserId = localStorage.getItem("fieldflow_user_id");
-    if (storedUserId) {
-      const foundUser = MOCK_USERS.find((u) => u.id === storedUserId);
-      if (foundUser) {
-        setUser(foundUser);
-      }
-    }
-    setIsLoading(false);
+    fetch("/api/auth/me", { credentials: 'include' })
+      .then(res => {
+        if (res.ok) return res.json();
+        throw new Error("Not authenticated");
+      })
+      .then(userData => {
+        setUser(userData);
+        localStorage.setItem("promains_user", JSON.stringify(userData));
+      })
+      .catch(() => {
+        localStorage.removeItem("promains_user");
+        setUser(null);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   }, []);
 
-  const login = async (email: string) => {
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  const login = async (username: string, password: string) => {
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify({ username, password }),
+      });
 
-    const foundUser = MOCK_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
-    if (foundUser) {
-      setUser(foundUser);
-      localStorage.setItem("fieldflow_user_id", foundUser.id);
+      if (!response.ok) {
+        return false;
+      }
+
+      const userData = await response.json();
+      setUser(userData);
+      localStorage.setItem("promains_user", JSON.stringify(userData));
       return true;
+    } catch (error) {
+      console.error("Login error:", error);
+      return false;
     }
-    return false;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST", credentials: 'include' });
+    } catch (e) {}
     setUser(null);
-    localStorage.removeItem("fieldflow_user_id");
+    localStorage.removeItem("promains_user");
     setLocation("/auth");
   };
 
