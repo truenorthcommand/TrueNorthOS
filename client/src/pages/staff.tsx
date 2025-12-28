@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, User, Shield, Wrench, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { Plus, Trash2, User, Shield, Wrench, AlertCircle, Eye, EyeOff, Lock, KeyRound } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface StaffMember {
@@ -24,6 +24,9 @@ export default function Staff() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
+  const [verifyPassword, setVerifyPassword] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
   const [newStaff, setNewStaff] = useState({
     name: "",
     email: "",
@@ -31,6 +34,50 @@ export default function Staff() {
     password: "",
     role: "engineer" as 'admin' | 'engineer',
   });
+
+  const handleVerifyPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!verifyPassword) {
+      toast({
+        title: "Password Required",
+        description: "Please enter your password to access staff management.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsVerifying(true);
+    try {
+      const res = await fetch('/api/auth/verify-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ password: verifyPassword }),
+      });
+
+      if (res.ok) {
+        setIsVerified(true);
+        setVerifyPassword("");
+        fetchStaff();
+      } else {
+        const data = await res.json();
+        toast({
+          title: "Access Denied",
+          description: data.error || "Invalid password",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to verify password",
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   const fetchStaff = async () => {
     try {
@@ -51,8 +98,8 @@ export default function Staff() {
   };
 
   useEffect(() => {
-    if (user?.role === 'admin') {
-      fetchStaff();
+    if (user?.role !== 'admin') {
+      setIsLoading(false);
     }
   }, [user]);
 
@@ -62,6 +109,59 @@ export default function Staff() {
         <AlertCircle className="h-12 w-12 text-destructive mb-4" />
         <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
         <p className="text-muted-foreground">Only administrators can manage staff.</p>
+      </div>
+    );
+  }
+
+  // Password verification screen
+  if (!isVerified) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+              <Lock className="h-8 w-8 text-primary" />
+            </div>
+            <CardTitle className="text-2xl">Staff Management</CardTitle>
+            <CardDescription>
+              This area is password protected. Please enter your password to continue.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleVerifyPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="verify-password">Your Password</Label>
+                <div className="relative">
+                  <Input
+                    id="verify-password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={verifyPassword}
+                    onChange={(e) => setVerifyPassword(e.target.value)}
+                    data-testid="input-verify-password"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <Button 
+                type="submit" 
+                className="w-full"
+                disabled={isVerifying}
+                data-testid="button-verify-password"
+              >
+                <KeyRound className="mr-2 h-4 w-4" />
+                {isVerifying ? "Verifying..." : "Unlock Staff Management"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -166,11 +266,17 @@ export default function Staff() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Staff Management</h1>
-        <p className="text-muted-foreground">
-          Add and remove administrators and engineers
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Staff Management</h1>
+          <p className="text-muted-foreground">
+            Add and remove administrators and engineers
+          </p>
+        </div>
+        <Badge variant="outline" className="gap-1">
+          <Lock className="h-3 w-3" />
+          Protected
+        </Badge>
       </div>
 
       <Card>

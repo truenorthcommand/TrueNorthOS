@@ -1,9 +1,12 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
+import bcrypt from "bcrypt";
 import { storage } from "./storage";
 import { insertJobSchema } from "@shared/schema";
 import { z } from "zod";
+
+const SALT_ROUNDS = 10;
 
 declare module "express-session" {
   interface SessionData {
@@ -52,7 +55,20 @@ export async function registerRoutes(
       const { username, password } = req.body;
       const user = await storage.getUserByUsername(username);
       
-      if (!user || user.password !== password) {
+      if (!user) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      // Check if password is hashed (starts with $2b$) or plain text (legacy)
+      let isValidPassword = false;
+      if (user.password.startsWith('$2b$')) {
+        isValidPassword = await bcrypt.compare(password, user.password);
+      } else {
+        // Legacy plain-text password - for demo accounts
+        isValidPassword = user.password === password;
+      }
+
+      if (!isValidPassword) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
@@ -118,12 +134,43 @@ export async function registerRoutes(
     }
   });
 
+  // Verify password for sensitive operations (staff page access)
+  app.post("/api/auth/verify-password", requireAdmin, async (req, res) => {
+    try {
+      const { password } = req.body;
+      const user = await storage.getUser(req.session.userId!);
+      
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      let isValidPassword = false;
+      if (user.password.startsWith('$2b$')) {
+        isValidPassword = await bcrypt.compare(password, user.password);
+      } else {
+        isValidPassword = user.password === password;
+      }
+
+      if (!isValidPassword) {
+        return res.status(401).json({ error: "Invalid password" });
+      }
+
+      res.json({ verified: true });
+    } catch (error) {
+      res.status(500).json({ error: "Verification failed" });
+    }
+  });
+
   app.post("/api/users", requireAdmin, async (req, res) => {
     try {
       const { username, password, name, email, role } = req.body;
       
       if (!username || !password || !name || !email || !role) {
         return res.status(400).json({ error: "All fields are required" });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
       }
 
       if (!['admin', 'engineer'].includes(role)) {
@@ -135,9 +182,12 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Username already exists" });
       }
 
+      // Hash the password before storing
+      const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
       const user = await storage.createUser({
         username,
-        password,
+        password: hashedPassword,
         name,
         email,
         role,
