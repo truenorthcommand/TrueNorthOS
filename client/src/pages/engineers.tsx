@@ -6,8 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, User, BarChart3, CheckCircle2, AlertCircle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Trash2, User, BarChart3, CheckCircle2, AlertCircle, MapPin, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { Link } from "wouter";
 
 interface Engineer {
   id: string;
@@ -115,6 +118,21 @@ export default function Engineers() {
     return jobs.filter((job) => job.assignedToId === engineerId).length;
   };
 
+  const getEngineerJobs = (engineerId: string) => {
+    return jobs.filter((job) => job.assignedToId === engineerId);
+  };
+
+  const handleReassignJob = (jobId: string, newEngineerId: string) => {
+    // This would require updateJob from store, but since we don't have direct access
+    // we'll need to pass this to the store
+    const store = useStore();
+    store.updateJob(jobId, { assignedToId: newEngineerId });
+    toast({
+      title: "Job Reassigned",
+      description: "Job has been reassigned successfully.",
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -216,17 +234,43 @@ export default function Engineers() {
                   </div>
                 </div>
 
-                {/* Job Status */}
-                {currentJobsCount > 0 && (
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <p className="text-sm text-blue-900 dark:text-blue-100">
-                      <span className="font-semibold">{currentJobsCount} job{currentJobsCount !== 1 ? 's' : ''}</span> currently assigned
-                    </p>
+                {/* Assigned Jobs Section */}
+                {expandedEngineerId === engineer.id && (
+                  <div className="pt-3 border-t space-y-3">
+                    <h4 className="font-semibold text-sm">Assigned Jobs ({currentJobsCount})</h4>
+                    {getEngineerJobs(engineer.id).length > 0 ? (
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {getEngineerJobs(engineer.id).map((job) => (
+                          <Link key={job.id} href={`/jobs/${job.id}`}>
+                            <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border hover:border-primary transition-colors cursor-pointer">
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-sm truncate">{job.customerName}</p>
+                                  <p className="text-xs text-muted-foreground">{job.jobNo}</p>
+                                </div>
+                                <Badge 
+                                  variant="secondary" 
+                                  className="text-xs shrink-0"
+                                >
+                                  {job.status}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Calendar className="w-3 h-3" />
+                                <span>{format(new Date(job.date), "dd MMM")}</span>
+                              </div>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-2">No jobs assigned</p>
+                    )}
                   </div>
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex gap-2">
+                <div className="flex gap-2 pt-2">
                   <Button
                     variant="outline"
                     size="sm"
@@ -237,7 +281,7 @@ export default function Engineers() {
                       )
                     }
                   >
-                    {expandedEngineerId === engineer.id ? "Hide" : "View"} Details
+                    {expandedEngineerId === engineer.id ? "Hide" : "View"} Jobs
                   </Button>
                   <Button
                     variant="destructive"

@@ -11,20 +11,29 @@ import { Separator } from "@/components/ui/separator";
 import { 
   ArrowLeft, Save, Printer, Trash2, Plus, 
   MapPin, Phone, Mail, Calendar, Upload, X, FileCheck,
-  AlertCircle, AlertTriangle, AlertOctagon
+  AlertCircle, AlertTriangle, AlertOctagon, Users
 } from "lucide-react";
 import { ActionPriority } from "@/lib/types";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function JobDetail() {
+  const { user } = useAuth();
   const [match, params] = useRoute("/jobs/:id");
   const [, setLocation] = useLocation();
-  const { getJob, updateJob, addMaterial, removeMaterial, addPhoto, removePhoto, deleteJob } = useStore();
+  const { getJob, updateJob, addMaterial, removeMaterial, addPhoto, removePhoto, deleteJob, jobs } = useStore();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [actionDescription, setActionDescription] = useState("");
   const [selectedPriority, setSelectedPriority] = useState<ActionPriority>("medium");
+
+  const MOCK_ENGINEERS = [
+    { id: "eng-1", name: "John Smith" },
+    { id: "eng-2", name: "Sarah Jones" },
+    { id: "eng-3", name: "Mike Davis" },
+  ];
 
   const jobId = params?.id;
   const job = jobId ? getJob(jobId) : undefined;
@@ -279,6 +288,37 @@ export default function JobDetail() {
                 </div>
               </div>
             </div>
+
+            {/* Engineer Assignment (Admin Only) */}
+            {user?.role === "admin" && (
+              <div className="space-y-2 border-t pt-6 mt-6">
+                <Label className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Assign to Engineer
+                </Label>
+                <Select 
+                  value={job.assignedToId} 
+                  onValueChange={(value) => updateJob(job.id, { assignedToId: value })}
+                  disabled={isReadOnly}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select an engineer..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MOCK_ENGINEERS.map((engineer) => (
+                      <SelectItem key={engineer.id} value={engineer.id}>
+                        {engineer.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {job.assignedToId && (
+                  <p className="text-xs text-muted-foreground">
+                    Currently assigned to {MOCK_ENGINEERS.find(e => e.id === job.assignedToId)?.name}
+                  </p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
