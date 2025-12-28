@@ -60,6 +60,7 @@ export default function Dashboard() {
       materials: [],
       photos: [],
       signatures: [],
+      furtherActions: [],
     });
   };
 

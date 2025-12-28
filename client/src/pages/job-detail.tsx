@@ -10,8 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { 
   ArrowLeft, Save, Printer, Trash2, Plus, 
-  MapPin, Phone, Mail, Calendar, Upload, X, FileCheck
+  MapPin, Phone, Mail, Calendar, Upload, X, FileCheck,
+  AlertCircle, AlertTriangle, AlertOctagon
 } from "lucide-react";
+import { ActionPriority } from "@/lib/types";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -21,6 +23,8 @@ export default function JobDetail() {
   const { getJob, updateJob, addMaterial, removeMaterial, addPhoto, removePhoto, deleteJob } = useStore();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [actionDescription, setActionDescription] = useState("");
+  const [selectedPriority, setSelectedPriority] = useState<ActionPriority>("medium");
 
   const jobId = params?.id;
   const job = jobId ? getJob(jobId) : undefined;
@@ -53,6 +57,73 @@ export default function JobDetail() {
   };
 
   const isReadOnly = job.status === "Signed Off";
+
+  const handleAddAction = () => {
+    if (!actionDescription.trim()) {
+      toast({
+        title: "Empty Description",
+        description: "Please enter a description for the action.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newAction = {
+      id: `action-${Date.now()}`,
+      description: actionDescription,
+      priority: selectedPriority,
+      timestamp: new Date().toISOString()
+    };
+
+    updateJob(job.id, {
+      furtherActions: [...(job.furtherActions || []), newAction]
+    });
+
+    toast({
+      title: "Action Added",
+      description: `New ${selectedPriority} priority action recorded.`
+    });
+
+    setActionDescription("");
+    setSelectedPriority("medium");
+  };
+
+  const handleRemoveAction = (actionId: string) => {
+    updateJob(job.id, {
+      furtherActions: job.furtherActions.filter(a => a.id !== actionId)
+    });
+    toast({
+      title: "Action Removed",
+      variant: "default"
+    });
+  };
+
+  const getPriorityColor = (priority: ActionPriority) => {
+    switch (priority) {
+      case "urgent":
+        return "bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-700 dark:text-red-300";
+      case "high":
+        return "bg-orange-100 dark:bg-orange-900/30 border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300";
+      case "medium":
+        return "bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300";
+      case "low":
+        return "bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300";
+      default:
+        return "bg-slate-100 dark:bg-slate-800";
+    }
+  };
+
+  const getPriorityIcon = (priority: ActionPriority) => {
+    switch (priority) {
+      case "urgent":
+        return <AlertOctagon className="w-4 h-4" />;
+      case "high":
+        return <AlertTriangle className="w-4 h-4" />;
+      case "medium":
+      case "low":
+        return <AlertCircle className="w-4 h-4" />;
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto pb-20">
@@ -407,6 +478,92 @@ export default function JobDetail() {
             </CardContent>
           </Card>
         )}
+
+        {/* Further Actions / Revisit Section */}
+        <Card className="print:shadow-none print:border-none border-2 border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-900/10">
+          <CardHeader className="bg-blue-100 dark:bg-blue-900/40 print:bg-transparent print:p-0 print:mb-4">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              Further Actions / Revisit
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">Alert admins of follow-up work or issues requiring attention</p>
+          </CardHeader>
+          <CardContent className="pt-6 print:pt-0">
+            {!isReadOnly && (
+              <div className="space-y-4 mb-6 p-4 bg-white dark:bg-slate-900/50 rounded-lg border">
+                <div className="space-y-2">
+                  <Label>Action Description</Label>
+                  <Textarea
+                    placeholder="Describe any further actions needed, issues found, or follow-up work required..."
+                    value={actionDescription}
+                    onChange={(e) => setActionDescription(e.target.value)}
+                    className="min-h-[80px]"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Priority Level</Label>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {(['low', 'medium', 'high', 'urgent'] as ActionPriority[]).map((priority) => (
+                      <button
+                        key={priority}
+                        onClick={() => setSelectedPriority(priority)}
+                        className={`px-3 py-2 rounded text-sm font-medium capitalize border-2 transition-all ${
+                          selectedPriority === priority
+                            ? getPriorityColor(priority) + ' border-current'
+                            : 'border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-current'
+                        }`}
+                      >
+                        {priority}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <Button onClick={handleAddAction} className="w-full bg-blue-600 hover:bg-blue-700">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Action Alert
+                </Button>
+              </div>
+            )}
+
+            {job.furtherActions && job.furtherActions.length > 0 ? (
+              <div className="space-y-3">
+                {job.furtherActions.map((action) => (
+                  <div
+                    key={action.id}
+                    className={`p-4 rounded-lg border-l-4 ${getPriorityColor(action.priority)}`}
+                  >
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div className="flex items-start gap-2 flex-1">
+                        {getPriorityIcon(action.priority)}
+                        <div className="flex-1">
+                          <p className="font-medium capitalize text-sm">{action.priority} Priority</p>
+                          <p className="text-sm mt-1">{action.description}</p>
+                        </div>
+                      </div>
+                      {!isReadOnly && (
+                        <button
+                          onClick={() => handleRemoveAction(action.id)}
+                          className="text-current hover:opacity-70 transition-opacity"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs opacity-75">
+                      {format(new Date(action.timestamp), "dd MMM yyyy HH:mm")}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground bg-white dark:bg-slate-900/30 rounded-lg border border-dashed">
+                <p>No further actions recorded.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
        {!isReadOnly && (

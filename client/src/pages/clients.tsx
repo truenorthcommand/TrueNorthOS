@@ -197,6 +197,7 @@ export default function Clients() {
       materials: [],
       photos: [],
       signatures: [],
+      furtherActions: [],
     });
 
     toast({

@@ -44,6 +44,7 @@ export const MOCK_JOBS: Job[] = [
     ],
     photos: [],
     signatures: [],
+    furtherActions: [],
     createdAt: new Date(Date.now() - 86400000).toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -66,6 +67,7 @@ export const MOCK_JOBS: Job[] = [
     materials: [],
     photos: [],
     signatures: [],
+    furtherActions: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -96,6 +98,7 @@ export const MOCK_JOBS: Job[] = [
       { id: "s-1", type: "engineer", name: "Sarah Jones", url: "mock_sig", timestamp: new Date().toISOString() },
       { id: "s-2", type: "customer", name: "IT Manager", url: "mock_sig", timestamp: new Date().toISOString() }
     ],
+    furtherActions: [],
     createdAt: new Date(Date.now() - 200000000).toISOString(),
     updatedAt: new Date().toISOString(),
   },

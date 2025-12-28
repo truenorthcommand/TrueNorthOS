@@ -29,6 +29,15 @@ export type Signature = {
   timestamp: string;
 };
 
+export type ActionPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export type FurtherAction = {
+  id: string;
+  description: string;
+  priority: ActionPriority;
+  timestamp: string;
+};
+
 export type Job = {
   id: string;
   jobNo: string;
@@ -48,6 +57,7 @@ export type Job = {
   materials: Material[];
   photos: Photo[];
   signatures: Signature[];
+  furtherActions: FurtherAction[];
   createdAt: string;
   updatedAt: string;
 };
