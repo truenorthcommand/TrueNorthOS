@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
-import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,11 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, Building2, MapPin, FileText } from "lucide-react";
+import { Plus, Trash2, Building2, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
 
 interface Property {
   id: string;
@@ -71,8 +66,6 @@ const MOCK_CLIENTS: Client[] = [
 
 export default function Clients() {
   const { user } = useAuth();
-  const { addJob } = useStore();
-  const [, setLocation] = useLocation();
   const { toast } = useToast();
   
   const [clients, setClients] = useState<Client[]>(MOCK_CLIENTS);
@@ -87,15 +80,6 @@ export default function Clients() {
   const [newPropertyByClient, setNewPropertyByClient] = useState<
     Record<string, { address: string; postcode: string }>
   >({});
-
-  // Job creation form state
-  const [selectedClientId, setSelectedClientId] = useState("");
-  const [selectedPropertyId, setSelectedPropertyId] = useState("");
-  const [jobForm, setJobForm] = useState({
-    description: "",
-    notes: "",
-    startTime: format(new Date(), "HH:mm"),
-  });
 
   const handleAddClient = (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,79 +146,16 @@ export default function Clients() {
     setExpandedClientId(null);
   };
 
-  const handleCreateJobFromClient = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedClientId || !selectedPropertyId || !jobForm.description) {
-      toast({ 
-        title: "Missing Information", 
-        description: "Please select a client, property, and enter a description.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const client = clients.find(c => c.id === selectedClientId);
-    const property = client?.properties.find(p => p.id === selectedPropertyId);
-    
-    if (!client || !property) return;
-
-    addJob({
-      jobNo: `J-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`,
-      client: client.name,
-      customerName: client.name,
-      address: property.address,
-      postcode: property.postcode,
-      contactName: client.contact,
-      contactPhone: client.phone,
-      contactEmail: client.email,
-      date: new Date().toISOString(),
-      startTime: jobForm.startTime,
-      description: jobForm.description,
-      notes: jobForm.notes,
-      status: "Draft",
-      assignedToId: user?.id || "",
-      materials: [],
-      photos: [],
-      signatures: [],
-      furtherActions: [],
-    });
-
-    toast({
-      title: "Job Created",
-      description: `New job sheet created for ${client.name}`,
-    });
-
-    // Reset form
-    setSelectedClientId("");
-    setSelectedPropertyId("");
-    setJobForm({ description: "", notes: "", startTime: format(new Date(), "HH:mm") });
-
-    // Redirect to jobs list
-    setLocation("/");
-  };
-
   if (!user) return null;
-
-  const selectedClient = clients.find(c => c.id === selectedClientId);
-  const selectedProperty = selectedClient?.properties.find(p => p.id === selectedPropertyId);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Clients</h1>
         <p className="text-muted-foreground">
-          Manage service providers and create job sheets
+          Manage service providers and properties
         </p>
       </div>
-
-      <Tabs defaultValue="manage" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
-          <TabsTrigger value="manage">Manage Clients</TabsTrigger>
-          <TabsTrigger value="create-job">Create Job Sheet</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="manage" className="space-y-6 mt-6">
 
       {/* Add New Client Form */}
       <Card>
@@ -474,143 +395,11 @@ export default function Clients() {
         ))}
       </div>
 
-          {clients.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground">
-              <p>No clients added yet.</p>
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="create-job" className="space-y-6 mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Create New Job Sheet
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleCreateJobFromClient} className="space-y-6">
-                {/* Client Selection */}
-                <div className="space-y-2">
-                  <Label>Select Client</Label>
-                  <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a client..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.map((client) => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Property Selection (only show if client is selected) */}
-                {selectedClient && (
-                  <div className="space-y-2">
-                    <Label>Select Property / Site</Label>
-                    <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choose a property..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {selectedClient.properties.map((prop) => (
-                          <SelectItem key={prop.id} value={prop.id}>
-                            {prop.address} • {prop.postcode}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {/* Auto-filled Client Info (read-only) */}
-                {selectedClient && (
-                  <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border space-y-3">
-                    <div className="grid md:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Contact Person</p>
-                        <p className="font-medium">{selectedClient.contact}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Phone</p>
-                        <p className="font-medium">{selectedClient.phone}</p>
-                      </div>
-                      <div className="md:col-span-2">
-                        <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Email</p>
-                        <p className="font-medium">{selectedClient.email}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Property Info */}
-                {selectedProperty && (
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800 space-y-2">
-                    <p className="text-xs font-medium text-blue-900 dark:text-blue-300 uppercase">Selected Location</p>
-                    <div className="space-y-1">
-                      <p className="font-semibold">{selectedProperty.address}</p>
-                      <p className="text-sm text-muted-foreground">{selectedProperty.postcode}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Job Details */}
-                <div className="space-y-2">
-                  <Label>Start Time</Label>
-                  <Input
-                    type="time"
-                    value={jobForm.startTime}
-                    onChange={(e) => setJobForm({ ...jobForm, startTime: e.target.value })}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Description of Works</Label>
-                  <Textarea
-                    placeholder="Describe the work to be carried out..."
-                    value={jobForm.description}
-                    onChange={(e) => setJobForm({ ...jobForm, description: e.target.value })}
-                    className="min-h-[120px]"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Notes (Optional)</Label>
-                  <Textarea
-                    placeholder="Access codes, parking info, special instructions..."
-                    value={jobForm.notes}
-                    onChange={(e) => setJobForm({ ...jobForm, notes: e.target.value })}
-                    className="min-h-[80px]"
-                  />
-                </div>
-
-                <div className="flex gap-2">
-                  <Button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-700" disabled={!selectedPropertyId}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Job Sheet
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => {
-                      setSelectedClientId("");
-                      setSelectedPropertyId("");
-                      setJobForm({ description: "", notes: "", startTime: format(new Date(), "HH:mm") });
-                    }}
-                  >
-                    Clear
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {clients.length === 0 && (
+        <div className="text-center py-12 text-muted-foreground">
+          <p>No clients added yet.</p>
+        </div>
+      )}
     </div>
   );
 }
