@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { Job, JobStatus } from "@/lib/types";
@@ -14,7 +14,8 @@ import { Progress } from "@/components/ui/progress";
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { jobs, addJob } = useStore();
+  const { jobs } = useStore();
+  const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
 
   if (!user) return null;
@@ -41,27 +42,7 @@ export default function Dashboard() {
   };
 
   const handleCreateJob = () => {
-    // Quick create for prototype
-    addJob({
-      jobNo: `J-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`,
-      client: "",
-      customerName: "New Customer",
-      address: "",
-      postcode: "",
-      contactName: "",
-      contactPhone: "",
-      contactEmail: "",
-      date: new Date().toISOString(),
-      startTime: "09:00",
-      description: "",
-      notes: "",
-      status: "Draft",
-      assignedToId: user.id, // Assign to self for now
-      materials: [],
-      photos: [],
-      signatures: [],
-      furtherActions: [],
-    });
+    setLocation("/clients");
   };
 
   return (
