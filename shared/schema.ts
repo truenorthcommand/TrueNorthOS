@@ -59,7 +59,10 @@ export const insertUserSchema = createInsertSchema(users).omit({
   createdAt: true,
 });
 
-export const insertJobSchema = createInsertSchema(jobs).omit({
+export const insertJobSchema = createInsertSchema(jobs, {
+  date: z.coerce.date().optional(),
+  signOffTimestamp: z.coerce.date().optional(),
+}).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
