@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
@@ -90,11 +90,28 @@ export default function Clients() {
 
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedPropertyId, setSelectedPropertyId] = useState("");
+  const [selectedEngineerId, setSelectedEngineerId] = useState("");
+  const [engineers, setEngineers] = useState<{id: string; name: string}[]>([]);
   const [jobForm, setJobForm] = useState({
     description: "",
     notes: "",
     startTime: format(new Date(), "HH:mm"),
+    date: format(new Date(), "yyyy-MM-dd"),
   });
+
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      fetch('/api/users', { credentials: 'include' })
+        .then(res => res.json())
+        .then(data => {
+          const engineerList = data
+            .filter((u: any) => u.role === 'engineer')
+            .map((u: any) => ({ id: u.id, name: u.name }));
+          setEngineers(engineerList);
+        })
+        .catch(() => {});
+    }
+  }, [user]);
 
   const handleAddClient = (e: React.FormEvent) => {
     e.preventDefault();
@@ -178,6 +195,8 @@ export default function Clients() {
     
     if (!client || !property) return;
 
+    const assignToId = user?.role === 'admin' && selectedEngineerId ? selectedEngineerId : user?.id || "";
+    
     const newJob = await addJob({
       jobNo: `J-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`,
       client: client.name,
@@ -187,12 +206,12 @@ export default function Clients() {
       contactName: client.contact,
       contactPhone: client.phone,
       contactEmail: client.email,
-      date: new Date().toISOString(),
+      date: new Date(jobForm.date).toISOString(),
       startTime: jobForm.startTime,
       description: jobForm.description,
       notes: jobForm.notes,
       status: "Draft",
-      assignedToId: user?.id || "",
+      assignedToId: assignToId,
       materials: [],
       photos: [],
       signatures: [],
@@ -207,7 +226,8 @@ export default function Clients() {
 
       setSelectedClientId("");
       setSelectedPropertyId("");
-      setJobForm({ description: "", notes: "", startTime: format(new Date(), "HH:mm") });
+      setSelectedEngineerId("");
+      setJobForm({ description: "", notes: "", startTime: format(new Date(), "HH:mm"), date: format(new Date(), "yyyy-MM-dd") });
       setLocation("/");
     }
   };
@@ -313,14 +333,43 @@ export default function Clients() {
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <Label>Start Time</Label>
-                  <Input
-                    type="time"
-                    value={jobForm.startTime}
-                    onChange={(e) => setJobForm({ ...jobForm, startTime: e.target.value })}
-                    data-testid="input-start-time"
-                  />
+                {user?.role === 'admin' && engineers.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Assign Engineer</Label>
+                    <Select value={selectedEngineerId} onValueChange={setSelectedEngineerId}>
+                      <SelectTrigger data-testid="select-engineer">
+                        <SelectValue placeholder="Choose an engineer..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {engineers.map((eng) => (
+                          <SelectItem key={eng.id} value={eng.id}>
+                            {eng.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Appointment Date</Label>
+                    <Input
+                      type="date"
+                      value={jobForm.date}
+                      onChange={(e) => setJobForm({ ...jobForm, date: e.target.value })}
+                      data-testid="input-date"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Appointment Time</Label>
+                    <Input
+                      type="time"
+                      value={jobForm.startTime}
+                      onChange={(e) => setJobForm({ ...jobForm, startTime: e.target.value })}
+                      data-testid="input-start-time"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -362,7 +411,8 @@ export default function Clients() {
                     onClick={() => {
                       setSelectedClientId("");
                       setSelectedPropertyId("");
-                      setJobForm({ description: "", notes: "", startTime: format(new Date(), "HH:mm") });
+                      setSelectedEngineerId("");
+                      setJobForm({ description: "", notes: "", startTime: format(new Date(), "HH:mm"), date: format(new Date(), "yyyy-MM-dd") });
                     }}
                     data-testid="button-clear-form"
                   >
