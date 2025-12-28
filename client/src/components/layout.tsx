@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, FilePlus, User as UserIcon, Menu } from "lucide-react";
+import { LogOut, LayoutDashboard, FilePlus, User as UserIcon, Menu, Building2 as Building2Icon } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 
@@ -24,6 +24,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="flex flex-col gap-2 flex-1">
+        <Link href="/clients">
+          <Button
+            variant={location === "/clients" ? "secondary" : "ghost"}
+            className="w-full justify-start h-12 text-lg font-medium"
+            onClick={() => setIsOpen(false)}
+          >
+            <Building2Icon className="mr-3 h-5 w-5" />
+            Clients
+          </Button>
+        </Link>
+        
         <Link href="/">
           <Button
             variant={location === "/" ? "secondary" : "ghost"}
@@ -98,6 +109,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
           
           <nav className="flex items-center gap-4">
+             <Link href="/clients">
+              <Button variant={location === "/clients" ? "secondary" : "ghost"}>
+                Clients
+              </Button>
+            </Link>
              <Link href="/">
               <Button variant={location === "/" ? "secondary" : "ghost"}>
                 Jobs List

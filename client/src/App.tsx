@@ -10,6 +10,7 @@ import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import JobDetail from "@/pages/job-detail";
 import SignOff from "@/pages/sign-off";
+import Clients from "@/pages/clients";
 import { Layout } from "@/components/layout";
 import { Loader2 } from "lucide-react";
 
@@ -41,6 +42,9 @@ function Router() {
   return (
     <Switch>
       <Route path="/auth" component={Login} />
+      <Route path="/clients">
+        <PrivateRoute component={Clients} />
+      </Route>
       <Route path="/">
         <PrivateRoute component={Dashboard} />
       </Route>
