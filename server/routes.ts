@@ -100,7 +100,7 @@ export async function registerRoutes(
 
   // ==================== USER / ENGINEER ROUTES (PROTECTED) ====================
   
-  app.get("/api/users", requireAuth, async (req, res) => {
+  app.get("/api/users", requireAdmin, async (req, res) => {
     try {
       const allUsers = await storage.getAllUsers();
       res.json(allUsers.map(e => ({

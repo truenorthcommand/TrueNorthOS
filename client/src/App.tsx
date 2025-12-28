@@ -13,6 +13,7 @@ import SignOff from "@/pages/sign-off";
 import Clients from "@/pages/clients";
 import Engineers from "@/pages/engineers";
 import CompletedJobs from "@/pages/completed-jobs";
+import Staff from "@/pages/staff";
 import { Layout } from "@/components/layout";
 import { Loader2 } from "lucide-react";
 
@@ -54,6 +55,9 @@ function Router() {
       </Route>
       <Route path="/completed-jobs">
         <PrivateRoute component={CompletedJobs} />
+      </Route>
+      <Route path="/staff">
+        <PrivateRoute component={Staff} />
       </Route>
       <Route path="/">
         <PrivateRoute component={Dashboard} />
