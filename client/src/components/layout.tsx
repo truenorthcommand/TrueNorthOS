@@ -20,7 +20,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center text-primary-foreground font-bold">
           FF
         </div>
-        <span className="text-xl font-bold tracking-tight">FieldFlow</span>
+        <span className="text-xl font-bold tracking-tight">Field View</span>
       </div>
 
       <nav className="flex flex-col gap-2 flex-1">
@@ -115,7 +115,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
            <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm">
             FF
           </div>
-          <span className="text-lg font-bold">FieldFlow</span>
+          <span className="text-lg font-bold">Field View</span>
         </div>
 
         <div className="hidden md:flex items-center gap-6 w-full">
@@ -123,7 +123,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center text-primary-foreground font-bold">
               FF
             </div>
-            <span className="text-xl font-bold tracking-tight">FieldFlow</span>
+            <span className="text-xl font-bold tracking-tight">Field View</span>
           </div>
           
           <nav className="flex items-center gap-4">
