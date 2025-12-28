@@ -1,14 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, User, BarChart3, CheckCircle2, AlertCircle, MapPin, Calendar } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { User, CheckCircle2, AlertCircle, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { Link } from "wouter";
 
@@ -16,45 +12,33 @@ interface Engineer {
   id: string;
   name: string;
   email: string;
-  status: 'active' | 'inactive';
-  jobsCompleted: number;
+  role: string;
+  currentLat: number | null;
+  currentLng: number | null;
+  lastLocationUpdate: string | null;
 }
-
-const MOCK_ENGINEERS: Engineer[] = [
-  {
-    id: "eng-1",
-    name: "John Smith",
-    email: "john@fieldflow.com",
-    status: "active",
-    jobsCompleted: 24,
-  },
-  {
-    id: "eng-2",
-    name: "Sarah Jones",
-    email: "sarah@fieldflow.com",
-    status: "active",
-    jobsCompleted: 31,
-  },
-  {
-    id: "eng-3",
-    name: "Mike Davis",
-    email: "mike@fieldflow.com",
-    status: "inactive",
-    jobsCompleted: 18,
-  },
-];
 
 export default function Engineers() {
   const { user } = useAuth();
   const { jobs } = useStore();
-  const { toast } = useToast();
-
-  const [engineers, setEngineers] = useState<Engineer[]>(MOCK_ENGINEERS);
-  const [newEngineer, setNewEngineer] = useState({
-    name: "",
-    email: "",
-  });
+  const [engineers, setEngineers] = useState<Engineer[]>([]);
   const [expandedEngineerId, setExpandedEngineerId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      fetch('/api/users', { credentials: 'include' })
+        .then(res => res.json())
+        .then(data => {
+          const engineerList = data.filter((u: any) => u.role === 'engineer');
+          setEngineers(engineerList);
+          setIsLoading(false);
+        })
+        .catch(() => {
+          setIsLoading(false);
+        });
+    }
+  }, [user]);
 
   if (!user || user.role !== "admin") {
     return (
@@ -66,149 +50,51 @@ export default function Engineers() {
     );
   }
 
-  const handleAddEngineer = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newEngineer.name || !newEngineer.email) {
-      toast({
-        title: "Missing Information",
-        description: "Please enter engineer name and email.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const engineer: Engineer = {
-      id: `eng-${Date.now()}`,
-      name: newEngineer.name,
-      email: newEngineer.email,
-      status: "active",
-      jobsCompleted: 0,
-    };
-
-    setEngineers([...engineers, engineer]);
-    setNewEngineer({ name: "", email: "" });
-
-    toast({
-      title: "Engineer Added",
-      description: `${newEngineer.name} has been added to the team.`,
-    });
-  };
-
-  const handleDeleteEngineer = (id: string) => {
-    if (confirm("Are you sure you want to remove this engineer?")) {
-      setEngineers(engineers.filter((e) => e.id !== id));
-      toast({
-        title: "Engineer Removed",
-        variant: "default",
-      });
-    }
-  };
-
-  const handleToggleStatus = (id: string) => {
-    setEngineers(
-      engineers.map((e) =>
-        e.id === id
-          ? { ...e, status: e.status === "active" ? "inactive" : "active" }
-          : e
-      )
-    );
-  };
-
   const getEngineerJobsCount = (engineerId: string) => {
-    return jobs.filter((job) => job.assignedToId === engineerId).length;
+    return jobs.filter((job) => job.assignedToId === engineerId && job.status !== "Signed Off").length;
+  };
+
+  const getEngineerCompletedCount = (engineerId: string) => {
+    return jobs.filter((job) => job.assignedToId === engineerId && job.status === "Signed Off").length;
   };
 
   const getEngineerJobs = (engineerId: string) => {
     return jobs.filter((job) => job.assignedToId === engineerId);
   };
 
-  const handleReassignJob = (jobId: string, newEngineerId: string) => {
-    // This would require updateJob from store, but since we don't have direct access
-    // we'll need to pass this to the store
-    const store = useStore();
-    store.updateJob(jobId, { assignedToId: newEngineerId });
-    toast({
-      title: "Job Reassigned",
-      description: "Job has been reassigned successfully.",
-    });
-  };
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <p className="text-muted-foreground">Loading engineers...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Team Engineers</h1>
         <p className="text-muted-foreground">
-          Manage field engineers and monitor their job assignments
+          View field engineers and their job assignments
         </p>
       </div>
 
-      {/* Add New Engineer */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Plus className="h-5 w-5" />
-            Add New Engineer
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleAddEngineer} className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Full Name</Label>
-                <Input
-                  placeholder="Engineer name"
-                  value={newEngineer.name}
-                  onChange={(e) =>
-                    setNewEngineer({ ...newEngineer, name: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Email Address</Label>
-                <Input
-                  type="email"
-                  placeholder="engineer@company.com"
-                  value={newEngineer.email}
-                  onChange={(e) =>
-                    setNewEngineer({ ...newEngineer, email: e.target.value })
-                  }
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Engineer
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Engineers Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {engineers.map((engineer) => {
           const currentJobsCount = getEngineerJobsCount(engineer.id);
+          const completedJobsCount = getEngineerCompletedCount(engineer.id);
+          const allJobs = getEngineerJobs(engineer.id);
+          
           return (
-            <Card key={engineer.id} className="hover:shadow-md transition-shadow">
+            <Card key={engineer.id} className="hover:shadow-md transition-shadow" data-testid={`card-engineer-${engineer.id}`}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between mb-2">
                   <Badge
-                    variant={engineer.status === "active" ? "default" : "secondary"}
-                    className={
-                      engineer.status === "active"
-                        ? "bg-emerald-600 hover:bg-emerald-700"
-                        : ""
-                    }
+                    variant="default"
+                    className="bg-emerald-600 hover:bg-emerald-700"
                   >
-                    {engineer.status === "active" ? "Active" : "Inactive"}
+                    Active
                   </Badge>
-                  <button
-                    onClick={() => handleToggleStatus(engineer.id)}
-                    className="text-xs font-medium text-primary hover:underline"
-                  >
-                    Toggle
-                  </button>
                 </div>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <User className="h-5 w-5" />
@@ -218,12 +104,11 @@ export default function Engineers() {
               </CardHeader>
 
               <CardContent className="space-y-4">
-                {/* Stats */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg">
-                    <p className="text-xs text-muted-foreground">Total Completed</p>
+                    <p className="text-xs text-muted-foreground">Completed</p>
                     <p className="text-xl font-bold text-emerald-600">
-                      {engineer.jobsCompleted}
+                      {completedJobsCount}
                     </p>
                   </div>
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg">
@@ -234,13 +119,12 @@ export default function Engineers() {
                   </div>
                 </div>
 
-                {/* Assigned Jobs Section */}
                 {expandedEngineerId === engineer.id && (
                   <div className="pt-3 border-t space-y-3">
-                    <h4 className="font-semibold text-sm">Assigned Jobs ({currentJobsCount})</h4>
-                    {getEngineerJobs(engineer.id).length > 0 ? (
+                    <h4 className="font-semibold text-sm">Assigned Jobs ({allJobs.length})</h4>
+                    {allJobs.length > 0 ? (
                       <div className="space-y-2 max-h-64 overflow-y-auto">
-                        {getEngineerJobs(engineer.id).map((job) => (
+                        {allJobs.map((job) => (
                           <Link key={job.id} href={`/jobs/${job.id}`}>
                             <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border hover:border-primary transition-colors cursor-pointer">
                               <div className="flex items-start justify-between gap-2 mb-2">
@@ -257,7 +141,7 @@ export default function Engineers() {
                               </div>
                               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                 <Calendar className="w-3 h-3" />
-                                <span>{format(new Date(job.date), "dd MMM")}</span>
+                                <span>{job.date ? format(new Date(job.date), "dd MMM") : "No date"}</span>
                               </div>
                             </div>
                           </Link>
@@ -269,7 +153,6 @@ export default function Engineers() {
                   </div>
                 )}
 
-                {/* Action Buttons */}
                 <div className="flex gap-2 pt-2">
                   <Button
                     variant="outline"
@@ -280,16 +163,9 @@ export default function Engineers() {
                         expandedEngineerId === engineer.id ? null : engineer.id
                       )
                     }
+                    data-testid={`button-toggle-jobs-${engineer.id}`}
                   >
                     {expandedEngineerId === engineer.id ? "Hide" : "View"} Jobs
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="text-xs"
-                    onClick={() => handleDeleteEngineer(engineer.id)}
-                  >
-                    <Trash2 className="h-3 w-3" />
                   </Button>
                 </div>
               </CardContent>
@@ -300,7 +176,7 @@ export default function Engineers() {
 
       {engineers.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">
-          <p>No engineers added yet. Create your first engineer above.</p>
+          <p>No engineers found in the system.</p>
         </div>
       )}
     </div>
