@@ -24,16 +24,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="flex flex-col gap-2 flex-1">
-        <Link href="/clients">
-          <Button
-            variant={location === "/clients" ? "secondary" : "ghost"}
-            className="w-full justify-start h-12 text-lg font-medium"
-            onClick={() => setIsOpen(false)}
-          >
-            <Building2Icon className="mr-3 h-5 w-5" />
-            Clients
-          </Button>
-        </Link>
+        {user.role === "admin" && (
+          <Link href="/clients">
+            <Button
+              variant={location === "/clients" ? "secondary" : "ghost"}
+              className="w-full justify-start h-12 text-lg font-medium"
+              onClick={() => setIsOpen(false)}
+            >
+              <Building2Icon className="mr-3 h-5 w-5" />
+              Clients
+            </Button>
+          </Link>
+        )}
         
         <Link href="/">
           <Button
@@ -56,16 +58,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Button>
         )}
 
-        <Link href="/completed-jobs">
-          <Button
-            variant={location === "/completed-jobs" ? "secondary" : "ghost"}
-            className="w-full justify-start h-12 text-lg font-medium"
-            onClick={() => setIsOpen(false)}
-          >
-            <CheckCircle2 className="mr-3 h-5 w-5" />
-            Completed Jobs
-          </Button>
-        </Link>
+        {user.role === "admin" && (
+          <Link href="/completed-jobs">
+            <Button
+              variant={location === "/completed-jobs" ? "secondary" : "ghost"}
+              className="w-full justify-start h-12 text-lg font-medium"
+              onClick={() => setIsOpen(false)}
+            >
+              <CheckCircle2 className="mr-3 h-5 w-5" />
+              Completed Jobs
+            </Button>
+          </Link>
+        )}
       </nav>
 
       <div className="border-t pt-4 mt-auto">
@@ -120,11 +124,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
           
           <nav className="flex items-center gap-4">
-             <Link href="/clients">
-              <Button variant={location === "/clients" ? "secondary" : "ghost"}>
-                Clients
-              </Button>
-            </Link>
+             {user.role === "admin" && (
+              <Link href="/clients">
+                <Button variant={location === "/clients" ? "secondary" : "ghost"}>
+                  Clients
+                </Button>
+              </Link>
+            )}
              <Link href="/">
               <Button variant={location === "/" ? "secondary" : "ghost"}>
                 Jobs List
@@ -135,11 +141,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 Engineers
               </Button>
             )}
-             <Link href="/completed-jobs">
-              <Button variant={location === "/completed-jobs" ? "secondary" : "ghost"}>
-                Completed Jobs
-              </Button>
-            </Link>
+             {user.role === "admin" && (
+              <Link href="/completed-jobs">
+                <Button variant={location === "/completed-jobs" ? "secondary" : "ghost"}>
+                  Completed Jobs
+                </Button>
+              </Link>
+            )}
           </nav>
 
           <div className="ml-auto flex items-center gap-4">
