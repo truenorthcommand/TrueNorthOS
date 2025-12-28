@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Plus, Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -193,12 +194,7 @@ function JobCard({ job, statusColor }: { job: Job, statusColor: string }) {
                   <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Progress</span>
                   <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{completedCount}/{progressItems.length}</span>
                 </div>
-                <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-emerald-500 transition-all duration-300" 
-                    style={{ width: `${progressPercentage}%` }}
-                  />
-                </div>
+                <Progress value={progressPercentage} className="h-2" />
               </div>
 
               {/* Progress Indicators */}
