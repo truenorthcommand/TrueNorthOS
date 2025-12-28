@@ -102,18 +102,75 @@ export async function registerRoutes(
   
   app.get("/api/users", requireAuth, async (req, res) => {
     try {
-      const engineers = await storage.getAllEngineers();
-      res.json(engineers.map(e => ({
+      const allUsers = await storage.getAllUsers();
+      res.json(allUsers.map(e => ({
         id: e.id,
         name: e.name,
         email: e.email,
         role: e.role,
+        username: e.username,
         currentLat: e.currentLat,
         currentLng: e.currentLng,
         lastLocationUpdate: e.lastLocationUpdate,
       })));
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.post("/api/users", requireAdmin, async (req, res) => {
+    try {
+      const { username, password, name, email, role } = req.body;
+      
+      if (!username || !password || !name || !email || !role) {
+        return res.status(400).json({ error: "All fields are required" });
+      }
+
+      if (!['admin', 'engineer'].includes(role)) {
+        return res.status(400).json({ error: "Role must be 'admin' or 'engineer'" });
+      }
+
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ error: "Username already exists" });
+      }
+
+      const user = await storage.createUser({
+        username,
+        password,
+        name,
+        email,
+        role,
+        status: 'active',
+      });
+
+      res.status(201).json({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        username: user.username,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create user" });
+    }
+  });
+
+  app.delete("/api/users/:id", requireAdmin, async (req, res) => {
+    try {
+      if (req.params.id === req.session.userId) {
+        return res.status(400).json({ error: "Cannot delete your own account" });
+      }
+
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      await storage.deleteUser(req.params.id);
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete user" });
     }
   });
 
