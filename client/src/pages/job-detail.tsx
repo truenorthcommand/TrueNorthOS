@@ -41,6 +41,7 @@ export default function JobDetail() {
     date: string;
     startTime: string;
     description: string;
+    worksCompleted: string;
     notes: string;
   }>({
     client: "",
@@ -53,6 +54,7 @@ export default function JobDetail() {
     date: "",
     startTime: "",
     description: "",
+    worksCompleted: "",
     notes: "",
   });
   const [formInitialized, setFormInitialized] = useState(false);
@@ -88,6 +90,7 @@ export default function JobDetail() {
         date: job.date ? format(new Date(job.date), "yyyy-MM-dd") : "",
         startTime: job.startTime || "",
         description: job.description || "",
+        worksCompleted: job.worksCompleted || "",
         notes: job.notes || "",
       });
       setFormInitialized(true);
@@ -135,6 +138,7 @@ export default function JobDetail() {
       date: formData.date ? new Date(formData.date).toISOString() : undefined,
       startTime: formData.startTime,
       description: formData.description,
+      worksCompleted: formData.worksCompleted,
       notes: formData.notes,
     });
     toast({ title: "Job Updated", description: "All changes have been saved." });
@@ -443,6 +447,23 @@ export default function JobDetail() {
                 className="min-h-[120px] text-base print:border-none print:p-0"
                 placeholder="Describe the work to be carried out..."
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                Works Completed
+                <Badge variant="outline" className="text-xs font-normal">Engineer</Badge>
+              </Label>
+              <Textarea 
+                value={formData.worksCompleted} 
+                onChange={(e) => handleFieldChange('worksCompleted', e.target.value)}
+                onBlur={() => handleFieldBlur('worksCompleted')}
+                disabled={isReadOnly}
+                className="min-h-[120px] text-base print:border-none print:p-0 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800"
+                placeholder="Describe the work that has been completed..."
+                data-testid="input-works-completed"
+              />
+              <p className="text-xs text-muted-foreground">Enter details of all work completed on this job</p>
             </div>
             
             <div className="space-y-2">

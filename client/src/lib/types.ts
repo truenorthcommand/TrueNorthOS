@@ -55,6 +55,7 @@ export type Job = {
   date: string | null;
   startTime: string | null;
   description: string | null;
+  worksCompleted: string | null;
   notes: string | null;
   status: JobStatus;
   assignedToId: string | null;

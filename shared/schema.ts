@@ -30,6 +30,7 @@ export const jobs = pgTable("jobs", {
   date: timestamp("date").defaultNow(),
   startTime: text("start_time"),
   description: text("description"),
+  worksCompleted: text("works_completed"),
   notes: text("notes"),
   status: text("status").notNull().default("Draft"),
   assignedToId: varchar("assigned_to_id"),
