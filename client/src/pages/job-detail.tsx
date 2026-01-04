@@ -29,6 +29,33 @@ export default function JobDetail() {
   const [actionDescription, setActionDescription] = useState("");
   const [selectedPriority, setSelectedPriority] = useState<ActionPriority>("medium");
   const [engineers, setEngineers] = useState<{id: string; name: string}[]>([]);
+  
+  const [formData, setFormData] = useState<{
+    client: string;
+    customerName: string;
+    address: string;
+    postcode: string;
+    contactName: string;
+    contactPhone: string;
+    contactEmail: string;
+    date: string;
+    startTime: string;
+    description: string;
+    notes: string;
+  }>({
+    client: "",
+    customerName: "",
+    address: "",
+    postcode: "",
+    contactName: "",
+    contactPhone: "",
+    contactEmail: "",
+    date: "",
+    startTime: "",
+    description: "",
+    notes: "",
+  });
+  const [formInitialized, setFormInitialized] = useState(false);
 
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -47,6 +74,38 @@ export default function JobDetail() {
       refreshJobs();
     }
   }, [jobId]);
+  
+  useEffect(() => {
+    if (job) {
+      setFormData({
+        client: job.client || "",
+        customerName: job.customerName || "",
+        address: job.address || "",
+        postcode: job.postcode || "",
+        contactName: job.contactName || "",
+        contactPhone: job.contactPhone || "",
+        contactEmail: job.contactEmail || "",
+        date: job.date ? format(new Date(job.date), "yyyy-MM-dd") : "",
+        startTime: job.startTime || "",
+        description: job.description || "",
+        notes: job.notes || "",
+      });
+      setFormInitialized(true);
+    }
+  }, [job?.id]);
+
+  const handleFieldChange = (field: keyof typeof formData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleFieldBlur = async (field: keyof typeof formData) => {
+    if (!job) return;
+    let valueToSave: string | Date = formData[field];
+    if (field === 'date' && formData.date) {
+      valueToSave = new Date(formData.date).toISOString();
+    }
+    await updateJob(job.id, { [field]: valueToSave });
+  };
 
   if (!job) {
     return (
@@ -196,8 +255,9 @@ export default function JobDetail() {
               <div className="space-y-2">
                 <Label>Client/Service Provider</Label>
                 <Input 
-                  value={job.client || ""} 
-                  onChange={(e) => updateJob(job.id, { client: e.target.value })}
+                  value={formData.client} 
+                  onChange={(e) => handleFieldChange('client', e.target.value)}
+                  onBlur={() => handleFieldBlur('client')}
                   disabled={isReadOnly}
                   className="print:border-none print:p-0 print:font-semibold"
                   placeholder="Your company name"
@@ -206,8 +266,9 @@ export default function JobDetail() {
               <div className="space-y-2">
                 <Label>Customer Name</Label>
                 <Input 
-                  value={job.customerName} 
-                  onChange={(e) => updateJob(job.id, { customerName: e.target.value })}
+                  value={formData.customerName} 
+                  onChange={(e) => handleFieldChange('customerName', e.target.value)}
+                  onBlur={() => handleFieldBlur('customerName')}
                   disabled={isReadOnly}
                   className="print:border-none print:p-0 print:font-bold"
                 />
@@ -215,8 +276,9 @@ export default function JobDetail() {
               <div className="space-y-2">
                 <Label>Address</Label>
                 <Textarea 
-                  value={job.address || ""} 
-                  onChange={(e) => updateJob(job.id, { address: e.target.value })}
+                  value={formData.address} 
+                  onChange={(e) => handleFieldChange('address', e.target.value)}
+                  onBlur={() => handleFieldBlur('address')}
                   disabled={isReadOnly}
                   className="min-h-[80px] print:border-none print:p-0"
                 />
@@ -224,8 +286,9 @@ export default function JobDetail() {
               <div className="space-y-2">
                 <Label>Postcode</Label>
                 <Input 
-                  value={job.postcode || ""} 
-                  onChange={(e) => updateJob(job.id, { postcode: e.target.value })}
+                  value={formData.postcode} 
+                  onChange={(e) => handleFieldChange('postcode', e.target.value)}
+                  onBlur={() => handleFieldBlur('postcode')}
                   disabled={isReadOnly}
                   className="print:border-none print:p-0"
                 />
@@ -238,8 +301,9 @@ export default function JobDetail() {
                 <div className="relative">
                   <UserIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground print:hidden" />
                   <Input 
-                    value={job.contactName || ""} 
-                    onChange={(e) => updateJob(job.id, { contactName: e.target.value })}
+                    value={formData.contactName} 
+                    onChange={(e) => handleFieldChange('contactName', e.target.value)}
+                    onBlur={() => handleFieldBlur('contactName')}
                     disabled={isReadOnly}
                     className="pl-9 print:pl-0 print:border-none"
                     placeholder="Contact Name"
@@ -251,8 +315,9 @@ export default function JobDetail() {
                 <div className="relative">
                   <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground print:hidden" />
                   <Input 
-                    value={job.contactPhone || ""} 
-                    onChange={(e) => updateJob(job.id, { contactPhone: e.target.value })}
+                    value={formData.contactPhone} 
+                    onChange={(e) => handleFieldChange('contactPhone', e.target.value)}
+                    onBlur={() => handleFieldBlur('contactPhone')}
                     disabled={isReadOnly}
                     className="pl-9 print:pl-0 print:border-none"
                     placeholder="Phone Number"
@@ -264,8 +329,9 @@ export default function JobDetail() {
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground print:hidden" />
                   <Input 
-                    value={job.contactEmail || ""} 
-                    onChange={(e) => updateJob(job.id, { contactEmail: e.target.value })}
+                    value={formData.contactEmail} 
+                    onChange={(e) => handleFieldChange('contactEmail', e.target.value)}
+                    onBlur={() => handleFieldBlur('contactEmail')}
                     disabled={isReadOnly}
                     className="pl-9 print:pl-0 print:border-none"
                     placeholder="Email Address"
@@ -279,8 +345,9 @@ export default function JobDetail() {
                     <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground print:hidden" />
                     <Input 
                       type="date"
-                      value={job.date ? format(new Date(job.date), "yyyy-MM-dd") : ""}
-                      onChange={(e) => updateJob(job.id, { date: new Date(e.target.value).toISOString() })}
+                      value={formData.date}
+                      onChange={(e) => handleFieldChange('date', e.target.value)}
+                      onBlur={() => handleFieldBlur('date')}
                       disabled={isReadOnly}
                       className="pl-9 print:pl-0 print:border-none"
                     />
@@ -290,8 +357,9 @@ export default function JobDetail() {
                   <Label>Time</Label>
                   <Input 
                     type="time"
-                    value={job.startTime || ""} 
-                    onChange={(e) => updateJob(job.id, { startTime: e.target.value })}
+                    value={formData.startTime} 
+                    onChange={(e) => handleFieldChange('startTime', e.target.value)}
+                    onBlur={() => handleFieldBlur('startTime')}
                     disabled={isReadOnly}
                     className="print:border-none print:p-0"
                   />
@@ -344,8 +412,9 @@ export default function JobDetail() {
             <div className="space-y-2">
               <Label>Description of Works</Label>
               <Textarea 
-                value={job.description || ""} 
-                onChange={(e) => updateJob(job.id, { description: e.target.value })}
+                value={formData.description} 
+                onChange={(e) => handleFieldChange('description', e.target.value)}
+                onBlur={() => handleFieldBlur('description')}
                 disabled={isReadOnly}
                 className="min-h-[120px] text-base print:border-none print:p-0"
                 placeholder="Describe the work to be carried out..."
@@ -355,8 +424,9 @@ export default function JobDetail() {
             <div className="space-y-2">
               <Label>Internal Notes</Label>
               <Textarea 
-                value={job.notes || ""} 
-                onChange={(e) => updateJob(job.id, { notes: e.target.value })}
+                value={formData.notes} 
+                onChange={(e) => handleFieldChange('notes', e.target.value)}
+                onBlur={() => handleFieldBlur('notes')}
                 disabled={isReadOnly}
                 className="min-h-[80px] print:hidden"
                 placeholder="Access codes, parking info, etc."
