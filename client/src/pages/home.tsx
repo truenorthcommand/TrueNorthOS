@@ -65,11 +65,11 @@ export default function Home() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
-                FF
+                AI
               </div>
               <div>
                 <h1 className="text-xl font-bold tracking-tight">Field View</h1>
-                <p className="text-xs text-muted-foreground">Pro Main Solutions</p>
+                <p className="text-xs text-muted-foreground">Applied Intelligence Solutions</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -207,7 +207,7 @@ export default function Home() {
 
       <footer className="border-t py-8 px-4">
         <div className="max-w-6xl mx-auto text-center text-sm text-muted-foreground">
-          <p>Pro Main Solutions Field View - Digital Job Sheet Management</p>
+          <p>Applied Intelligence Solutions Field View - Digital Job Sheet Management</p>
         </div>
       </footer>
     </div>

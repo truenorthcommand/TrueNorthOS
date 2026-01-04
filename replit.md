@@ -1,4 +1,4 @@
-# Pro Main Solutions Field View
+# Applied Intelligence Solutions Field View
 
 A web-based job sheet application for field engineers with authentication, job management, photo uploads, signature capture, GPS tracking, and PDF generation.
 

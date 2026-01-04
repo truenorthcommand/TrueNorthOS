@@ -35,9 +35,9 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto w-12 h-12 bg-primary rounded-lg flex items-center justify-center mb-4">
-            <span className="text-primary-foreground font-bold text-xl">PM</span>
+            <span className="text-primary-foreground font-bold text-xl">AI</span>
           </div>
-          <CardTitle className="text-2xl">Pro Main Solutions</CardTitle>
+          <CardTitle className="text-2xl">Applied Intelligence Solutions</CardTitle>
           <CardDescription>Field View - Sign in to manage your jobs</CardDescription>
         </CardHeader>
         <CardContent>
