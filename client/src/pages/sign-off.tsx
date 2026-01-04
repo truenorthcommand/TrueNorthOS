@@ -41,23 +41,45 @@ export default function SignOff() {
     setIsSubmitting(true);
 
     try {
+      const newSignatures = [...(job.signatures || [])];
+      
       if (engSigRef.current && !engSigRef.current.isEmpty()) {
-        await addSignature(job.id, {
-          type: "engineer",
+        newSignatures.push({
+          id: `sig-${Date.now()}`,
+          type: "engineer" as const,
           name: engName,
           url: engSigRef.current.toDataURL(),
+          timestamp: new Date().toISOString(),
         });
       }
 
       if (custSigRef.current && !custSigRef.current.isEmpty()) {
-        await addSignature(job.id, {
-          type: "customer",
+        newSignatures.push({
+          id: `sig-${Date.now() + 1}`,
+          type: "customer" as const,
           name: custName,
           url: custSigRef.current.toDataURL(),
+          timestamp: new Date().toISOString(),
         });
       }
 
-      await signOffJob(job.id);
+      await updateJob(job.id, { signatures: newSignatures });
+      
+      await refreshJobs();
+      
+      const response = await fetch(`/api/jobs/${job.id}/sign-off`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify({ signatures: newSignatures }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Sign-off failed");
+      }
+
+      await refreshJobs();
       
       toast({
         title: "Job Completed!",
@@ -65,10 +87,10 @@ export default function SignOff() {
       });
 
       setLocation(`/jobs/${job.id}`);
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to complete sign-off. Please try again.",
+        description: error.message || "Failed to complete sign-off. Please try again.",
         variant: "destructive",
       });
     } finally {
