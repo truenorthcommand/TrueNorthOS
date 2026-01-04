@@ -364,11 +364,7 @@ export async function registerRoutes(
 
   app.post("/api/jobs/:id/sign-off", requireAuth, async (req, res) => {
     try {
-      const { latitude, longitude, address, signatures } = req.body;
-
-      if (typeof latitude !== "number" || typeof longitude !== "number") {
-        return res.status(400).json({ error: "GPS coordinates are required for sign-off" });
-      }
+      const { signatures } = req.body;
 
       const existingJob = await storage.getJob(req.params.id);
       if (!existingJob) {
@@ -402,12 +398,7 @@ export async function registerRoutes(
         await storage.updateJob(req.params.id, { signatures });
       }
 
-      const job = await storage.signOffJob(
-        req.params.id,
-        latitude,
-        longitude,
-        address || ""
-      );
+      const job = await storage.signOffJob(req.params.id);
 
       res.json(job);
     } catch (error) {

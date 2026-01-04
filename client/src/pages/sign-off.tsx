@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ArrowLeft, Eraser, CheckCircle2, AlertTriangle, MapPin, Loader2 } from "lucide-react";
+import { ArrowLeft, Eraser, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 import SignatureCanvas from "react-signature-canvas";
 import { useToast } from "@/hooks/use-toast";
 
@@ -22,10 +22,6 @@ export default function SignOff() {
   const [engName, setEngName] = useState("");
   const [custName, setCustName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const [gpsStatus, setGpsStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [gpsError, setGpsError] = useState<string>("");
-  const [location, setLocationData] = useState<{lat: number; lng: number; address: string} | null>(null);
 
   const jobId = params?.id;
   const job = jobId ? getJob(jobId) : undefined;
@@ -36,96 +32,12 @@ export default function SignOff() {
     }
   }, [jobId]);
 
-  const captureLocation = async () => {
-    setGpsStatus('loading');
-    setGpsError("");
-    
-    if (!navigator.geolocation) {
-      setGpsStatus('error');
-      setGpsError("Geolocation is not supported by your browser.");
-      toast({
-        title: "GPS Not Available",
-        description: "Geolocation is not supported by your browser.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const getPositionPromise = (): Promise<GeolocationPosition> => {
-      return new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 30000,
-          maximumAge: 0
-        });
-      });
-    };
-
-    try {
-      const position = await getPositionPromise();
-      const { latitude, longitude, accuracy } = position.coords;
-      
-      let address = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-      
-      try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
-          { signal: AbortSignal.timeout(5000) }
-        );
-        if (response.ok) {
-          const data = await response.json();
-          if (data.display_name) {
-            address = data.display_name;
-          }
-        }
-      } catch (e) {
-        console.log("Geocoding failed, using coordinates");
-      }
-
-      setLocationData({ lat: latitude, lng: longitude, address });
-      setGpsStatus('success');
-      toast({
-        title: "Location Captured",
-        description: `Accuracy: ${accuracy?.toFixed(0)}m`,
-      });
-    } catch (error: any) {
-      setGpsStatus('error');
-      let errorMessage = "Failed to get your location.";
-      
-      if (error.code === 1) {
-        errorMessage = "Location permission denied. Please enable location access in your browser settings and try again.";
-      } else if (error.code === 2) {
-        errorMessage = "Location unavailable. Please check your GPS is enabled and try again.";
-      } else if (error.code === 3) {
-        errorMessage = "Location request timed out. Please try again in an open area with better GPS signal.";
-      }
-      
-      setGpsError(errorMessage);
-      toast({
-        title: "Location Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    }
-  };
-
   if (!job) return null;
 
   const hasPhotos = (job.photos || []).length > 0;
-  const hasEngineerSig = !!(engSigRef.current && !engSigRef.current.isEmpty() && engName);
-  const hasCustomerSig = !!(custSigRef.current && !custSigRef.current.isEmpty() && custName);
-  const canSubmit = hasPhotos && engName && custName && location && !isSubmitting;
+  const canSubmit = hasPhotos && engName && custName && !isSubmitting;
 
   const handleComplete = async () => {
-    if (!location) {
-      toast({
-        title: "Location Required",
-        description: "Please capture your GPS location before signing off.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
@@ -145,11 +57,11 @@ export default function SignOff() {
         });
       }
 
-      await signOffJob(job.id, location.lat, location.lng, location.address);
+      await signOffJob(job.id);
       
       toast({
         title: "Job Completed!",
-        description: "Job has been signed off with GPS location.",
+        description: "Job has been signed off successfully.",
       });
 
       setLocation(`/jobs/${job.id}`);
@@ -189,82 +101,6 @@ export default function SignOff() {
       )}
 
       <div className="space-y-6">
-        <Card data-testid="card-location">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
-              GPS Location
-            </CardTitle>
-            <CardDescription>
-              Capture your current location to verify sign-off location.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {location ? (
-              <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                <p className="text-sm font-medium text-green-800 dark:text-green-300 mb-1">Location Captured</p>
-                <p className="text-xs text-green-600 dark:text-green-400 break-words">{location.address}</p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Coordinates: {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
-                </p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="mt-3"
-                  onClick={() => {
-                    setLocationData(null);
-                    setGpsStatus('idle');
-                  }}
-                >
-                  Recapture Location
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <Button 
-                  onClick={captureLocation} 
-                  disabled={gpsStatus === 'loading'}
-                  className="w-full h-14 text-base"
-                  variant={gpsStatus === 'error' ? 'outline' : 'default'}
-                  data-testid="button-capture-location"
-                >
-                  {gpsStatus === 'loading' ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Getting Location...
-                    </>
-                  ) : gpsStatus === 'error' ? (
-                    <>
-                      <MapPin className="mr-2 h-5 w-5" />
-                      Try Again
-                    </>
-                  ) : (
-                    <>
-                      <MapPin className="mr-2 h-5 w-5" />
-                      Capture GPS Location
-                    </>
-                  )}
-                </Button>
-                
-                {gpsStatus === 'error' && gpsError && (
-                  <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription className="text-sm">
-                      {gpsError}
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {gpsStatus === 'idle' && (
-                  <p className="text-xs text-muted-foreground text-center">
-                    Tap the button above to capture your current GPS location. Make sure location services are enabled on your device.
-                  </p>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
         <Card className={!hasPhotos ? "opacity-50 pointer-events-none" : ""} data-testid="card-engineer-signature">
           <CardHeader>
             <CardTitle>Engineer Sign-off</CardTitle>
@@ -362,12 +198,6 @@ export default function SignOff() {
             </>
           )}
         </Button>
-
-        {!location && (
-          <p className="text-center text-sm text-muted-foreground">
-            GPS location capture is required before sign-off
-          </p>
-        )}
       </div>
     </div>
   );

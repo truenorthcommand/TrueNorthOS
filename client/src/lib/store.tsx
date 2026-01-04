@@ -18,7 +18,7 @@ interface StoreContextType {
   addFurtherAction: (jobId: string, action: Omit<FurtherAction, "id" | "timestamp">) => Promise<void>;
   removeFurtherAction: (jobId: string, actionId: string) => Promise<void>;
   deleteJob: (id: string) => Promise<void>;
-  signOffJob: (id: string, lat: number, lng: number, address: string) => Promise<void>;
+  signOffJob: (id: string) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -182,7 +182,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const signOffJob = async (id: string, lat: number, lng: number, address: string) => {
+  const signOffJob = async (id: string) => {
     try {
       const job = getJob(id);
       const response = await fetch(`/api/jobs/${id}/sign-off`, {
@@ -190,9 +190,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         headers: { "Content-Type": "application/json" },
         credentials: 'include',
         body: JSON.stringify({ 
-          latitude: lat, 
-          longitude: lng, 
-          address,
           signatures: job?.signatures 
         }),
       });
@@ -200,7 +197,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         await refreshJobs();
         toast({
           title: "Job Signed Off",
-          description: "Location and signatures recorded successfully.",
+          description: "Signatures recorded successfully.",
         });
       }
     } catch (error) {

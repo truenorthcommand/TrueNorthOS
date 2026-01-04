@@ -22,7 +22,7 @@ export interface IStorage {
   createJob(job: InsertJob): Promise<Job>;
   updateJob(id: string, updates: Partial<Job>): Promise<Job | undefined>;
   deleteJob(id: string): Promise<void>;
-  signOffJob(id: string, lat: number, lng: number, address: string): Promise<Job | undefined>;
+  signOffJob(id: string): Promise<Job | undefined>;
   
   addEngineerLocation(location: InsertEngineerLocation): Promise<EngineerLocation>;
   getEngineerLocationHistory(engineerId: string, limit?: number): Promise<EngineerLocation[]>;
@@ -100,14 +100,11 @@ export class DatabaseStorage implements IStorage {
     await db.delete(jobs).where(eq(jobs.id, id));
   }
 
-  async signOffJob(id: string, lat: number, lng: number, address: string): Promise<Job | undefined> {
+  async signOffJob(id: string): Promise<Job | undefined> {
     const [job] = await db
       .update(jobs)
       .set({
         status: "Signed Off",
-        signOffLat: lat,
-        signOffLng: lng,
-        signOffAddress: address,
         signOffTimestamp: new Date(),
         updatedAt: new Date(),
       })

@@ -1,10 +1,10 @@
 # Applied Intelligence Solutions Field View
 
-A web-based job sheet application for field engineers with authentication, job management, photo uploads, signature capture, GPS tracking, and PDF generation.
+A web-based job sheet application for field engineers with authentication, job management, photo uploads, signature capture, and PDF generation.
 
 ## Overview
 
-This application enables field service companies to manage job sheets digitally. Engineers can view assigned jobs, add materials, upload photos, capture signatures, and sign off jobs with GPS location verification. Admins can manage all jobs and track engineer locations.
+This application enables field service companies to manage job sheets digitally. Engineers can view assigned jobs, add materials, upload photos, capture signatures, and sign off jobs. Admins can manage all jobs and staff.
 
 ## Key Features
 
@@ -12,7 +12,6 @@ This application enables field service companies to manage job sheets digitally.
 - **Job Management**: Create, edit, track job progress and status
 - **Photo Evidence**: Upload photos as job completion evidence
 - **Digital Signatures**: Capture engineer and customer signatures
-- **GPS Tracking**: Location-stamped sign-offs with reverse geocoding
 - **Further Actions**: Flag issues with priority levels (low/medium/high/urgent)
 - **Print-friendly Output**: Generate PDF-ready job sheets
 
@@ -35,9 +34,8 @@ This application enables field service companies to manage job sheets digitally.
 - `/server/db.ts` - PostgreSQL connection
 
 ### Database (PostgreSQL)
-- `users` - User accounts with roles and location
+- `users` - User accounts with roles
 - `jobs` - Job records with materials, photos, signatures
-- `engineer_locations` - GPS tracking history
 
 ## Sign-off Validation Rules
 
@@ -45,7 +43,6 @@ Before a job can be signed off:
 1. At least one photo must be uploaded
 2. Engineer signature must be captured
 3. Customer signature must be captured
-4. GPS location must be captured
 
 ## API Authentication
 
