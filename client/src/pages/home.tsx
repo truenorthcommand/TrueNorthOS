@@ -64,9 +64,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
-                AI
-              </div>
+              <img src="/attached_assets/image_1767549721528.png" alt="AI Logo" className="w-10 h-10 rounded-lg" />
               <div>
                 <h1 className="text-xl font-bold tracking-tight">Field View</h1>
                 <p className="text-xs text-muted-foreground">Applied Intelligence Solutions</p>

@@ -34,8 +34,8 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto w-12 h-12 bg-primary rounded-lg flex items-center justify-center mb-4">
-            <span className="text-primary-foreground font-bold text-xl">AI</span>
+          <div className="mx-auto mb-4">
+            <img src="/attached_assets/image_1767549721528.png" alt="AI Logo" className="w-12 h-12 rounded-lg" />
           </div>
           <CardTitle className="text-2xl">Applied Intelligence Solutions</CardTitle>
           <CardDescription>Field View - Sign in to manage your jobs</CardDescription>
