@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, FilePlus, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users } from "lucide-react";
+import { LogOut, LayoutDashboard, FilePlus, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 
@@ -24,6 +24,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="flex flex-col gap-2 flex-1">
+        <Link href="/home">
+          <Button
+            variant={location === "/home" ? "secondary" : "ghost"}
+            className="w-full justify-start h-12 text-lg font-medium"
+            onClick={() => setIsOpen(false)}
+          >
+            <Home className="mr-3 h-5 w-5" />
+            Home
+          </Button>
+        </Link>
+
         {user.role === "admin" && (
           <Link href="/clients">
             <Button
@@ -140,6 +151,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
           
           <nav className="flex items-center gap-4">
+             <Link href="/home">
+              <Button variant={location === "/home" ? "secondary" : "ghost"}>
+                Home
+              </Button>
+            </Link>
              {user.role === "admin" && (
               <Link href="/clients">
                 <Button variant={location === "/clients" ? "secondary" : "ghost"}>

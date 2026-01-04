@@ -14,6 +14,7 @@ import Clients from "@/pages/clients";
 import Engineers from "@/pages/engineers";
 import CompletedJobs from "@/pages/completed-jobs";
 import Staff from "@/pages/staff";
+import Home from "@/pages/home";
 import { Layout } from "@/components/layout";
 import { Loader2 } from "lucide-react";
 
@@ -46,6 +47,7 @@ function PrivateRoute({ component: Component, ...rest }: any) {
 function Router() {
   return (
     <Switch>
+      <Route path="/home" component={Home} />
       <Route path="/auth" component={Login} />
       <Route path="/clients">
         <PrivateRoute component={Clients} />
