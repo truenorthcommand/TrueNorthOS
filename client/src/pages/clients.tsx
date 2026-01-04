@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, Building2, MapPin, FileText, Camera, X } from "lucide-react";
+import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -482,8 +482,8 @@ export default function Clients() {
                     disabled={!selectedPropertyId || !jobForm.description}
                     data-testid="button-create-job"
                   >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Job Sheet
+                    <Send className="mr-2 h-4 w-4" />
+                    Send
                   </Button>
                   <Button 
                     type="button" 

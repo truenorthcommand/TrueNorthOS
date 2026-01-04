@@ -122,6 +122,24 @@ export default function JobDetail() {
     window.print();
   };
 
+  const handleUpdateJob = async () => {
+    if (!job) return;
+    await updateJob(job.id, {
+      client: formData.client,
+      customerName: formData.customerName,
+      address: formData.address,
+      postcode: formData.postcode,
+      contactName: formData.contactName,
+      contactPhone: formData.contactPhone,
+      contactEmail: formData.contactEmail,
+      date: formData.date ? new Date(formData.date).toISOString() : undefined,
+      startTime: formData.startTime,
+      description: formData.description,
+      notes: formData.notes,
+    });
+    toast({ title: "Job Updated", description: "All changes have been saved." });
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -225,6 +243,12 @@ export default function JobDetail() {
         </div>
         
         <div className="flex gap-2 w-full sm:w-auto">
+          {!isReadOnly && (
+            <Button variant="outline" onClick={handleUpdateJob} className="flex-1 sm:flex-none" data-testid="button-update-job">
+              <Save className="mr-2 h-4 w-4" />
+              Update
+            </Button>
+          )}
           <Button variant="outline" onClick={handlePrint} className="flex-1 sm:flex-none">
             <Printer className="mr-2 h-4 w-4" />
             Print / PDF
