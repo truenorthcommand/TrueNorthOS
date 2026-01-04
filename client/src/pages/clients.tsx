@@ -10,9 +10,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, Building2, MapPin, FileText } from "lucide-react";
+import { Plus, Trash2, Building2, MapPin, FileText, Camera, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+
+interface JobPhoto {
+  id: string;
+  url: string;
+  caption: string;
+  timestamp: string;
+}
 
 interface Property {
   id: string;
@@ -98,6 +105,36 @@ export default function Clients() {
     startTime: format(new Date(), "HH:mm"),
     date: format(new Date(), "yyyy-MM-dd"),
   });
+  const [jobPhotos, setJobPhotos] = useState<JobPhoto[]>([]);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploadingPhoto(true);
+    
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const newPhoto: JobPhoto = {
+          id: `photo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          url: reader.result as string,
+          caption: file.name,
+          timestamp: new Date().toISOString(),
+        };
+        setJobPhotos((prev) => [...prev, newPhoto]);
+        setIsUploadingPhoto(false);
+      };
+      reader.readAsDataURL(file);
+    });
+    
+    e.target.value = '';
+  };
+
+  const handleRemovePhoto = (photoId: string) => {
+    setJobPhotos((prev) => prev.filter((p) => p.id !== photoId));
+  };
 
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -213,7 +250,7 @@ export default function Clients() {
       status: "Draft",
       assignedToId: assignToId,
       materials: [],
-      photos: [],
+      photos: jobPhotos,
       signatures: [],
       furtherActions: [],
     });
@@ -228,6 +265,7 @@ export default function Clients() {
       setSelectedPropertyId("");
       setSelectedEngineerId("");
       setJobForm({ description: "", notes: "", startTime: format(new Date(), "HH:mm"), date: format(new Date(), "yyyy-MM-dd") });
+      setJobPhotos([]);
       setLocation("/");
     }
   };
@@ -395,6 +433,48 @@ export default function Clients() {
                   />
                 </div>
 
+                <div className="space-y-3">
+                  <Label>Photos (Optional)</Label>
+                  <div className="flex flex-wrap gap-3">
+                    {jobPhotos.map((photo) => (
+                      <div key={photo.id} className="relative group">
+                        <img
+                          src={photo.url}
+                          alt={photo.caption}
+                          className="h-24 w-24 object-cover rounded-lg border"
+                          data-testid={`photo-preview-${photo.id}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePhoto(photo.id)}
+                          className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          data-testid={`button-remove-photo-${photo.id}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                    <label className="h-24 w-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+                      <Camera className="h-6 w-6 text-muted-foreground mb-1" />
+                      <span className="text-xs text-muted-foreground">
+                        {isUploadingPhoto ? "..." : "Add"}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={handlePhotoUpload}
+                        disabled={isUploadingPhoto}
+                        data-testid="input-photo-upload"
+                      />
+                    </label>
+                  </div>
+                  {jobPhotos.length > 0 && (
+                    <p className="text-xs text-muted-foreground">{jobPhotos.length} photo(s) attached</p>
+                  )}
+                </div>
+
                 <div className="flex gap-2">
                   <Button 
                     type="submit" 
@@ -413,6 +493,7 @@ export default function Clients() {
                       setSelectedPropertyId("");
                       setSelectedEngineerId("");
                       setJobForm({ description: "", notes: "", startTime: format(new Date(), "HH:mm"), date: format(new Date(), "yyyy-MM-dd") });
+                      setJobPhotos([]);
                     }}
                     data-testid="button-clear-form"
                   >
