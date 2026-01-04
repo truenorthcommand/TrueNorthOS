@@ -125,6 +125,7 @@ export default function Dashboard() {
 }
 
 function JobCard({ job, statusColor, isAdmin }: { job: Job, statusColor: string, isAdmin: boolean }) {
+  const [, setLocation] = useLocation();
   const photos = job.photos || [];
   const signatures = job.signatures || [];
   
@@ -141,91 +142,97 @@ function JobCard({ job, statusColor, isAdmin }: { job: Job, statusColor: string,
   const completedCount = progressItems.filter(item => item.complete).length;
   const progressPercentage = (completedCount / progressItems.length) * 100;
 
+  const handleCardClick = () => {
+    setLocation(`/jobs/${job.id}`);
+  };
+
   return (
-    <Card className="hover:shadow-lg transition-all cursor-pointer group border-l-4 overflow-hidden" style={{ borderLeftColor: statusColor.includes('blue') ? 'rgb(59, 130, 246)' : statusColor.includes('amber') ? 'rgb(217, 119, 6)' : statusColor.includes('emerald') ? 'rgb(16, 185, 129)' : 'rgb(100, 116, 139)' }}>
-      <Link href={`/jobs/${job.id}`}>
-        <div className="h-full flex flex-col">
-          <CardHeader className="pb-3">
-            <div className="flex justify-between items-start mb-2">
-              <Badge className={statusColor}>{job.status}</Badge>
-              <span className="text-xs font-mono text-muted-foreground">{job.jobNo}</span>
-            </div>
-            <CardTitle className="text-lg leading-tight group-hover:text-primary transition-colors">
-              {job.customerName}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 pb-4">
-            <div className="space-y-4">
-              {/* Basic Info */}
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <div className="flex items-start gap-2">
-                  <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
-                  <span className="line-clamp-2">{job.address || "No address set"}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 shrink-0" />
-                  <span>{job.date ? format(new Date(job.date), "dd MMM yyyy") : "No date"} • {job.startTime || "No time"}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 shrink-0" />
-                  <span>{job.contactName || "No contact"}</span>
-                </div>
+    <Card 
+      className="hover:shadow-lg transition-all cursor-pointer group border-l-4 overflow-hidden" 
+      style={{ borderLeftColor: statusColor.includes('blue') ? 'rgb(59, 130, 246)' : statusColor.includes('amber') ? 'rgb(217, 119, 6)' : statusColor.includes('emerald') ? 'rgb(16, 185, 129)' : 'rgb(100, 116, 139)' }}
+      onClick={handleCardClick}
+      data-testid={`card-job-${job.id}`}
+    >
+      <div className="h-full flex flex-col">
+        <CardHeader className="pb-3">
+          <div className="flex justify-between items-start mb-2">
+            <Badge className={statusColor}>{job.status}</Badge>
+            <span className="text-xs font-mono text-muted-foreground">{job.jobNo}</span>
+          </div>
+          <CardTitle className="text-lg leading-tight group-hover:text-primary transition-colors">
+            {job.customerName}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex-1 pb-4">
+          <div className="space-y-4">
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <div className="flex items-start gap-2">
+                <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
+                <span className="line-clamp-2">{job.address || "No address set"}</span>
               </div>
-
-              {/* Progress Bar */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Progress</span>
-                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{completedCount}/{progressItems.length}</span>
-                </div>
-                <Progress value={progressPercentage} className="h-2" />
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 shrink-0" />
+                <span>{job.date ? format(new Date(job.date), "dd MMM yyyy") : "No date"} • {job.startTime || "No time"}</span>
               </div>
-
-              {/* Progress Indicators */}
-              <div className="flex gap-2">
-                {progressItems.map((item, idx) => {
-                  const Icon = item.icon;
-                  return (
-                    <div 
-                      key={idx}
-                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
-                        item.complete 
-                          ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' 
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                      }`}
-                    >
-                      <Icon className="w-3 h-3" />
-                      <span>{item.label}</span>
-                      {item.complete && <CheckCircle2 className="w-3 h-3 ml-0.5" />}
-                    </div>
-                  );
-                })}
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 shrink-0" />
+                <span>{job.contactName || "No contact"}</span>
               </div>
             </div>
-          </CardContent>
-          <CardFooter className="pt-3 border-t bg-slate-50 dark:bg-slate-900/50">
-            <div className="w-full flex items-center justify-between">
-              <span className="text-sm font-medium text-primary flex items-center gap-1">
-                View Details
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </span>
-              {isAdmin && job.status !== "Signed Off" && (
-                <Link href={`/jobs/${job.id}`} onClick={(e) => e.stopPropagation()}>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="h-8 gap-1"
-                    data-testid={`button-edit-job-${job.id}`}
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Progress</span>
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{completedCount}/{progressItems.length}</span>
+              </div>
+              <Progress value={progressPercentage} className="h-2" />
+            </div>
+
+            <div className="flex gap-2 flex-wrap">
+              {progressItems.map((item, idx) => {
+                const Icon = item.icon;
+                return (
+                  <div 
+                    key={idx}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                      item.complete 
+                        ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' 
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                    }`}
                   >
-                    <Pencil className="w-3 h-3" />
-                    Edit
-                  </Button>
-                </Link>
-              )}
+                    <Icon className="w-3 h-3" />
+                    <span>{item.label}</span>
+                    {item.complete && <CheckCircle2 className="w-3 h-3 ml-0.5" />}
+                  </div>
+                );
+              })}
             </div>
-          </CardFooter>
-        </div>
-      </Link>
+          </div>
+        </CardContent>
+        <CardFooter className="pt-3 border-t bg-slate-50 dark:bg-slate-900/50">
+          <div className="w-full flex items-center justify-between">
+            <span className="text-sm font-medium text-primary flex items-center gap-1">
+              View Details
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </span>
+            {isAdmin && job.status !== "Signed Off" && (
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="h-8 gap-1"
+                data-testid={`button-edit-job-${job.id}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLocation(`/jobs/${job.id}`);
+                }}
+              >
+                <Pencil className="w-3 h-3" />
+                Edit
+              </Button>
+            )}
+          </div>
+        </CardFooter>
+      </div>
     </Card>
   );
 }

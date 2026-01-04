@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { LogOut, LayoutDashboard, FilePlus, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home } from "lucide-react";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { useState } from "react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -129,6 +129,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-[300px] sm:w-[350px] p-6">
+            <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
             <NavContent />
           </SheetContent>
         </Sheet>
