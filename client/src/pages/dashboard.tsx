@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2 } from "lucide-react";
+import { Plus, Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
@@ -86,7 +86,7 @@ export default function Dashboard() {
                 No active jobs. Great work!
               </div>
             ) : filteredJobs.filter(j => j.status === "In Progress" || j.status === "Draft").map(job => (
-               <JobCard key={job.id} job={job} statusColor={getStatusColor(job.status)} />
+               <JobCard key={job.id} job={job} statusColor={getStatusColor(job.status)} isAdmin={user.role === 'admin'} />
             ))}
           </div>
         </TabsContent>
@@ -98,7 +98,7 @@ export default function Dashboard() {
                  No jobs found.
                </div>
             ) : filteredJobs.map(job => (
-              <JobCard key={job.id} job={job} statusColor={getStatusColor(job.status)} />
+              <JobCard key={job.id} job={job} statusColor={getStatusColor(job.status)} isAdmin={user.role === 'admin'} />
             ))}
           </div>
         </TabsContent>
@@ -107,7 +107,7 @@ export default function Dashboard() {
         <TabsContent value="signatures" className="mt-6">
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredJobs.filter(j => j.status === "Awaiting Signatures").map(job => (
-               <JobCard key={job.id} job={job} statusColor={getStatusColor(job.status)} />
+               <JobCard key={job.id} job={job} statusColor={getStatusColor(job.status)} isAdmin={user.role === 'admin'} />
             ))}
           </div>
         </TabsContent>
@@ -115,7 +115,7 @@ export default function Dashboard() {
         <TabsContent value="done" className="mt-6">
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredJobs.filter(j => j.status === "Signed Off").map(job => (
-               <JobCard key={job.id} job={job} statusColor={getStatusColor(job.status)} />
+               <JobCard key={job.id} job={job} statusColor={getStatusColor(job.status)} isAdmin={user.role === 'admin'} />
             ))}
           </div>
         </TabsContent>
@@ -124,7 +124,7 @@ export default function Dashboard() {
   );
 }
 
-function JobCard({ job, statusColor }: { job: Job, statusColor: string }) {
+function JobCard({ job, statusColor, isAdmin }: { job: Job, statusColor: string, isAdmin: boolean }) {
   const photos = job.photos || [];
   const signatures = job.signatures || [];
   
@@ -204,9 +204,24 @@ function JobCard({ job, statusColor }: { job: Job, statusColor: string }) {
             </div>
           </CardContent>
           <CardFooter className="pt-3 border-t bg-slate-50 dark:bg-slate-900/50">
-            <div className="w-full flex items-center justify-between text-sm font-medium text-primary">
-              View Details
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            <div className="w-full flex items-center justify-between">
+              <span className="text-sm font-medium text-primary flex items-center gap-1">
+                View Details
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </span>
+              {isAdmin && job.status !== "Signed Off" && (
+                <Link href={`/jobs/${job.id}`} onClick={(e) => e.stopPropagation()}>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="h-8 gap-1"
+                    data-testid={`button-edit-job-${job.id}`}
+                  >
+                    <Pencil className="w-3 h-3" />
+                    Edit
+                  </Button>
+                </Link>
+              )}
             </div>
           </CardFooter>
         </div>
