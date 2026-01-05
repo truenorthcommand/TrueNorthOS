@@ -31,7 +31,7 @@ export default function Dashboard() {
       job.jobNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (job.address || "").toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesRole = user.role === "admin" || job.assignedToId === user.id;
+    const matchesRole = user.role === "admin" || job.assignedToId === user.id || (job.assignedToIds || []).includes(user.id);
 
     return matchesSearch && matchesRole;
   });
@@ -249,7 +249,7 @@ function EngineerDashboard() {
 
   if (!user) return null;
 
-  const myJobs = jobs.filter(job => job.assignedToId === user.id);
+  const myJobs = jobs.filter(job => job.assignedToId === user.id || (job.assignedToIds || []).includes(user.id));
   
   const todayJobs = myJobs
     .filter(job => job.date && isToday(parseISO(job.date)))

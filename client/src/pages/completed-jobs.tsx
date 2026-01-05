@@ -26,7 +26,7 @@ export default function CompletedJobs() {
         job.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
         job.client.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesRole = user.role === "admin" || job.assignedToId === user.id;
+      const matchesRole = user.role === "admin" || job.assignedToId === user.id || (job.assignedToIds || []).includes(user.id);
 
       return matchesSearch && matchesRole;
     })

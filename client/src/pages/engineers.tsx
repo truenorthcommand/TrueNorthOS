@@ -51,15 +51,15 @@ export default function Engineers() {
   }
 
   const getEngineerJobsCount = (engineerId: string) => {
-    return jobs.filter((job) => job.assignedToId === engineerId && job.status !== "Signed Off").length;
+    return jobs.filter((job) => (job.assignedToId === engineerId || (job.assignedToIds || []).includes(engineerId)) && job.status !== "Signed Off").length;
   };
 
   const getEngineerCompletedCount = (engineerId: string) => {
-    return jobs.filter((job) => job.assignedToId === engineerId && job.status === "Signed Off").length;
+    return jobs.filter((job) => (job.assignedToId === engineerId || (job.assignedToIds || []).includes(engineerId)) && job.status === "Signed Off").length;
   };
 
   const getEngineerJobs = (engineerId: string) => {
-    return jobs.filter((job) => job.assignedToId === engineerId);
+    return jobs.filter((job) => job.assignedToId === engineerId || (job.assignedToIds || []).includes(engineerId));
   };
 
   if (isLoading) {
