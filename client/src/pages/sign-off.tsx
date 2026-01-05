@@ -6,9 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ArrowLeft, Eraser, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
+import { ArrowLeft, Eraser, CheckCircle2, AlertTriangle, Loader2, MapPin, RefreshCw } from "lucide-react";
 import SignatureCanvas from "react-signature-canvas";
 import { useToast } from "@/hooks/use-toast";
+import { reverseGeocode } from "@/components/google-map";
 
 export default function SignOff() {
   const [match, params] = useRoute("/jobs/:id/sign-off");
@@ -22,20 +23,72 @@ export default function SignOff() {
   const [engName, setEngName] = useState("");
   const [custName, setCustName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [location, setGeoLocation] = useState<{lat: number; lng: number} | null>(null);
+  const [locationAddress, setLocationAddress] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
 
   const jobId = params?.id;
   const job = jobId ? getJob(jobId) : undefined;
 
+  const getLocation = async () => {
+    setIsGettingLocation(true);
+    setLocationError(null);
+    
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported by your browser");
+      setIsGettingLocation(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const coords = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        setGeoLocation(coords);
+        
+        try {
+          const address = await reverseGeocode(coords.lat, coords.lng);
+          setLocationAddress(address);
+        } catch {
+          setLocationAddress(`${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`);
+        }
+        setIsGettingLocation(false);
+      },
+      (error) => {
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            setLocationError("Location permission denied. Please enable location access.");
+            break;
+          case error.POSITION_UNAVAILABLE:
+            setLocationError("Location information is unavailable.");
+            break;
+          case error.TIMEOUT:
+            setLocationError("Location request timed out.");
+            break;
+          default:
+            setLocationError("An unknown error occurred.");
+        }
+        setIsGettingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
   useEffect(() => {
     if (jobId) {
       refreshJobs();
+      getLocation();
     }
   }, [jobId]);
 
   if (!job) return null;
 
-  const hasPhotos = (job.photos || []).length > 0;
-  const canSubmit = hasPhotos && engName && custName && !isSubmitting;
+  const hasPhotos = (job.photos || []).filter(p => !p.source || p.source === 'engineer').length > 0;
+  const hasLocation = location !== null;
+  const canSubmit = hasPhotos && hasLocation && engName && custName && !isSubmitting;
 
   const handleComplete = async () => {
     setIsSubmitting(true);
@@ -71,7 +124,12 @@ export default function SignOff() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: 'include',
-        body: JSON.stringify({ signatures: newSignatures }),
+        body: JSON.stringify({ 
+          signatures: newSignatures,
+          signOffLat: location?.lat,
+          signOffLng: location?.lng,
+          signOffAddress: locationAddress,
+        }),
       });
 
       if (!response.ok) {
@@ -123,6 +181,57 @@ export default function SignOff() {
       )}
 
       <div className="space-y-6">
+        <Card className={`border-2 ${hasLocation ? 'border-emerald-200 bg-emerald-50/50' : locationError ? 'border-amber-200 bg-amber-50/50' : 'border-blue-200 bg-blue-50/50'}`} data-testid="card-location">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className={`h-5 w-5 ${hasLocation ? 'text-emerald-600' : locationError ? 'text-amber-600' : 'text-blue-600'}`} />
+              Sign-off Location
+            </CardTitle>
+            <CardDescription>
+              Your current location will be recorded with the sign-off
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isGettingLocation ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Getting your location...</span>
+              </div>
+            ) : hasLocation ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-emerald-700">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span className="font-medium">Location captured</span>
+                </div>
+                <p className="text-sm text-muted-foreground">{locationAddress}</p>
+                <p className="text-xs text-muted-foreground">
+                  Coordinates: {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+                </p>
+              </div>
+            ) : locationError ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-amber-700">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="font-medium">{locationError}</span>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={getLocation}
+                  data-testid="button-retry-location"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Try Again
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <span>Waiting for location...</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Card className={!hasPhotos ? "opacity-50 pointer-events-none" : ""} data-testid="card-engineer-signature">
           <CardHeader>
             <CardTitle>Engineer Sign-off</CardTitle>

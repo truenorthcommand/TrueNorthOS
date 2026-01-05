@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, FilePlus, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar } from "lucide-react";
+import { LogOut, LayoutDashboard, FilePlus, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { useState } from "react";
 
@@ -108,6 +108,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </Button>
           </Link>
         )}
+
+        {user.role === "admin" && (
+          <Link href="/map">
+            <Button
+              variant={location === "/map" ? "secondary" : "ghost"}
+              className="w-full justify-start h-12 text-lg font-medium"
+              onClick={() => setIsOpen(false)}
+            >
+              <MapPin className="mr-3 h-5 w-5" />
+              Live Map
+            </Button>
+          </Link>
+        )}
       </nav>
 
       <div className="border-t pt-4 mt-auto">
@@ -201,6 +214,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Link href="/calendar">
                 <Button variant={location === "/calendar" ? "secondary" : "ghost"}>
                   Calendar
+                </Button>
+              </Link>
+            )}
+             {user.role === "admin" && (
+              <Link href="/map">
+                <Button variant={location === "/map" ? "secondary" : "ghost"}>
+                  Map
                 </Button>
               </Link>
             )}

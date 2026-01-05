@@ -26,6 +26,7 @@ export interface IStorage {
   
   addEngineerLocation(location: InsertEngineerLocation): Promise<EngineerLocation>;
   getEngineerLocationHistory(engineerId: string, limit?: number): Promise<EngineerLocation[]>;
+  getEngineerLocations(): Promise<{ id: string; name: string; lat: number; lng: number; lastUpdate: Date | null }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -130,6 +131,23 @@ export class DatabaseStorage implements IStorage {
       .where(eq(engineerLocations.engineerId, engineerId))
       .orderBy(desc(engineerLocations.timestamp))
       .limit(limit);
+  }
+
+  async getEngineerLocations(): Promise<{ id: string; name: string; lat: number; lng: number; lastUpdate: Date | null }[]> {
+    const engineers = await db
+      .select()
+      .from(users)
+      .where(eq(users.role, "engineer"));
+    
+    return engineers
+      .filter(e => e.currentLat !== null && e.currentLng !== null)
+      .map(e => ({
+        id: e.id,
+        name: e.name,
+        lat: e.currentLat!,
+        lng: e.currentLng!,
+        lastUpdate: e.lastLocationUpdate,
+      }));
   }
 }
 

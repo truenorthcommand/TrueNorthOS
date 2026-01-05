@@ -16,7 +16,9 @@ import CompletedJobs from "@/pages/completed-jobs";
 import Staff from "@/pages/staff";
 import Home from "@/pages/home";
 import CalendarPage from "@/pages/calendar";
+import MapPage from "@/pages/map";
 import { Layout } from "@/components/layout";
+import { LocationTracker } from "@/components/location-tracker";
 import { Loader2 } from "lucide-react";
 
 function PrivateRoute({ component: Component, ...rest }: any) {
@@ -65,6 +67,9 @@ function Router() {
       <Route path="/calendar">
         <PrivateRoute component={CalendarPage} />
       </Route>
+      <Route path="/map">
+        <PrivateRoute component={MapPage} />
+      </Route>
       <Route path="/">
         <PrivateRoute component={Dashboard} />
       </Route>
@@ -85,6 +90,7 @@ function App() {
       <AuthProvider>
         <StoreProvider>
           <TooltipProvider>
+            <LocationTracker />
             <Toaster />
             <Router />
           </TooltipProvider>

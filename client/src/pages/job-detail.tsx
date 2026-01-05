@@ -705,6 +705,35 @@ export default function JobDetail() {
           </Card>
         )}
 
+        {/* Sign-off Location (if signed off) */}
+        {job.status === "Signed Off" && (job.signOffLat || job.signOffAddress) && (
+          <Card className="print:shadow-none print:border-none break-inside-avoid border-2 border-emerald-200 dark:border-emerald-900">
+            <CardHeader className="bg-emerald-50 dark:bg-emerald-900/20 print:bg-transparent print:p-0 print:mb-4">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-emerald-600" />
+                Sign-off Location
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6 print:pt-0">
+              <div className="space-y-2">
+                {job.signOffAddress && (
+                  <p className="text-sm">{job.signOffAddress}</p>
+                )}
+                {job.signOffLat && job.signOffLng && (
+                  <p className="text-xs text-muted-foreground">
+                    Coordinates: {job.signOffLat.toFixed(6)}, {job.signOffLng.toFixed(6)}
+                  </p>
+                )}
+                {job.signOffTimestamp && (
+                  <p className="text-xs text-muted-foreground">
+                    Signed off: {format(new Date(job.signOffTimestamp), "dd MMM yyyy HH:mm")}
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Further Actions / Revisit Section */}
         <Card className="print:shadow-none print:border-none border-2 border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-900/10">
           <CardHeader className="bg-blue-100 dark:bg-blue-900/40 print:bg-transparent print:p-0 print:mb-4">

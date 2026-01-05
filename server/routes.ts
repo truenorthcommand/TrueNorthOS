@@ -96,6 +96,11 @@ export async function registerRoutes(
     });
   });
 
+  app.get("/api/config/maps", requireAuth, (req, res) => {
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY || '';
+    res.json({ apiKey });
+  });
+
   app.get("/api/auth/me", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);
@@ -364,7 +369,7 @@ export async function registerRoutes(
 
   app.post("/api/jobs/:id/sign-off", requireAuth, async (req, res) => {
     try {
-      const { signatures } = req.body;
+      const { signatures, signOffLat, signOffLng, signOffAddress } = req.body;
 
       const existingJob = await storage.getJob(req.params.id);
       if (!existingJob) {
@@ -380,8 +385,9 @@ export async function registerRoutes(
       }
 
       const photos = existingJob.photos as any[] || [];
-      if (photos.length === 0) {
-        return res.status(400).json({ error: "At least one photo is required before sign-off" });
+      const engineerPhotos = photos.filter((p: any) => !p.source || p.source === 'engineer');
+      if (engineerPhotos.length === 0) {
+        return res.status(400).json({ error: "At least one evidence photo is required before sign-off" });
       }
 
       const allSignatures = signatures || existingJob.signatures || [];
@@ -394,8 +400,20 @@ export async function registerRoutes(
         });
       }
 
+      const updates: any = {};
       if (signatures) {
-        await storage.updateJob(req.params.id, { signatures });
+        updates.signatures = signatures;
+      }
+      if (signOffLat !== undefined && signOffLng !== undefined) {
+        updates.signOffLat = signOffLat;
+        updates.signOffLng = signOffLng;
+      }
+      if (signOffAddress) {
+        updates.signOffAddress = signOffAddress;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await storage.updateJob(req.params.id, updates);
       }
 
       const job = await storage.signOffJob(req.params.id);
@@ -403,6 +421,34 @@ export async function registerRoutes(
       res.json(job);
     } catch (error) {
       res.status(500).json({ error: "Failed to sign off job" });
+    }
+  });
+
+  // ==================== LOCATION TRACKING ====================
+
+  app.post("/api/users/:id/location", requireAuth, async (req, res) => {
+    try {
+      const { latitude, longitude, accuracy } = req.body;
+      const userId = req.params.id;
+
+      if (req.session.userId !== userId && req.session.userRole !== 'admin') {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await storage.updateEngineerLocation(userId, latitude, longitude);
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update location" });
+    }
+  });
+
+  app.get("/api/engineers/locations", requireAdmin, async (req, res) => {
+    try {
+      const engineers = await storage.getEngineerLocations();
+      res.json(engineers);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get engineer locations" });
     }
   });
 
