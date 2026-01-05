@@ -37,7 +37,7 @@ export default function Login() {
           <div className="mx-auto mb-4">
             <img src="/logo.png" alt="AI Logo" className="w-12 h-12 rounded-lg" />
           </div>
-          <CardTitle className="text-2xl">Applied Intelligence Solutions</CardTitle>
+          <CardTitle className="text-2xl">TrueNorth</CardTitle>
           <CardDescription>Field View - Sign in to manage your jobs</CardDescription>
         </CardHeader>
         <CardContent>

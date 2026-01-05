@@ -67,7 +67,7 @@ export default function Home() {
               <img src="/logo.png" alt="AI Logo" className="w-10 h-10 rounded-lg" />
               <div>
                 <h1 className="text-xl font-bold tracking-tight">Field View</h1>
-                <p className="text-xs text-muted-foreground">Applied Intelligence Solutions</p>
+                <p className="text-xs text-muted-foreground">TrueNorth</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -205,7 +205,7 @@ export default function Home() {
 
       <footer className="border-t py-8 px-4">
         <div className="max-w-6xl mx-auto text-center text-sm text-muted-foreground">
-          <p>Applied Intelligence Solutions Field View - Digital Job Sheet Management</p>
+          <p>TrueNorth Field View - Digital Job Sheet Management</p>
         </div>
       </footer>
     </div>
