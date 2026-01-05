@@ -59,6 +59,7 @@ export type Job = {
   notes: string | null;
   status: JobStatus;
   assignedToId: string | null;
+  assignedToIds: string[];
   materials: Material[];
   photos: Photo[];
   signatures: Signature[];

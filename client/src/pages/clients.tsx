@@ -10,7 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search } from "lucide-react";
+import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search, Check } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -98,7 +99,7 @@ export default function Clients() {
 
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedPropertyId, setSelectedPropertyId] = useState("");
-  const [selectedEngineerId, setSelectedEngineerId] = useState("");
+  const [selectedEngineerIds, setSelectedEngineerIds] = useState<string[]>([]);
   const [engineers, setEngineers] = useState<{id: string; name: string}[]>([]);
   const [jobForm, setJobForm] = useState({
     description: "",
@@ -233,7 +234,10 @@ export default function Clients() {
     
     if (!client || !property) return;
 
-    const assignToId = user?.role === 'admin' && selectedEngineerId ? selectedEngineerId : user?.id || "";
+    const assignToIds = user?.role === 'admin' && selectedEngineerIds.length > 0 
+      ? selectedEngineerIds 
+      : user?.id ? [user.id] : [];
+    const primaryAssignee = assignToIds[0] || user?.id || "";
     
     const newJob = await addJob({
       jobNo: `J-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`,
@@ -249,7 +253,8 @@ export default function Clients() {
       description: jobForm.description,
       notes: jobForm.notes,
       status: "Draft",
-      assignedToId: assignToId,
+      assignedToId: primaryAssignee,
+      assignedToIds: assignToIds,
       materials: [],
       photos: jobPhotos,
       signatures: [],
@@ -264,7 +269,7 @@ export default function Clients() {
 
       setSelectedClientId("");
       setSelectedPropertyId("");
-      setSelectedEngineerId("");
+      setSelectedEngineerIds([]);
       setJobForm({ description: "", notes: "", startTime: format(new Date(), "HH:mm"), date: format(new Date(), "yyyy-MM-dd") });
       setJobPhotos([]);
       setLocation("/");
@@ -374,19 +379,36 @@ export default function Clients() {
 
                 {user?.role === 'admin' && engineers.length > 0 && (
                   <div className="space-y-2">
-                    <Label>Assign Engineer</Label>
-                    <Select value={selectedEngineerId} onValueChange={setSelectedEngineerId}>
-                      <SelectTrigger data-testid="select-engineer">
-                        <SelectValue placeholder="Choose an engineer..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {engineers.map((eng) => (
-                          <SelectItem key={eng.id} value={eng.id}>
+                    <Label>Assign Engineers</Label>
+                    <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto" data-testid="engineer-checkbox-list">
+                      {engineers.map((eng) => (
+                        <div key={eng.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`eng-${eng.id}`}
+                            checked={selectedEngineerIds.includes(eng.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedEngineerIds([...selectedEngineerIds, eng.id]);
+                              } else {
+                                setSelectedEngineerIds(selectedEngineerIds.filter(id => id !== eng.id));
+                              }
+                            }}
+                            data-testid={`checkbox-engineer-${eng.id}`}
+                          />
+                          <label 
+                            htmlFor={`eng-${eng.id}`} 
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
                             {eng.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    {selectedEngineerIds.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {selectedEngineerIds.length} engineer(s) selected
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -492,7 +514,7 @@ export default function Clients() {
                     onClick={() => {
                       setSelectedClientId("");
                       setSelectedPropertyId("");
-                      setSelectedEngineerId("");
+                      setSelectedEngineerIds([]);
                       setJobForm({ description: "", notes: "", startTime: format(new Date(), "HH:mm"), date: format(new Date(), "yyyy-MM-dd") });
                       setJobPhotos([]);
                     }}

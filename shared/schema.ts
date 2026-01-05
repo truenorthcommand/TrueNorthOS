@@ -34,6 +34,7 @@ export const jobs = pgTable("jobs", {
   notes: text("notes"),
   status: text("status").notNull().default("Draft"),
   assignedToId: varchar("assigned_to_id"),
+  assignedToIds: jsonb("assigned_to_ids").default([]),
   materials: jsonb("materials").default([]),
   photos: jsonb("photos").default([]),
   signatures: jsonb("signatures").default([]),
