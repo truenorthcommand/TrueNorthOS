@@ -98,7 +98,7 @@ export const MOCK_JOBS: Job[] = [
       { id: "m-4", name: "Faceplates", quantity: "4" },
     ],
     photos: [
-      { id: "p-1", url: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&q=80&w=200", timestamp: new Date().toISOString() }
+      { id: "p-1", url: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&q=80&w=200", timestamp: new Date().toISOString(), source: "engineer" as const }
     ],
     signatures: [
       { id: "s-1", type: "engineer", name: "Sarah Jones", url: "mock_sig", timestamp: new Date().toISOString() },

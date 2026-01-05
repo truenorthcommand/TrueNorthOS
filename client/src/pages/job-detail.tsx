@@ -26,6 +26,7 @@ export default function JobDetail() {
   const { getJob, updateJob, addMaterial, removeMaterial, addPhoto, removePhoto, deleteJob, jobs, refreshJobs } = useStore();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const adminFileInputRef = useRef<HTMLInputElement>(null);
   const [actionDescription, setActionDescription] = useState("");
   const [selectedPriority, setSelectedPriority] = useState<ActionPriority>("medium");
   const [engineers, setEngineers] = useState<{id: string; name: string}[]>([]);
@@ -144,13 +145,16 @@ export default function JobDetail() {
     toast({ title: "Job Updated", description: "All changes have been saved." });
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, source: 'admin' | 'engineer' = 'engineer') => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        addPhoto(job.id, reader.result as string);
-        toast({ title: "Photo Uploaded", description: "Image added to job record." });
+        addPhoto(job.id, reader.result as string, source);
+        toast({ 
+          title: "Photo Uploaded", 
+          description: source === 'admin' ? "Reference photo added." : "Evidence photo added." 
+        });
       };
       reader.readAsDataURL(file);
     }
@@ -560,11 +564,67 @@ export default function JobDetail() {
           </CardContent>
         </Card>
 
-        {/* Photos */}
-        <Card className="print:shadow-none print:border-none">
-          <CardHeader className="bg-slate-50 dark:bg-slate-900/50 print:bg-transparent print:p-0 print:mb-4">
+        {/* Admin Reference Photos */}
+        <Card className="print:shadow-none print:border-none border-2 border-blue-200 dark:border-blue-900">
+          <CardHeader className="bg-blue-50 dark:bg-blue-900/20 print:bg-transparent print:p-0 print:mb-4">
              <div className="flex justify-between items-center">
-              <CardTitle className="text-lg">Photos</CardTitle>
+              <CardTitle className="text-lg">Reference Photos (Admin)</CardTitle>
+              {user?.role === 'admin' && !isReadOnly && (
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="no-print"
+                  onClick={() => adminFileInputRef.current?.click()}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Add Reference Photo
+                </Button>
+              )}
+              <input 
+                type="file" 
+                ref={adminFileInputRef} 
+                className="hidden" 
+                accept="image/*" 
+                onChange={(e) => handleFileUpload(e, 'admin')}
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">Reference images, instructions, or site photos provided by admin</p>
+          </CardHeader>
+          <CardContent className="pt-6 print:pt-0">
+             {(job.photos || []).filter(p => p.source === 'admin').length === 0 ? (
+               <div className="text-center py-6 border-2 border-dashed rounded-lg text-muted-foreground bg-blue-50/50">
+                 <p>No reference photos added.</p>
+               </div>
+             ) : (
+               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                 {(job.photos || []).filter(p => p.source === 'admin').map((photo) => (
+                   <div key={photo.id} className="relative group aspect-square bg-slate-100 rounded-md overflow-hidden border">
+                     <img src={photo.url} alt="Reference photo" className="w-full h-full object-cover" />
+                     {user?.role === 'admin' && !isReadOnly && (
+                       <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity no-print"
+                        onClick={() => removePhoto(job.id, photo.id)}
+                       >
+                         <Trash2 className="h-4 w-4" />
+                       </Button>
+                     )}
+                     <div className="absolute bottom-0 left-0 right-0 bg-blue-600/70 text-white text-[10px] p-1 px-2 truncate">
+                       {format(new Date(photo.timestamp), "dd/MM/yy HH:mm")}
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             )}
+          </CardContent>
+        </Card>
+
+        {/* Engineer Evidence Photos */}
+        <Card className="print:shadow-none print:border-none border-2 border-emerald-200 dark:border-emerald-900">
+          <CardHeader className="bg-emerald-50 dark:bg-emerald-900/20 print:bg-transparent print:p-0 print:mb-4">
+             <div className="flex justify-between items-center">
+              <CardTitle className="text-lg">Evidence Photos (Engineer)</CardTitle>
               {!isReadOnly && (
                 <Button 
                   size="sm" 
@@ -573,7 +633,7 @@ export default function JobDetail() {
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <Upload className="mr-2 h-4 w-4" />
-                  Add Photo
+                  Add Evidence Photo
                 </Button>
               )}
               <input 
@@ -581,20 +641,21 @@ export default function JobDetail() {
                 ref={fileInputRef} 
                 className="hidden" 
                 accept="image/*" 
-                onChange={handleFileUpload}
+                onChange={(e) => handleFileUpload(e, 'engineer')}
               />
             </div>
+            <p className="text-sm text-muted-foreground">Photos taken by engineers as proof of work completed</p>
           </CardHeader>
           <CardContent className="pt-6 print:pt-0">
-             {(job.photos || []).length === 0 ? (
-               <div className="text-center py-8 border-2 border-dashed rounded-lg text-muted-foreground bg-slate-50/50">
-                 <p>No photos uploaded yet.</p>
+             {(job.photos || []).filter(p => !p.source || p.source === 'engineer').length === 0 ? (
+               <div className="text-center py-6 border-2 border-dashed rounded-lg text-muted-foreground bg-emerald-50/50">
+                 <p>No evidence photos uploaded yet.</p>
                </div>
              ) : (
                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                 {(job.photos || []).map((photo) => (
+                 {(job.photos || []).filter(p => !p.source || p.source === 'engineer').map((photo) => (
                    <div key={photo.id} className="relative group aspect-square bg-slate-100 rounded-md overflow-hidden border">
-                     <img src={photo.url} alt="Job photo" className="w-full h-full object-cover" />
+                     <img src={photo.url} alt="Evidence photo" className="w-full h-full object-cover" />
                      {!isReadOnly && (
                        <Button
                         variant="destructive"
@@ -605,7 +666,7 @@ export default function JobDetail() {
                          <Trash2 className="h-4 w-4" />
                        </Button>
                      )}
-                     <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] p-1 px-2 truncate">
+                     <div className="absolute bottom-0 left-0 right-0 bg-emerald-600/70 text-white text-[10px] p-1 px-2 truncate">
                        {format(new Date(photo.timestamp), "dd/MM/yy HH:mm")}
                      </div>
                    </div>

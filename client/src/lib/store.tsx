@@ -12,7 +12,7 @@ interface StoreContextType {
   updateJob: (id: string, updates: Partial<Job>) => Promise<void>;
   addMaterial: (jobId: string, material: Omit<Material, "id">) => Promise<void>;
   removeMaterial: (jobId: string, materialId: string) => Promise<void>;
-  addPhoto: (jobId: string, url: string) => Promise<void>;
+  addPhoto: (jobId: string, url: string, source?: 'admin' | 'engineer') => Promise<void>;
   removePhoto: (jobId: string, photoId: string) => Promise<void>;
   addSignature: (jobId: string, signature: Omit<Signature, "id" | "timestamp">) => Promise<void>;
   addFurtherAction: (jobId: string, action: Omit<FurtherAction, "id" | "timestamp">) => Promise<void>;
@@ -127,13 +127,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const addPhoto = async (jobId: string, url: string) => {
+  const addPhoto = async (jobId: string, url: string, source: 'admin' | 'engineer' = 'engineer') => {
     const job = getJob(jobId);
     if (!job) return;
     const newPhoto: Photo = {
       id: `p-${Date.now()}`,
       url,
       timestamp: new Date().toISOString(),
+      source,
     };
     await updateJob(jobId, {
       photos: [...(job.photos || []), newPhoto],

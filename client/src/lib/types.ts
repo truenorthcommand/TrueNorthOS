@@ -23,6 +23,7 @@ export type Photo = {
   id: string;
   url: string;
   timestamp: string;
+  source: 'admin' | 'engineer';
 };
 
 export type Signature = {
