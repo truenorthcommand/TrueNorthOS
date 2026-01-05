@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send } from "lucide-react";
+import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -83,6 +83,7 @@ export default function Clients() {
   const { toast } = useToast();
   
   const [clients, setClients] = useState<Client[]>(MOCK_CLIENTS);
+  const [clientSearchTerm, setClientSearchTerm] = useState("");
   const [newClient, setNewClient] = useState({
     name: "",
     contact: "",
@@ -573,8 +574,35 @@ export default function Clients() {
             </CardContent>
           </Card>
 
+          <div className="flex items-center space-x-2 bg-white dark:bg-slate-900 p-2 rounded-lg border shadow-sm mb-4">
+            <Search className="w-5 h-5 text-muted-foreground ml-2" />
+            <Input 
+              placeholder="Search clients by name, contact, email, or address..." 
+              className="border-none shadow-none focus-visible:ring-0"
+              value={clientSearchTerm}
+              onChange={(e) => setClientSearchTerm(e.target.value)}
+              data-testid="input-search-clients"
+            />
+          </div>
+
           <div className="space-y-4">
-            {clients.map((client) => (
+            {clients
+              .filter((client) => {
+                if (!clientSearchTerm) return true;
+                const term = clientSearchTerm.toLowerCase();
+                return (
+                  client.name.toLowerCase().includes(term) ||
+                  client.contact.toLowerCase().includes(term) ||
+                  client.email.toLowerCase().includes(term) ||
+                  client.phone.toLowerCase().includes(term) ||
+                  client.mainAddress.toLowerCase().includes(term) ||
+                  client.properties.some(p => 
+                    p.address.toLowerCase().includes(term) || 
+                    p.postcode.toLowerCase().includes(term)
+                  )
+                );
+              })
+              .map((client) => (
               <Card
                 key={client.id}
                 className="hover:shadow-md transition-shadow overflow-hidden"
@@ -747,6 +775,24 @@ export default function Clients() {
           {clients.length === 0 && (
             <div className="text-center py-12 text-muted-foreground">
               <p>No clients added yet.</p>
+            </div>
+          )}
+          {clients.length > 0 && clientSearchTerm && clients.filter((client) => {
+            const term = clientSearchTerm.toLowerCase();
+            return (
+              client.name.toLowerCase().includes(term) ||
+              client.contact.toLowerCase().includes(term) ||
+              client.email.toLowerCase().includes(term) ||
+              client.phone.toLowerCase().includes(term) ||
+              client.mainAddress.toLowerCase().includes(term) ||
+              client.properties.some(p => 
+                p.address.toLowerCase().includes(term) || 
+                p.postcode.toLowerCase().includes(term)
+              )
+            );
+          }).length === 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>No clients match your search.</p>
             </div>
           )}
         </TabsContent>
