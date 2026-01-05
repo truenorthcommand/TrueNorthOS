@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
-import { Job, JobStatus } from "@/lib/types";
+import { Job, JobStatus, User as UserType } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, MapPin, Clock, User } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, MapPin, Clock, User, Users } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, parseISO, addMonths, subMonths, getDay, isToday, isValid } from "date-fns";
 
 function safeParseISO(dateStr: string | null | undefined): Date | null {
@@ -25,6 +25,26 @@ export default function CalendarPage() {
   const [, setLocation] = useLocation();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [engineers, setEngineers] = useState<{id: string; name: string}[]>([]);
+
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      fetch('/api/users', { credentials: 'include' })
+        .then(res => res.json())
+        .then(data => {
+          const engineerList = data.filter((u: any) => u.role === 'engineer');
+          setEngineers(engineerList.map((e: any) => ({ id: e.id, name: e.name })));
+        })
+        .catch(() => {});
+    }
+  }, [user]);
+
+  const getEngineerNames = (job: Job): string => {
+    const ids = job.assignedToIds && job.assignedToIds.length > 0 
+      ? job.assignedToIds 
+      : job.assignedToId ? [job.assignedToId] : [];
+    return ids.map(id => engineers.find(e => e.id === id)?.name || '').filter(Boolean).join(', ');
+  };
 
   if (!user || user.role !== "admin") {
     return (
@@ -197,15 +217,18 @@ export default function CalendarPage() {
                       {format(day, "d")}
                     </div>
                     <div className="space-y-0.5">
-                      {dayJobs.slice(0, 3).map(job => (
-                        <div
-                          key={job.id}
-                          className={`text-xs px-1 py-0.5 rounded truncate text-white ${getStatusColor(job.status)}`}
-                          title={job.customerName}
-                        >
-                          {job.startTime || ""} {job.customerName}
-                        </div>
-                      ))}
+                      {dayJobs.slice(0, 3).map(job => {
+                        const engineerNames = getEngineerNames(job);
+                        return (
+                          <div
+                            key={job.id}
+                            className={`text-xs px-1 py-0.5 rounded truncate text-white ${getStatusColor(job.status)}`}
+                            title={`${job.customerName}${engineerNames ? ` - ${engineerNames}` : ''}`}
+                          >
+                            {job.startTime || ""} {engineerNames ? `[${engineerNames.split(',')[0].split(' ')[0]}]` : ''} {job.customerName}
+                          </div>
+                        );
+                      })}
                       {dayJobs.length > 3 && (
                         <div className="text-xs text-muted-foreground px-1">
                           +{dayJobs.length - 3} more
@@ -269,6 +292,12 @@ export default function CalendarPage() {
                         <div className="flex items-center gap-1">
                           <User className="h-3 w-3" />
                           <span>{job.contactName}</span>
+                        </div>
+                      )}
+                      {getEngineerNames(job) && (
+                        <div className="flex items-center gap-1 mt-1 pt-1 border-t">
+                          <Users className="h-3 w-3 text-primary" />
+                          <span className="font-medium text-primary">{getEngineerNames(job)}</span>
                         </div>
                       )}
                     </div>
