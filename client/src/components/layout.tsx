@@ -17,7 +17,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const NavContent = () => (
     <div className="flex flex-col gap-4 h-full">
       <div className="flex items-center gap-2 mb-6 px-2">
-        <img src="/logo.png" alt="AI Logo" className="w-8 h-8 rounded-md" />
+        <img src="/logo.png" alt="TrueNorth Logo" className="w-8 h-8 rounded-md" />
         <span className="text-xl font-bold tracking-tight">Field View</span>
       </div>
 
@@ -161,13 +161,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </Sheet>
         
         <div className="flex items-center gap-2 md:hidden">
-          <img src="/logo.png" alt="AI Logo" className="w-8 h-8 rounded-md" />
+          <img src="/logo.png" alt="TrueNorth Logo" className="w-8 h-8 rounded-md" />
           <span className="text-lg font-bold">Field View</span>
         </div>
 
         <div className="hidden md:flex items-center gap-6 w-full">
            <div className="flex items-center gap-2 mr-8">
-            <img src="/logo.png" alt="AI Logo" className="w-8 h-8 rounded-md" />
+            <img src="/logo.png" alt="TrueNorth Logo" className="w-8 h-8 rounded-md" />
             <span className="text-xl font-bold tracking-tight">Field View</span>
           </div>
           
