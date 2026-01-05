@@ -126,7 +126,7 @@ export default function MapPage() {
         <Button 
           variant="outline" 
           size="sm" 
-          onClick={fetchEngineers}
+          onClick={fetchEngineerLocations}
           disabled={isLoading}
           data-testid="button-refresh-map"
         >
