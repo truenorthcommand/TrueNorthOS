@@ -60,7 +60,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, refreshJobs]);
 
-  const getJob = (id: string) => jobs.find((j) => j.id === id);
+  const getJob = useCallback((id: string) => jobs.find((j) => j.id === id), [jobs]);
 
   const addJob = async (jobData: Partial<Job>): Promise<Job | null> => {
     try {
@@ -72,9 +72,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       });
       if (response.ok) {
         const newJob = await response.json();
-        await refreshJobs();
+        const normalizedJob = {
+          ...newJob,
+          materials: newJob.materials || [],
+          photos: newJob.photos || [],
+          signatures: newJob.signatures || [],
+          furtherActions: newJob.furtherActions || [],
+        };
+        setJobs(prev => [...prev, normalizedJob]);
         toast({ title: "Job Created", description: `Job ${newJob.jobNo} has been created.` });
-        return newJob;
+        return normalizedJob;
       }
     } catch (error) {
       toast({ title: "Error", description: "Failed to create job", variant: "destructive" });
@@ -83,6 +90,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateJob = async (id: string, updates: Partial<Job>) => {
+    const previousJob = jobs.find(j => j.id === id);
+    
+    setJobs(prev => prev.map(job => 
+      job.id === id ? { ...job, ...updates } : job
+    ));
+    
     try {
       const response = await fetch(`/api/jobs/${id}`, {
         method: "PATCH",
@@ -91,21 +104,43 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify(updates),
       });
       if (response.ok) {
-        await refreshJobs();
+        const updatedJob = await response.json();
+        setJobs(prev => prev.map(job => 
+          job.id === id ? {
+            ...updatedJob,
+            materials: updatedJob.materials || [],
+            photos: updatedJob.photos || [],
+            signatures: updatedJob.signatures || [],
+            furtherActions: updatedJob.furtherActions || [],
+          } : job
+        ));
+      } else {
+        if (previousJob) {
+          setJobs(prev => prev.map(job => job.id === id ? previousJob : job));
+        }
+        toast({ title: "Error", description: "Failed to update job", variant: "destructive" });
       }
     } catch (error) {
+      if (previousJob) {
+        setJobs(prev => prev.map(job => job.id === id ? previousJob : job));
+      }
       toast({ title: "Error", description: "Failed to update job", variant: "destructive" });
     }
   };
 
   const deleteJob = async (id: string) => {
+    const previousJobs = jobs;
+    setJobs(prev => prev.filter(job => job.id !== id));
+    
     try {
       const response = await fetch(`/api/jobs/${id}`, { method: "DELETE", credentials: 'include' });
       if (response.ok) {
-        await refreshJobs();
         toast({ title: "Job Deleted", variant: "destructive" });
+      } else {
+        setJobs(previousJobs);
       }
     } catch (error) {
+      setJobs(previousJobs);
       toast({ title: "Error", description: "Failed to delete job", variant: "destructive" });
     }
   };
@@ -195,7 +230,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         }),
       });
       if (response.ok) {
-        await refreshJobs();
+        const updatedJob = await response.json();
+        setJobs(prev => prev.map(j => 
+          j.id === id ? {
+            ...updatedJob,
+            materials: updatedJob.materials || [],
+            photos: updatedJob.photos || [],
+            signatures: updatedJob.signatures || [],
+            furtherActions: updatedJob.furtherActions || [],
+          } : j
+        ));
         toast({
           title: "Job Signed Off",
           description: "Signatures recorded successfully.",

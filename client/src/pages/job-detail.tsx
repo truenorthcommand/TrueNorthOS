@@ -23,7 +23,7 @@ export default function JobDetail() {
   const { user } = useAuth();
   const [match, params] = useRoute("/jobs/:id");
   const [, setLocation] = useLocation();
-  const { getJob, updateJob, addMaterial, removeMaterial, addPhoto, removePhoto, deleteJob, jobs, refreshJobs } = useStore();
+  const { getJob, updateJob, addMaterial, removeMaterial, addPhoto, removePhoto, deleteJob, jobs } = useStore();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const adminFileInputRef = useRef<HTMLInputElement>(null);
@@ -72,11 +72,6 @@ export default function JobDetail() {
   const jobId = params?.id;
   const job = jobId ? getJob(jobId) : undefined;
   
-  useEffect(() => {
-    if (jobId) {
-      refreshJobs();
-    }
-  }, [jobId]);
   
   useEffect(() => {
     if (job) {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, memo } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
@@ -247,50 +247,6 @@ function EngineerDashboard() {
   const { jobs } = useStore();
   const [, setLocation] = useLocation();
 
-  if (!user) return null;
-
-  const myJobs = jobs.filter(job => job.assignedToId === user.id || (job.assignedToIds || []).includes(user.id));
-  
-  const todayJobs = myJobs
-    .filter(job => job.date && isToday(parseISO(job.date)))
-    .sort((a, b) => {
-      const orderA = a.orderNumber ?? 9999;
-      const orderB = b.orderNumber ?? 9999;
-      if (orderA !== orderB) return orderA - orderB;
-      if (!a.session && b.session) return 1;
-      if (a.session && !b.session) return -1;
-      if (a.session && b.session && a.session !== b.session) return a.session.localeCompare(b.session);
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateA - dateB;
-    });
-
-  const tomorrowJobs = myJobs
-    .filter(job => job.date && isTomorrow(parseISO(job.date)))
-    .sort((a, b) => {
-      const orderA = a.orderNumber ?? 9999;
-      const orderB = b.orderNumber ?? 9999;
-      if (orderA !== orderB) return orderA - orderB;
-      if (!a.session && b.session) return 1;
-      if (a.session && !b.session) return -1;
-      if (a.session && b.session && a.session !== b.session) return a.session.localeCompare(b.session);
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateA - dateB;
-    });
-
-  const upcomingJobs = myJobs
-    .filter(job => {
-      if (!job.date) return false;
-      const jobDate = parseISO(job.date);
-      return isThisWeek(jobDate) && !isToday(jobDate) && !isTomorrow(jobDate);
-    })
-    .sort((a, b) => {
-      const dateA = a.date ? new Date(a.date).getTime() : 0;
-      const dateB = b.date ? new Date(b.date).getTime() : 0;
-      return dateA - dateB;
-    });
-
   const sortByOrder = (a: Job, b: Job) => {
     const orderA = a.orderNumber ?? 9999;
     const orderB = b.orderNumber ?? 9999;
@@ -303,9 +259,56 @@ function EngineerDashboard() {
     return dateA - dateB;
   };
 
-  const activeJobs = myJobs.filter(job => job.status === "In Progress" || job.status === "Draft").sort(sortByOrder);
-  const completedJobs = myJobs.filter(job => job.status === "Signed Off").sort(sortByOrder);
-  const awaitingSignature = myJobs.filter(job => job.status === "Awaiting Signatures").sort(sortByOrder);
+  const myJobs = useMemo(() => 
+    jobs.filter(job => job.assignedToId === user?.id || (job.assignedToIds || []).includes(user?.id || '')),
+    [jobs, user?.id]
+  );
+  
+  const todayJobs = useMemo(() => 
+    myJobs
+      .filter(job => job.date && isToday(parseISO(job.date)))
+      .sort(sortByOrder),
+    [myJobs]
+  );
+
+  const tomorrowJobs = useMemo(() => 
+    myJobs
+      .filter(job => job.date && isTomorrow(parseISO(job.date)))
+      .sort(sortByOrder),
+    [myJobs]
+  );
+
+  const upcomingJobs = useMemo(() => 
+    myJobs
+      .filter(job => {
+        if (!job.date) return false;
+        const jobDate = parseISO(job.date);
+        return isThisWeek(jobDate) && !isToday(jobDate) && !isTomorrow(jobDate);
+      })
+      .sort((a, b) => {
+        const dateA = a.date ? new Date(a.date).getTime() : 0;
+        const dateB = b.date ? new Date(b.date).getTime() : 0;
+        return dateA - dateB;
+      }),
+    [myJobs]
+  );
+
+  const activeJobs = useMemo(() => 
+    myJobs.filter(job => job.status === "In Progress" || job.status === "Draft").sort(sortByOrder),
+    [myJobs]
+  );
+  
+  const completedJobs = useMemo(() => 
+    myJobs.filter(job => job.status === "Signed Off").sort(sortByOrder),
+    [myJobs]
+  );
+  
+  const awaitingSignature = useMemo(() => 
+    myJobs.filter(job => job.status === "Awaiting Signatures").sort(sortByOrder),
+    [myJobs]
+  );
+
+  if (!user) return null;
 
   const getStatusColor = (status: JobStatus) => {
     switch (status) {
