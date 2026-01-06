@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
@@ -20,13 +20,14 @@ interface Engineer {
 
 export default function Engineers() {
   const { user } = useAuth();
-  const { jobs } = useStore();
+  const { jobs, refreshJobs } = useStore();
   const [engineers, setEngineers] = useState<Engineer[]>([]);
   const [expandedEngineerId, setExpandedEngineerId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (user?.role === 'admin') {
+      refreshJobs();
       fetch('/api/users', { credentials: 'include' })
         .then(res => res.json())
         .then(data => {
@@ -40,6 +41,34 @@ export default function Engineers() {
     }
   }, [user]);
 
+  const jobsByEngineer = useMemo(() => {
+    const map = new Map<string, { total: number; completed: number; inProgress: number; allJobs: typeof jobs }>();
+    
+    jobs.forEach(job => {
+      const engineerIds = new Set<string>();
+      if (job.assignedToId) engineerIds.add(job.assignedToId);
+      (job.assignedToIds || []).forEach(id => engineerIds.add(id));
+      
+      engineerIds.forEach(engineerId => {
+        const existing = map.get(engineerId) || { total: 0, completed: 0, inProgress: 0, allJobs: [] as typeof jobs };
+        existing.total++;
+        if (job.status === "Signed Off") {
+          existing.completed++;
+        } else {
+          existing.inProgress++;
+        }
+        existing.allJobs = [...existing.allJobs, job];
+        map.set(engineerId, existing);
+      });
+    });
+    
+    return map;
+  }, [jobs]);
+
+  const getEngineerStats = useCallback((engineerId: string) => {
+    return jobsByEngineer.get(engineerId) || { total: 0, completed: 0, inProgress: 0, allJobs: [] };
+  }, [jobsByEngineer]);
+
   if (!user || user.role !== "admin") {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh]">
@@ -49,18 +78,6 @@ export default function Engineers() {
       </div>
     );
   }
-
-  const getEngineerJobsCount = (engineerId: string) => {
-    return jobs.filter((job) => (job.assignedToId === engineerId || (job.assignedToIds || []).includes(engineerId)) && job.status !== "Signed Off").length;
-  };
-
-  const getEngineerCompletedCount = (engineerId: string) => {
-    return jobs.filter((job) => (job.assignedToId === engineerId || (job.assignedToIds || []).includes(engineerId)) && job.status === "Signed Off").length;
-  };
-
-  const getEngineerJobs = (engineerId: string) => {
-    return jobs.filter((job) => job.assignedToId === engineerId || (job.assignedToIds || []).includes(engineerId));
-  };
 
   if (isLoading) {
     return (
@@ -81,9 +98,10 @@ export default function Engineers() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {engineers.map((engineer) => {
-          const currentJobsCount = getEngineerJobsCount(engineer.id);
-          const completedJobsCount = getEngineerCompletedCount(engineer.id);
-          const allJobs = getEngineerJobs(engineer.id);
+          const stats = getEngineerStats(engineer.id);
+          const currentJobsCount = stats.inProgress;
+          const completedJobsCount = stats.completed;
+          const allJobs = stats.allJobs;
           
           return (
             <Card key={engineer.id} className="hover:shadow-md transition-shadow" data-testid={`card-engineer-${engineer.id}`}>
