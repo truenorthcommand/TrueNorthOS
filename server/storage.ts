@@ -2,7 +2,8 @@ import {
   type User, type InsertUser, 
   type Job, type InsertJob,
   type EngineerLocation, type InsertEngineerLocation,
-  users, jobs, engineerLocations
+  type AiAdvisor, type InsertAiAdvisor,
+  users, jobs, engineerLocations, aiAdvisors
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql } from "drizzle-orm";
@@ -27,6 +28,13 @@ export interface IStorage {
   addEngineerLocation(location: InsertEngineerLocation): Promise<EngineerLocation>;
   getEngineerLocationHistory(engineerId: string, limit?: number): Promise<EngineerLocation[]>;
   getEngineerLocations(): Promise<{ id: string; name: string; lat: number; lng: number; lastUpdate: Date | null }[]>;
+  
+  getAllAiAdvisors(): Promise<AiAdvisor[]>;
+  getActiveAiAdvisors(): Promise<AiAdvisor[]>;
+  getAiAdvisor(id: string): Promise<AiAdvisor | undefined>;
+  createAiAdvisor(advisor: InsertAiAdvisor): Promise<AiAdvisor>;
+  updateAiAdvisor(id: string, updates: Partial<AiAdvisor>): Promise<AiAdvisor | undefined>;
+  deleteAiAdvisor(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -148,6 +156,33 @@ export class DatabaseStorage implements IStorage {
         lng: e.currentLng!,
         lastUpdate: e.lastLocationUpdate,
       }));
+  }
+
+  async getAllAiAdvisors(): Promise<AiAdvisor[]> {
+    return db.select().from(aiAdvisors).orderBy(aiAdvisors.name);
+  }
+
+  async getActiveAiAdvisors(): Promise<AiAdvisor[]> {
+    return db.select().from(aiAdvisors).where(eq(aiAdvisors.isActive, true)).orderBy(aiAdvisors.name);
+  }
+
+  async getAiAdvisor(id: string): Promise<AiAdvisor | undefined> {
+    const [advisor] = await db.select().from(aiAdvisors).where(eq(aiAdvisors.id, id));
+    return advisor;
+  }
+
+  async createAiAdvisor(advisor: InsertAiAdvisor): Promise<AiAdvisor> {
+    const [created] = await db.insert(aiAdvisors).values(advisor).returning();
+    return created;
+  }
+
+  async updateAiAdvisor(id: string, updates: Partial<AiAdvisor>): Promise<AiAdvisor | undefined> {
+    const [updated] = await db.update(aiAdvisors).set(updates).where(eq(aiAdvisors.id, id)).returning();
+    return updated;
+  }
+
+  async deleteAiAdvisor(id: string): Promise<void> {
+    await db.delete(aiAdvisors).where(eq(aiAdvisors.id, id));
   }
 }
 

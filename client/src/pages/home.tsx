@@ -71,6 +71,11 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <Link href="/pricing">
+                <Button variant="outline" data-testid="button-pricing">
+                  Pricing
+                </Button>
+              </Link>
               {user ? (
                 <Link href="/">
                   <Button data-testid="button-go-to-app">

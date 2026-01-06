@@ -115,3 +115,22 @@ export type FurtherAction = {
 };
 
 export type JobStatus = 'Draft' | 'In Progress' | 'Awaiting Signatures' | 'Signed Off';
+
+export const aiAdvisors = pgTable("ai_advisors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  icon: text("icon").notNull().default("Bot"),
+  category: text("category").notNull().default("general"),
+  systemPrompt: text("system_prompt").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAiAdvisorSchema = createInsertSchema(aiAdvisors).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAiAdvisor = z.infer<typeof insertAiAdvisorSchema>;
+export type AiAdvisor = typeof aiAdvisors.$inferSelect;

@@ -17,6 +17,9 @@ import Staff from "@/pages/staff";
 import Home from "@/pages/home";
 import CalendarPage from "@/pages/calendar";
 import MapPage from "@/pages/map";
+import Pricing from "@/pages/pricing";
+import AiAdvisors from "@/pages/ai-advisors";
+import AdminAdvisors from "@/pages/admin-advisors";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { Loader2 } from "lucide-react";
@@ -51,6 +54,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/home" component={Home} />
+      <Route path="/pricing" component={Pricing} />
       <Route path="/auth" component={Login} />
       <Route path="/clients">
         <PrivateRoute component={Clients} />
@@ -69,6 +73,12 @@ function Router() {
       </Route>
       <Route path="/map">
         <PrivateRoute component={MapPage} />
+      </Route>
+      <Route path="/ai-advisors">
+        <PrivateRoute component={AiAdvisors} />
+      </Route>
+      <Route path="/admin/advisors">
+        <PrivateRoute component={AdminAdvisors} />
       </Route>
       <Route path="/">
         <PrivateRoute component={Dashboard} />

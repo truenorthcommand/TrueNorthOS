@@ -1,6 +1,6 @@
 # TrueNorth Field View
 
-A web-based job sheet application for field engineers with authentication, job management, photo uploads, signature capture, and PDF generation.
+A web-based job sheet application for field engineers with authentication, job management, photo uploads, signature capture, GPS tracking, AI assistants, and PDF generation.
 
 ## Overview
 
@@ -10,10 +10,13 @@ This application enables field service companies to manage job sheets digitally.
 
 - **Role-based Authentication**: Admin and Engineer roles with different access levels
 - **Job Management**: Create, edit, track job progress and status
-- **Photo Evidence**: Upload photos as job completion evidence
+- **Photo Evidence**: Upload photos as job completion evidence (separated by admin reference and engineer evidence)
 - **Digital Signatures**: Capture engineer and customer signatures
+- **GPS Tracking**: Live engineer locations on map, geolocation-stamped sign-offs with reverse geocoding
+- **AI Advisors**: Specialist AI assistants (Snagging Pro, Trade Parts Finder, Gas & Heating Expert, Electrical Expert) with photo analysis
 - **Further Actions**: Flag issues with priority levels (low/medium/high/urgent)
 - **Print-friendly Output**: Generate PDF-ready job sheets
+- **PWA Support**: Installable as mobile app with offline caching
 
 ## User Credentials (Demo)
 
@@ -34,16 +37,31 @@ This application enables field service companies to manage job sheets digitally.
 - `/server/db.ts` - PostgreSQL connection
 
 ### Database (PostgreSQL)
-- `users` - User accounts with roles
+- `users` - User accounts with roles, location tracking
 - `jobs` - Job records with materials, photos, signatures
+- `engineer_locations` - Location history
+- `ai_advisors` - AI assistant configurations
 
 ## Sign-off Validation Rules
 
 Before a job can be signed off:
-1. At least one photo must be uploaded
+1. At least one evidence photo must be uploaded
 2. Engineer signature must be captured
 3. Customer signature must be captured
+4. Geolocation must be captured
 
 ## API Authentication
 
 All API routes (except login and seed) require authentication via session cookies. Engineers can only access their assigned jobs; admins have full access.
+
+## Environment Variables
+
+- `OPENAI_API_KEY` - Required for AI Advisors functionality
+- `GOOGLE_MAPS_API_KEY` - Required for live map and geocoding
+
+## Pricing Tiers
+
+- **Starter**: Free for 2 users, +£10/user after
+- **Professional**: £99/month, +£10/user up to 35
+- **Business**: £300/month, +£10/user up to 35
+- **Enterprise**: Custom pricing, unlimited users
