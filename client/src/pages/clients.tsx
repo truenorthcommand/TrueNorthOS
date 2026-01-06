@@ -19,6 +19,7 @@ interface JobPhoto {
   id: string;
   url: string;
   caption: string;
+  source: 'admin' | 'engineer';
   timestamp: string;
 }
 
@@ -106,6 +107,7 @@ export default function Clients() {
     notes: "",
     session: "AM",
     date: format(new Date(), "yyyy-MM-dd"),
+    orderNumber: "" as string | number,
   });
   const [jobPhotos, setJobPhotos] = useState<JobPhoto[]>([]);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
@@ -123,6 +125,7 @@ export default function Clients() {
           id: `photo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           url: reader.result as string,
           caption: file.name,
+          source: 'admin',
           timestamp: new Date().toISOString(),
         };
         setJobPhotos((prev) => [...prev, newPhoto]);
@@ -250,6 +253,7 @@ export default function Clients() {
       contactEmail: client.email,
       date: new Date(jobForm.date).toISOString(),
       session: jobForm.session,
+      orderNumber: jobForm.orderNumber ? Number(jobForm.orderNumber) : null,
       description: jobForm.description,
       notes: jobForm.notes,
       status: "Draft",
@@ -270,7 +274,7 @@ export default function Clients() {
       setSelectedClientId("");
       setSelectedPropertyId("");
       setSelectedEngineerIds([]);
-      setJobForm({ description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd") });
+      setJobForm({ description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "" });
       setJobPhotos([]);
       setLocation("/");
     }
@@ -412,7 +416,7 @@ export default function Clients() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>Appointment Date</Label>
                     <Input
@@ -433,6 +437,19 @@ export default function Clients() {
                         <SelectItem value="PM">PM (Afternoon)</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Job Order</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="999"
+                      placeholder="Auto"
+                      value={jobForm.orderNumber}
+                      onChange={(e) => setJobForm({ ...jobForm, orderNumber: e.target.value })}
+                      data-testid="input-order-number"
+                    />
+                    <p className="text-xs text-muted-foreground">Lower numbers appear first</p>
                   </div>
                 </div>
 
@@ -518,7 +535,7 @@ export default function Clients() {
                       setSelectedClientId("");
                       setSelectedPropertyId("");
                       setSelectedEngineerIds([]);
-                      setJobForm({ description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd") });
+                      setJobForm({ description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "" });
                       setJobPhotos([]);
                     }}
                     data-testid="button-clear-form"
