@@ -204,6 +204,51 @@ export async function registerRoutes(
       res.status(500).json({ error: "Failed to check status" });
     }
   });
+  
+  // Emergency password reset for admin - resets to default password
+  app.post("/api/setup/reset-admin", async (req, res) => {
+    try {
+      const { username, newPassword, setupKey } = req.body;
+      
+      // Require a setup key for security
+      if (setupKey !== 'TrueNorth2024Reset') {
+        return res.status(403).json({ error: "Invalid setup key" });
+      }
+      
+      if (!username || !newPassword) {
+        return res.status(400).json({ error: "Username and new password required" });
+      }
+      
+      if (newPassword.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+      
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
+      await storage.updateUser(user.id, { password: hashedPassword });
+      
+      // Auto-login
+      req.session.userId = user.id;
+      req.session.userRole = user.role;
+      
+      res.json({ 
+        message: "Password reset successful",
+        user: {
+          id: user.id,
+          name: user.name,
+          role: user.role,
+          username: user.username,
+        }
+      });
+    } catch (error) {
+      console.error("Password reset error:", error);
+      res.status(500).json({ error: "Password reset failed" });
+    }
+  });
 
   // ==================== USER / ENGINEER ROUTES (PROTECTED) ====================
   
