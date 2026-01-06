@@ -113,7 +113,10 @@ export default function Staff() {
   };
 
   useEffect(() => {
-    if (user?.role !== 'admin') {
+    if (user?.role === 'admin') {
+      setIsVerified(true);
+      fetchStaff();
+    } else {
       setIsLoading(false);
     }
   }, [user]);
