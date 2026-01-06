@@ -267,8 +267,8 @@ export default function Clients() {
 
     if (newJob) {
       toast({
-        title: "Job Created",
-        description: `New job sheet created for ${client.name}`,
+        title: "Job Sheet Sent",
+        description: `Job sheet #${newJob.jobNo} has been created and sent for ${client.name}`,
       });
 
       setSelectedClientId("");
@@ -276,7 +276,6 @@ export default function Clients() {
       setSelectedEngineerIds([]);
       setJobForm({ description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "" });
       setJobPhotos([]);
-      setLocation("/");
     }
   };
 
