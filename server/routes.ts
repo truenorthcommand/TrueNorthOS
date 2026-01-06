@@ -360,7 +360,22 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Cannot modify a signed-off job" });
       }
 
-      const job = await storage.updateJob(req.params.id, req.body);
+      let updates = req.body;
+      
+      if (req.session.userRole === 'engineer') {
+        const engineerAllowedFields = ['worksCompleted', 'notes', 'materials', 'photos', 'signatures', 'furtherActions'];
+        const requestedFields = Object.keys(updates);
+        const disallowedFields = requestedFields.filter(key => !engineerAllowedFields.includes(key));
+        
+        if (disallowedFields.length > 0) {
+          return res.status(403).json({ 
+            error: "Engineers cannot modify admin fields", 
+            disallowedFields 
+          });
+        }
+      }
+
+      const job = await storage.updateJob(req.params.id, updates);
       res.json(job);
     } catch (error) {
       res.status(500).json({ error: "Failed to update job" });

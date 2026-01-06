@@ -156,6 +156,8 @@ export default function JobDetail() {
   };
 
   const isReadOnly = job.status === "Signed Off";
+  const isAdmin = user?.role === "admin";
+  const isAdminFieldReadOnly = isReadOnly || !isAdmin;
 
   const handleAddAction = () => {
     if (!actionDescription.trim()) {
@@ -285,7 +287,7 @@ export default function JobDetail() {
                   value={formData.client} 
                   onChange={(e) => handleFieldChange('client', e.target.value)}
                   onBlur={() => handleFieldBlur('client')}
-                  disabled={isReadOnly}
+                  disabled={isAdminFieldReadOnly}
                   className="print:border-none print:p-0 print:font-semibold"
                   placeholder="Your company name"
                 />
@@ -296,7 +298,7 @@ export default function JobDetail() {
                   value={formData.customerName} 
                   onChange={(e) => handleFieldChange('customerName', e.target.value)}
                   onBlur={() => handleFieldBlur('customerName')}
-                  disabled={isReadOnly}
+                  disabled={isAdminFieldReadOnly}
                   className="print:border-none print:p-0 print:font-bold"
                 />
               </div>
@@ -306,7 +308,7 @@ export default function JobDetail() {
                   value={formData.address} 
                   onChange={(e) => handleFieldChange('address', e.target.value)}
                   onBlur={() => handleFieldBlur('address')}
-                  disabled={isReadOnly}
+                  disabled={isAdminFieldReadOnly}
                   className="min-h-[80px] print:border-none print:p-0"
                 />
               </div>
@@ -316,7 +318,7 @@ export default function JobDetail() {
                   value={formData.postcode} 
                   onChange={(e) => handleFieldChange('postcode', e.target.value)}
                   onBlur={() => handleFieldBlur('postcode')}
-                  disabled={isReadOnly}
+                  disabled={isAdminFieldReadOnly}
                   className="print:border-none print:p-0"
                 />
               </div>
@@ -331,7 +333,7 @@ export default function JobDetail() {
                     value={formData.contactName} 
                     onChange={(e) => handleFieldChange('contactName', e.target.value)}
                     onBlur={() => handleFieldBlur('contactName')}
-                    disabled={isReadOnly}
+                    disabled={isAdminFieldReadOnly}
                     className="pl-9 print:pl-0 print:border-none"
                     placeholder="Contact Name"
                   />
@@ -345,7 +347,7 @@ export default function JobDetail() {
                     value={formData.contactPhone} 
                     onChange={(e) => handleFieldChange('contactPhone', e.target.value)}
                     onBlur={() => handleFieldBlur('contactPhone')}
-                    disabled={isReadOnly}
+                    disabled={isAdminFieldReadOnly}
                     className="pl-9 print:pl-0 print:border-none"
                     placeholder="Phone Number"
                   />
@@ -359,7 +361,7 @@ export default function JobDetail() {
                     value={formData.contactEmail} 
                     onChange={(e) => handleFieldChange('contactEmail', e.target.value)}
                     onBlur={() => handleFieldBlur('contactEmail')}
-                    disabled={isReadOnly}
+                    disabled={isAdminFieldReadOnly}
                     className="pl-9 print:pl-0 print:border-none"
                     placeholder="Email Address"
                   />
@@ -375,7 +377,7 @@ export default function JobDetail() {
                       value={formData.date}
                       onChange={(e) => handleFieldChange('date', e.target.value)}
                       onBlur={() => handleFieldBlur('date')}
-                      disabled={isReadOnly}
+                      disabled={isAdminFieldReadOnly}
                       className="pl-9 print:pl-0 print:border-none"
                     />
                   </div>
@@ -388,7 +390,7 @@ export default function JobDetail() {
                       handleFieldChange('session', value);
                       if (job) updateJob(job.id, { session: value });
                     }}
-                    disabled={isReadOnly}
+                    disabled={isAdminFieldReadOnly}
                   >
                     <SelectTrigger className="print:border-none print:p-0">
                       <SelectValue placeholder="Select session..." />
@@ -470,7 +472,7 @@ export default function JobDetail() {
                 value={formData.description} 
                 onChange={(e) => handleFieldChange('description', e.target.value)}
                 onBlur={() => handleFieldBlur('description')}
-                disabled={isReadOnly}
+                disabled={isAdminFieldReadOnly}
                 className="min-h-[120px] text-base print:border-none print:p-0"
                 placeholder="Describe the work to be carried out..."
               />
