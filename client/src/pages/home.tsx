@@ -77,13 +77,8 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-3">
               <Link href="/guides">
-                <Button variant="ghost" data-testid="button-guides">
+                <Button variant="outline" data-testid="button-guides">
                   User Guides
-                </Button>
-              </Link>
-              <Link href="/pricing">
-                <Button variant="outline" data-testid="button-pricing">
-                  Pricing
                 </Button>
               </Link>
               {user ? (
