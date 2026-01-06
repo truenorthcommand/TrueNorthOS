@@ -646,13 +646,10 @@ export async function registerRoutes(
   // ==================== SEED ROUTE (DEV ONLY) ====================
 
   app.post("/api/seed", async (req, res) => {
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({ error: "Seed not available in production" });
-    }
-
     try {
-      const existingAdmin = await storage.getUserByUsername("admin");
-      if (existingAdmin) {
+      // Allow seeding if no users exist (initial setup)
+      const allUsers = await storage.getAllUsers();
+      if (allUsers.length > 0) {
         return res.json({ message: "Database already seeded" });
       }
 
