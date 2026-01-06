@@ -238,6 +238,48 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/users/:id", requireAdmin, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const { name, email, username, password, role } = req.body;
+      const updates: Record<string, any> = {};
+
+      if (name) updates.name = name;
+      if (email) updates.email = email;
+      if (username) {
+        const existingUser = await storage.getUserByUsername(username);
+        if (existingUser && existingUser.id !== req.params.id) {
+          return res.status(400).json({ error: "Username already exists" });
+        }
+        updates.username = username;
+      }
+      if (password) {
+        if (password.length < 6) {
+          return res.status(400).json({ error: "Password must be at least 6 characters" });
+        }
+        updates.password = await bcrypt.hash(password, SALT_ROUNDS);
+      }
+      if (role && (role === 'admin' || role === 'engineer')) {
+        updates.role = role;
+      }
+
+      const updatedUser = await storage.updateUser(req.params.id, updates);
+      res.json({
+        id: updatedUser!.id,
+        name: updatedUser!.name,
+        email: updatedUser!.email,
+        role: updatedUser!.role,
+        username: updatedUser!.username,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
   app.get("/api/users/:id", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUser(req.params.id);

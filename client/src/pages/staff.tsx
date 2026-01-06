@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, User, Shield, Wrench, AlertCircle, Eye, EyeOff, Lock, KeyRound } from "lucide-react";
+import { Plus, Trash2, User, Shield, Wrench, AlertCircle, Eye, EyeOff, Lock, KeyRound, Pencil } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 
 interface StaffMember {
@@ -34,6 +35,16 @@ export default function Staff() {
     password: "",
     role: "engineer" as 'admin' | 'engineer',
   });
+  const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    email: "",
+    username: "",
+    password: "",
+    role: "engineer" as 'admin' | 'engineer',
+  });
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   const handleVerifyPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -221,6 +232,75 @@ export default function Staff() {
     }
   };
 
+  const handleEditStaff = (member: StaffMember) => {
+    setEditingStaff(member);
+    setEditForm({
+      name: member.name,
+      email: member.email,
+      username: member.username,
+      password: "",
+      role: member.role,
+    });
+    setShowEditPassword(false);
+  };
+
+  const handleUpdateStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStaff) return;
+
+    setIsEditing(true);
+    try {
+      const updateData: any = {
+        name: editForm.name,
+        email: editForm.email,
+        username: editForm.username,
+        role: editForm.role,
+      };
+      
+      if (editForm.password) {
+        if (editForm.password.length < 6) {
+          toast({
+            title: "Weak Password",
+            description: "Password must be at least 6 characters.",
+            variant: "destructive",
+          });
+          setIsEditing(false);
+          return;
+        }
+        updateData.password = editForm.password;
+      }
+
+      const res = await fetch(`/api/users/${editingStaff.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(updateData),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update staff member');
+      }
+
+      setStaff(staff.map(s => s.id === editingStaff.id ? data : s));
+      setEditingStaff(null);
+
+      toast({
+        title: "Staff Updated",
+        description: `${data.name} has been updated.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update staff member",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEditing(false);
+    }
+  };
+
   const handleDeleteStaff = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to remove ${name}? This action cannot be undone.`)) {
       return;
@@ -397,6 +477,15 @@ export default function Staff() {
                       <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
                         Admin
                       </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleEditStaff(admin)}
+                        data-testid={`button-edit-${admin.id}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
                       {admin.id !== user.id && (
                         <Button
                           variant="ghost"
@@ -450,6 +539,15 @@ export default function Staff() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleEditStaff(engineer)}
+                        data-testid={`button-edit-${engineer.id}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-8 w-8 text-destructive hover:text-destructive"
                         onClick={() => handleDeleteStaff(engineer.id, engineer.name)}
                         data-testid={`button-delete-${engineer.id}`}
@@ -464,6 +562,95 @@ export default function Staff() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={!!editingStaff} onOpenChange={(open) => !open && setEditingStaff(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Staff Member</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdateStaff} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Full Name</Label>
+              <Input
+                id="edit-name"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                required
+                data-testid="input-edit-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">Email</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                required
+                data-testid="input-edit-email"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-username">Username</Label>
+              <Input
+                id="edit-username"
+                value={editForm.username}
+                onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                required
+                data-testid="input-edit-username"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-password">New Password (leave blank to keep current)</Label>
+              <div className="relative">
+                <Input
+                  id="edit-password"
+                  type={showEditPassword ? "text" : "password"}
+                  value={editForm.password}
+                  onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                  placeholder="Enter new password..."
+                  data-testid="input-edit-password"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full px-3"
+                  onClick={() => setShowEditPassword(!showEditPassword)}
+                >
+                  {showEditPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              {editForm.password && editForm.password.length < 6 && (
+                <p className="text-xs text-destructive">Password must be at least 6 characters</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-role">Role</Label>
+              <Select
+                value={editForm.role}
+                onValueChange={(value: 'admin' | 'engineer') => setEditForm({ ...editForm, role: value })}
+              >
+                <SelectTrigger data-testid="select-edit-role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="engineer">Engineer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditingStaff(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isEditing} data-testid="button-update-staff">
+                {isEditing ? "Updating..." : "Update Staff"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
