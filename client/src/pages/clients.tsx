@@ -104,7 +104,7 @@ export default function Clients() {
   const [jobForm, setJobForm] = useState({
     description: "",
     notes: "",
-    startTime: format(new Date(), "HH:mm"),
+    session: "AM",
     date: format(new Date(), "yyyy-MM-dd"),
   });
   const [jobPhotos, setJobPhotos] = useState<JobPhoto[]>([]);
@@ -249,7 +249,7 @@ export default function Clients() {
       contactPhone: client.phone,
       contactEmail: client.email,
       date: new Date(jobForm.date).toISOString(),
-      startTime: jobForm.startTime,
+      session: jobForm.session,
       description: jobForm.description,
       notes: jobForm.notes,
       status: "Draft",
@@ -270,7 +270,7 @@ export default function Clients() {
       setSelectedClientId("");
       setSelectedPropertyId("");
       setSelectedEngineerIds([]);
-      setJobForm({ description: "", notes: "", startTime: format(new Date(), "HH:mm"), date: format(new Date(), "yyyy-MM-dd") });
+      setJobForm({ description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd") });
       setJobPhotos([]);
       setLocation("/");
     }
@@ -423,13 +423,16 @@ export default function Clients() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Appointment Time</Label>
-                    <Input
-                      type="time"
-                      value={jobForm.startTime}
-                      onChange={(e) => setJobForm({ ...jobForm, startTime: e.target.value })}
-                      data-testid="input-start-time"
-                    />
+                    <Label>Session</Label>
+                    <Select value={jobForm.session} onValueChange={(value) => setJobForm({ ...jobForm, session: value })}>
+                      <SelectTrigger data-testid="select-session">
+                        <SelectValue placeholder="Select session..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="AM">AM (Morning)</SelectItem>
+                        <SelectItem value="PM">PM (Afternoon)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -515,7 +518,7 @@ export default function Clients() {
                       setSelectedClientId("");
                       setSelectedPropertyId("");
                       setSelectedEngineerIds([]);
-                      setJobForm({ description: "", notes: "", startTime: format(new Date(), "HH:mm"), date: format(new Date(), "yyyy-MM-dd") });
+                      setJobForm({ description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd") });
                       setJobPhotos([]);
                     }}
                     data-testid="button-clear-form"

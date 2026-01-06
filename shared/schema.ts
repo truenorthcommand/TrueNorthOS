@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, doublePrecision, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, doublePrecision, boolean, jsonb, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -28,7 +28,8 @@ export const jobs = pgTable("jobs", {
   contactPhone: text("contact_phone"),
   contactEmail: text("contact_email"),
   date: timestamp("date").defaultNow(),
-  startTime: text("start_time"),
+  session: text("session").default("AM"),
+  orderNumber: integer("order_number"),
   description: text("description"),
   worksCompleted: text("works_completed"),
   notes: text("notes"),

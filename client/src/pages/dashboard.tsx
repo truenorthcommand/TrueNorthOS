@@ -177,7 +177,7 @@ function JobCard({ job, statusColor, isAdmin }: { job: Job, statusColor: string,
               </div>
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 shrink-0" />
-                <span>{job.date ? format(new Date(job.date), "dd MMM yyyy") : "No date"} • {job.startTime || "No time"}</span>
+                <span>{job.date ? format(new Date(job.date), "dd MMM yyyy") : "No date"} • {job.session || "No session"}</span>
               </div>
               <div className="flex items-center gap-2">
                 <User className="w-4 h-4 shrink-0" />
@@ -254,17 +254,29 @@ function EngineerDashboard() {
   const todayJobs = myJobs
     .filter(job => job.date && isToday(parseISO(job.date)))
     .sort((a, b) => {
-      if (!a.startTime) return 1;
-      if (!b.startTime) return -1;
-      return a.startTime.localeCompare(b.startTime);
+      const orderA = a.orderNumber ?? 9999;
+      const orderB = b.orderNumber ?? 9999;
+      if (orderA !== orderB) return orderA - orderB;
+      if (!a.session && b.session) return 1;
+      if (a.session && !b.session) return -1;
+      if (a.session && b.session && a.session !== b.session) return a.session.localeCompare(b.session);
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateA - dateB;
     });
 
   const tomorrowJobs = myJobs
     .filter(job => job.date && isTomorrow(parseISO(job.date)))
     .sort((a, b) => {
-      if (!a.startTime) return 1;
-      if (!b.startTime) return -1;
-      return a.startTime.localeCompare(b.startTime);
+      const orderA = a.orderNumber ?? 9999;
+      const orderB = b.orderNumber ?? 9999;
+      if (orderA !== orderB) return orderA - orderB;
+      if (!a.session && b.session) return 1;
+      if (a.session && !b.session) return -1;
+      if (a.session && b.session && a.session !== b.session) return a.session.localeCompare(b.session);
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateA - dateB;
     });
 
   const upcomingJobs = myJobs
@@ -404,7 +416,7 @@ function EngineerDashboard() {
                       </div>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                         <Clock className="h-3.5 w-3.5" />
-                        <span>{job.startTime || "No time set"}</span>
+                        <span>{job.session || "No session"}</span>
                         <span className="text-xs font-mono">#{job.jobNo}</span>
                       </div>
                       <div className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -443,7 +455,7 @@ function EngineerDashboard() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-medium truncate">{job.customerName || "Unknown Customer"}</span>
-                        <Badge variant="outline" className="text-xs">{job.startTime || "TBD"}</Badge>
+                        <Badge variant="outline" className="text-xs">{job.session || "TBD"}</Badge>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <MapPin className="h-3.5 w-3.5 shrink-0" />

@@ -225,7 +225,7 @@ export default function CalendarPage() {
                             className={`text-xs px-1 py-0.5 rounded truncate text-white ${getStatusColor(job.status)}`}
                             title={`${job.customerName}${engineerNames ? ` - ${engineerNames}` : ''}`}
                           >
-                            {job.startTime || ""} {engineerNames ? `[${engineerNames.split(',')[0].split(' ')[0]}]` : ''} {job.customerName}
+                            {job.session || ""} {engineerNames ? `[${engineerNames.split(',')[0].split(' ')[0]}]` : ''} {job.customerName}
                           </div>
                         );
                       })}
@@ -276,10 +276,10 @@ export default function CalendarPage() {
                     </div>
                     <p className="font-medium text-sm mb-2">{job.customerName}</p>
                     <div className="space-y-1 text-xs text-muted-foreground">
-                      {job.startTime && (
+                      {job.session && (
                         <div className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          <span>{job.startTime}</span>
+                          <span>{job.session}</span>
                         </div>
                       )}
                       {job.address && (

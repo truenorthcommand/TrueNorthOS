@@ -40,7 +40,7 @@ export default function JobDetail() {
     contactPhone: string;
     contactEmail: string;
     date: string;
-    startTime: string;
+    session: string;
     description: string;
     worksCompleted: string;
     notes: string;
@@ -53,7 +53,7 @@ export default function JobDetail() {
     contactPhone: "",
     contactEmail: "",
     date: "",
-    startTime: "",
+    session: "AM",
     description: "",
     worksCompleted: "",
     notes: "",
@@ -89,7 +89,7 @@ export default function JobDetail() {
         contactPhone: job.contactPhone || "",
         contactEmail: job.contactEmail || "",
         date: job.date ? format(new Date(job.date), "yyyy-MM-dd") : "",
-        startTime: job.startTime || "",
+        session: job.session || "AM",
         description: job.description || "",
         worksCompleted: job.worksCompleted || "",
         notes: job.notes || "",
@@ -137,7 +137,7 @@ export default function JobDetail() {
       contactPhone: formData.contactPhone,
       contactEmail: formData.contactEmail,
       date: formData.date ? new Date(formData.date).toISOString() : undefined,
-      startTime: formData.startTime,
+      session: formData.session,
       description: formData.description,
       worksCompleted: formData.worksCompleted,
       notes: formData.notes,
@@ -386,15 +386,23 @@ export default function JobDetail() {
                   </div>
                 </div>
                 <div className="space-y-2 flex-1">
-                  <Label>Time</Label>
-                  <Input 
-                    type="time"
-                    value={formData.startTime} 
-                    onChange={(e) => handleFieldChange('startTime', e.target.value)}
-                    onBlur={() => handleFieldBlur('startTime')}
+                  <Label>Session</Label>
+                  <Select 
+                    value={formData.session} 
+                    onValueChange={(value) => {
+                      handleFieldChange('session', value);
+                      if (job) updateJob(job.id, { session: value });
+                    }}
                     disabled={isReadOnly}
-                    className="print:border-none print:p-0"
-                  />
+                  >
+                    <SelectTrigger className="print:border-none print:p-0">
+                      <SelectValue placeholder="Select session..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AM">AM</SelectItem>
+                      <SelectItem value="PM">PM</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>

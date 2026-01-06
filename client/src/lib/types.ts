@@ -54,7 +54,8 @@ export type Job = {
   contactPhone: string | null;
   contactEmail: string | null;
   date: string | null;
-  startTime: string | null;
+  session: string | null;
+  orderNumber: number | null;
   description: string | null;
   worksCompleted: string | null;
   notes: string | null;

@@ -23,14 +23,14 @@ export default function CompletedJobs() {
       const matchesSearch =
         job.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         job.jobNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job.client.toLowerCase().includes(searchTerm.toLowerCase());
+        (job.address?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+        (job.client?.toLowerCase() || "").includes(searchTerm.toLowerCase());
 
       const matchesRole = user.role === "admin" || job.assignedToId === user.id || (job.assignedToIds || []).includes(user.id);
 
       return matchesSearch && matchesRole;
     })
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
 
   const totalCompleted = jobs.filter((j) => j.status === "Signed Off").length;
 
@@ -97,8 +97,8 @@ export default function CompletedJobs() {
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 shrink-0" />
                         <span>
-                          {format(new Date(job.date), "dd MMM yyyy")} •{" "}
-                          {job.startTime}
+                          {job.date ? format(new Date(job.date), "dd MMM yyyy") : "No date"} •{" "}
+                          {job.session}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -109,7 +109,7 @@ export default function CompletedJobs() {
                         <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
                         <span>
                           Signed off{" "}
-                          {format(new Date(job.updatedAt), "dd MMM yyyy")}
+                          {job.updatedAt ? format(new Date(job.updatedAt), "dd MMM yyyy") : ""}
                         </span>
                       </div>
                     </div>
