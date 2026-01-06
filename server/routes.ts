@@ -647,9 +647,9 @@ export async function registerRoutes(
 
   app.post("/api/seed", async (req, res) => {
     try {
-      // Allow seeding if no users exist (initial setup)
-      const allUsers = await storage.getAllUsers();
-      if (allUsers.length > 0) {
+      // Check if demo admin already exists
+      const existingAdmin = await storage.getUserByUsername("admin");
+      if (existingAdmin) {
         return res.json({ message: "Database already seeded" });
       }
 
@@ -662,23 +662,30 @@ export async function registerRoutes(
         status: "active",
       });
 
-      await storage.createUser({
-        username: "john",
-        password: "john123",
-        name: "John Smith",
-        email: "john@promains.com",
-        role: "engineer",
-        status: "active",
-      });
+      // Only create other demo users if they don't exist
+      const existingJohn = await storage.getUserByUsername("john");
+      if (!existingJohn) {
+        await storage.createUser({
+          username: "john",
+          password: "john123",
+          name: "John Smith",
+          email: "john@promains.com",
+          role: "engineer",
+          status: "active",
+        });
+      }
 
-      await storage.createUser({
-        username: "sarah",
-        password: "sarah123",
-        name: "Sarah Jones",
-        email: "sarah@promains.com",
-        role: "engineer",
-        status: "active",
-      });
+      const existingSarah = await storage.getUserByUsername("sarah");
+      if (!existingSarah) {
+        await storage.createUser({
+          username: "sarah",
+          password: "sarah123",
+          name: "Sarah Jones",
+          email: "sarah@promains.com",
+          role: "engineer",
+          status: "active",
+        });
+      }
 
       res.json({ message: "Database seeded successfully" });
     } catch (error) {
