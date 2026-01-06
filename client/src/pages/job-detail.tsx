@@ -404,6 +404,26 @@ export default function JobDetail() {
                     </SelectContent>
                   </Select>
                 </div>
+                {user?.role === "admin" && (
+                  <div className="space-y-2 flex-1">
+                    <Label>Job Order</Label>
+                    <Input 
+                      type="number"
+                      min="1"
+                      max="999"
+                      placeholder="Auto"
+                      value={job.orderNumber ?? ""}
+                      onChange={(e) => {
+                        const value = e.target.value ? parseInt(e.target.value) : null;
+                        updateJob(job.id, { orderNumber: value });
+                      }}
+                      disabled={isReadOnly}
+                      className="print:border-none print:p-0"
+                      data-testid="input-order-number"
+                    />
+                    <p className="text-xs text-muted-foreground">Lower numbers appear first</p>
+                  </div>
+                )}
               </div>
             </div>
 
