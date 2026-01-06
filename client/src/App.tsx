@@ -21,6 +21,7 @@ import Pricing from "@/pages/pricing";
 import AiAdvisors from "@/pages/ai-advisors";
 import AdminAdvisors from "@/pages/admin-advisors";
 import UserGuides from "@/pages/user-guides";
+import Setup from "@/pages/setup";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { Loader2 } from "lucide-react";
@@ -58,6 +59,7 @@ function Router() {
       <Route path="/pricing" component={Pricing} />
       <Route path="/guides" component={UserGuides} />
       <Route path="/auth" component={Login} />
+      <Route path="/setup" component={Setup} />
       <Route path="/clients">
         <PrivateRoute component={Clients} />
       </Route>
