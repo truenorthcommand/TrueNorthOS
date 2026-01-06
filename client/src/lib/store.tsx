@@ -105,15 +105,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       });
       if (response.ok) {
         const updatedJob = await response.json();
-        setJobs(prev => prev.map(job => 
-          job.id === id ? {
+        setJobs(prev => prev.map(job => {
+          if (job.id !== id) return job;
+          return {
+            ...job,
             ...updatedJob,
-            materials: updatedJob.materials || [],
-            photos: updatedJob.photos || [],
-            signatures: updatedJob.signatures || [],
-            furtherActions: updatedJob.furtherActions || [],
-          } : job
-        ));
+            assignedToId: updatedJob.assignedToId ?? job.assignedToId,
+            assignedToIds: updatedJob.assignedToIds ?? job.assignedToIds ?? [],
+            materials: updatedJob.materials || job.materials || [],
+            photos: updatedJob.photos || job.photos || [],
+            signatures: updatedJob.signatures || job.signatures || [],
+            furtherActions: updatedJob.furtherActions || job.furtherActions || [],
+          };
+        }));
       } else {
         if (previousJob) {
           setJobs(prev => prev.map(job => job.id === id ? previousJob : job));
