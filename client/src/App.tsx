@@ -20,6 +20,7 @@ import MapPage from "@/pages/map";
 import Pricing from "@/pages/pricing";
 import AiAdvisors from "@/pages/ai-advisors";
 import AdminAdvisors from "@/pages/admin-advisors";
+import UserGuides from "@/pages/user-guides";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { Loader2 } from "lucide-react";
@@ -55,6 +56,7 @@ function Router() {
     <Switch>
       <Route path="/home" component={Home} />
       <Route path="/pricing" component={Pricing} />
+      <Route path="/guides" component={UserGuides} />
       <Route path="/auth" component={Login} />
       <Route path="/clients">
         <PrivateRoute component={Clients} />
