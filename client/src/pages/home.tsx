@@ -11,7 +11,12 @@ import {
   Shield,
   CheckCircle2,
   ArrowRight,
-  Wrench
+  Wrench,
+  Bot,
+  HardHat,
+  Search,
+  Flame,
+  Zap
 } from "lucide-react";
 
 export default function Home() {
@@ -150,8 +155,83 @@ export default function Home() {
           </div>
         </section>
 
+        <section className="py-16 px-4">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-4">
+                <Bot className="h-4 w-4" />
+                AI-Powered Assistance
+              </div>
+              <h3 className="text-2xl md:text-3xl font-bold mb-4">
+                Expert AI Advisors at Your Fingertips
+              </h3>
+              <p className="text-muted-foreground max-w-2xl mx-auto">
+                Get instant expert guidance from our specialist AI assistants. Upload photos for analysis or ask questions about any technical issue.
+              </p>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card className="border-2 hover:border-amber-500 hover:shadow-lg transition-all cursor-pointer group" data-testid="advisor-card-snagging">
+                <CardHeader className="text-center pb-2">
+                  <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                    <HardHat className="h-8 w-8 text-amber-600" />
+                  </div>
+                  <CardTitle className="text-lg">Snagging Pro</CardTitle>
+                </CardHeader>
+                <CardContent className="text-center">
+                  <CardDescription>Quality assessment & refurbishment defects specialist</CardDescription>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-2 hover:border-blue-500 hover:shadow-lg transition-all cursor-pointer group" data-testid="advisor-card-parts">
+                <CardHeader className="text-center pb-2">
+                  <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                    <Search className="h-8 w-8 text-blue-600" />
+                  </div>
+                  <CardTitle className="text-lg">Trade Parts Finder</CardTitle>
+                </CardHeader>
+                <CardContent className="text-center">
+                  <CardDescription>UK parts sourcing from photos & descriptions</CardDescription>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-2 hover:border-orange-500 hover:shadow-lg transition-all cursor-pointer group" data-testid="advisor-card-gas">
+                <CardHeader className="text-center pb-2">
+                  <div className="w-16 h-16 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                    <Flame className="h-8 w-8 text-orange-600" />
+                  </div>
+                  <CardTitle className="text-lg">Gas & Heating</CardTitle>
+                </CardHeader>
+                <CardContent className="text-center">
+                  <CardDescription>Boiler diagnostics & Gas Safe compliance</CardDescription>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-2 hover:border-yellow-500 hover:shadow-lg transition-all cursor-pointer group" data-testid="advisor-card-electrical">
+                <CardHeader className="text-center pb-2">
+                  <div className="w-16 h-16 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                    <Zap className="h-8 w-8 text-yellow-600" />
+                  </div>
+                  <CardTitle className="text-lg">Electrical Expert</CardTitle>
+                </CardHeader>
+                <CardContent className="text-center">
+                  <CardDescription>BS 7671 wiring regs & fault diagnosis</CardDescription>
+                </CardContent>
+              </Card>
+            </div>
+            <div className="text-center mt-8">
+              <Link href={user ? "/ai-advisors" : "/auth"}>
+                <Button size="lg" variant="outline" className="gap-2" data-testid="button-try-ai-advisors">
+                  <Bot className="h-5 w-5" />
+                  {user ? "Chat with AI Advisors" : "Sign in to Try AI Advisors"}
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </section>
+
         {user && (
-          <section className="py-16 px-4">
+          <section className="py-16 bg-slate-100/50 dark:bg-slate-900/50 px-4">
             <div className="max-w-4xl mx-auto">
               <h3 className="text-2xl md:text-3xl font-bold text-center mb-8">
                 Quick Navigation
