@@ -128,6 +128,83 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== FIRST-TIME SETUP (NO AUTH REQUIRED) ====================
+  
+  // One-time setup: Create first admin account when no admins exist
+  app.post("/api/setup/first-admin", async (req, res) => {
+    try {
+      // Check if any admin users exist
+      const allUsers = await storage.getAllUsers();
+      const existingAdmins = allUsers.filter(u => u.role === 'admin');
+      
+      if (existingAdmins.length > 0) {
+        return res.status(403).json({ error: "Setup already completed. Admin accounts exist." });
+      }
+      
+      const { username, password, name, email, phone } = req.body;
+      
+      if (!username || !password || !name) {
+        return res.status(400).json({ error: "Username, password, and name are required" });
+      }
+      
+      if (!email && !phone) {
+        return res.status(400).json({ error: "Either email or phone number is required" });
+      }
+      
+      if (password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+      
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ error: "Username already exists" });
+      }
+      
+      const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+      
+      const user = await storage.createUser({
+        username,
+        password: hashedPassword,
+        name,
+        email: email || null,
+        phone: phone || null,
+        role: 'admin',
+      });
+      
+      // Auto-login the new admin
+      req.session.userId = user.id;
+      req.session.userRole = user.role;
+      
+      res.json({
+        message: "First admin account created successfully",
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          username: user.username,
+        }
+      });
+    } catch (error) {
+      console.error("Setup error:", error);
+      res.status(500).json({ error: "Setup failed" });
+    }
+  });
+  
+  // Check if setup is needed
+  app.get("/api/setup/status", async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      const existingAdmins = allUsers.filter(u => u.role === 'admin');
+      res.json({ 
+        setupRequired: existingAdmins.length === 0,
+        hasAdmins: existingAdmins.length > 0 
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check status" });
+    }
+  });
+
   // ==================== USER / ENGINEER ROUTES (PROTECTED) ====================
   
   app.get("/api/users", requireAdmin, async (req, res) => {
