@@ -1,9 +1,11 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import bcrypt from "bcrypt";
 import OpenAI from "openai";
 import { storage } from "./storage";
+import { pool } from "./db";
 import { insertJobSchema, insertAiAdvisorSchema } from "@shared/schema";
 import { z } from "zod";
 
@@ -46,14 +48,26 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
+  // Use PostgreSQL session store for persistence across restarts
+  const PgSession = connectPgSimple(session);
+  
+  // Trust proxy for secure cookies behind Replit's reverse proxy
+  app.set('trust proxy', 1);
+  
   app.use(session({
+    store: new PgSession({
+      pool: pool as any,
+      tableName: 'session',
+      createTableIfMissing: true,
+    }),
     secret: process.env.SESSION_SECRET || 'promains-field-view-secret-key-2024',
     resave: false,
     saveUninitialized: false,
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000,
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     }
   }));
 
