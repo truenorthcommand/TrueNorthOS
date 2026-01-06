@@ -163,7 +163,7 @@ export default function Home() {
                 AI-Powered Assistance
               </div>
               <h3 className="text-2xl md:text-3xl font-bold mb-4">
-                Expert AI Advisors at Your Fingertips
+                Expert Technical Advisors at Your Fingertips
               </h3>
               <p className="text-muted-foreground max-w-2xl mx-auto">
                 Get instant expert guidance from our specialist AI assistants. Upload photos for analysis or ask questions about any technical issue.
@@ -222,7 +222,7 @@ export default function Home() {
               <Link href={user ? "/ai-advisors" : "/auth"}>
                 <Button size="lg" variant="outline" className="gap-2" data-testid="button-try-ai-advisors">
                   <Bot className="h-5 w-5" />
-                  {user ? "Chat with AI Advisors" : "Sign in to Try AI Advisors"}
+                  {user ? "Chat with Technical Advisor" : "Sign in to Try Technical Advisor"}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>

@@ -129,7 +129,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             onClick={() => setIsOpen(false)}
           >
             <Bot className="mr-3 h-5 w-5" />
-            AI Advisors
+            Technical Advisor
           </Button>
         </Link>
 
@@ -250,7 +250,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             )}
             <Link href="/ai-advisors">
               <Button variant={location === "/ai-advisors" ? "secondary" : "ghost"}>
-                AI Advisors
+                Technical Advisor
               </Button>
             </Link>
           </nav>

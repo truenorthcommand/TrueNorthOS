@@ -167,15 +167,15 @@ export default function AiAdvisors() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">AI Advisors</h1>
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">Technical Advisor</h1>
           <p className="text-muted-foreground">Expert AI assistants for field service tasks</p>
         </div>
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Bot className="h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No AI Advisors Available</h3>
+            <h3 className="text-lg font-semibold mb-2">No Technical Advisors Available</h3>
             <p className="text-muted-foreground text-center max-w-md">
-              AI advisors haven't been configured yet. Contact your administrator to set up AI assistants.
+              Technical advisors haven't been configured yet. Contact your administrator to set them up.
             </p>
           </CardContent>
         </Card>
@@ -324,8 +324,8 @@ export default function AiAdvisors() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold" data-testid="text-page-title">AI Advisors</h1>
-        <p className="text-muted-foreground">Expert AI assistants to help with field service tasks</p>
+        <h1 className="text-2xl font-bold" data-testid="text-page-title">Technical Advisor</h1>
+        <p className="text-muted-foreground">Expert technical assistants to help with field service tasks</p>
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">

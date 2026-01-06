@@ -86,7 +86,7 @@ export default function AdminAdvisors() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ai-advisors"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ai-advisors/all"] });
-      toast({ title: "Success", description: "AI Advisor created successfully" });
+      toast({ title: "Success", description: "Technical Advisor created successfully" });
       resetForm();
     },
     onError: (error: Error) => {
@@ -102,7 +102,7 @@ export default function AdminAdvisors() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ai-advisors"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ai-advisors/all"] });
-      toast({ title: "Success", description: "AI Advisor updated successfully" });
+      toast({ title: "Success", description: "Technical Advisor updated successfully" });
       resetForm();
     },
     onError: (error: Error) => {
@@ -117,7 +117,7 @@ export default function AdminAdvisors() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ai-advisors"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ai-advisors/all"] });
-      toast({ title: "Success", description: "AI Advisor deleted successfully" });
+      toast({ title: "Success", description: "Technical Advisor deleted successfully" });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -178,7 +178,7 @@ export default function AdminAdvisors() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">AI Advisors Settings</h1>
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">Technical Advisor Settings</h1>
           <p className="text-muted-foreground">Manage AI assistant configurations</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsDialogOpen(open); }}>
@@ -190,7 +190,7 @@ export default function AdminAdvisors() {
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{editingAdvisor ? "Edit AI Advisor" : "Create AI Advisor"}</DialogTitle>
+              <DialogTitle>{editingAdvisor ? "Edit Technical Advisor" : "Create Technical Advisor"}</DialogTitle>
               <DialogDescription>
                 Configure the AI advisor's personality and capabilities
               </DialogDescription>
@@ -312,7 +312,7 @@ export default function AdminAdvisors() {
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-16">
               <Bot className="h-16 w-16 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No AI Advisors</h3>
+              <h3 className="text-lg font-semibold mb-2">No Technical Advisors</h3>
               <p className="text-muted-foreground text-center max-w-md mb-4">
                 Create your first AI advisor to get started
               </p>
