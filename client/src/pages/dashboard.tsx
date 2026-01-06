@@ -177,7 +177,7 @@ function JobCard({ job, statusColor, isAdmin }: { job: Job, statusColor: string,
               </div>
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 shrink-0" />
-                <span>{job.date ? format(new Date(job.date), "dd MMM yyyy") : "No date"} • {job.session || "No session"}</span>
+                <span>{job.date ? format(new Date(job.date), "dd MMM yyyy") : "No date"} • {job.session || "No session"}{job.orderNumber ? ` • #${job.orderNumber}` : ""}</span>
               </div>
               <div className="flex items-center gap-2">
                 <User className="w-4 h-4 shrink-0" />
@@ -291,9 +291,21 @@ function EngineerDashboard() {
       return dateA - dateB;
     });
 
-  const activeJobs = myJobs.filter(job => job.status === "In Progress" || job.status === "Draft");
-  const completedJobs = myJobs.filter(job => job.status === "Signed Off");
-  const awaitingSignature = myJobs.filter(job => job.status === "Awaiting Signatures");
+  const sortByOrder = (a: Job, b: Job) => {
+    const orderA = a.orderNumber ?? 9999;
+    const orderB = b.orderNumber ?? 9999;
+    if (orderA !== orderB) return orderA - orderB;
+    if (!a.session && b.session) return 1;
+    if (a.session && !b.session) return -1;
+    if (a.session && b.session && a.session !== b.session) return a.session.localeCompare(b.session);
+    const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return dateA - dateB;
+  };
+
+  const activeJobs = myJobs.filter(job => job.status === "In Progress" || job.status === "Draft").sort(sortByOrder);
+  const completedJobs = myJobs.filter(job => job.status === "Signed Off").sort(sortByOrder);
+  const awaitingSignature = myJobs.filter(job => job.status === "Awaiting Signatures").sort(sortByOrder);
 
   const getStatusColor = (status: JobStatus) => {
     switch (status) {
@@ -417,6 +429,9 @@ function EngineerDashboard() {
                       <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                         <Clock className="h-3.5 w-3.5" />
                         <span>{job.session || "No session"}</span>
+                        {job.orderNumber && (
+                          <Badge variant="outline" className="text-xs px-1.5 py-0">Order #{job.orderNumber}</Badge>
+                        )}
                         <span className="text-xs font-mono">#{job.jobNo}</span>
                       </div>
                       <div className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -456,6 +471,9 @@ function EngineerDashboard() {
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-medium truncate">{job.customerName || "Unknown Customer"}</span>
                         <Badge variant="outline" className="text-xs">{job.session || "TBD"}</Badge>
+                        {job.orderNumber && (
+                          <Badge variant="outline" className="text-xs px-1.5">#{job.orderNumber}</Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <MapPin className="h-3.5 w-3.5 shrink-0" />
