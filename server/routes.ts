@@ -647,24 +647,33 @@ export async function registerRoutes(
 
   app.post("/api/seed", async (req, res) => {
     try {
-      // Check if demo admin already exists
+      // Upsert demo admin - create or reset password
       const existingAdmin = await storage.getUserByUsername("admin");
       if (existingAdmin) {
-        return res.json({ message: "Database already seeded" });
+        await storage.updateUser(existingAdmin.id, { 
+          password: "admin123", 
+          role: "admin",
+          name: "Dispatcher Dave"
+        });
+      } else {
+        await storage.createUser({
+          username: "admin",
+          password: "admin123",
+          name: "Dispatcher Dave",
+          email: "admin@promains.com",
+          role: "admin",
+          status: "active",
+        });
       }
 
-      await storage.createUser({
-        username: "admin",
-        password: "admin123",
-        name: "Dispatcher Dave",
-        email: "admin@promains.com",
-        role: "admin",
-        status: "active",
-      });
-
-      // Only create other demo users if they don't exist
+      // Upsert john
       const existingJohn = await storage.getUserByUsername("john");
-      if (!existingJohn) {
+      if (existingJohn) {
+        await storage.updateUser(existingJohn.id, { 
+          password: "john123", 
+          role: "engineer" 
+        });
+      } else {
         await storage.createUser({
           username: "john",
           password: "john123",
@@ -675,8 +684,14 @@ export async function registerRoutes(
         });
       }
 
+      // Upsert sarah
       const existingSarah = await storage.getUserByUsername("sarah");
-      if (!existingSarah) {
+      if (existingSarah) {
+        await storage.updateUser(existingSarah.id, { 
+          password: "sarah123", 
+          role: "engineer" 
+        });
+      } else {
         await storage.createUser({
           username: "sarah",
           password: "sarah123",
@@ -687,10 +702,10 @@ export async function registerRoutes(
         });
       }
 
-      res.json({ message: "Database seeded successfully" });
+      res.json({ message: "Demo accounts reset successfully! Login with admin/admin123" });
     } catch (error) {
       console.error("Seed error:", error);
-      res.status(500).json({ error: "Failed to seed database" });
+      res.status(500).json({ error: "Failed to seed database: " + (error as Error).message });
     }
   });
 
