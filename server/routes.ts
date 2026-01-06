@@ -137,6 +137,7 @@ export async function registerRoutes(
         id: e.id,
         name: e.name,
         email: e.email,
+        phone: e.phone,
         role: e.role,
         username: e.username,
         currentLat: e.currentLat,
@@ -177,10 +178,14 @@ export async function registerRoutes(
 
   app.post("/api/users", requireAdmin, async (req, res) => {
     try {
-      const { username, password, name, email, role } = req.body;
+      const { username, password, name, email, phone, role } = req.body;
       
-      if (!username || !password || !name || !email || !role) {
-        return res.status(400).json({ error: "All fields are required" });
+      if (!username || !password || !name || !role) {
+        return res.status(400).json({ error: "Username, password, name, and role are required" });
+      }
+
+      if (!email && !phone) {
+        return res.status(400).json({ error: "Either email or phone number is required" });
       }
 
       if (password.length < 6) {
@@ -203,7 +208,8 @@ export async function registerRoutes(
         username,
         password: hashedPassword,
         name,
-        email,
+        email: email || null,
+        phone: phone || null,
         role,
         status: 'active',
       });
@@ -212,6 +218,7 @@ export async function registerRoutes(
         id: user.id,
         name: user.name,
         email: user.email,
+        phone: user.phone,
         role: user.role,
         username: user.username,
       });
@@ -245,11 +252,12 @@ export async function registerRoutes(
         return res.status(404).json({ error: "User not found" });
       }
 
-      const { name, email, username, password, role } = req.body;
+      const { name, email, phone, username, password, role } = req.body;
       const updates: Record<string, any> = {};
 
       if (name) updates.name = name;
-      if (email) updates.email = email;
+      if (email !== undefined) updates.email = email || null;
+      if (phone !== undefined) updates.phone = phone || null;
       if (username) {
         const existingUser = await storage.getUserByUsername(username);
         if (existingUser && existingUser.id !== req.params.id) {
@@ -272,6 +280,7 @@ export async function registerRoutes(
         id: updatedUser!.id,
         name: updatedUser!.name,
         email: updatedUser!.email,
+        phone: updatedUser!.phone,
         role: updatedUser!.role,
         username: updatedUser!.username,
       });

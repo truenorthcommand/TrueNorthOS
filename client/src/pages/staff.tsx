@@ -13,7 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 interface StaffMember {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
+  phone: string | null;
   username: string;
   role: 'admin' | 'engineer';
 }
@@ -31,14 +32,17 @@ export default function Staff() {
   const [newStaff, setNewStaff] = useState({
     name: "",
     email: "",
+    phone: "",
     username: "",
     password: "",
     role: "engineer" as 'admin' | 'engineer',
+    contactMethod: "email" as 'email' | 'phone',
   });
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
   const [editForm, setEditForm] = useState({
     name: "",
     email: "",
+    phone: "",
     username: "",
     password: "",
     role: "engineer" as 'admin' | 'engineer',
@@ -180,10 +184,12 @@ export default function Staff() {
   const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newStaff.name || !newStaff.email || !newStaff.username || !newStaff.password) {
+    const contactValue = newStaff.contactMethod === 'email' ? newStaff.email : newStaff.phone;
+    
+    if (!newStaff.name || !contactValue || !newStaff.username || !newStaff.password) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all fields.",
+        description: `Please fill in name, ${newStaff.contactMethod === 'email' ? 'email' : 'phone number'}, username, and password.`,
         variant: "destructive",
       });
       return;
@@ -200,11 +206,20 @@ export default function Staff() {
 
     setIsSubmitting(true);
     try {
+      const payload = {
+        name: newStaff.name,
+        email: newStaff.contactMethod === 'email' ? newStaff.email : null,
+        phone: newStaff.contactMethod === 'phone' ? newStaff.phone : null,
+        username: newStaff.username,
+        password: newStaff.password,
+        role: newStaff.role,
+      };
+
       const res = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(newStaff),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -214,7 +229,7 @@ export default function Staff() {
       }
 
       setStaff([...staff, data]);
-      setNewStaff({ name: "", email: "", username: "", password: "", role: "engineer" });
+      setNewStaff({ name: "", email: "", phone: "", username: "", password: "", role: "engineer", contactMethod: "email" });
       setShowPassword(false);
 
       toast({
@@ -236,7 +251,8 @@ export default function Staff() {
     setEditingStaff(member);
     setEditForm({
       name: member.name,
-      email: member.email,
+      email: member.email || "",
+      phone: member.phone || "",
       username: member.username,
       password: "",
       role: member.role,
@@ -252,7 +268,8 @@ export default function Staff() {
     try {
       const updateData: any = {
         name: editForm.name,
-        email: editForm.email,
+        email: editForm.email || null,
+        phone: editForm.phone || null,
         username: editForm.username,
         role: editForm.role,
       };
@@ -379,14 +396,44 @@ export default function Staff() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Email Address</Label>
-                <Input
-                  type="email"
-                  placeholder="john@company.com"
-                  value={newStaff.email}
-                  onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
-                  data-testid="input-staff-email"
-                />
+                <Label>Contact Method</Label>
+                <Select
+                  value={newStaff.contactMethod}
+                  onValueChange={(value: 'email' | 'phone') => setNewStaff({ ...newStaff, contactMethod: value })}
+                >
+                  <SelectTrigger data-testid="select-contact-method">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="email">Email Address</SelectItem>
+                    <SelectItem value="phone">Phone Number</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                {newStaff.contactMethod === 'email' ? (
+                  <>
+                    <Label>Email Address</Label>
+                    <Input
+                      type="email"
+                      placeholder="john@company.com"
+                      value={newStaff.email}
+                      onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
+                      data-testid="input-staff-email"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Label>Phone Number</Label>
+                    <Input
+                      type="tel"
+                      placeholder="07123 456789"
+                      value={newStaff.phone}
+                      onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })}
+                      data-testid="input-staff-phone"
+                    />
+                  </>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Username (for login)</Label>
@@ -471,6 +518,7 @@ export default function Staff() {
                       <div>
                         <p className="font-medium">{admin.name}</p>
                         <p className="text-sm text-muted-foreground">@{admin.username}</p>
+                        <p className="text-xs text-muted-foreground">{admin.email || admin.phone || ''}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -530,6 +578,7 @@ export default function Staff() {
                       <div>
                         <p className="font-medium">{engineer.name}</p>
                         <p className="text-sm text-muted-foreground">@{engineer.username}</p>
+                        <p className="text-xs text-muted-foreground">{engineer.email || engineer.phone || ''}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -580,14 +629,25 @@ export default function Staff() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-email">Email</Label>
+              <Label htmlFor="edit-email">Email (optional)</Label>
               <Input
                 id="edit-email"
                 type="email"
                 value={editForm.email}
                 onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                required
+                placeholder="john@company.com"
                 data-testid="input-edit-email"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-phone">Phone (optional)</Label>
+              <Input
+                id="edit-phone"
+                type="tel"
+                value={editForm.phone}
+                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                placeholder="07123 456789"
+                data-testid="input-edit-phone"
               />
             </div>
             <div className="space-y-2">
