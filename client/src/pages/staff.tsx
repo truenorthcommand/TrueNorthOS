@@ -113,7 +113,7 @@ export default function Staff() {
   };
 
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (user?.superAdmin) {
       setIsVerified(true);
       fetchStaff();
     } else {
@@ -121,12 +121,12 @@ export default function Staff() {
     }
   }, [user]);
 
-  if (!user || user.role !== "admin") {
+  if (!user || !user.superAdmin) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh]">
         <AlertCircle className="h-12 w-12 text-destructive mb-4" />
         <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
-        <p className="text-muted-foreground">Only administrators can manage staff.</p>
+        <p className="text-muted-foreground">Only super administrators can manage staff.</p>
       </div>
     );
   }

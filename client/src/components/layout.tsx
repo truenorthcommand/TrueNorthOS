@@ -83,7 +83,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Link>
         )}
 
-        {user.role === "admin" && (
+        {user.superAdmin && (
           <Link href="/staff">
             <Button
               variant={location === "/staff" ? "secondary" : "ghost"}

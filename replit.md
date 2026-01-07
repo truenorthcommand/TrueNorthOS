@@ -8,7 +8,8 @@ This application enables field service companies to manage job sheets digitally.
 
 ## Key Features
 
-- **Role-based Authentication**: Admin and Engineer roles with different access levels
+- **Role-based Authentication**: Admin, Engineer, and Super Admin roles with different access levels
+- **Super Admin**: Only super admins can add/remove staff members (granted via /setup reset-admin)
 - **Job Management**: Create, edit, track job progress and status
 - **Photo Evidence**: Upload photos as job completion evidence (separated by admin reference and engineer evidence)
 - **Digital Signatures**: Capture engineer and customer signatures
@@ -58,6 +59,7 @@ All API routes (except login and seed) require authentication via session cookie
 
 - `OPENAI_API_KEY` - Required for AI Advisors functionality
 - `GOOGLE_MAPS_API_KEY` - Required for live map and geocoding
+- `SETUP_KEY` - Required to enable the /setup password reset endpoint (set to disable after initial setup)
 
 ## Pricing Tiers
 

@@ -6,6 +6,7 @@ export type User = {
   email: string;
   role: Role;
   username?: string;
+  superAdmin?: boolean;
   currentLat?: number;
   currentLng?: number;
   lastLocationUpdate?: string;

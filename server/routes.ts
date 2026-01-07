@@ -43,6 +43,17 @@ const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
   next();
 };
 
+const requireSuperAdmin = async (req: Request, res: Response, next: NextFunction) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  const user = await storage.getUser(req.session.userId);
+  if (!user || !user.superAdmin) {
+    return res.status(403).json({ error: "Super admin access required" });
+  }
+  next();
+};
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -104,6 +115,7 @@ export async function registerRoutes(
         email: user.email,
         role: user.role,
         username: user.username,
+        superAdmin: user.superAdmin,
       });
     } catch (error) {
       res.status(500).json({ error: "Login failed" });
@@ -136,6 +148,7 @@ export async function registerRoutes(
         email: user.email,
         role: user.role,
         username: user.username,
+        superAdmin: user.superAdmin,
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch user" });
@@ -183,6 +196,7 @@ export async function registerRoutes(
         email: email || null,
         phone: phone || null,
         role: 'admin',
+        superAdmin: true, // First admin is always super admin
       });
       
       // Auto-login the new admin
@@ -196,6 +210,7 @@ export async function registerRoutes(
           name: user.name,
           email: user.email,
           role: user.role,
+          superAdmin: user.superAdmin,
           username: user.username,
         }
       });
@@ -224,8 +239,12 @@ export async function registerRoutes(
     try {
       const { username, newPassword, setupKey } = req.body;
       
-      // Require a setup key for security
-      if (setupKey !== 'TrueNorth2024Reset') {
+      // Require a setup key for security - must be configured via environment variable
+      const validSetupKey = process.env.SETUP_KEY;
+      if (!validSetupKey) {
+        return res.status(403).json({ error: "Setup endpoint disabled. Configure SETUP_KEY environment variable to enable." });
+      }
+      if (setupKey !== validSetupKey) {
         return res.status(403).json({ error: "Invalid setup key" });
       }
       
@@ -243,7 +262,8 @@ export async function registerRoutes(
       }
       
       const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
-      await storage.updateUser(user.id, { password: hashedPassword });
+      // Also grant super admin access when using setup key reset
+      await storage.updateUser(user.id, { password: hashedPassword, superAdmin: true });
       
       // Auto-login
       req.session.userId = user.id;
@@ -256,6 +276,7 @@ export async function registerRoutes(
           name: user.name,
           role: user.role,
           username: user.username,
+          superAdmin: true,
         }
       });
     } catch (error) {
@@ -286,7 +307,7 @@ export async function registerRoutes(
   });
 
   // Verify password for sensitive operations (staff page access)
-  app.post("/api/auth/verify-password", requireAdmin, async (req, res) => {
+  app.post("/api/auth/verify-password", requireSuperAdmin, async (req, res) => {
     try {
       const { password } = req.body;
       const user = await storage.getUser(req.session.userId!);
@@ -312,7 +333,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/users", requireAdmin, async (req, res) => {
+  app.post("/api/users", requireSuperAdmin, async (req, res) => {
     try {
       const { username, password, name, email, phone, role } = req.body;
       
@@ -363,7 +384,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/users/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/users/:id", requireSuperAdmin, async (req, res) => {
     try {
       if (req.params.id === req.session.userId) {
         return res.status(400).json({ error: "Cannot delete your own account" });
@@ -381,7 +402,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/users/:id", requireAdmin, async (req, res) => {
+  app.patch("/api/users/:id", requireSuperAdmin, async (req, res) => {
     try {
       const user = await storage.getUser(req.params.id);
       if (!user) {
