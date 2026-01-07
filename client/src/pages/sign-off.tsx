@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ArrowLeft, Eraser, CheckCircle2, AlertTriangle, Loader2, MapPin, RefreshCw } from "lucide-react";
 import SignatureCanvas from "react-signature-canvas";
 import { useToast } from "@/hooks/use-toast";
-import { reverseGeocode } from "@/components/google-map";
+import { reverseGeocode } from "@/components/leaflet-map";
 
 export default function SignOff() {
   const [match, params] = useRoute("/jobs/:id/sign-off");
