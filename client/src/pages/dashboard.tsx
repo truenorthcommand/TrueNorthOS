@@ -1,4 +1,4 @@
-import { useState, useMemo, memo } from "react";
+import { useState, useMemo, memo, useEffect, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2, Pencil, Clock, Navigation, Briefcase, CheckCircle } from "lucide-react";
-import { format, isToday, isTomorrow, isThisWeek, parseISO } from "date-fns";
+import { Plus, Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2, Pencil, Clock, Navigation, Briefcase, CheckCircle, LogIn, LogOut, Timer, Loader2 } from "lucide-react";
+import { format, isToday, isTomorrow, isThisWeek, parseISO, formatDistanceToNow } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -246,6 +247,105 @@ function EngineerDashboard() {
   const { user } = useAuth();
   const { jobs } = useStore();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  
+  const [clockedIn, setClockedIn] = useState(false);
+  const [clockInTime, setClockInTime] = useState<Date | null>(null);
+  const [isClocking, setIsClocking] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState("");
+
+  const fetchClockStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/time/status", { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setClockedIn(data.clockedIn);
+        if (data.activeLog?.clockInTime) {
+          setClockInTime(new Date(data.activeLog.clockInTime));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch clock status", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchClockStatus();
+  }, [fetchClockStatus]);
+
+  useEffect(() => {
+    if (!clockedIn || !clockInTime) {
+      setElapsedTime("");
+      return;
+    }
+    const updateElapsed = () => {
+      setElapsedTime(formatDistanceToNow(clockInTime, { addSuffix: false }));
+    };
+    updateElapsed();
+    const interval = setInterval(updateElapsed, 60000);
+    return () => clearInterval(interval);
+  }, [clockedIn, clockInTime]);
+
+  const getLocationAndAddress = async (): Promise<{ latitude: number | null; longitude: number | null; address: string | null }> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        resolve({ latitude: null, longitude: null, address: null });
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          let address = null;
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+            if (res.ok) {
+              const data = await res.json();
+              address = data.display_name || null;
+            }
+          } catch {
+            console.error("Reverse geocoding failed");
+          }
+          resolve({ latitude: lat, longitude: lng, address });
+        },
+        () => resolve({ latitude: null, longitude: null, address: null }),
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    });
+  };
+
+  const handleClockInOut = async () => {
+    setIsClocking(true);
+    try {
+      const location = await getLocationAndAddress();
+      const endpoint = clockedIn ? "/api/time/clock-out" : "/api/time/clock-in";
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(location),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (clockedIn) {
+          setClockedIn(false);
+          setClockInTime(null);
+          toast({ title: "Clocked Out", description: `Session ended at ${format(new Date(), "HH:mm")}` });
+        } else {
+          setClockedIn(true);
+          setClockInTime(new Date(data.clockInTime));
+          toast({ title: "Clocked In", description: `Started at ${format(new Date(), "HH:mm")}` });
+        }
+      } else {
+        const err = await res.json();
+        toast({ title: "Error", description: err.error || "Failed to process request", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to clock in/out", variant: "destructive" });
+    } finally {
+      setIsClocking(false);
+    }
+  };
 
   const sortByOrder = (a: Job, b: Job) => {
     const orderA = a.orderNumber ?? 9999;
@@ -331,6 +431,50 @@ function EngineerDashboard() {
           </p>
         </div>
       </div>
+
+      {/* Clock In/Out Card */}
+      <Card className={`border-2 ${clockedIn ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' : 'border-slate-300 dark:border-slate-700'}`}>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className={`p-3 rounded-full ${clockedIn ? 'bg-emerald-500' : 'bg-slate-400'}`}>
+                <Timer className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="font-semibold text-lg">
+                  {clockedIn ? 'Currently On Shift' : 'Not Clocked In'}
+                </p>
+                {clockedIn && clockInTime && (
+                  <p className="text-sm text-muted-foreground">
+                    Started at {format(clockInTime, "HH:mm")} ({elapsedTime})
+                  </p>
+                )}
+              </div>
+            </div>
+            <Button
+              size="lg"
+              onClick={handleClockInOut}
+              disabled={isClocking}
+              className={clockedIn ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-500 hover:bg-emerald-600'}
+              data-testid="button-clock-in-out"
+            >
+              {isClocking ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : clockedIn ? (
+                <>
+                  <LogOut className="h-5 w-5 mr-2" />
+                  Clock Out
+                </>
+              ) : (
+                <>
+                  <LogIn className="h-5 w-5 mr-2" />
+                  Clock In
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

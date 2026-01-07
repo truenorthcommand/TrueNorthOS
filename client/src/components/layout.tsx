@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, FilePlus, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot } from "lucide-react";
+import { LogOut, LayoutDashboard, FilePlus, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot, Clock } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { useState } from "react";
 
@@ -118,6 +118,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
             >
               <MapPin className="mr-3 h-5 w-5" />
               Live Map
+            </Button>
+          </Link>
+        )}
+
+        {user.role === "admin" && (
+          <Link href="/time-logs">
+            <Button
+              variant={location === "/time-logs" ? "secondary" : "ghost"}
+              className="w-full justify-start h-12 text-lg font-medium"
+              onClick={() => setIsOpen(false)}
+            >
+              <Clock className="mr-3 h-5 w-5" />
+              Time Logs
             </Button>
           </Link>
         )}
@@ -245,6 +258,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Link href="/map">
                 <Button variant={location === "/map" ? "secondary" : "ghost"}>
                   Map
+                </Button>
+              </Link>
+            )}
+            {user.role === "admin" && (
+              <Link href="/time-logs">
+                <Button variant={location === "/time-logs" ? "secondary" : "ghost"}>
+                  Time Logs
                 </Button>
               </Link>
             )}

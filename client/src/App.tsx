@@ -22,6 +22,7 @@ import AiAdvisors from "@/pages/ai-advisors";
 import AdminAdvisors from "@/pages/admin-advisors";
 import UserGuides from "@/pages/user-guides";
 import Setup from "@/pages/setup";
+import TimeLogs from "@/pages/time-logs";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { Loader2 } from "lucide-react";
@@ -77,6 +78,9 @@ function Router() {
       </Route>
       <Route path="/map">
         <PrivateRoute component={MapPage} />
+      </Route>
+      <Route path="/time-logs">
+        <PrivateRoute component={TimeLogs} />
       </Route>
       <Route path="/ai-advisors">
         <PrivateRoute component={AiAdvisors} />

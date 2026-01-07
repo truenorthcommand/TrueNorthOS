@@ -137,3 +137,26 @@ export const insertAiAdvisorSchema = createInsertSchema(aiAdvisors).omit({
 
 export type InsertAiAdvisor = z.infer<typeof insertAiAdvisorSchema>;
 export type AiAdvisor = typeof aiAdvisors.$inferSelect;
+
+export const timeLogs = pgTable("time_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  engineerId: varchar("engineer_id").notNull(),
+  clockInTime: timestamp("clock_in_time").notNull(),
+  clockOutTime: timestamp("clock_out_time"),
+  clockInLat: doublePrecision("clock_in_lat"),
+  clockInLng: doublePrecision("clock_in_lng"),
+  clockInAddress: text("clock_in_address"),
+  clockOutLat: doublePrecision("clock_out_lat"),
+  clockOutLng: doublePrecision("clock_out_lng"),
+  clockOutAddress: text("clock_out_address"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTimeLogSchema = createInsertSchema(timeLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTimeLog = z.infer<typeof insertTimeLogSchema>;
+export type TimeLog = typeof timeLogs.$inferSelect;

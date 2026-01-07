@@ -3,10 +3,11 @@ import {
   type Job, type InsertJob,
   type EngineerLocation, type InsertEngineerLocation,
   type AiAdvisor, type InsertAiAdvisor,
-  users, jobs, engineerLocations, aiAdvisors
+  type TimeLog, type InsertTimeLog,
+  users, jobs, engineerLocations, aiAdvisors, timeLogs
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, or, sql } from "drizzle-orm";
+import { eq, desc, or, sql, isNull, and } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -36,6 +37,12 @@ export interface IStorage {
   createAiAdvisor(advisor: InsertAiAdvisor): Promise<AiAdvisor>;
   updateAiAdvisor(id: string, updates: Partial<AiAdvisor>): Promise<AiAdvisor | undefined>;
   deleteAiAdvisor(id: string): Promise<void>;
+  
+  clockIn(engineerId: string, lat: number | null, lng: number | null, address: string | null): Promise<TimeLog>;
+  clockOut(engineerId: string, lat: number | null, lng: number | null, address: string | null): Promise<TimeLog | undefined>;
+  getActiveTimeLog(engineerId: string): Promise<TimeLog | undefined>;
+  getTimeLogsByEngineer(engineerId: string, limit?: number): Promise<TimeLog[]>;
+  getAllTimeLogs(limit?: number): Promise<TimeLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -189,6 +196,53 @@ export class DatabaseStorage implements IStorage {
 
   async deleteAiAdvisor(id: string): Promise<void> {
     await db.delete(aiAdvisors).where(eq(aiAdvisors.id, id));
+  }
+
+  async clockIn(engineerId: string, lat: number | null, lng: number | null, address: string | null): Promise<TimeLog> {
+    const [timeLog] = await db.insert(timeLogs).values({
+      engineerId,
+      clockInTime: new Date(),
+      clockInLat: lat,
+      clockInLng: lng,
+      clockInAddress: address,
+    }).returning();
+    return timeLog;
+  }
+
+  async clockOut(engineerId: string, lat: number | null, lng: number | null, address: string | null): Promise<TimeLog | undefined> {
+    const activeLog = await this.getActiveTimeLog(engineerId);
+    if (!activeLog) return undefined;
+    
+    const [updated] = await db.update(timeLogs).set({
+      clockOutTime: new Date(),
+      clockOutLat: lat,
+      clockOutLng: lng,
+      clockOutAddress: address,
+    }).where(eq(timeLogs.id, activeLog.id)).returning();
+    return updated;
+  }
+
+  async getActiveTimeLog(engineerId: string): Promise<TimeLog | undefined> {
+    const [log] = await db.select().from(timeLogs).where(
+      and(
+        eq(timeLogs.engineerId, engineerId),
+        isNull(timeLogs.clockOutTime)
+      )
+    ).orderBy(desc(timeLogs.clockInTime)).limit(1);
+    return log;
+  }
+
+  async getTimeLogsByEngineer(engineerId: string, limit = 50): Promise<TimeLog[]> {
+    return db.select().from(timeLogs)
+      .where(eq(timeLogs.engineerId, engineerId))
+      .orderBy(desc(timeLogs.clockInTime))
+      .limit(limit);
+  }
+
+  async getAllTimeLogs(limit = 100): Promise<TimeLog[]> {
+    return db.select().from(timeLogs)
+      .orderBy(desc(timeLogs.clockInTime))
+      .limit(limit);
   }
 }
 

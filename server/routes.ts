@@ -694,6 +694,83 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== TIME TRACKING ====================
+
+  const clockRequestSchema = z.object({
+    latitude: z.number().nullable().optional(),
+    longitude: z.number().nullable().optional(),
+    address: z.string().nullable().optional(),
+  });
+
+  app.post("/api/time/clock-in", requireAuth, async (req, res) => {
+    try {
+      const parsed = clockRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request data" });
+      }
+      const { latitude, longitude, address } = parsed.data;
+      const engineerId = req.session.userId!;
+
+      const activeLog = await storage.getActiveTimeLog(engineerId);
+      if (activeLog) {
+        return res.status(400).json({ error: "Already clocked in" });
+      }
+
+      const timeLog = await storage.clockIn(engineerId, latitude ?? null, longitude ?? null, address ?? null);
+      res.json(timeLog);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to clock in" });
+    }
+  });
+
+  app.post("/api/time/clock-out", requireAuth, async (req, res) => {
+    try {
+      const parsed = clockRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request data" });
+      }
+      const { latitude, longitude, address } = parsed.data;
+      const engineerId = req.session.userId!;
+
+      const timeLog = await storage.clockOut(engineerId, latitude ?? null, longitude ?? null, address ?? null);
+      if (!timeLog) {
+        return res.status(400).json({ error: "Not currently clocked in" });
+      }
+      res.json(timeLog);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to clock out" });
+    }
+  });
+
+  app.get("/api/time/status", requireAuth, async (req, res) => {
+    try {
+      const engineerId = req.session.userId!;
+      const activeLog = await storage.getActiveTimeLog(engineerId);
+      res.json({ clockedIn: !!activeLog, activeLog });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get clock status" });
+    }
+  });
+
+  app.get("/api/time/logs", requireAuth, async (req, res) => {
+    try {
+      const engineerId = req.session.userId!;
+      const logs = await storage.getTimeLogsByEngineer(engineerId);
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get time logs" });
+    }
+  });
+
+  app.get("/api/time/logs/all", requireAdmin, async (req, res) => {
+    try {
+      const logs = await storage.getAllTimeLogs();
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get all time logs" });
+    }
+  });
+
   // ==================== AI ADVISORS ROUTES ====================
 
   app.get("/api/ai-advisors", requireAuth, async (req, res) => {
