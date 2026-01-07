@@ -64,9 +64,9 @@ export async function registerRoutes(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: false, // Disabled for Replit subdomain compatibility
+      secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: 'lax', // Works across iPhone, Android, and web
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     }
   }));
