@@ -46,3 +46,6 @@ mockupState = "FULLSTACK"
 
 [userenv.shared]
 SETUP_KEY = "TrueNorth2024Reset"
+
+[userenv.production]
+NODE_ENV = "production"
