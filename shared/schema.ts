@@ -11,6 +11,7 @@ export const users = pgTable("users", {
   email: text("email"),
   phone: text("phone"),
   role: text("role").notNull().default("engineer"),
+  superAdmin: boolean("super_admin").notNull().default(false),
   status: text("status").notNull().default("active"),
   currentLat: doublePrecision("current_lat"),
   currentLng: doublePrecision("current_lng"),
