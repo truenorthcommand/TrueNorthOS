@@ -395,6 +395,11 @@ export async function registerRoutes(
         return res.status(404).json({ error: "User not found" });
       }
 
+      // Protect super admins from being deleted
+      if (user.superAdmin) {
+        return res.status(403).json({ error: "Cannot delete a super admin account" });
+      }
+
       await storage.deleteUser(req.params.id);
       res.json({ message: "User deleted successfully" });
     } catch (error) {
@@ -407,6 +412,11 @@ export async function registerRoutes(
       const user = await storage.getUser(req.params.id);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
+      }
+
+      // Protect super admins from being demoted
+      if (user.superAdmin && req.body.role && req.body.role !== 'admin') {
+        return res.status(403).json({ error: "Cannot demote a super admin" });
       }
 
       const { name, email, phone, username, password, role } = req.body;
