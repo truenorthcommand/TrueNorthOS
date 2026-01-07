@@ -1043,19 +1043,14 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
       return res.status(403).send("Access denied");
     }
     try {
-      const existingJohn = await storage.getUserByUsername("john");
-      if (existingJohn) {
-        await storage.updateUser(existingJohn.id, { password: "john123" });
+      const allUsers = await storage.getAllUsers();
+      const resetPasswords: string[] = [];
+      for (const user of allUsers) {
+        const newPassword = user.username + "123";
+        await storage.updateUser(user.id, { password: newPassword });
+        resetPasswords.push(`<b>${user.username}</b>: ${newPassword}`);
       }
-      const existingSarah = await storage.getUserByUsername("sarah");
-      if (existingSarah) {
-        await storage.updateUser(existingSarah.id, { password: "sarah123" });
-      }
-      const existingAdmin = await storage.getUserByUsername("admin");
-      if (existingAdmin) {
-        await storage.updateUser(existingAdmin.id, { password: "admin123" });
-      }
-      res.send("<html><body style='font-family: system-ui; padding: 40px; text-align: center;'><h1>Passwords Reset!</h1><p>All demo passwords have been reset.</p><p><b>admin</b>: admin123<br><b>john</b>: john123<br><b>sarah</b>: sarah123</p><p><a href='/'>Go to Login</a></p></body></html>");
+      res.send(`<html><body style='font-family: system-ui; padding: 40px; text-align: center;'><h1>All Passwords Reset!</h1><p>All user passwords have been reset to username + "123":</p><p>${resetPasswords.join('<br>')}</p><p><a href='/'>Go to Login</a></p></body></html>`);
     } catch (error) {
       res.status(500).send("Reset failed");
     }
