@@ -81,7 +81,7 @@ function MapBoundsUpdater({ markers, userLocation }: { markers: MapMarker[]; use
     const bounds = L.latLngBounds([]);
     
     markers.forEach(marker => {
-      if (marker.lat && marker.lng) {
+      if (typeof marker.lat === 'number' && typeof marker.lng === 'number') {
         bounds.extend([marker.lat, marker.lng]);
       }
     });
@@ -169,7 +169,7 @@ export function LeafletMap({
         <MapBoundsUpdater markers={markers} userLocation={userLocation} />
 
         {markers.map((marker) => (
-          marker.lat && marker.lng && (
+          typeof marker.lat === 'number' && typeof marker.lng === 'number' && (
             <Marker
               key={marker.id}
               position={[marker.lat, marker.lng]}
