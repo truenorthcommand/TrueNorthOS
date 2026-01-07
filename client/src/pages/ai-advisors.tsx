@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 import { 
   Bot, 
   ClipboardCheck, 
@@ -17,7 +18,8 @@ import {
   X, 
   ArrowLeft,
   Loader2,
-  User
+  User,
+  Plus
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +53,8 @@ function AdvisorIcon({ icon, className }: { icon: string; className?: string }) 
 
 export default function AiAdvisors() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [selectedAdvisor, setSelectedAdvisor] = useState<AiAdvisor | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -78,6 +82,34 @@ export default function AiAdvisors() {
     },
     onSuccess: (data) => {
       setMessages((prev) => [...prev, { role: "assistant", content: data.message }]);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const seedMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/ai-advisors/seed", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to initialize advisors");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Success",
+        description: `${data.count} AI advisors have been initialized`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/ai-advisors"] });
     },
     onError: (error: Error) => {
       toast({
@@ -174,9 +206,33 @@ export default function AiAdvisors() {
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Bot className="h-16 w-16 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">No Technical Advisors Available</h3>
-            <p className="text-muted-foreground text-center max-w-md">
-              Technical advisors haven't been configured yet. Contact your administrator to set them up.
+            <p className="text-muted-foreground text-center max-w-md mb-4">
+              Technical advisors haven't been configured yet.
             </p>
+            {user?.role === "admin" && (
+              <Button 
+                onClick={() => seedMutation.mutate()}
+                disabled={seedMutation.isPending}
+                data-testid="button-seed-advisors"
+              >
+                {seedMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Initializing...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Initialize Default Advisors
+                  </>
+                )}
+              </Button>
+            )}
+            {user?.role !== "admin" && (
+              <p className="text-muted-foreground text-sm">
+                Contact your administrator to set them up.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
