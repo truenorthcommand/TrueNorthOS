@@ -1036,6 +1036,31 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
   // ==================== SEED ROUTE (DEV ONLY) ====================
 
+  // Simple GET endpoint to reset passwords - requires secret key
+  app.get("/api/reset-demo", async (req, res) => {
+    const key = req.query.key;
+    if (key !== "TrueNorth2024Reset") {
+      return res.status(403).send("Access denied");
+    }
+    try {
+      const existingJohn = await storage.getUserByUsername("john");
+      if (existingJohn) {
+        await storage.updateUser(existingJohn.id, { password: "john123" });
+      }
+      const existingSarah = await storage.getUserByUsername("sarah");
+      if (existingSarah) {
+        await storage.updateUser(existingSarah.id, { password: "sarah123" });
+      }
+      const existingAdmin = await storage.getUserByUsername("admin");
+      if (existingAdmin) {
+        await storage.updateUser(existingAdmin.id, { password: "admin123" });
+      }
+      res.send("<html><body style='font-family: system-ui; padding: 40px; text-align: center;'><h1>Passwords Reset!</h1><p>All demo passwords have been reset.</p><p><b>admin</b>: admin123<br><b>john</b>: john123<br><b>sarah</b>: sarah123</p><p><a href='/'>Go to Login</a></p></body></html>");
+    } catch (error) {
+      res.status(500).send("Reset failed");
+    }
+  });
+
   app.post("/api/seed", async (req, res) => {
     try {
       // Upsert demo admin - create or reset password
