@@ -594,6 +594,11 @@ export async function registerRoutes(
         }
       }
 
+      // Convert date string to Date object for Drizzle
+      if (updates.date !== undefined) {
+        updates.date = updates.date ? new Date(updates.date) : null;
+      }
+
       const job = await storage.updateJob(req.params.id, updates);
       res.json(job);
     } catch (error) {
