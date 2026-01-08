@@ -47,8 +47,21 @@ export const jobs = pgTable("jobs", {
   signOffAddress: text("sign_off_address"),
   signOffTimestamp: timestamp("sign_off_timestamp"),
   orderIndex: integer("order_index").default(0),
+  isLongRunning: boolean("is_long_running").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Job updates for long-running jobs (2 updates per day max)
+export const jobUpdates = pgTable("job_updates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull(),
+  workDate: timestamp("work_date").notNull(),
+  sequence: integer("sequence").notNull(), // 1 or 2
+  notes: text("notes"),
+  photos: jsonb("photos").default([]),
+  engineerId: varchar("engineer_id"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const clients = pgTable("clients", {
@@ -109,6 +122,16 @@ export type Job = typeof jobs.$inferSelect;
 
 export type InsertEngineerLocation = z.infer<typeof insertEngineerLocationSchema>;
 export type EngineerLocation = typeof engineerLocations.$inferSelect;
+
+export const insertJobUpdateSchema = createInsertSchema(jobUpdates, {
+  workDate: z.coerce.date(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertJobUpdate = z.infer<typeof insertJobUpdateSchema>;
+export type JobUpdate = typeof jobUpdates.$inferSelect;
 
 export type Material = {
   id: string;
