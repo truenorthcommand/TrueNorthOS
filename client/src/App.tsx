@@ -23,6 +23,13 @@ import AdminAdvisors from "@/pages/admin-advisors";
 import UserGuides from "@/pages/user-guides";
 import Setup from "@/pages/setup";
 import TimeLogs from "@/pages/time-logs";
+import Quotes from "@/pages/quotes";
+import QuoteDetail from "@/pages/quote-detail";
+import ClientQuote from "@/pages/client-quote";
+import Invoices from "@/pages/invoices";
+import InvoiceDetail from "@/pages/invoice-detail";
+import ClientInvoice from "@/pages/client-invoice";
+import Settings from "@/pages/settings";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { Loader2 } from "lucide-react";
@@ -81,6 +88,23 @@ function Router() {
       </Route>
       <Route path="/time-logs">
         <PrivateRoute component={TimeLogs} />
+      </Route>
+      <Route path="/quotes">
+        <PrivateRoute component={Quotes} />
+      </Route>
+      <Route path="/quotes/:id">
+        <PrivateRoute component={QuoteDetail} />
+      </Route>
+      <Route path="/quote/:token" component={ClientQuote} />
+      <Route path="/invoices">
+        <PrivateRoute component={Invoices} />
+      </Route>
+      <Route path="/invoices/:id">
+        <PrivateRoute component={InvoiceDetail} />
+      </Route>
+      <Route path="/invoice/:token" component={ClientInvoice} />
+      <Route path="/settings">
+        <PrivateRoute component={Settings} />
       </Route>
       <Route path="/ai-advisors">
         <PrivateRoute component={AiAdvisors} />

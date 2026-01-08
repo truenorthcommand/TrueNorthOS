@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import OpenAI from "openai";
 import { storage } from "./storage";
 import { pool } from "./db";
@@ -768,6 +769,290 @@ export async function registerRoutes(
       res.json(logs);
     } catch (error) {
       res.status(500).json({ error: "Failed to get all time logs" });
+    }
+  });
+
+  // ==================== QUOTES ROUTES ====================
+
+  app.get("/api/quotes", requireAdmin, async (req, res) => {
+    try {
+      const allQuotes = await storage.getAllQuotes();
+      res.json(allQuotes);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch quotes" });
+    }
+  });
+
+  app.get("/api/quotes/:id", requireAdmin, async (req, res) => {
+    try {
+      const quote = await storage.getQuote(req.params.id);
+      if (!quote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      res.json(quote);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch quote" });
+    }
+  });
+
+  app.post("/api/quotes", requireAdmin, async (req, res) => {
+    try {
+      const quoteNo = await storage.getNextQuoteNumber();
+      const accessToken = crypto.randomUUID();
+      const quote = await storage.createQuote({
+        ...req.body,
+        quoteNo,
+        accessToken,
+        createdById: req.session.userId,
+      });
+      res.json(quote);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create quote" });
+    }
+  });
+
+  app.put("/api/quotes/:id", requireAdmin, async (req, res) => {
+    try {
+      const quote = await storage.updateQuote(req.params.id, req.body);
+      if (!quote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      res.json(quote);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update quote" });
+    }
+  });
+
+  app.delete("/api/quotes/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteQuote(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete quote" });
+    }
+  });
+
+  // Public quote view for clients (no auth required)
+  app.get("/api/quotes/view/:token", async (req, res) => {
+    try {
+      const quote = await storage.getQuoteByToken(req.params.token);
+      if (!quote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      const settings = await storage.getCompanySettings();
+      res.json({ quote, companySettings: settings });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch quote" });
+    }
+  });
+
+  // Client accepts quote
+  app.post("/api/quotes/accept/:token", async (req, res) => {
+    try {
+      const quote = await storage.getQuoteByToken(req.params.token);
+      if (!quote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      if (quote.status !== "Sent") {
+        return res.status(400).json({ error: "Quote cannot be accepted in current status" });
+      }
+      const updated = await storage.updateQuote(quote.id, {
+        status: "Accepted",
+        acceptedAt: new Date(),
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to accept quote" });
+    }
+  });
+
+  // Client declines quote
+  app.post("/api/quotes/decline/:token", async (req, res) => {
+    try {
+      const quote = await storage.getQuoteByToken(req.params.token);
+      if (!quote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      if (quote.status !== "Sent") {
+        return res.status(400).json({ error: "Quote cannot be declined in current status" });
+      }
+      const { reason } = req.body;
+      const updated = await storage.updateQuote(quote.id, {
+        status: "Declined",
+        declinedAt: new Date(),
+        declineReason: reason || null,
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to decline quote" });
+    }
+  });
+
+  // Convert quote to job
+  app.post("/api/quotes/:id/convert-to-job", requireAdmin, async (req, res) => {
+    try {
+      const quote = await storage.getQuote(req.params.id);
+      if (!quote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      if (quote.status !== "Accepted") {
+        return res.status(400).json({ error: "Only accepted quotes can be converted to jobs" });
+      }
+      
+      const jobCount = (await storage.getAllJobs()).length + 1;
+      const year = new Date().getFullYear();
+      const jobNo = `J-${year}-${String(jobCount).padStart(3, '0')}`;
+      
+      const job = await storage.createJob({
+        jobNo,
+        customerName: quote.customerName,
+        address: quote.siteAddress || undefined,
+        postcode: quote.sitePostcode || undefined,
+        contactEmail: quote.customerEmail || undefined,
+        contactPhone: quote.customerPhone || undefined,
+        description: quote.description || undefined,
+        status: "Draft",
+      });
+      
+      await storage.updateQuote(quote.id, {
+        status: "Converted",
+        convertedJobId: job.id,
+      });
+      
+      res.json({ job, quote: await storage.getQuote(quote.id) });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to convert quote to job" });
+    }
+  });
+
+  // ==================== INVOICES ROUTES ====================
+
+  app.get("/api/invoices", requireAdmin, async (req, res) => {
+    try {
+      const allInvoices = await storage.getAllInvoices();
+      res.json(allInvoices);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch invoices" });
+    }
+  });
+
+  app.get("/api/invoices/:id", requireAdmin, async (req, res) => {
+    try {
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      res.json(invoice);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch invoice" });
+    }
+  });
+
+  app.post("/api/invoices", requireAdmin, async (req, res) => {
+    try {
+      const invoiceNo = await storage.getNextInvoiceNumber();
+      const accessToken = crypto.randomUUID();
+      const invoice = await storage.createInvoice({
+        ...req.body,
+        invoiceNo,
+        accessToken,
+        createdById: req.session.userId,
+      });
+      res.json(invoice);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create invoice" });
+    }
+  });
+
+  app.put("/api/invoices/:id", requireAdmin, async (req, res) => {
+    try {
+      const invoice = await storage.updateInvoice(req.params.id, req.body);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      res.json(invoice);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update invoice" });
+    }
+  });
+
+  app.delete("/api/invoices/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteInvoice(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete invoice" });
+    }
+  });
+
+  // Public invoice view for clients
+  app.get("/api/invoices/view/:token", async (req, res) => {
+    try {
+      const invoice = await storage.getInvoiceByToken(req.params.token);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      const settings = await storage.getCompanySettings();
+      res.json({ invoice, companySettings: settings });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch invoice" });
+    }
+  });
+
+  // Create invoice from job
+  app.post("/api/jobs/:id/create-invoice", requireAdmin, async (req, res) => {
+    try {
+      const job = await storage.getJob(req.params.id);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      const invoiceNo = await storage.getNextInvoiceNumber();
+      const accessToken = crypto.randomUUID();
+      const settings = await storage.getCompanySettings();
+      
+      const invoice = await storage.createInvoice({
+        invoiceNo,
+        jobId: job.id,
+        customerName: job.customerName,
+        customerEmail: job.contactEmail || undefined,
+        customerPhone: job.contactPhone || undefined,
+        siteAddress: job.address || undefined,
+        sitePostcode: job.postcode || undefined,
+        lineItems: req.body.lineItems || [],
+        subtotal: req.body.subtotal || 0,
+        vatRate: settings?.defaultVatRate || 20,
+        vatAmount: req.body.vatAmount || 0,
+        total: req.body.total || 0,
+        notes: req.body.notes,
+        accessToken,
+        createdById: req.session.userId,
+        dueDate: new Date(Date.now() + (settings?.defaultPaymentTerms || 30) * 24 * 60 * 60 * 1000),
+      });
+      
+      res.json(invoice);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create invoice from job" });
+    }
+  });
+
+  // ==================== COMPANY SETTINGS ROUTES ====================
+
+  app.get("/api/company-settings", requireAdmin, async (req, res) => {
+    try {
+      const settings = await storage.getCompanySettings();
+      res.json(settings || {});
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch company settings" });
+    }
+  });
+
+  app.put("/api/company-settings", requireAdmin, async (req, res) => {
+    try {
+      const settings = await storage.upsertCompanySettings(req.body);
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update company settings" });
     }
   });
 

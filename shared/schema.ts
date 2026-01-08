@@ -160,3 +160,134 @@ export const insertTimeLogSchema = createInsertSchema(timeLogs).omit({
 
 export type InsertTimeLog = z.infer<typeof insertTimeLogSchema>;
 export type TimeLog = typeof timeLogs.$inferSelect;
+
+// Quote line item type
+export type QuoteLineItem = {
+  id: string;
+  itemCode?: string;
+  description: string;
+  quantity: number;
+  unitCost: number;
+  discount: number;
+  amount: number;
+};
+
+export type QuoteStatus = 'Draft' | 'Sent' | 'Accepted' | 'Declined' | 'Expired' | 'Converted';
+
+export const quotes = pgTable("quotes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  quoteNo: text("quote_no").notNull(),
+  customerId: varchar("customer_id"),
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email"),
+  customerPhone: text("customer_phone"),
+  siteAddress: text("site_address"),
+  sitePostcode: text("site_postcode"),
+  reference: text("reference"),
+  quoteDate: timestamp("quote_date").defaultNow(),
+  expiryDate: timestamp("expiry_date"),
+  description: text("description"),
+  lineItems: jsonb("line_items").default([]),
+  subtotal: doublePrecision("subtotal").default(0),
+  discountTotal: doublePrecision("discount_total").default(0),
+  vatRate: doublePrecision("vat_rate").default(20),
+  vatAmount: doublePrecision("vat_amount").default(0),
+  total: doublePrecision("total").default(0),
+  terms: text("terms"),
+  notes: text("notes"),
+  status: text("status").notNull().default("Draft"),
+  declineReason: text("decline_reason"),
+  acceptedAt: timestamp("accepted_at"),
+  declinedAt: timestamp("declined_at"),
+  sentAt: timestamp("sent_at"),
+  accessToken: text("access_token"),
+  convertedJobId: varchar("converted_job_id"),
+  createdById: varchar("created_by_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuoteSchema = createInsertSchema(quotes, {
+  quoteDate: z.coerce.date().optional(),
+  expiryDate: z.coerce.date().optional(),
+  acceptedAt: z.coerce.date().optional(),
+  declinedAt: z.coerce.date().optional(),
+  sentAt: z.coerce.date().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertQuote = z.infer<typeof insertQuoteSchema>;
+export type Quote = typeof quotes.$inferSelect;
+
+export type InvoiceStatus = 'Draft' | 'Sent' | 'Paid' | 'Overdue' | 'Cancelled';
+
+export const invoices = pgTable("invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceNo: text("invoice_no").notNull(),
+  jobId: varchar("job_id"),
+  quoteId: varchar("quote_id"),
+  customerId: varchar("customer_id"),
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email"),
+  customerPhone: text("customer_phone"),
+  siteAddress: text("site_address"),
+  sitePostcode: text("site_postcode"),
+  invoiceDate: timestamp("invoice_date").defaultNow(),
+  dueDate: timestamp("due_date"),
+  lineItems: jsonb("line_items").default([]),
+  subtotal: doublePrecision("subtotal").default(0),
+  vatRate: doublePrecision("vat_rate").default(20),
+  vatAmount: doublePrecision("vat_amount").default(0),
+  total: doublePrecision("total").default(0),
+  notes: text("notes"),
+  status: text("status").notNull().default("Draft"),
+  paidAt: timestamp("paid_at"),
+  sentAt: timestamp("sent_at"),
+  accessToken: text("access_token"),
+  createdById: varchar("created_by_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertInvoiceSchema = createInsertSchema(invoices, {
+  invoiceDate: z.coerce.date().optional(),
+  dueDate: z.coerce.date().optional(),
+  paidAt: z.coerce.date().optional(),
+  sentAt: z.coerce.date().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+export type Invoice = typeof invoices.$inferSelect;
+
+export const companySettings = pgTable("company_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyName: text("company_name"),
+  companyAddress: text("company_address"),
+  companyPhone: text("company_phone"),
+  companyEmail: text("company_email"),
+  bankName: text("bank_name"),
+  bankAccountName: text("bank_account_name"),
+  bankSortCode: text("bank_sort_code"),
+  bankAccountNumber: text("bank_account_number"),
+  vatNumber: text("vat_number"),
+  defaultVatRate: doublePrecision("default_vat_rate").default(20),
+  defaultPaymentTerms: integer("default_payment_terms").default(30),
+  quoteTerms: text("quote_terms"),
+  invoiceTerms: text("invoice_terms"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCompanySettingsSchema = createInsertSchema(companySettings).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
+export type CompanySettings = typeof companySettings.$inferSelect;

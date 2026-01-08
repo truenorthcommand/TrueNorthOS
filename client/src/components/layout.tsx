@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, FilePlus, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot, Clock } from "lucide-react";
+import { LogOut, LayoutDashboard, FilePlus, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { useState } from "react";
 
@@ -131,6 +131,45 @@ export function Layout({ children }: { children: React.ReactNode }) {
             >
               <Clock className="mr-3 h-5 w-5" />
               Time Logs
+            </Button>
+          </Link>
+        )}
+
+        {user.role === "admin" && (
+          <Link href="/quotes">
+            <Button
+              variant={location.startsWith("/quotes") ? "secondary" : "ghost"}
+              className="w-full justify-start h-12 text-lg font-medium"
+              onClick={() => setIsOpen(false)}
+            >
+              <FileText className="mr-3 h-5 w-5" />
+              Quotes
+            </Button>
+          </Link>
+        )}
+
+        {user.role === "admin" && (
+          <Link href="/invoices">
+            <Button
+              variant={location.startsWith("/invoices") ? "secondary" : "ghost"}
+              className="w-full justify-start h-12 text-lg font-medium"
+              onClick={() => setIsOpen(false)}
+            >
+              <Receipt className="mr-3 h-5 w-5" />
+              Invoices
+            </Button>
+          </Link>
+        )}
+
+        {user.role === "admin" && (
+          <Link href="/settings">
+            <Button
+              variant={location === "/settings" ? "secondary" : "ghost"}
+              className="w-full justify-start h-12 text-lg font-medium"
+              onClick={() => setIsOpen(false)}
+            >
+              <Settings className="mr-3 h-5 w-5" />
+              Settings
             </Button>
           </Link>
         )}
@@ -265,6 +304,27 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Link href="/time-logs">
                 <Button variant={location === "/time-logs" ? "secondary" : "ghost"}>
                   Time Logs
+                </Button>
+              </Link>
+            )}
+            {user.role === "admin" && (
+              <Link href="/quotes">
+                <Button variant={location.startsWith("/quotes") ? "secondary" : "ghost"}>
+                  Quotes
+                </Button>
+              </Link>
+            )}
+            {user.role === "admin" && (
+              <Link href="/invoices">
+                <Button variant={location.startsWith("/invoices") ? "secondary" : "ghost"}>
+                  Invoices
+                </Button>
+              </Link>
+            )}
+            {user.role === "admin" && (
+              <Link href="/settings">
+                <Button variant={location === "/settings" ? "secondary" : "ghost"}>
+                  Settings
                 </Button>
               </Link>
             )}

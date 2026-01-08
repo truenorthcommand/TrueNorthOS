@@ -4,7 +4,10 @@ import {
   type EngineerLocation, type InsertEngineerLocation,
   type AiAdvisor, type InsertAiAdvisor,
   type TimeLog, type InsertTimeLog,
-  users, jobs, engineerLocations, aiAdvisors, timeLogs
+  type Quote, type InsertQuote,
+  type Invoice, type InsertInvoice,
+  type CompanySettings, type InsertCompanySettings,
+  users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and } from "drizzle-orm";
@@ -43,6 +46,26 @@ export interface IStorage {
   getActiveTimeLog(engineerId: string): Promise<TimeLog | undefined>;
   getTimeLogsByEngineer(engineerId: string, limit?: number): Promise<TimeLog[]>;
   getAllTimeLogs(limit?: number): Promise<TimeLog[]>;
+  
+  getQuote(id: string): Promise<Quote | undefined>;
+  getQuoteByToken(token: string): Promise<Quote | undefined>;
+  getAllQuotes(): Promise<Quote[]>;
+  createQuote(quote: InsertQuote): Promise<Quote>;
+  updateQuote(id: string, updates: Partial<Quote>): Promise<Quote | undefined>;
+  deleteQuote(id: string): Promise<void>;
+  getNextQuoteNumber(): Promise<string>;
+  
+  getInvoice(id: string): Promise<Invoice | undefined>;
+  getInvoiceByToken(token: string): Promise<Invoice | undefined>;
+  getAllInvoices(): Promise<Invoice[]>;
+  getInvoicesByJob(jobId: string): Promise<Invoice[]>;
+  createInvoice(invoice: InsertInvoice): Promise<Invoice>;
+  updateInvoice(id: string, updates: Partial<Invoice>): Promise<Invoice | undefined>;
+  deleteInvoice(id: string): Promise<void>;
+  getNextInvoiceNumber(): Promise<string>;
+  
+  getCompanySettings(): Promise<CompanySettings | undefined>;
+  upsertCompanySettings(settings: InsertCompanySettings): Promise<CompanySettings>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -243,6 +266,95 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(timeLogs)
       .orderBy(desc(timeLogs.clockInTime))
       .limit(limit);
+  }
+
+  async getQuote(id: string): Promise<Quote | undefined> {
+    const [quote] = await db.select().from(quotes).where(eq(quotes.id, id));
+    return quote;
+  }
+
+  async getQuoteByToken(token: string): Promise<Quote | undefined> {
+    const [quote] = await db.select().from(quotes).where(eq(quotes.accessToken, token));
+    return quote;
+  }
+
+  async getAllQuotes(): Promise<Quote[]> {
+    return db.select().from(quotes).orderBy(desc(quotes.createdAt));
+  }
+
+  async createQuote(quote: InsertQuote): Promise<Quote> {
+    const [created] = await db.insert(quotes).values(quote).returning();
+    return created;
+  }
+
+  async updateQuote(id: string, updates: Partial<Quote>): Promise<Quote | undefined> {
+    const [updated] = await db.update(quotes).set({ ...updates, updatedAt: new Date() }).where(eq(quotes.id, id)).returning();
+    return updated;
+  }
+
+  async deleteQuote(id: string): Promise<void> {
+    await db.delete(quotes).where(eq(quotes.id, id));
+  }
+
+  async getNextQuoteNumber(): Promise<string> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(quotes);
+    const count = Number(result[0]?.count || 0) + 1;
+    const year = new Date().getFullYear();
+    return `Q-${year}-${String(count).padStart(4, '0')}`;
+  }
+
+  async getInvoice(id: string): Promise<Invoice | undefined> {
+    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+    return invoice;
+  }
+
+  async getInvoiceByToken(token: string): Promise<Invoice | undefined> {
+    const [invoice] = await db.select().from(invoices).where(eq(invoices.accessToken, token));
+    return invoice;
+  }
+
+  async getAllInvoices(): Promise<Invoice[]> {
+    return db.select().from(invoices).orderBy(desc(invoices.createdAt));
+  }
+
+  async getInvoicesByJob(jobId: string): Promise<Invoice[]> {
+    return db.select().from(invoices).where(eq(invoices.jobId, jobId)).orderBy(desc(invoices.createdAt));
+  }
+
+  async createInvoice(invoice: InsertInvoice): Promise<Invoice> {
+    const [created] = await db.insert(invoices).values(invoice).returning();
+    return created;
+  }
+
+  async updateInvoice(id: string, updates: Partial<Invoice>): Promise<Invoice | undefined> {
+    const [updated] = await db.update(invoices).set({ ...updates, updatedAt: new Date() }).where(eq(invoices.id, id)).returning();
+    return updated;
+  }
+
+  async deleteInvoice(id: string): Promise<void> {
+    await db.delete(invoices).where(eq(invoices.id, id));
+  }
+
+  async getNextInvoiceNumber(): Promise<string> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(invoices);
+    const count = Number(result[0]?.count || 0) + 1;
+    const year = new Date().getFullYear();
+    return `INV-${year}-${String(count).padStart(4, '0')}`;
+  }
+
+  async getCompanySettings(): Promise<CompanySettings | undefined> {
+    const [settings] = await db.select().from(companySettings).limit(1);
+    return settings;
+  }
+
+  async upsertCompanySettings(settings: InsertCompanySettings): Promise<CompanySettings> {
+    const existing = await this.getCompanySettings();
+    if (existing) {
+      const [updated] = await db.update(companySettings).set({ ...settings, updatedAt: new Date() }).where(eq(companySettings.id, existing.id)).returning();
+      return updated;
+    }
+    const [created] = await db.insert(companySettings).values(settings).returning();
+    return created;
   }
 }
 
