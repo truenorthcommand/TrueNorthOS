@@ -46,6 +46,7 @@ export const jobs = pgTable("jobs", {
   signOffLng: doublePrecision("sign_off_lng"),
   signOffAddress: text("sign_off_address"),
   signOffTimestamp: timestamp("sign_off_timestamp"),
+  orderIndex: integer("order_index").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
