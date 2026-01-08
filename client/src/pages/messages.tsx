@@ -328,6 +328,7 @@ export default function Messages() {
                       id="group-name"
                       value={groupName}
                       onChange={(e) => setGroupName(e.target.value)}
+                      onKeyDown={(e) => e.stopPropagation()}
                       placeholder="e.g., Project Team"
                       data-testid="input-group-name"
                     />
@@ -377,6 +378,7 @@ export default function Messages() {
             placeholder="Search conversations..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
             className="pl-10"
             data-testid="input-search-conversations"
           />
@@ -543,6 +545,7 @@ export default function Messages() {
             setMessageInput(e.target.value);
             handleTyping();
           }}
+          onKeyDown={(e) => e.stopPropagation()}
           className="flex-1"
           data-testid="input-message"
         />
