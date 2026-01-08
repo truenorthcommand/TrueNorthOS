@@ -61,6 +61,8 @@ import {
   useSensor,
   useSensors,
   PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
   useDroppable,
   closestCenter,
   closestCorners,
@@ -158,11 +160,12 @@ function SortableJobCard({
     data: { type: 'job', job },
   });
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 1000 : 1,
+    touchAction: 'none',
   };
 
   return (
@@ -171,7 +174,7 @@ function SortableJobCard({
       style={style}
       {...attributes}
       {...listeners}
-      className="bg-white dark:bg-slate-800 border rounded-md p-2 mb-1 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing"
+      className="bg-white dark:bg-slate-800 border rounded-md p-2 mb-1 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing select-none"
       data-testid={`planner-job-${job.id}`}
     >
       <p className="text-xs font-medium truncate">{job.customerName}</p>
@@ -280,7 +283,14 @@ export default function CalendarPage() {
       activationConstraint: {
         distance: 8,
       },
-    })
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor)
   );
 
   useEffect(() => {
