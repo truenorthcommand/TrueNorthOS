@@ -774,24 +774,67 @@ export async function registerRoutes(
 
   // ==================== QUOTES ROUTES ====================
 
+  // PUBLIC routes first (specific paths before :id parameter)
+  app.get("/api/quotes/view/:token", async (req, res) => {
+    try {
+      const quote = await storage.getQuoteByToken(req.params.token);
+      if (!quote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      const settings = await storage.getCompanySettings();
+      res.json({ quote, companySettings: settings });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch quote" });
+    }
+  });
+
+  app.post("/api/quotes/accept/:token", async (req, res) => {
+    try {
+      const quote = await storage.getQuoteByToken(req.params.token);
+      if (!quote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      if (quote.status !== "Sent") {
+        return res.status(400).json({ error: "Quote cannot be accepted in current status" });
+      }
+      const updated = await storage.updateQuote(quote.id, {
+        status: "Accepted",
+        acceptedAt: new Date(),
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to accept quote" });
+    }
+  });
+
+  app.post("/api/quotes/decline/:token", async (req, res) => {
+    try {
+      const quote = await storage.getQuoteByToken(req.params.token);
+      if (!quote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      if (quote.status !== "Sent") {
+        return res.status(400).json({ error: "Quote cannot be declined in current status" });
+      }
+      const { reason } = req.body;
+      const updated = await storage.updateQuote(quote.id, {
+        status: "Declined",
+        declinedAt: new Date(),
+        declineReason: reason || null,
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to decline quote" });
+    }
+  });
+
+  // AUTHENTICATED routes (admin only)
   app.get("/api/quotes", requireAdmin, async (req, res) => {
     try {
       const allQuotes = await storage.getAllQuotes();
       res.json(allQuotes);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch quotes" });
-    }
-  });
-
-  app.get("/api/quotes/:id", requireAdmin, async (req, res) => {
-    try {
-      const quote = await storage.getQuote(req.params.id);
-      if (!quote) {
-        return res.status(404).json({ error: "Quote not found" });
-      }
-      res.json(quote);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch quote" });
     }
   });
 
@@ -807,7 +850,20 @@ export async function registerRoutes(
       });
       res.json(quote);
     } catch (error) {
+      console.error("Failed to create quote:", error);
       res.status(500).json({ error: "Failed to create quote" });
+    }
+  });
+
+  app.get("/api/quotes/:id", requireAdmin, async (req, res) => {
+    try {
+      const quote = await storage.getQuote(req.params.id);
+      if (!quote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      res.json(quote);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch quote" });
     }
   });
 
@@ -832,63 +888,6 @@ export async function registerRoutes(
     }
   });
 
-  // Public quote view for clients (no auth required)
-  app.get("/api/quotes/view/:token", async (req, res) => {
-    try {
-      const quote = await storage.getQuoteByToken(req.params.token);
-      if (!quote) {
-        return res.status(404).json({ error: "Quote not found" });
-      }
-      const settings = await storage.getCompanySettings();
-      res.json({ quote, companySettings: settings });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch quote" });
-    }
-  });
-
-  // Client accepts quote
-  app.post("/api/quotes/accept/:token", async (req, res) => {
-    try {
-      const quote = await storage.getQuoteByToken(req.params.token);
-      if (!quote) {
-        return res.status(404).json({ error: "Quote not found" });
-      }
-      if (quote.status !== "Sent") {
-        return res.status(400).json({ error: "Quote cannot be accepted in current status" });
-      }
-      const updated = await storage.updateQuote(quote.id, {
-        status: "Accepted",
-        acceptedAt: new Date(),
-      });
-      res.json(updated);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to accept quote" });
-    }
-  });
-
-  // Client declines quote
-  app.post("/api/quotes/decline/:token", async (req, res) => {
-    try {
-      const quote = await storage.getQuoteByToken(req.params.token);
-      if (!quote) {
-        return res.status(404).json({ error: "Quote not found" });
-      }
-      if (quote.status !== "Sent") {
-        return res.status(400).json({ error: "Quote cannot be declined in current status" });
-      }
-      const { reason } = req.body;
-      const updated = await storage.updateQuote(quote.id, {
-        status: "Declined",
-        declinedAt: new Date(),
-        declineReason: reason || null,
-      });
-      res.json(updated);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to decline quote" });
-    }
-  });
-
-  // Convert quote to job
   app.post("/api/quotes/:id/convert-to-job", requireAdmin, async (req, res) => {
     try {
       const quote = await storage.getQuote(req.params.id);
@@ -927,24 +926,27 @@ export async function registerRoutes(
 
   // ==================== INVOICES ROUTES ====================
 
+  // PUBLIC routes first (specific paths before :id parameter)
+  app.get("/api/invoices/view/:token", async (req, res) => {
+    try {
+      const invoice = await storage.getInvoiceByToken(req.params.token);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      const settings = await storage.getCompanySettings();
+      res.json({ invoice, companySettings: settings });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch invoice" });
+    }
+  });
+
+  // AUTHENTICATED routes (admin only)
   app.get("/api/invoices", requireAdmin, async (req, res) => {
     try {
       const allInvoices = await storage.getAllInvoices();
       res.json(allInvoices);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch invoices" });
-    }
-  });
-
-  app.get("/api/invoices/:id", requireAdmin, async (req, res) => {
-    try {
-      const invoice = await storage.getInvoice(req.params.id);
-      if (!invoice) {
-        return res.status(404).json({ error: "Invoice not found" });
-      }
-      res.json(invoice);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch invoice" });
     }
   });
 
@@ -960,7 +962,20 @@ export async function registerRoutes(
       });
       res.json(invoice);
     } catch (error) {
+      console.error("Failed to create invoice:", error);
       res.status(500).json({ error: "Failed to create invoice" });
+    }
+  });
+
+  app.get("/api/invoices/:id", requireAdmin, async (req, res) => {
+    try {
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      res.json(invoice);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch invoice" });
     }
   });
 
@@ -982,20 +997,6 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete invoice" });
-    }
-  });
-
-  // Public invoice view for clients
-  app.get("/api/invoices/view/:token", async (req, res) => {
-    try {
-      const invoice = await storage.getInvoiceByToken(req.params.token);
-      if (!invoice) {
-        return res.status(404).json({ error: "Invoice not found" });
-      }
-      const settings = await storage.getCompanySettings();
-      res.json({ invoice, companySettings: settings });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch invoice" });
     }
   });
 
