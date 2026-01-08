@@ -695,6 +695,88 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== JOB UPDATES (Long-running jobs) ====================
+
+  app.get("/api/jobs/:id/updates", requireAuth, async (req, res) => {
+    try {
+      const job = await storage.getJob(req.params.id);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      if (req.session.userRole === 'engineer' && job.assignedToId !== req.session.userId) {
+        const assignedIds = job.assignedToIds as string[] || [];
+        if (!assignedIds.includes(req.session.userId!)) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+
+      const updates = await storage.getJobUpdates(req.params.id);
+      res.json(updates);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get job updates" });
+    }
+  });
+
+  app.get("/api/jobs/:id/updates/today", requireAuth, async (req, res) => {
+    try {
+      const job = await storage.getJob(req.params.id);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      const today = new Date();
+      const count = await storage.countJobUpdatesForDate(req.params.id, today);
+      const updates = await storage.getJobUpdatesForDate(req.params.id, today);
+      
+      res.json({ count, remaining: 2 - count, updates });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get today's updates" });
+    }
+  });
+
+  app.post("/api/jobs/:id/updates", requireAuth, async (req, res) => {
+    try {
+      const job = await storage.getJob(req.params.id);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      if (!job.isLongRunning) {
+        return res.status(400).json({ error: "Job updates are only available for long-running jobs" });
+      }
+
+      if (req.session.userRole === 'engineer' && job.assignedToId !== req.session.userId) {
+        const assignedIds = job.assignedToIds as string[] || [];
+        if (!assignedIds.includes(req.session.userId!)) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+
+      const today = new Date();
+      const todayCount = await storage.countJobUpdatesForDate(req.params.id, today);
+      
+      if (todayCount >= 2) {
+        return res.status(400).json({ error: "Maximum 2 updates per day reached" });
+      }
+
+      const { notes, photos } = req.body;
+      
+      const update = await storage.createJobUpdate({
+        jobId: req.params.id,
+        workDate: today,
+        sequence: todayCount + 1,
+        notes: notes || null,
+        photos: photos || [],
+        engineerId: req.session.userId || null,
+      });
+
+      res.status(201).json(update);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create job update" });
+    }
+  });
+
   // ==================== LOCATION TRACKING ====================
 
   app.post("/api/users/:id/location", requireAuth, async (req, res) => {
