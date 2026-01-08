@@ -8,7 +8,8 @@ import {
   type Invoice, type InsertInvoice,
   type CompanySettings, type InsertCompanySettings,
   type Client, type InsertClient,
-  users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients
+  type JobUpdate, type InsertJobUpdate,
+  users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, jobUpdates
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and, ne } from "drizzle-orm";
@@ -75,6 +76,11 @@ export interface IStorage {
   updateClient(id: string, updates: Partial<Client>): Promise<Client | undefined>;
   deleteClient(id: string): Promise<void>;
   findOrCreateClient(data: { name: string; email?: string | null; phone?: string | null; address?: string | null; postcode?: string | null; contactName?: string | null }): Promise<Client>;
+  
+  createJobUpdate(update: InsertJobUpdate): Promise<JobUpdate>;
+  getJobUpdates(jobId: string): Promise<JobUpdate[]>;
+  getJobUpdatesForDate(jobId: string, workDate: Date): Promise<JobUpdate[]>;
+  countJobUpdatesForDate(jobId: string, workDate: Date): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -420,6 +426,50 @@ export class DatabaseStorage implements IStorage {
       postcode: data.postcode,
       contactName: data.contactName,
     });
+  }
+
+  async createJobUpdate(update: InsertJobUpdate): Promise<JobUpdate> {
+    const [created] = await db.insert(jobUpdates).values(update).returning();
+    return created;
+  }
+
+  async getJobUpdates(jobId: string): Promise<JobUpdate[]> {
+    return db.select().from(jobUpdates)
+      .where(eq(jobUpdates.jobId, jobId))
+      .orderBy(desc(jobUpdates.workDate), desc(jobUpdates.sequence));
+  }
+
+  async getJobUpdatesForDate(jobId: string, workDate: Date): Promise<JobUpdate[]> {
+    const startOfDay = new Date(workDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(workDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    return db.select().from(jobUpdates)
+      .where(
+        and(
+          eq(jobUpdates.jobId, jobId),
+          sql`${jobUpdates.workDate} >= ${startOfDay} AND ${jobUpdates.workDate} <= ${endOfDay}`
+        )
+      )
+      .orderBy(jobUpdates.sequence);
+  }
+
+  async countJobUpdatesForDate(jobId: string, workDate: Date): Promise<number> {
+    const startOfDay = new Date(workDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(workDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(jobUpdates)
+      .where(
+        and(
+          eq(jobUpdates.jobId, jobId),
+          sql`${jobUpdates.workDate} >= ${startOfDay} AND ${jobUpdates.workDate} <= ${endOfDay}`
+        )
+      );
+    return Number(result[0]?.count || 0);
   }
 }
 
