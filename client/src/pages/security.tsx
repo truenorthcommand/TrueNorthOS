@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Shield, Key, Loader2, Check, X, Eye, EyeOff } from "lucide-react";
+import { Shield, Key, Loader2, Check, X, Eye, EyeOff, Download, Trash2, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Link } from "wouter";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,85 @@ export default function Security() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  
+  const [isExportingData, setIsExportingData] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const exportData = async () => {
+    setIsExportingData(true);
+    try {
+      const res = await fetch("/api/user/export-data", {
+        method: "GET",
+        credentials: "include",
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to export data");
+      }
+      
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `my-data-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Success",
+        description: "Your data has been exported successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to export data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExportingData(false);
+    }
+  };
+
+  const requestAccountDeletion = async () => {
+    setIsDeleting(true);
+    try {
+      const res = await fetch("/api/user/request-deletion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ password: deletePassword }),
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to request deletion");
+      }
+      
+      toast({
+        title: "Deletion Requested",
+        description: "Your account deletion request has been submitted. An admin will process your request.",
+      });
+      
+      setShowDeleteDialog(false);
+      setDeletePassword("");
+      setDeleteConfirmText("");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to request account deletion",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const setup2FA = async () => {
     setIsSettingUp2FA(true);
@@ -396,6 +476,82 @@ export default function Security() {
         </CardContent>
       </Card>
 
+      <Separator className="my-8" />
+      
+      <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+        <FileText className="h-5 w-5" />
+        Data Privacy (GDPR)
+      </h2>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Download className="w-5 h-5" />
+            Export Your Data
+          </CardTitle>
+          <CardDescription>
+            Download a copy of all your personal data in JSON format
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">
+            Under GDPR, you have the right to receive a copy of your personal data. 
+            This includes your profile information, job history, and any data associated with your account.
+          </p>
+          <Button 
+            onClick={exportData} 
+            disabled={isExportingData}
+            variant="outline"
+            data-testid="button-export-data"
+          >
+            {isExportingData && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Download className="mr-2 h-4 w-4" />
+            Download My Data
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-destructive/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <Trash2 className="w-5 h-5" />
+            Delete Account
+          </CardTitle>
+          <CardDescription>
+            Request permanent deletion of your account and all associated data
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>
+              Account deletion is permanent and cannot be undone. All your data including job history, 
+              messages, and personal information will be permanently removed.
+            </AlertDescription>
+          </Alert>
+          <Button 
+            onClick={() => setShowDeleteDialog(true)}
+            variant="destructive"
+            data-testid="button-request-deletion"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Request Account Deletion
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-4">
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap gap-4 text-sm">
+            <Link href="/privacy" className="text-primary underline" data-testid="link-privacy-policy">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="text-primary underline" data-testid="link-terms">
+              Terms of Service
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
       <Dialog open={showDisableDialog} onOpenChange={setShowDisableDialog}>
         <DialogContent>
           <DialogHeader>
@@ -429,6 +585,64 @@ export default function Security() {
             >
               {isDisabling && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Disable 2FA
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Delete Account</DialogTitle>
+            <DialogDescription>
+              This action is permanent and cannot be undone. All your data will be permanently deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Alert variant="destructive">
+              <AlertDescription>
+                Your account, job history, messages, and all associated data will be permanently removed.
+              </AlertDescription>
+            </Alert>
+            <div className="space-y-2">
+              <Label htmlFor="delete-password">Enter your password to confirm</Label>
+              <Input
+                id="delete-password"
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                placeholder="Enter your password"
+                data-testid="input-delete-password"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="delete-confirm">Type DELETE to confirm</Label>
+              <Input
+                id="delete-confirm"
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="DELETE"
+                data-testid="input-delete-confirm"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowDeleteDialog(false);
+              setDeletePassword("");
+              setDeleteConfirmText("");
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={requestAccountDeletion}
+              disabled={!deletePassword || deleteConfirmText !== "DELETE" || isDeleting}
+              data-testid="button-confirm-deletion"
+            >
+              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete My Account
             </Button>
           </DialogFooter>
         </DialogContent>

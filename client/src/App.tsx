@@ -32,8 +32,11 @@ import ClientInvoice from "@/pages/client-invoice";
 import Settings from "@/pages/settings";
 import Security from "@/pages/security";
 import Messages from "@/pages/messages";
+import Privacy from "@/pages/privacy";
+import Terms from "@/pages/terms";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
+import { CookieConsent } from "@/components/cookie-consent";
 import { Loader2 } from "lucide-react";
 
 function PrivateRoute({ component: Component, ...rest }: any) {
@@ -70,6 +73,8 @@ function Router() {
       <Route path="/guides" component={UserGuides} />
       <Route path="/auth" component={Login} />
       <Route path="/setup" component={Setup} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/terms" component={Terms} />
       <Route path="/clients">
         <PrivateRoute component={Clients} />
       </Route>
@@ -142,6 +147,7 @@ function App() {
           <TooltipProvider>
             <LocationTracker />
             <Toaster />
+            <CookieConsent />
             <Router />
           </TooltipProvider>
         </StoreProvider>

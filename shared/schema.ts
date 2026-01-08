@@ -18,6 +18,9 @@ export const users = pgTable("users", {
   lastLocationUpdate: timestamp("last_location_update"),
   twoFactorSecret: text("two_factor_secret"),
   twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
+  gdprConsentDate: timestamp("gdpr_consent_date"),
+  gdprConsentVersion: text("gdpr_consent_version"),
+  deletionRequestedAt: timestamp("deletion_requested_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

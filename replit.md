@@ -28,6 +28,7 @@ This application enables field service companies to manage job sheets digitally.
 - **Company Settings**: Configure company details, bank information, default VAT rates, and payment terms
 - **Long-running Jobs**: Track multi-day projects with daily progress updates (max 2 per day), photo evidence per update, and update history grouped by date
 - **Team Messaging**: WhatsApp-style internal messaging for real-time team communication with direct messages, group chats, typing indicators, and unread badges
+- **GDPR Compliance**: Cookie consent banner, privacy policy page, terms of service, data export, and account deletion request features
 
 ## User Credentials (Demo)
 
@@ -48,7 +49,7 @@ This application enables field service companies to manage job sheets digitally.
 - `/server/db.ts` - PostgreSQL connection
 
 ### Database (PostgreSQL)
-- `users` - User accounts with roles, location tracking, 2FA settings (twoFactorSecret, twoFactorEnabled)
+- `users` - User accounts with roles, location tracking, 2FA settings (twoFactorSecret, twoFactorEnabled), GDPR consent tracking (gdprConsentDate, gdprConsentVersion, deletionRequestedAt)
 - `jobs` - Job records with materials, photos, signatures
 - `clients` - Client records (name, email, phone, address, postcode)
 - `quotes` - Quote records with line items, linked to clients and jobs

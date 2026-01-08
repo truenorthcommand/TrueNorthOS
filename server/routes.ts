@@ -337,6 +337,131 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== GDPR DATA ROUTES ====================
+
+  app.get("/api/user/export-data", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Get user's jobs - only jobs primarily assigned to this user (not collaborative)
+      const userJobs = await storage.getJobsByEngineer(userId);
+
+      // Get user's messages - only messages SENT by this user
+      // We strip all sender metadata to ensure no other user's data is exposed
+      const conversations = await storage.getUserConversations(userId);
+      const messagesData: { content: string; sentAt: Date | null }[] = [];
+      for (const conv of conversations) {
+        const messages = await storage.getMessages(conv.id);
+        // Only include messages sent by this user - strip all identifying info
+        const userMessages = messages
+          .filter(m => m.senderId === userId)
+          .map(m => ({
+            content: m.content,
+            sentAt: m.createdAt,
+          }));
+        messagesData.push(...userMessages);
+      }
+
+      // Get location history - only this user's locations
+      const locationHistory = await storage.getEngineerLocationHistory(userId, 1000);
+
+      // Prepare export data - only personal data belonging to the requesting user
+      // No customer PII, no other engineer data
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        gdprNotice: "This file contains all personal data associated with your account as required by GDPR Article 15 (Right of Access).",
+        personalInfo: {
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          status: user.status,
+          createdAt: user.createdAt,
+          twoFactorEnabled: user.twoFactorEnabled,
+        },
+        jobsWorkedCount: userJobs.length,
+        workCompletedSummary: userJobs.map(job => ({
+          date: job.date,
+          worksCompleted: job.worksCompleted,
+        })),
+        messagesSentCount: messagesData.length,
+        messagesSent: messagesData,
+        locationHistory: locationHistory.map(loc => ({
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          timestamp: loc.timestamp,
+        })),
+      };
+
+      res.json(exportData);
+    } catch (error) {
+      console.error('Data export error:', error);
+      res.status(500).json({ error: "Failed to export data" });
+    }
+  });
+
+  app.post("/api/user/request-deletion", requireAuth, async (req, res) => {
+    try {
+      const { password } = req.body;
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Verify password
+      let isValidPassword = false;
+      if (user.password.startsWith('$2b$')) {
+        isValidPassword = await bcrypt.compare(password, user.password);
+      } else {
+        isValidPassword = user.password === password;
+      }
+
+      if (!isValidPassword) {
+        return res.status(401).json({ error: "Invalid password" });
+      }
+
+      // Mark account for deletion (admin will process)
+      await storage.updateUser(userId, { 
+        deletionRequestedAt: new Date(),
+        status: 'deletion_requested'
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Account deletion request submitted" 
+      });
+    } catch (error) {
+      console.error('Deletion request error:', error);
+      res.status(500).json({ error: "Failed to request account deletion" });
+    }
+  });
+
+  app.post("/api/user/record-consent", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { version } = req.body;
+      
+      await storage.updateUser(userId, { 
+        gdprConsentDate: new Date(),
+        gdprConsentVersion: version || '1.0'
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Consent recording error:', error);
+      res.status(500).json({ error: "Failed to record consent" });
+    }
+  });
+
   // ==================== FIRST-TIME SETUP (NO AUTH REQUIRED) ====================
   
   // One-time setup: Create first admin account when no admins exist
