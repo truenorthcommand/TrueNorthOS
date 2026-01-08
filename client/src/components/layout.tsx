@@ -1,9 +1,10 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronRight, Briefcase, BarChart3, Wrench } from "lucide-react";
+import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, PanelLeftClose, PanelLeft } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +14,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const [location] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [expandedSections, setExpandedSections] = useState<MenuSection[]>(['jobs']);
 
   if (!user) {
@@ -29,22 +31,49 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const isExpanded = (section: MenuSection) => expandedSections.includes(section);
 
-  const NavLink = ({ href, icon: Icon, children: linkChildren, onClick }: { href: string; icon: React.ElementType; children: React.ReactNode; onClick?: () => void }) => (
-    <Link href={href}>
-      <Button
-        variant={location === href || (href !== "/" && location.startsWith(href)) ? "secondary" : "ghost"}
-        className="w-full justify-start h-10 text-base font-medium pl-10"
-        onClick={() => {
-          setIsOpen(false);
-          onClick?.();
-        }}
-        data-testid={`nav-link-${href.replace(/\//g, '-').slice(1) || 'home'}`}
-      >
-        <Icon className="mr-3 h-4 w-4" />
-        {linkChildren}
-      </Button>
-    </Link>
-  );
+  const NavLink = ({ href, icon: Icon, children: linkChildren, onClick }: { href: string; icon: React.ElementType; children: React.ReactNode; onClick?: () => void }) => {
+    const isActive = location === href || (href !== "/" && location.startsWith(href));
+    
+    if (sidebarCollapsed) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Link href={href}>
+              <Button
+                variant={isActive ? "secondary" : "ghost"}
+                size="icon"
+                className="w-10 h-10"
+                onClick={onClick}
+                data-testid={`nav-link-${href.replace(/\//g, '-').slice(1) || 'home'}`}
+              >
+                <Icon className="h-4 w-4" />
+              </Button>
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            {linkChildren}
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+    
+    return (
+      <Link href={href}>
+        <Button
+          variant={isActive ? "secondary" : "ghost"}
+          className="w-full justify-start h-10 text-base font-medium pl-10"
+          onClick={() => {
+            setIsOpen(false);
+            onClick?.();
+          }}
+          data-testid={`nav-link-${href.replace(/\//g, '-').slice(1) || 'home'}`}
+        >
+          <Icon className="mr-3 h-4 w-4" />
+          {linkChildren}
+        </Button>
+      </Link>
+    );
+  };
 
   const MenuGroup = ({ 
     title, 
@@ -56,47 +85,94 @@ export function Layout({ children }: { children: React.ReactNode }) {
     icon: React.ElementType; 
     section: MenuSection; 
     children: React.ReactNode;
-  }) => (
-    <Collapsible open={isExpanded(section)} onOpenChange={() => toggleSection(section)}>
-      <CollapsibleTrigger asChild>
-        <Button
-          variant="ghost"
-          className="w-full justify-start h-12 text-lg font-medium hover:bg-accent"
-          data-testid={`menu-group-${section}`}
-        >
-          <Icon className="mr-3 h-5 w-5" />
-          {title}
-          <ChevronDown className={cn(
-            "ml-auto h-4 w-4 transition-transform duration-200",
-            isExpanded(section) ? "rotate-180" : ""
-          )} />
-        </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-1 ml-2 border-l-2 border-muted pl-2">
-        {groupChildren}
-      </CollapsibleContent>
-    </Collapsible>
-  );
+  }) => {
+    if (sidebarCollapsed) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="w-10 h-10"
+              onClick={() => setSidebarCollapsed(false)}
+              data-testid={`menu-group-${section}`}
+            >
+              <Icon className="h-5 w-5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            {title}
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+    
+    return (
+      <Collapsible open={isExpanded(section)} onOpenChange={() => toggleSection(section)}>
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            className="w-full justify-start h-12 text-lg font-medium hover:bg-accent"
+            data-testid={`menu-group-${section}`}
+          >
+            <Icon className="mr-3 h-5 w-5" />
+            {title}
+            <ChevronDown className={cn(
+              "ml-auto h-4 w-4 transition-transform duration-200",
+              isExpanded(section) ? "rotate-180" : ""
+            )} />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-1 ml-2 border-l-2 border-muted pl-2">
+          {groupChildren}
+        </CollapsibleContent>
+      </Collapsible>
+    );
+  };
 
-  const NavContent = () => (
+  const NavContent = ({ collapsed = false }: { collapsed?: boolean }) => (
     <div className="flex flex-col gap-2 h-full">
-      <div className="flex items-center gap-2 mb-6 px-2">
+      <div className={cn(
+        "flex items-center gap-2 mb-6",
+        collapsed ? "justify-center" : "px-2"
+      )}>
         <img src="/logo.png" alt="TrueNorth Logo" className="w-8 h-8 rounded-md" />
-        <span className="text-xl font-bold tracking-tight">Field View</span>
+        {!collapsed && <span className="text-xl font-bold tracking-tight">Field View</span>}
       </div>
 
-      <nav className="flex flex-col gap-1 flex-1 overflow-y-auto">
-        <Link href="/home">
-          <Button
-            variant={location === "/home" ? "secondary" : "ghost"}
-            className="w-full justify-start h-12 text-lg font-medium"
-            onClick={() => setIsOpen(false)}
-            data-testid="nav-home"
-          >
-            <Home className="mr-3 h-5 w-5" />
-            Home
-          </Button>
-        </Link>
+      <nav className={cn(
+        "flex flex-col gap-1 flex-1 overflow-y-auto",
+        collapsed && "items-center"
+      )}>
+        {collapsed ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link href="/home">
+                <Button
+                  variant={location === "/home" ? "secondary" : "ghost"}
+                  size="icon"
+                  className="w-10 h-10"
+                  data-testid="nav-home"
+                >
+                  <Home className="h-5 w-5" />
+                </Button>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right">Home</TooltipContent>
+          </Tooltip>
+        ) : (
+          <Link href="/home">
+            <Button
+              variant={location === "/home" ? "secondary" : "ghost"}
+              className="w-full justify-start h-12 text-lg font-medium"
+              onClick={() => setIsOpen(false)}
+              data-testid="nav-home"
+            >
+              <Home className="mr-3 h-5 w-5" />
+              Home
+            </Button>
+          </Link>
+        )}
 
         {/* Jobs Section */}
         <MenuGroup title="Jobs" icon={Briefcase} section="jobs">
@@ -146,69 +222,114 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </MenuGroup>
       </nav>
 
-      <div className="border-t pt-4 mt-auto">
-        <div className="px-4 py-2 mb-2">
-          <p className="text-sm font-medium">{user.name}</p>
-          <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
-        </div>
-        <Button 
-          variant="outline" 
-          className="w-full justify-start text-destructive hover:text-destructive" 
-          onClick={() => {
-            setIsOpen(false);
-            logout();
-          }}
-          data-testid="button-logout"
-        >
-          <LogOut className="mr-3 h-4 w-4" />
-          Sign Out
-        </Button>
+      <div className={cn("border-t pt-4 mt-auto", collapsed && "flex flex-col items-center")}>
+        {!collapsed && (
+          <div className="px-4 py-2 mb-2">
+            <p className="text-sm font-medium">{user.name}</p>
+            <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
+          </div>
+        )}
+        {collapsed ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="icon"
+                className="w-10 h-10 text-destructive hover:text-destructive" 
+                onClick={() => {
+                  setIsOpen(false);
+                  logout();
+                }}
+                data-testid="button-logout"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Sign Out</TooltipContent>
+          </Tooltip>
+        ) : (
+          <Button 
+            variant="outline" 
+            className="w-full justify-start text-destructive hover:text-destructive" 
+            onClick={() => {
+              setIsOpen(false);
+              logout();
+            }}
+            data-testid="button-logout"
+          >
+            <LogOut className="mr-3 h-4 w-4" />
+            Sign Out
+          </Button>
+        )}
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950">
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex md:w-64 lg:w-72 flex-col border-r bg-background h-screen sticky top-0">
-        <div className="p-4 flex-1 overflow-hidden flex flex-col">
-          <NavContent />
-        </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-h-screen">
-        {/* Mobile Header */}
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6 shadow-sm md:hidden">
-          <Sheet open={isOpen} onOpenChange={setIsOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Menu className="h-6 w-6" />
-                <span className="sr-only">Toggle menu</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-[300px] sm:w-[350px] p-6">
-              <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
-              <NavContent />
-            </SheetContent>
-          </Sheet>
+    <TooltipProvider delayDuration={0}>
+      <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950">
+        {/* Desktop Sidebar */}
+        <aside className={cn(
+          "hidden md:flex flex-col border-r bg-background h-screen sticky top-0 transition-all duration-300",
+          sidebarCollapsed ? "w-16" : "w-64 lg:w-72"
+        )}>
+          {/* Collapse Toggle Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute -right-3 top-6 z-10 h-6 w-6 rounded-full border bg-background shadow-md hover:bg-accent"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            data-testid="button-toggle-sidebar"
+          >
+            {sidebarCollapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
+          </Button>
           
-          <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="TrueNorth Logo" className="w-8 h-8 rounded-md" />
-            <span className="text-lg font-bold">Field View</span>
+          <div className={cn(
+            "flex-1 overflow-hidden flex flex-col",
+            sidebarCollapsed ? "p-2" : "p-4"
+          )}>
+            <NavContent collapsed={sidebarCollapsed} />
           </div>
+        </aside>
 
-          <div className="ml-auto">
-            <Button variant="outline" size="sm" onClick={logout}>
-              Sign Out
-            </Button>
-          </div>
-        </header>
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-h-screen">
+          {/* Mobile Header */}
+          <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6 shadow-sm md:hidden">
+            <Sheet open={isOpen} onOpenChange={setIsOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-6 w-6" />
+                  <span className="sr-only">Toggle menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[300px] sm:w-[350px] p-6">
+                <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+                <NavContent collapsed={false} />
+              </SheetContent>
+            </Sheet>
+            
+            <div className="flex items-center gap-2">
+              <img src="/logo.png" alt="TrueNorth Logo" className="w-8 h-8 rounded-md" />
+              <span className="text-lg font-bold">Field View</span>
+            </div>
 
-        <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full no-print">
-          {children}
-        </main>
+            <div className="ml-auto">
+              <Button variant="outline" size="sm" onClick={logout}>
+                Sign Out
+              </Button>
+            </div>
+          </header>
+
+          <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full no-print">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
