@@ -72,6 +72,18 @@ export type Job = {
   signOffAddress?: string | null;
   signOffTimestamp?: string | null;
   orderIndex?: number;
+  isLongRunning?: boolean;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type JobUpdate = {
+  id: string;
+  jobId: string;
+  workDate: string;
+  sequence: number;
+  notes: string | null;
+  photos: Photo[];
+  engineerId: string | null;
+  createdAt: string;
 };

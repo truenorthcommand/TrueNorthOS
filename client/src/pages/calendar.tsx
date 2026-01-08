@@ -140,9 +140,11 @@ type Engineer = {
 function SortableJobCard({
   job,
   onRemoveFromDay,
+  updateCount,
 }: {
   job: Job;
   onRemoveFromDay: (jobId: string) => void;
+  updateCount?: { count: number; remaining: number } | null;
 }) {
   const {
     attributes,
@@ -178,6 +180,15 @@ function SortableJobCard({
           <MapPin className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
           {job.postcode}
         </p>
+      )}
+      {job.isLongRunning && updateCount && (
+        <Badge 
+          variant="outline" 
+          className="mt-1 text-[10px] px-1 py-0 bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700"
+          data-testid={`badge-updates-${job.id}`}
+        >
+          Updates: {updateCount.count}/2
+        </Badge>
       )}
     </div>
   );
@@ -262,6 +273,7 @@ export default function CalendarPage() {
   const [activeJob, setActiveJob] = useState<Job | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [engineerDialogOpen, setEngineerDialogOpen] = useState(false);
+  const [updateCounts, setUpdateCounts] = useState<Record<string, { count: number; remaining: number }>>({});
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -274,6 +286,32 @@ export default function CalendarPage() {
   useEffect(() => {
     refreshJobs();
   }, [refreshJobs]);
+
+  // Fetch update counts for long-running jobs
+  useEffect(() => {
+    const fetchUpdateCounts = async () => {
+      const longRunningJobs = jobs.filter(j => j.isLongRunning);
+      if (longRunningJobs.length === 0) return;
+      
+      const counts: Record<string, { count: number; remaining: number }> = {};
+      await Promise.all(
+        longRunningJobs.map(async (job) => {
+          try {
+            const response = await fetch(`/api/jobs/${job.id}/updates/today`, { credentials: 'include' });
+            if (response.ok) {
+              const data = await response.json();
+              counts[job.id] = { count: data.count, remaining: data.remaining };
+            }
+          } catch (error) {
+            // Ignore errors for individual jobs
+          }
+        })
+      );
+      setUpdateCounts(counts);
+    };
+    
+    fetchUpdateCounts();
+  }, [jobs]);
 
 
   useEffect(() => {
@@ -1067,6 +1105,7 @@ export default function CalendarPage() {
                                   key={job.id}
                                   job={job}
                                   onRemoveFromDay={handleRemoveFromDay}
+                                  updateCount={job.isLongRunning ? updateCounts[job.id] : null}
                                 />
                               ))}
                             </SortableContext>
@@ -1099,6 +1138,7 @@ export default function CalendarPage() {
                                 key={job.id}
                                 job={job}
                                 onRemoveFromDay={handleRemoveFromDay}
+                                updateCount={job.isLongRunning ? updateCounts[job.id] : null}
                               />
                             ))}
                           </SortableContext>

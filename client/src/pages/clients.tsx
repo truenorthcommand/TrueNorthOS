@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search, Check } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -108,6 +109,7 @@ export default function Clients() {
     session: "AM",
     date: format(new Date(), "yyyy-MM-dd"),
     orderNumber: "" as string | number,
+    isLongRunning: false,
   });
   const [jobPhotos, setJobPhotos] = useState<JobPhoto[]>([]);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
@@ -256,6 +258,7 @@ export default function Clients() {
       orderNumber: jobForm.orderNumber ? Number(jobForm.orderNumber) : null,
       description: jobForm.description,
       notes: jobForm.notes,
+      isLongRunning: jobForm.isLongRunning,
       status: "Draft",
       assignedToId: primaryAssignee,
       assignedToIds: assignToIds,
@@ -274,7 +277,7 @@ export default function Clients() {
       setSelectedClientId("");
       setSelectedPropertyId("");
       setSelectedEngineerIds([]);
-      setJobForm({ description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "" });
+      setJobForm({ description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "", isLongRunning: false });
       setJobPhotos([]);
     }
   };
@@ -475,6 +478,19 @@ export default function Clients() {
                   />
                 </div>
 
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="long-running-switch">Long-running Job</Label>
+                    <p className="text-sm text-muted-foreground">Enable daily progress updates for multi-day projects</p>
+                  </div>
+                  <Switch
+                    id="long-running-switch"
+                    checked={jobForm.isLongRunning}
+                    onCheckedChange={(checked) => setJobForm({ ...jobForm, isLongRunning: checked })}
+                    data-testid="switch-long-running"
+                  />
+                </div>
+
                 <div className="space-y-3">
                   <Label>Photos (Optional)</Label>
                   <div className="flex flex-wrap gap-3">
@@ -534,7 +550,7 @@ export default function Clients() {
                       setSelectedClientId("");
                       setSelectedPropertyId("");
                       setSelectedEngineerIds([]);
-                      setJobForm({ description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "" });
+                      setJobForm({ description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "", isLongRunning: false });
                       setJobPhotos([]);
                     }}
                     data-testid="button-clear-form"

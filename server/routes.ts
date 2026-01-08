@@ -760,7 +760,16 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Maximum 2 updates per day reached" });
       }
 
-      const { notes, photos } = req.body;
+      const updateInput = z.object({
+        notes: z.string().nullable().optional(),
+        photos: z.array(z.any()).optional().default([]),
+      }).safeParse(req.body);
+      
+      if (!updateInput.success) {
+        return res.status(400).json({ error: "Invalid request body" });
+      }
+      
+      const { notes, photos } = updateInput.data;
       
       const update = await storage.createJobUpdate({
         jobId: req.params.id,

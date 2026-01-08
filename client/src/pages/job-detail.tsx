@@ -11,9 +11,11 @@ import { Separator } from "@/components/ui/separator";
 import { 
   ArrowLeft, Save, Printer, Trash2, Plus, 
   MapPin, Phone, Mail, Calendar, Upload, X, FileCheck,
-  AlertCircle, AlertTriangle, AlertOctagon, Users
+  AlertCircle, AlertTriangle, AlertOctagon, Users, ChevronDown, ClipboardList
 } from "lucide-react";
-import { ActionPriority } from "@/lib/types";
+import { ActionPriority, JobUpdate, Photo } from "@/lib/types";
+import { Switch } from "@/components/ui/switch";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
@@ -31,6 +33,15 @@ export default function JobDetail() {
   const [selectedPriority, setSelectedPriority] = useState<ActionPriority>("medium");
   const [engineers, setEngineers] = useState<{id: string; name: string}[]>([]);
   const [jobNotFoundAfterRefresh, setJobNotFoundAfterRefresh] = useState(false);
+  
+  // Daily updates state
+  const [dailyUpdatesOpen, setDailyUpdatesOpen] = useState(true);
+  const [todayUpdates, setTodayUpdates] = useState<{ count: number; remaining: number; updates: JobUpdate[] }>({ count: 0, remaining: 2, updates: [] });
+  const [allUpdates, setAllUpdates] = useState<JobUpdate[]>([]);
+  const [updateNotes, setUpdateNotes] = useState("");
+  const [updatePhotos, setUpdatePhotos] = useState<Photo[]>([]);
+  const [isSubmittingUpdate, setIsSubmittingUpdate] = useState(false);
+  const updateFileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState<{
     client: string;
@@ -70,6 +81,26 @@ export default function JobDetail() {
     }
   }, [user]);
 
+  // Fetch daily updates for long-running jobs
+  const fetchUpdates = async (jobId: string) => {
+    try {
+      const [todayRes, allRes] = await Promise.all([
+        fetch(`/api/jobs/${jobId}/updates/today`, { credentials: 'include' }),
+        fetch(`/api/jobs/${jobId}/updates`, { credentials: 'include' })
+      ]);
+      if (todayRes.ok) {
+        const todayData = await todayRes.json();
+        setTodayUpdates(todayData);
+      }
+      if (allRes.ok) {
+        const allData = await allRes.json();
+        setAllUpdates(allData);
+      }
+    } catch (error) {
+      console.error('Failed to fetch updates:', error);
+    }
+  };
+
   const jobId = params?.id;
   const job = jobId ? getJob(jobId) : undefined;
   const [hasTriedRefresh, setHasTriedRefresh] = useState(false);
@@ -108,6 +139,13 @@ export default function JobDetail() {
       setFormInitialized(true);
     }
   }, [job?.id]);
+
+  // Fetch updates for long-running jobs
+  useEffect(() => {
+    if (job?.isLongRunning && job.id) {
+      fetchUpdates(job.id);
+    }
+  }, [job?.id, job?.isLongRunning]);
 
   const handleFieldChange = (field: keyof typeof formData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -179,6 +217,89 @@ export default function JobDetail() {
       reader.readAsDataURL(file);
     }
   };
+
+  const handleUpdatePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const newPhoto: Photo = {
+          id: `update-photo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          url: reader.result as string,
+          timestamp: new Date().toISOString(),
+          source: 'engineer',
+        };
+        setUpdatePhotos((prev) => [...prev, newPhoto]);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+
+  const handleRemoveUpdatePhoto = (photoId: string) => {
+    setUpdatePhotos((prev) => prev.filter((p) => p.id !== photoId));
+  };
+
+  const handleSubmitUpdate = async () => {
+    if (!job || !updateNotes.trim()) {
+      toast({
+        title: "Missing Notes",
+        description: "Please enter some notes for this update.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSubmittingUpdate(true);
+    try {
+      const response = await fetch(`/api/jobs/${job.id}/updates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          notes: updateNotes,
+          photos: updatePhotos,
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Update Added",
+          description: "Daily progress update has been saved."
+        });
+        setUpdateNotes("");
+        setUpdatePhotos([]);
+        fetchUpdates(job.id);
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Error",
+          description: error.message || "Failed to submit update",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to submit update",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmittingUpdate(false);
+    }
+  };
+
+  // Group updates by date for display
+  const groupedUpdates = allUpdates.reduce((groups, update) => {
+    const date = format(new Date(update.workDate), 'yyyy-MM-dd');
+    if (!groups[date]) {
+      groups[date] = [];
+    }
+    groups[date].push(update);
+    return groups;
+  }, {} as Record<string, JobUpdate[]>);
 
   const isReadOnly = job.status === "Signed Off";
   const isAdmin = user?.role === "admin";
@@ -479,6 +600,26 @@ export default function JobDetail() {
                 )}
               </div>
             )}
+
+            {/* Long-running Job Toggle (Admin Only) */}
+            {user?.role === "admin" && (
+              <div className="flex items-center justify-between p-4 border rounded-lg mt-6 bg-slate-50 dark:bg-slate-900/50">
+                <div className="space-y-0.5">
+                  <Label htmlFor="long-running-toggle" className="flex items-center gap-2">
+                    <ClipboardList className="h-4 w-4" />
+                    Long-running Job
+                  </Label>
+                  <p className="text-sm text-muted-foreground">Enable daily progress updates for multi-day projects</p>
+                </div>
+                <Switch
+                  id="long-running-toggle"
+                  checked={job.isLongRunning || false}
+                  onCheckedChange={(checked) => updateJob(job.id, { isLongRunning: checked })}
+                  disabled={isReadOnly}
+                  data-testid="switch-long-running-detail"
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -536,6 +677,168 @@ export default function JobDetail() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Daily Updates - Only for long-running jobs */}
+        {job.isLongRunning && (
+          <Card className="print:shadow-none print:border-none border-2 border-purple-200 dark:border-purple-900" data-testid="card-daily-updates">
+            <Collapsible open={dailyUpdatesOpen} onOpenChange={setDailyUpdatesOpen}>
+              <CardHeader className="bg-purple-50 dark:bg-purple-900/20 print:bg-transparent print:p-0 print:mb-4">
+                <CollapsibleTrigger asChild>
+                  <div className="flex justify-between items-center cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <ClipboardList className="h-5 w-5 text-purple-600" />
+                        Daily Updates
+                      </CardTitle>
+                      <Badge variant="outline" className="ml-2" data-testid="badge-today-updates">
+                        {todayUpdates.count} of 2 today
+                      </Badge>
+                    </div>
+                    <ChevronDown className={`h-5 w-5 transition-transform ${dailyUpdatesOpen ? 'rotate-180' : ''}`} />
+                  </div>
+                </CollapsibleTrigger>
+                <p className="text-sm text-muted-foreground mt-1">Track daily progress for this long-running project</p>
+              </CardHeader>
+              <CollapsibleContent>
+                <CardContent className="pt-6 print:pt-0 space-y-6">
+                  {/* Update Form */}
+                  {!isReadOnly && todayUpdates.remaining > 0 && (
+                    <div className="space-y-4 p-4 bg-white dark:bg-slate-900/50 rounded-lg border" data-testid="form-daily-update">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-base font-semibold">Add Progress Update</Label>
+                        <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+                          {todayUpdates.remaining} remaining today
+                        </Badge>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Update Notes *</Label>
+                        <Textarea
+                          placeholder="Describe today's progress, work completed, issues encountered..."
+                          value={updateNotes}
+                          onChange={(e) => setUpdateNotes(e.target.value)}
+                          className="min-h-[100px]"
+                          data-testid="textarea-update-notes"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Photos (Optional)</Label>
+                        <div className="flex flex-wrap gap-3">
+                          {updatePhotos.map((photo) => (
+                            <div key={photo.id} className="relative group">
+                              <img
+                                src={photo.url}
+                                alt="Update photo"
+                                className="h-20 w-20 object-cover rounded-lg border"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveUpdatePhoto(photo.id)}
+                                className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ))}
+                          <label className="h-20 w-20 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+                            <Upload className="h-5 w-5 text-muted-foreground mb-1" />
+                            <span className="text-xs text-muted-foreground">Add</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              onChange={handleUpdatePhotoUpload}
+                              ref={updateFileInputRef}
+                              data-testid="input-update-photos"
+                            />
+                          </label>
+                        </div>
+                      </div>
+
+                      <Button 
+                        onClick={handleSubmitUpdate}
+                        disabled={isSubmittingUpdate || !updateNotes.trim()}
+                        className="w-full bg-purple-600 hover:bg-purple-700"
+                        data-testid="button-submit-update"
+                      >
+                        {isSubmittingUpdate ? "Submitting..." : "Submit Progress Update"}
+                      </Button>
+                    </div>
+                  )}
+
+                  {!isReadOnly && todayUpdates.remaining === 0 && (
+                    <div className="text-center py-6 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <p className="text-purple-700 dark:text-purple-300 font-medium">Daily update limit reached</p>
+                      <p className="text-sm text-muted-foreground mt-1">You've submitted 2 updates today. Check back tomorrow.</p>
+                    </div>
+                  )}
+
+                  {/* Update History */}
+                  <div className="space-y-4">
+                    <Label className="text-base font-semibold">Update History</Label>
+                    
+                    {Object.keys(groupedUpdates).length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground bg-slate-50 dark:bg-slate-900/30 rounded-lg border border-dashed">
+                        <p>No updates recorded yet.</p>
+                      </div>
+                    ) : (
+                      Object.keys(groupedUpdates)
+                        .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
+                        .map((dateKey) => (
+                          <div key={dateKey} className="space-y-3" data-testid={`update-group-${dateKey}`}>
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium text-sm">{format(new Date(dateKey), 'EEEE, dd MMMM yyyy')}</span>
+                            </div>
+                            {groupedUpdates[dateKey]
+                              .sort((a, b) => a.sequence - b.sequence)
+                              .map((update) => (
+                                <div 
+                                  key={update.id} 
+                                  className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg border ml-6"
+                                  data-testid={`update-item-${update.id}`}
+                                >
+                                  <div className="flex items-start justify-between mb-2">
+                                    <Badge variant="secondary" className="text-xs">
+                                      Update #{update.sequence}
+                                    </Badge>
+                                    <span className="text-xs text-muted-foreground">
+                                      {format(new Date(update.createdAt), 'HH:mm')}
+                                    </span>
+                                  </div>
+                                  {update.notes && (
+                                    <p className="text-sm mb-3">{update.notes}</p>
+                                  )}
+                                  {update.photos && update.photos.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                      {update.photos.map((photo: Photo) => (
+                                        <img
+                                          key={photo.id}
+                                          src={photo.url}
+                                          alt="Update photo"
+                                          className="h-16 w-16 object-cover rounded border"
+                                        />
+                                      ))}
+                                    </div>
+                                  )}
+                                  {update.engineerId && (
+                                    <p className="text-xs text-muted-foreground mt-2">
+                                      By: {engineers.find(e => e.id === update.engineerId)?.name || 'Engineer'}
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                          </div>
+                        ))
+                    )}
+                  </div>
+                </CardContent>
+              </CollapsibleContent>
+            </Collapsible>
+          </Card>
+        )}
 
         {/* Materials */}
         <Card className="print:shadow-none print:border-none">
