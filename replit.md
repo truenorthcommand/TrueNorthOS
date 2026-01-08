@@ -24,7 +24,6 @@ This application enables field service companies to manage job sheets digitally.
 - **Client Quote Portal**: Clients can view, accept, or decline quotes with optional decline reason
 - **Invoice Management**: Generate invoices with bank transfer payment details
 - **Company Settings**: Configure company details, bank information, default VAT rates, and payment terms
-- **Weekly Planner Board**: Drag-and-drop job scheduling with engineer rows and day columns, up/down buttons for reordering jobs within cells
 
 ## User Credentials (Demo)
 

@@ -24,8 +24,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
-  ChevronDown,
   Calendar as CalendarIcon,
   MapPin,
   Clock,
@@ -64,8 +62,13 @@ import {
   useSensors,
   PointerSensor,
   useDroppable,
+  closestCenter,
+  closestCorners,
+  pointerWithin,
   rectIntersection,
+  getFirstCollision,
   CollisionDetection,
+  UniqueIdentifier,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -87,27 +90,46 @@ function safeParseISO(dateStr: string | null | undefined): Date | null {
   }
 }
 
-// Simplified collision detection using rectIntersection for cross-cell moves
+// Custom collision detection that prioritizes sortable items over droppable containers
 const customCollisionDetection: CollisionDetection = (args) => {
   const { active } = args;
   const activeId = String(active.id);
   
-  // Use rectIntersection to find overlapping droppable areas
-  const collisions = rectIntersection(args);
+  // First try pointerWithin - this finds items the pointer is directly over
+  const pointerCollisions = pointerWithin(args);
   
-  // Filter out the active item and prioritize containers
-  const filtered = collisions
+  // Filter out the active item and sort: jobs first, then containers
+  const filteredCollisions = pointerCollisions
     .filter(c => String(c.id) !== activeId)
     .sort((a, b) => {
-      // Prioritize containers (cells) over individual items for cross-cell moves
       const aIsContainer = String(a.id).includes('_');
       const bIsContainer = String(b.id).includes('_');
-      if (aIsContainer && !bIsContainer) return -1;
-      if (!aIsContainer && bIsContainer) return 1;
+      if (aIsContainer && !bIsContainer) return 1;
+      if (!aIsContainer && bIsContainer) return -1;
       return 0;
     });
   
-  return filtered.length > 0 ? [filtered[0]] : [];
+  if (filteredCollisions.length > 0) {
+    return [filteredCollisions[0]];
+  }
+  
+  // Fallback to closestCenter for nearby items
+  const centerCollisions = closestCenter(args);
+  const filteredCenter = centerCollisions
+    .filter(c => String(c.id) !== activeId)
+    .sort((a, b) => {
+      const aIsContainer = String(a.id).includes('_');
+      const bIsContainer = String(b.id).includes('_');
+      if (aIsContainer && !bIsContainer) return 1;
+      if (!aIsContainer && bIsContainer) return -1;
+      return 0;
+    });
+  
+  if (filteredCenter.length > 0) {
+    return [filteredCenter[0]];
+  }
+  
+  return [];
 };
 
 type Engineer = {
@@ -118,17 +140,9 @@ type Engineer = {
 function SortableJobCard({
   job,
   onRemoveFromDay,
-  onMoveUp,
-  onMoveDown,
-  canMoveUp,
-  canMoveDown,
 }: {
   job: Job;
   onRemoveFromDay: (jobId: string) => void;
-  onMoveUp?: () => void;
-  onMoveDown?: () => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
 }) {
   const {
     attributes,
@@ -153,58 +167,18 @@ function SortableJobCard({
     <div
       ref={setNodeRef}
       style={style}
-      className="bg-white dark:bg-slate-800 border rounded-md p-1.5 mb-1 shadow-sm hover:shadow-md transition-shadow group"
+      {...attributes}
+      {...listeners}
+      className="bg-white dark:bg-slate-800 border rounded-md p-2 mb-1 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing"
       data-testid={`planner-job-${job.id}`}
     >
-      <div className="flex items-start gap-1">
-        {/* Drag handle */}
-        <div 
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded flex-shrink-0"
-        >
-          <GripVertical className="h-3 w-3 text-muted-foreground" />
-        </div>
-        
-        {/* Job info */}
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium truncate">{job.customerName}</p>
-          {job.postcode && (
-            <p className="text-xs text-muted-foreground truncate flex items-center">
-              <MapPin className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
-              {job.postcode}
-            </p>
-          )}
-        </div>
-        
-        {/* Up/Down buttons */}
-        <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onMoveUp?.();
-            }}
-            disabled={!canMoveUp}
-            className={`p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700 ${!canMoveUp ? 'opacity-30 cursor-not-allowed' : ''}`}
-            data-testid={`move-up-${job.id}`}
-            title="Move up"
-          >
-            <ChevronUp className="h-3 w-3" />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onMoveDown?.();
-            }}
-            disabled={!canMoveDown}
-            className={`p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700 ${!canMoveDown ? 'opacity-30 cursor-not-allowed' : ''}`}
-            data-testid={`move-down-${job.id}`}
-            title="Move down"
-          >
-            <ChevronDown className="h-3 w-3" />
-          </button>
-        </div>
-      </div>
+      <p className="text-xs font-medium truncate">{job.customerName}</p>
+      {job.postcode && (
+        <p className="text-xs text-muted-foreground truncate flex items-center">
+          <MapPin className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
+          {job.postcode}
+        </p>
+      )}
     </div>
   );
 }
@@ -499,6 +473,7 @@ export default function CalendarPage() {
     const { active, over } = event;
     setActiveJob(null);
 
+    // Use tracked overId if event.over.id equals active.id (collision detection bug workaround)
     const activeId = active.id as string;
     let targetId = over?.id as string;
     
@@ -512,82 +487,91 @@ export default function CalendarPage() {
     
     setOverId(null);
     
+    console.log('[DragEnd] Final targetId:', targetId);
+    
     if (!targetId) return;
+
+    const overData = over?.data?.current as { type?: string; cellId?: string; job?: Job } | undefined;
+
+    // If dropped on itself, ignore
     if (activeId === targetId) return;
 
-    // Get metadata from the droppable target
-    const overData = over?.data?.current as { type?: string; cellId?: string; job?: Job } | undefined;
+    // Check if we dropped on another job (reordering within cell)
     const activeJob = jobs.find((j) => j.id === activeId);
-    if (!activeJob) return;
+    const isOverJob = jobs.find((j) => j.id === targetId);
+    const overJob = jobs.find((j) => j.id === targetId);
 
-    // Determine target cell ID using droppable metadata
-    let targetCellId: string | undefined;
-    
-    if (overData?.type === 'container' && overData?.cellId) {
-      // Dropped on a cell container - use its cellId
-      targetCellId = overData.cellId;
-      console.log('[DragEnd] Dropped on container, cellId:', targetCellId);
-    } else if (targetId.includes('_')) {
-      // targetId itself is a cell ID (backup check)
-      targetCellId = targetId;
-      console.log('[DragEnd] targetId is cell ID:', targetCellId);
-    } else {
-      // Dropped on a job - check if same cell or different cell
-      const overJob = jobs.find((j) => j.id === targetId);
-      if (overJob) {
-        // Build the cell ID from the target job's data
-        const overJobDate = safeParseISO(overJob.date);
-        const overEngineerId = overJob.assignedToIds?.[0] || overJob.assignedToId;
-        if (overJobDate && overEngineerId) {
-          targetCellId = `${overEngineerId}_${format(overJobDate, "yyyy-MM-dd")}`;
-          console.log('[DragEnd] Dropped on job, inferred cellId:', targetCellId);
+    if (activeJob && overJob && isOverJob) {
+      // Reordering within the same cell
+      const activeDate = safeParseISO(activeJob.date);
+      const overDate = safeParseISO(overJob.date);
+      
+      const activeAssignedIds =
+        activeJob.assignedToIds && activeJob.assignedToIds.length > 0
+          ? activeJob.assignedToIds
+          : activeJob.assignedToId
+          ? [activeJob.assignedToId]
+          : [];
+      const overAssignedIds =
+        overJob.assignedToIds && overJob.assignedToIds.length > 0
+          ? overJob.assignedToIds
+          : overJob.assignedToId
+          ? [overJob.assignedToId]
+          : [];
+
+      // Check if both jobs are in the same cell
+      const sameEngineer = activeAssignedIds.some((id) => overAssignedIds.includes(id));
+      const sameDate = activeDate && overDate && isSameDay(activeDate, overDate);
+
+      if (sameEngineer && sameDate) {
+        // Find common engineer
+        const commonEngineerId = activeAssignedIds.find((id) => overAssignedIds.includes(id));
+        if (commonEngineerId && activeDate) {
+          // Get all jobs in this cell and reorder
+          const cellJobs = getJobsForCell(commonEngineerId, activeDate);
+          const oldIndex = cellJobs.findIndex((j) => j.id === activeId);
+          const newIndex = cellJobs.findIndex((j) => j.id === targetId);
+
+          if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+            const reorderedJobs = arrayMove(cellJobs, oldIndex, newIndex);
+            const jobOrders = reorderedJobs.map((job, index) => ({
+              jobId: job.id,
+              orderIndex: index,
+            }));
+
+            reorderJobsMutation.mutate(jobOrders);
+            toast({
+              title: "Jobs reordered",
+              description: "The job order has been updated.",
+            });
+          }
         }
+        return;
       }
     }
-    
-    if (!targetCellId) return;
 
-    // Parse the target cell ID
-    const [engineerId, dateStr] = targetCellId.split("_");
+    // Moving to a different cell
+    const [engineerId, dateStr] = targetId.split("_");
     if (!engineerId || !dateStr) return;
 
-    // Determine the active job's current cell
-    const activeJobDate = safeParseISO(activeJob.date);
-    const activeEngineerId = activeJob.assignedToIds?.[0] || activeJob.assignedToId;
-    const activeCellId = activeEngineerId && activeJobDate 
-      ? `${activeEngineerId}_${format(activeJobDate, "yyyy-MM-dd")}`
-      : null;
+    const job = jobs.find((j) => j.id === activeId);
+    if (!job) return;
 
-    console.log('[DragEnd] activeCellId:', activeCellId, 'targetCellId:', targetCellId);
-
-    // Check if same cell (reorder) or different cell (move)
-    if (activeCellId === targetCellId) {
-      // Same cell - reorder within cell
-      const overJob = jobs.find((j) => j.id === targetId);
-      if (!overJob) return;
-      
-      const cellJobs = getJobsForCell(engineerId, parseISO(dateStr));
-      const oldIndex = cellJobs.findIndex((j) => j.id === activeId);
-      const newIndex = cellJobs.findIndex((j) => j.id === targetId);
-
-      if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-        const reorderedJobs = arrayMove(cellJobs, oldIndex, newIndex);
-        const jobOrders = reorderedJobs.map((job, index) => ({
-          jobId: job.id,
-          orderIndex: index,
-        }));
-
-        reorderJobsMutation.mutate(jobOrders);
-        toast({
-          title: "Jobs reordered",
-          description: "The job order has been updated.",
-        });
-      }
-      return;
-    }
-
-    // Different cell - move job to new cell
+    const currentAssignedIds =
+      job.assignedToIds && job.assignedToIds.length > 0
+        ? job.assignedToIds
+        : job.assignedToId
+        ? [job.assignedToId]
+        : [];
+    const currentDate = safeParseISO(job.date);
     const targetDate = parseISO(dateStr);
+
+    const isSameCell =
+      currentAssignedIds.includes(engineerId) &&
+      currentDate &&
+      isSameDay(currentDate, targetDate);
+
+    if (isSameCell) return;
 
     const fullIsoDate = new Date(targetDate).toISOString();
 
@@ -618,26 +602,6 @@ export default function CalendarPage() {
     toast({
       title: "Job removed from schedule",
       description: "The job has been removed from the planner but not deleted.",
-    });
-  };
-
-  const handleMoveJob = (jobId: string, direction: 'up' | 'down', cellJobs: Job[]) => {
-    const currentIndex = cellJobs.findIndex(j => j.id === jobId);
-    if (currentIndex === -1) return;
-    
-    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-    if (newIndex < 0 || newIndex >= cellJobs.length) return;
-    
-    const reorderedJobs = arrayMove(cellJobs, currentIndex, newIndex);
-    const jobOrders = reorderedJobs.map((job, index) => ({
-      jobId: job.id,
-      orderIndex: index,
-    }));
-    
-    reorderJobsMutation.mutate(jobOrders);
-    toast({
-      title: "Job order updated",
-      description: `Moved ${direction === 'up' ? 'up' : 'down'} in the list.`,
     });
   };
 
@@ -1098,15 +1062,11 @@ export default function CalendarPage() {
                               items={cellJobs.map((j) => j.id)}
                               strategy={verticalListSortingStrategy}
                             >
-                              {cellJobs.map((job, index) => (
+                              {cellJobs.map((job) => (
                                 <SortableJobCard
                                   key={job.id}
                                   job={job}
                                   onRemoveFromDay={handleRemoveFromDay}
-                                  onMoveUp={() => handleMoveJob(job.id, 'up', cellJobs)}
-                                  onMoveDown={() => handleMoveJob(job.id, 'down', cellJobs)}
-                                  canMoveUp={index > 0}
-                                  canMoveDown={index < cellJobs.length - 1}
                                 />
                               ))}
                             </SortableContext>
@@ -1134,15 +1094,11 @@ export default function CalendarPage() {
                             items={unassignedJobs.map((j) => j.id)}
                             strategy={verticalListSortingStrategy}
                           >
-                            {unassignedJobs.map((job, index) => (
+                            {unassignedJobs.map((job) => (
                               <SortableJobCard
                                 key={job.id}
                                 job={job}
                                 onRemoveFromDay={handleRemoveFromDay}
-                                onMoveUp={() => handleMoveJob(job.id, 'up', unassignedJobs)}
-                                onMoveDown={() => handleMoveJob(job.id, 'down', unassignedJobs)}
-                                canMoveUp={index > 0}
-                                canMoveDown={index < unassignedJobs.length - 1}
                               />
                             ))}
                           </SortableContext>
