@@ -92,50 +92,44 @@ function safeParseISO(dateStr: string | null | undefined): Date | null {
 
 // Custom collision detection that prioritizes sortable items over droppable containers
 const customCollisionDetection: CollisionDetection = (args) => {
-  const { active, droppableContainers, pointerCoordinates } = args;
+  const { active } = args;
+  const activeId = String(active.id);
   
-  // Get all collisions using closestCorners (better for sortable items)
-  const cornerCollisions = closestCorners(args);
+  // First try pointerWithin - this finds items the pointer is directly over
+  const pointerCollisions = pointerWithin(args);
   
-  // If we have corner collisions, prioritize job items over containers
-  if (cornerCollisions.length > 0) {
-    // Find the first non-active job collision
-    const jobCollision = cornerCollisions.find((collision) => {
-      const id = String(collision.id);
-      const isContainer = id.includes('_');
-      const isNotActive = id !== String(active.id);
-      return !isContainer && isNotActive;
+  // Filter out the active item and sort: jobs first, then containers
+  const filteredCollisions = pointerCollisions
+    .filter(c => String(c.id) !== activeId)
+    .sort((a, b) => {
+      const aIsContainer = String(a.id).includes('_');
+      const bIsContainer = String(b.id).includes('_');
+      if (aIsContainer && !bIsContainer) return 1;
+      if (!aIsContainer && bIsContainer) return -1;
+      return 0;
     });
-    
-    if (jobCollision) {
-      return [jobCollision];
-    }
-    
-    // Otherwise return first container collision
-    const containerCollision = cornerCollisions.find((collision) => {
-      const id = String(collision.id);
-      return id.includes('_');
-    });
-    
-    if (containerCollision) {
-      return [containerCollision];
-    }
+  
+  if (filteredCollisions.length > 0) {
+    return [filteredCollisions[0]];
   }
   
-  // Fallback to rectIntersection for container detection
-  const rectCollisions = rectIntersection(args);
-  if (rectCollisions.length > 0) {
-    const containerCollision = rectCollisions.find((collision) => {
-      const id = String(collision.id);
-      return id.includes('_');
+  // Fallback to closestCenter for nearby items
+  const centerCollisions = closestCenter(args);
+  const filteredCenter = centerCollisions
+    .filter(c => String(c.id) !== activeId)
+    .sort((a, b) => {
+      const aIsContainer = String(a.id).includes('_');
+      const bIsContainer = String(b.id).includes('_');
+      if (aIsContainer && !bIsContainer) return 1;
+      if (!aIsContainer && bIsContainer) return -1;
+      return 0;
     });
-    if (containerCollision) {
-      return [containerCollision];
-    }
-    return [rectCollisions[0]];
+  
+  if (filteredCenter.length > 0) {
+    return [filteredCenter[0]];
   }
   
-  return closestCenter(args);
+  return [];
 };
 
 type Engineer = {
