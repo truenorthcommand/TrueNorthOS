@@ -64,13 +64,8 @@ import {
   useSensors,
   PointerSensor,
   useDroppable,
-  closestCenter,
-  closestCorners,
-  pointerWithin,
   rectIntersection,
-  getFirstCollision,
   CollisionDetection,
-  UniqueIdentifier,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -92,46 +87,27 @@ function safeParseISO(dateStr: string | null | undefined): Date | null {
   }
 }
 
-// Custom collision detection that prioritizes sortable items over droppable containers
+// Simplified collision detection using rectIntersection for cross-cell moves
 const customCollisionDetection: CollisionDetection = (args) => {
   const { active } = args;
   const activeId = String(active.id);
   
-  // First try pointerWithin - this finds items the pointer is directly over
-  const pointerCollisions = pointerWithin(args);
+  // Use rectIntersection to find overlapping droppable areas
+  const collisions = rectIntersection(args);
   
-  // Filter out the active item and sort: jobs first, then containers
-  const filteredCollisions = pointerCollisions
+  // Filter out the active item and prioritize containers
+  const filtered = collisions
     .filter(c => String(c.id) !== activeId)
     .sort((a, b) => {
+      // Prioritize containers (cells) over individual items for cross-cell moves
       const aIsContainer = String(a.id).includes('_');
       const bIsContainer = String(b.id).includes('_');
-      if (aIsContainer && !bIsContainer) return 1;
-      if (!aIsContainer && bIsContainer) return -1;
+      if (aIsContainer && !bIsContainer) return -1;
+      if (!aIsContainer && bIsContainer) return 1;
       return 0;
     });
   
-  if (filteredCollisions.length > 0) {
-    return [filteredCollisions[0]];
-  }
-  
-  // Fallback to closestCenter for nearby items
-  const centerCollisions = closestCenter(args);
-  const filteredCenter = centerCollisions
-    .filter(c => String(c.id) !== activeId)
-    .sort((a, b) => {
-      const aIsContainer = String(a.id).includes('_');
-      const bIsContainer = String(b.id).includes('_');
-      if (aIsContainer && !bIsContainer) return 1;
-      if (!aIsContainer && bIsContainer) return -1;
-      return 0;
-    });
-  
-  if (filteredCenter.length > 0) {
-    return [filteredCenter[0]];
-  }
-  
-  return [];
+  return filtered.length > 0 ? [filtered[0]] : [];
 };
 
 type Engineer = {
