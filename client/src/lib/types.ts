@@ -71,6 +71,7 @@ export type Job = {
   signOffLng?: number | null;
   signOffAddress?: string | null;
   signOffTimestamp?: string | null;
+  orderIndex?: number;
   createdAt?: string;
   updatedAt?: string;
 };

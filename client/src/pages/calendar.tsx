@@ -62,8 +62,14 @@ import {
   PointerSensor,
   useDroppable,
   closestCenter,
+  DragOverEvent,
 } from "@dnd-kit/core";
-import { useDraggable } from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -83,22 +89,30 @@ type Engineer = {
   name: string;
 };
 
-function DraggableJobCard({
+function SortableJobCard({
   job,
   onRemoveFromDay,
 }: {
   job: Job;
   onRemoveFromDay: (jobId: string) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } =
-    useDraggable({
-      id: job.id,
-      data: { job },
-    });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: job.id,
+    data: { job },
+  });
 
   const style = {
-    transform: CSS.Translate.toString(transform),
+    transform: CSS.Transform.toString(transform),
+    transition,
     opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1000 : 1,
   };
 
   return (
@@ -273,34 +287,38 @@ export default function CalendarPage() {
   }, [engineers, visibleEngineerIds]);
 
   const getJobsForCell = (engineerId: string, date: Date): Job[] => {
-    return jobs.filter((job) => {
-      const jobDate = safeParseISO(job.date);
-      if (!jobDate || !isSameDay(jobDate, date)) return false;
-      const assignedIds =
-        job.assignedToIds && job.assignedToIds.length > 0
-          ? job.assignedToIds
-          : job.assignedToId
-          ? [job.assignedToId]
-          : [];
-      return assignedIds.includes(engineerId);
-    });
+    return jobs
+      .filter((job) => {
+        const jobDate = safeParseISO(job.date);
+        if (!jobDate || !isSameDay(jobDate, date)) return false;
+        const assignedIds =
+          job.assignedToIds && job.assignedToIds.length > 0
+            ? job.assignedToIds
+            : job.assignedToId
+            ? [job.assignedToId]
+            : [];
+        return assignedIds.includes(engineerId);
+      })
+      .sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
   };
 
   const getUnassignedJobsForDay = (date: Date): Job[] => {
-    return jobs.filter((job) => {
-      const jobDate = safeParseISO(job.date);
-      if (!jobDate || !isSameDay(jobDate, date)) return false;
-      const assignedIds =
-        job.assignedToIds && job.assignedToIds.length > 0
-          ? job.assignedToIds
-          : job.assignedToId
-          ? [job.assignedToId]
-          : [];
-      const hasNoAssignment = assignedIds.length === 0;
-      const assignedToHiddenEngineer = assignedIds.length > 0 && 
-        !assignedIds.some((id) => visibleEngineerIds.includes(id));
-      return hasNoAssignment || assignedToHiddenEngineer;
-    });
+    return jobs
+      .filter((job) => {
+        const jobDate = safeParseISO(job.date);
+        if (!jobDate || !isSameDay(jobDate, date)) return false;
+        const assignedIds =
+          job.assignedToIds && job.assignedToIds.length > 0
+            ? job.assignedToIds
+            : job.assignedToId
+            ? [job.assignedToId]
+            : [];
+        const hasNoAssignment = assignedIds.length === 0;
+        const assignedToHiddenEngineer = assignedIds.length > 0 && 
+          !assignedIds.some((id) => visibleEngineerIds.includes(id));
+        return hasNoAssignment || assignedToHiddenEngineer;
+      })
+      .sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
   };
 
   const updateJobMutation = useMutation({
@@ -308,10 +326,12 @@ export default function CalendarPage() {
       jobId,
       date,
       engineerId,
+      orderIndex,
     }: {
       jobId: string;
       date: string | null;
       engineerId?: string;
+      orderIndex?: number;
     }) => {
       const response = await fetch(`/api/jobs/${jobId}`, {
         method: "PATCH",
@@ -321,11 +341,39 @@ export default function CalendarPage() {
           date: date,
           assignedToId: engineerId,
           assignedToIds: engineerId ? [engineerId] : [],
+          ...(orderIndex !== undefined && { orderIndex }),
         }),
       });
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to update job");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      refreshJobs();
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const reorderJobsMutation = useMutation({
+    mutationFn: async (jobOrders: { jobId: string; orderIndex: number }[]) => {
+      const response = await fetch("/api/jobs/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ jobOrders }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to reorder jobs");
       }
       return response.json();
     },
@@ -356,13 +404,67 @@ export default function CalendarPage() {
 
     if (!over) return;
 
-    const jobId = active.id as string;
-    const targetCellId = over.id as string;
+    const activeId = active.id as string;
+    const overId = over.id as string;
 
-    const [engineerId, dateStr] = targetCellId.split("_");
+    // Check if we dropped on another job (reordering within cell)
+    const activeJob = jobs.find((j) => j.id === activeId);
+    const overJob = jobs.find((j) => j.id === overId);
+
+    if (activeJob && overJob && activeId !== overId) {
+      // Reordering within the same cell
+      const activeDate = safeParseISO(activeJob.date);
+      const overDate = safeParseISO(overJob.date);
+      
+      const activeAssignedIds =
+        activeJob.assignedToIds && activeJob.assignedToIds.length > 0
+          ? activeJob.assignedToIds
+          : activeJob.assignedToId
+          ? [activeJob.assignedToId]
+          : [];
+      const overAssignedIds =
+        overJob.assignedToIds && overJob.assignedToIds.length > 0
+          ? overJob.assignedToIds
+          : overJob.assignedToId
+          ? [overJob.assignedToId]
+          : [];
+
+      // Check if both jobs are in the same cell
+      const sameEngineer = activeAssignedIds.some((id) => overAssignedIds.includes(id));
+      const sameDate = activeDate && overDate && isSameDay(activeDate, overDate);
+
+      if (sameEngineer && sameDate) {
+        // Find common engineer
+        const commonEngineerId = activeAssignedIds.find((id) => overAssignedIds.includes(id));
+        if (commonEngineerId && activeDate) {
+          // Get all jobs in this cell and reorder
+          const cellJobs = getJobsForCell(commonEngineerId, activeDate);
+          const oldIndex = cellJobs.findIndex((j) => j.id === activeId);
+          const newIndex = cellJobs.findIndex((j) => j.id === overId);
+
+          if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+            const reorderedJobs = arrayMove(cellJobs, oldIndex, newIndex);
+            const jobOrders = reorderedJobs.map((job, index) => ({
+              jobId: job.id,
+              orderIndex: index,
+            }));
+
+            reorderJobsMutation.mutate(jobOrders);
+            toast({
+              title: "Jobs reordered",
+              description: "The job order has been updated.",
+            });
+          }
+        }
+        return;
+      }
+    }
+
+    // Moving to a different cell
+    const [engineerId, dateStr] = overId.split("_");
     if (!engineerId || !dateStr) return;
 
-    const job = jobs.find((j) => j.id === jobId);
+    const job = jobs.find((j) => j.id === activeId);
     if (!job) return;
 
     const currentAssignedIds =
@@ -383,10 +485,15 @@ export default function CalendarPage() {
 
     const fullIsoDate = new Date(targetDate).toISOString();
 
+    // Get the target cell's jobs to determine the new orderIndex
+    const targetCellJobs = getJobsForCell(engineerId, targetDate);
+    const newOrderIndex = targetCellJobs.length;
+
     updateJobMutation.mutate({
-      jobId,
+      jobId: activeId,
       date: fullIsoDate,
       engineerId,
+      orderIndex: newOrderIndex,
     });
 
     toast({
@@ -433,11 +540,13 @@ export default function CalendarPage() {
   const trailingDays = endDayOfWeek === 6 ? 0 : 6 - endDayOfWeek;
 
   const getJobsForDate = (date: Date): Job[] => {
-    return jobs.filter((job) => {
-      const jobDate = safeParseISO(job.date);
-      if (!jobDate) return false;
-      return isSameDay(jobDate, date);
-    });
+    return jobs
+      .filter((job) => {
+        const jobDate = safeParseISO(job.date);
+        if (!jobDate) return false;
+        return isSameDay(jobDate, date);
+      })
+      .sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
   };
 
   const getStatusColor = (status: JobStatus): string => {
@@ -858,13 +967,18 @@ export default function CalendarPage() {
                             id={cellId}
                             isEmpty={cellJobs.length === 0}
                           >
-                            {cellJobs.map((job) => (
-                              <DraggableJobCard
-                                key={job.id}
-                                job={job}
-                                onRemoveFromDay={handleRemoveFromDay}
-                              />
-                            ))}
+                            <SortableContext
+                              items={cellJobs.map((j) => j.id)}
+                              strategy={verticalListSortingStrategy}
+                            >
+                              {cellJobs.map((job) => (
+                                <SortableJobCard
+                                  key={job.id}
+                                  job={job}
+                                  onRemoveFromDay={handleRemoveFromDay}
+                                />
+                              ))}
+                            </SortableContext>
                           </DroppableCell>
                         );
                       })}
@@ -878,19 +992,26 @@ export default function CalendarPage() {
                     </div>
                     {weekDays.map((day) => {
                       const unassignedJobs = getUnassignedJobsForDay(day);
+                      const unassignedCellId = `unassigned_${format(day, "yyyy-MM-dd")}`;
                       return (
-                        <div
-                          key={`unassigned_${format(day, "yyyy-MM-dd")}`}
-                          className="min-h-[80px] p-1 border-r border-b bg-amber-50/50 dark:bg-amber-900/10"
+                        <DroppableCell
+                          key={unassignedCellId}
+                          id={unassignedCellId}
+                          isEmpty={unassignedJobs.length === 0}
                         >
-                          {unassignedJobs.map((job) => (
-                            <DraggableJobCard
-                              key={job.id}
-                              job={job}
-                              onRemoveFromDay={handleRemoveFromDay}
-                            />
-                          ))}
-                        </div>
+                          <SortableContext
+                            items={unassignedJobs.map((j) => j.id)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            {unassignedJobs.map((job) => (
+                              <SortableJobCard
+                                key={job.id}
+                                job={job}
+                                onRemoveFromDay={handleRemoveFromDay}
+                              />
+                            ))}
+                          </SortableContext>
+                        </DroppableCell>
                       );
                     })}
                   </>

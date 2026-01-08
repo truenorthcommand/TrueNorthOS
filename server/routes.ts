@@ -606,6 +606,28 @@ export async function registerRoutes(
     }
   });
 
+  // Reorder jobs - update orderIndex for multiple jobs at once
+  app.patch("/api/jobs/reorder", requireAdmin, async (req, res) => {
+    try {
+      const { jobOrders } = req.body;
+      
+      if (!Array.isArray(jobOrders)) {
+        return res.status(400).json({ error: "jobOrders must be an array" });
+      }
+      
+      // Update each job's orderIndex
+      for (const { jobId, orderIndex } of jobOrders) {
+        if (typeof jobId === 'string' && typeof orderIndex === 'number') {
+          await storage.updateJob(jobId, { orderIndex });
+        }
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to reorder jobs" });
+    }
+  });
+
   app.delete("/api/jobs/:id", requireAdmin, async (req, res) => {
     try {
       await storage.deleteJob(req.params.id);
