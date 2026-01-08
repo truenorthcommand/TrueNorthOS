@@ -7,7 +7,8 @@ import {
   type Quote, type InsertQuote,
   type Invoice, type InsertInvoice,
   type CompanySettings, type InsertCompanySettings,
-  users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings
+  type Client, type InsertClient,
+  users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and } from "drizzle-orm";
@@ -66,6 +67,14 @@ export interface IStorage {
   
   getCompanySettings(): Promise<CompanySettings | undefined>;
   upsertCompanySettings(settings: InsertCompanySettings): Promise<CompanySettings>;
+  
+  getClient(id: string): Promise<Client | undefined>;
+  getClientByEmail(email: string): Promise<Client | undefined>;
+  getAllClients(): Promise<Client[]>;
+  createClient(client: InsertClient): Promise<Client>;
+  updateClient(id: string, updates: Partial<Client>): Promise<Client | undefined>;
+  deleteClient(id: string): Promise<void>;
+  findOrCreateClient(data: { name: string; email?: string | null; phone?: string | null; address?: string | null; postcode?: string | null; contactName?: string | null }): Promise<Client>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -355,6 +364,59 @@ export class DatabaseStorage implements IStorage {
     }
     const [created] = await db.insert(companySettings).values(settings).returning();
     return created;
+  }
+
+  async getClient(id: string): Promise<Client | undefined> {
+    const [client] = await db.select().from(clients).where(eq(clients.id, id));
+    return client;
+  }
+
+  async getClientByEmail(email: string): Promise<Client | undefined> {
+    const [client] = await db.select().from(clients).where(eq(clients.email, email));
+    return client;
+  }
+
+  async getAllClients(): Promise<Client[]> {
+    return db.select().from(clients).orderBy(desc(clients.name));
+  }
+
+  async createClient(client: InsertClient): Promise<Client> {
+    const [created] = await db.insert(clients).values(client).returning();
+    return created;
+  }
+
+  async updateClient(id: string, updates: Partial<Client>): Promise<Client | undefined> {
+    const [updated] = await db.update(clients).set({ ...updates, updatedAt: new Date() }).where(eq(clients.id, id)).returning();
+    return updated;
+  }
+
+  async deleteClient(id: string): Promise<void> {
+    await db.delete(clients).where(eq(clients.id, id));
+  }
+
+  async findOrCreateClient(data: { name: string; email?: string | null; phone?: string | null; address?: string | null; postcode?: string | null; contactName?: string | null }): Promise<Client> {
+    if (data.email) {
+      const existing = await this.getClientByEmail(data.email);
+      if (existing) {
+        const [updated] = await db.update(clients).set({ 
+          name: data.name,
+          phone: data.phone ?? existing.phone,
+          address: data.address ?? existing.address,
+          postcode: data.postcode ?? existing.postcode,
+          contactName: data.contactName ?? existing.contactName,
+          updatedAt: new Date()
+        }).where(eq(clients.id, existing.id)).returning();
+        return updated;
+      }
+    }
+    return this.createClient({
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+      address: data.address,
+      postcode: data.postcode,
+      contactName: data.contactName,
+    });
   }
 }
 
