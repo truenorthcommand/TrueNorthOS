@@ -499,7 +499,6 @@ export default function CalendarPage() {
     const { active, over } = event;
     setActiveJob(null);
 
-    // Use tracked overId if event.over.id equals active.id (collision detection bug workaround)
     const activeId = active.id as string;
     let targetId = over?.id as string;
     
@@ -513,107 +512,82 @@ export default function CalendarPage() {
     
     setOverId(null);
     
-    console.log('[DragEnd] Final targetId:', targetId);
-    
     if (!targetId) return;
-
-    const overData = over?.data?.current as { type?: string; cellId?: string; job?: Job } | undefined;
-
-    // If dropped on itself, ignore
     if (activeId === targetId) return;
 
-    // Check if we dropped on another job (reordering within cell)
+    // Get metadata from the droppable target
+    const overData = over?.data?.current as { type?: string; cellId?: string; job?: Job } | undefined;
     const activeJob = jobs.find((j) => j.id === activeId);
-    const isOverJob = jobs.find((j) => j.id === targetId);
-    const overJob = jobs.find((j) => j.id === targetId);
+    if (!activeJob) return;
 
-    if (activeJob && overJob && isOverJob) {
-      // Reordering within the same cell
-      const activeDate = safeParseISO(activeJob.date);
-      const overDate = safeParseISO(overJob.date);
-      
-      const activeAssignedIds =
-        activeJob.assignedToIds && activeJob.assignedToIds.length > 0
-          ? activeJob.assignedToIds
-          : activeJob.assignedToId
-          ? [activeJob.assignedToId]
-          : [];
-      const overAssignedIds =
-        overJob.assignedToIds && overJob.assignedToIds.length > 0
-          ? overJob.assignedToIds
-          : overJob.assignedToId
-          ? [overJob.assignedToId]
-          : [];
-
-      // Check if both jobs are in the same cell
-      const sameEngineer = activeAssignedIds.some((id) => overAssignedIds.includes(id));
-      const sameDate = activeDate && overDate && isSameDay(activeDate, overDate);
-
-      if (sameEngineer && sameDate) {
-        // Find common engineer
-        const commonEngineerId = activeAssignedIds.find((id) => overAssignedIds.includes(id));
-        if (commonEngineerId && activeDate) {
-          // Get all jobs in this cell and reorder
-          const cellJobs = getJobsForCell(commonEngineerId, activeDate);
-          const oldIndex = cellJobs.findIndex((j) => j.id === activeId);
-          const newIndex = cellJobs.findIndex((j) => j.id === targetId);
-
-          if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-            const reorderedJobs = arrayMove(cellJobs, oldIndex, newIndex);
-            const jobOrders = reorderedJobs.map((job, index) => ({
-              jobId: job.id,
-              orderIndex: index,
-            }));
-
-            reorderJobsMutation.mutate(jobOrders);
-            toast({
-              title: "Jobs reordered",
-              description: "The job order has been updated.",
-            });
-          }
+    // Determine target cell ID using droppable metadata
+    let targetCellId: string | undefined;
+    
+    if (overData?.type === 'container' && overData?.cellId) {
+      // Dropped on a cell container - use its cellId
+      targetCellId = overData.cellId;
+      console.log('[DragEnd] Dropped on container, cellId:', targetCellId);
+    } else if (targetId.includes('_')) {
+      // targetId itself is a cell ID (backup check)
+      targetCellId = targetId;
+      console.log('[DragEnd] targetId is cell ID:', targetCellId);
+    } else {
+      // Dropped on a job - check if same cell or different cell
+      const overJob = jobs.find((j) => j.id === targetId);
+      if (overJob) {
+        // Build the cell ID from the target job's data
+        const overJobDate = safeParseISO(overJob.date);
+        const overEngineerId = overJob.assignedToIds?.[0] || overJob.assignedToId;
+        if (overJobDate && overEngineerId) {
+          targetCellId = `${overEngineerId}_${format(overJobDate, "yyyy-MM-dd")}`;
+          console.log('[DragEnd] Dropped on job, inferred cellId:', targetCellId);
         }
-        return;
       }
     }
+    
+    if (!targetCellId) return;
 
-    // Moving to a different cell
-    // targetId could be a cell ID (engineerId_date) or a job ID (if dropped on a job in different cell)
-    let engineerId: string | undefined;
-    let dateStr: string | undefined;
-    
-    if (targetId.includes("_")) {
-      // It's a cell ID
-      [engineerId, dateStr] = targetId.split("_");
-    } else if (overJob) {
-      // It's a job ID - get the cell info from the target job
-      const overJobDate = safeParseISO(overJob.date);
-      if (overJobDate) {
-        dateStr = format(overJobDate, "yyyy-MM-dd");
-        // Get engineer from the target job
-        engineerId = overJob.assignedToIds?.[0] || overJob.assignedToId || undefined;
-      }
-    }
-    
+    // Parse the target cell ID
+    const [engineerId, dateStr] = targetCellId.split("_");
     if (!engineerId || !dateStr) return;
 
-    const job = jobs.find((j) => j.id === activeId);
-    if (!job) return;
+    // Determine the active job's current cell
+    const activeJobDate = safeParseISO(activeJob.date);
+    const activeEngineerId = activeJob.assignedToIds?.[0] || activeJob.assignedToId;
+    const activeCellId = activeEngineerId && activeJobDate 
+      ? `${activeEngineerId}_${format(activeJobDate, "yyyy-MM-dd")}`
+      : null;
 
-    const currentAssignedIds =
-      job.assignedToIds && job.assignedToIds.length > 0
-        ? job.assignedToIds
-        : job.assignedToId
-        ? [job.assignedToId]
-        : [];
-    const currentDate = safeParseISO(job.date);
+    console.log('[DragEnd] activeCellId:', activeCellId, 'targetCellId:', targetCellId);
+
+    // Check if same cell (reorder) or different cell (move)
+    if (activeCellId === targetCellId) {
+      // Same cell - reorder within cell
+      const overJob = jobs.find((j) => j.id === targetId);
+      if (!overJob) return;
+      
+      const cellJobs = getJobsForCell(engineerId, parseISO(dateStr));
+      const oldIndex = cellJobs.findIndex((j) => j.id === activeId);
+      const newIndex = cellJobs.findIndex((j) => j.id === targetId);
+
+      if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+        const reorderedJobs = arrayMove(cellJobs, oldIndex, newIndex);
+        const jobOrders = reorderedJobs.map((job, index) => ({
+          jobId: job.id,
+          orderIndex: index,
+        }));
+
+        reorderJobsMutation.mutate(jobOrders);
+        toast({
+          title: "Jobs reordered",
+          description: "The job order has been updated.",
+        });
+      }
+      return;
+    }
+
+    // Different cell - move job to new cell
     const targetDate = parseISO(dateStr);
-
-    const isSameCell =
-      currentAssignedIds.includes(engineerId) &&
-      currentDate &&
-      isSameDay(currentDate, targetDate);
-
-    if (isSameCell) return;
 
     const fullIsoDate = new Date(targetDate).toISOString();
 
