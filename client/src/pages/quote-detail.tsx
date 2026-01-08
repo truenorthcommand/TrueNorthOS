@@ -189,7 +189,12 @@ export default function QuoteDetail() {
       if (res.ok) {
         const saved = await res.json();
         if (isNew) {
-          toast({ title: "Success", description: "Quote created" });
+          const clientName = saved.client?.name || quote.customerName;
+          const jobNo = saved.draftJob?.jobNo || "";
+          toast({ 
+            title: "Quote Created", 
+            description: `Client "${clientName}" saved and draft job ${jobNo} created.`,
+          });
           if (sendAfterSave) {
             await sendQuote(saved.id);
           }
@@ -306,6 +311,31 @@ export default function QuoteDetail() {
           )}
         </div>
       </div>
+
+      {!isNew && quote.convertedJobId && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <FileText className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-sm font-medium">Linked Job Sheet</p>
+                  <p className="text-xs text-muted-foreground">A draft job was created for this quote</p>
+                </div>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setLocation(`/jobs/${quote.convertedJobId}`)}
+                data-testid="button-view-linked-job"
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                View Job
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
