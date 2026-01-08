@@ -24,6 +24,7 @@ This application enables field service companies to manage job sheets digitally.
 - **Client Quote Portal**: Clients can view, accept, or decline quotes with optional decline reason
 - **Invoice Management**: Generate invoices with bank transfer payment details
 - **Company Settings**: Configure company details, bank information, default VAT rates, and payment terms
+- **Long-running Jobs**: Track multi-day projects with daily progress updates (max 2 per day), photo evidence per update, and update history grouped by date
 
 ## User Credentials (Demo)
 
@@ -52,6 +53,7 @@ This application enables field service companies to manage job sheets digitally.
 - `engineer_locations` - Location history
 - `ai_advisors` - AI assistant configurations
 - `company_settings` - Company details, bank info, VAT rates
+- `job_updates` - Daily progress updates for long-running jobs (max 2 per day)
 
 ## Sign-off Validation Rules
 
