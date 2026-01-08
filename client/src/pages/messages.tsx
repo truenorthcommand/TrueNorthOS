@@ -121,22 +121,14 @@ export default function Messages() {
       queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
       setSelectedConversation(conversation);
       setIsNewGroupOpen(false);
-      setSelectedUsers([]);
       setGroupName("");
+      setSelectedUsers([]);
       setIsMobileViewingConvo(true);
     },
   });
 
   const sendMessage = useMutation({
     mutationFn: async ({ conversationId, content }: { conversationId: string; content: string }) => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          type: "chat_message",
-          conversationId,
-          content,
-        }));
-        return null;
-      }
       const res = await fetch(`/api/messages/conversations/${conversationId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -144,6 +136,18 @@ export default function Messages() {
       });
       if (!res.ok) throw new Error("Failed to send message");
       return res.json();
+    },
+    onSuccess: (newMessage) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations", selectedConversation?.id, "messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
+      
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: "chat_message",
+          conversationId: selectedConversation?.id,
+          message: newMessage,
+        }));
+      }
     },
   });
 
@@ -156,50 +160,41 @@ export default function Messages() {
       try {
         const data = JSON.parse(event.data);
         
-        if (data.type === "new_message") {
+        if (data.type === "chat_message") {
+          queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations", data.conversationId, "messages"] });
           queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
-          if (selectedConversation?.id === data.conversationId) {
-            queryClient.invalidateQueries({ 
-              queryKey: ["/api/messages/conversations", data.conversationId, "messages"] 
-            });
-          }
-        } else if (data.type === "user_typing") {
-          if (data.isTyping) {
-            setTypingUsers(prev => new Map(prev).set(data.conversationId, data.userName));
-          } else {
-            setTypingUsers(prev => {
-              const next = new Map(prev);
-              next.delete(data.conversationId);
-              return next;
-            });
-          }
         }
-      } catch (err) {
-        console.error("WebSocket message error:", err);
+        
+        if (data.type === "typing") {
+          setTypingUsers(prev => {
+            const newMap = new Map(prev);
+            if (data.isTyping) {
+              newMap.set(data.conversationId, data.userName);
+            } else {
+              newMap.delete(data.conversationId);
+            }
+            return newMap;
+          });
+        }
+      } catch (e) {
+        console.error("WebSocket message parse error:", e);
       }
-    };
-
-    ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
     };
 
     return () => {
       ws.close();
     };
-  }, [queryClient, selectedConversation?.id]);
+  }, [queryClient]);
+
+  useEffect(() => {
+    if (selectedConversation) {
+      fetch(`/api/messages/conversations/${selectedConversation.id}/read`, { method: "POST" });
+    }
+  }, [selectedConversation]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  useEffect(() => {
-    if (selectedConversation && wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: "mark_read",
-        conversationId: selectedConversation.id,
-      }));
-    }
-  }, [selectedConversation, messages]);
 
   const handleSendMessage = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -268,311 +263,301 @@ export default function Messages() {
     return name.includes(searchQuery.toLowerCase());
   });
 
-  const ConversationList = () => (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <MessageCircle className="h-5 w-5" />
-            Messages
-          </h2>
-          <div className="flex gap-2">
-            <Dialog open={isNewChatOpen} onOpenChange={setIsNewChatOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" variant="outline" data-testid="button-new-chat">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>New Conversation</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">Select a team member to start chatting:</p>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {availableUsers.map((u) => (
-                      <Button
-                        key={u.id}
-                        variant="ghost"
-                        className="w-full justify-start"
-                        onClick={() => createDirectConversation.mutate(u.id)}
-                        disabled={createDirectConversation.isPending}
-                        data-testid={`button-start-chat-${u.id}`}
-                      >
-                        <Avatar className="h-8 w-8 mr-2">
-                          <AvatarFallback>{u.name.split(" ").map(n => n[0]).join("").slice(0, 2)}</AvatarFallback>
-                        </Avatar>
-                        <span>{u.name}</span>
-                        <Badge variant="secondary" className="ml-auto">{u.role}</Badge>
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={isNewGroupOpen} onOpenChange={setIsNewGroupOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" variant="outline" data-testid="button-new-group">
-                  <Users className="h-4 w-4" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create Group Chat</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="group-name">Group Name</Label>
-                    <Input
-                      id="group-name"
-                      value={groupName}
-                      onChange={(e) => setGroupName(e.target.value)}
-                      onKeyDown={(e) => e.stopPropagation()}
-                      placeholder="e.g., Project Team"
-                      data-testid="input-group-name"
-                    />
-                  </div>
-                  <div>
-                    <Label>Select Members</Label>
-                    <div className="space-y-2 max-h-48 overflow-y-auto mt-2">
-                      {availableUsers.map((u) => (
-                        <div key={u.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`user-${u.id}`}
-                            checked={selectedUsers.includes(u.id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedUsers([...selectedUsers, u.id]);
-                              } else {
-                                setSelectedUsers(selectedUsers.filter(id => id !== u.id));
-                              }
-                            }}
-                            data-testid={`checkbox-user-${u.id}`}
-                          />
-                          <Label htmlFor={`user-${u.id}`} className="flex items-center gap-2 cursor-pointer">
-                            {u.name}
-                            <Badge variant="secondary" className="text-xs">{u.role}</Badge>
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <Button
-                    onClick={() => createGroupConversation.mutate({ name: groupName, memberIds: selectedUsers })}
-                    disabled={selectedUsers.length === 0 || !groupName.trim() || createGroupConversation.isPending}
-                    className="w-full"
-                    data-testid="button-create-group"
-                  >
-                    Create Group
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search conversations..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.stopPropagation()}
-            className="pl-10"
-            data-testid="input-search-conversations"
-          />
-        </div>
-      </div>
-
-      <ScrollArea className="flex-1">
-        {loadingConversations ? (
-          <div className="flex justify-center p-8">
-            <Loader2 className="h-6 w-6 animate-spin" />
-          </div>
-        ) : filteredConversations.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground">
-            <MessageCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
-            <p>No conversations yet</p>
-            <p className="text-sm">Start a new chat to get started</p>
-          </div>
-        ) : (
-          filteredConversations.map((conversation) => (
-            <div
-              key={conversation.id}
-              className={`flex items-center gap-3 p-4 cursor-pointer hover:bg-muted transition-colors ${
-                selectedConversation?.id === conversation.id ? "bg-muted" : ""
-              }`}
-              onClick={() => {
-                setSelectedConversation(conversation);
-                setIsMobileViewingConvo(true);
-              }}
-              data-testid={`conversation-item-${conversation.id}`}
-            >
-              <Avatar className="h-12 w-12">
-                <AvatarFallback>{getConversationInitials(conversation)}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium truncate">{getConversationName(conversation)}</span>
-                  {conversation.lastMessage && (
-                    <span className="text-xs text-muted-foreground">
-                      {formatMessageTime(conversation.lastMessage.createdAt)}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground truncate">
-                    {typingUsers.get(conversation.id) ? (
-                      <span className="text-primary italic">typing...</span>
-                    ) : conversation.lastMessage ? (
-                      <>
-                        {conversation.lastMessage.sender?.id === user?.id ? "You: " : ""}
-                        {conversation.lastMessage.content}
-                      </>
-                    ) : (
-                      "No messages yet"
-                    )}
-                  </p>
-                  {conversation.unreadCount > 0 && (
-                    <Badge variant="default" className="ml-2">
-                      {conversation.unreadCount}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </ScrollArea>
-    </div>
-  );
-
-  const ChatView = () => (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="md:hidden"
-          onClick={() => setIsMobileViewingConvo(false)}
-          data-testid="button-back-to-list"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        {selectedConversation && (
-          <>
-            <Avatar className="h-10 w-10">
-              <AvatarFallback>{getConversationInitials(selectedConversation)}</AvatarFallback>
-            </Avatar>
-            <div>
-              <h3 className="font-semibold">{getConversationName(selectedConversation)}</h3>
-              {selectedConversation.isGroup && (
-                <p className="text-xs text-muted-foreground">
-                  {selectedConversation.members.length} members
-                </p>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-
-      <ScrollArea className="flex-1 p-4">
-        {loadingMessages ? (
-          <div className="flex justify-center p-8">
-            <Loader2 className="h-6 w-6 animate-spin" />
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-            <MessageCircle className="h-12 w-12 mb-2 opacity-50" />
-            <p>No messages yet</p>
-            <p className="text-sm">Send a message to start the conversation</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {messages.map((message, index) => {
-              const isOwn = message.senderId === user?.id;
-              const showAvatar = !isOwn && (index === 0 || messages[index - 1].senderId !== message.senderId);
-              
-              return (
-                <div
-                  key={message.id}
-                  className={`flex items-end gap-2 ${isOwn ? "justify-end" : "justify-start"}`}
-                  data-testid={`message-${message.id}`}
-                >
-                  {!isOwn && showAvatar && (
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="text-xs">
-                        {message.sender?.name?.split(" ").map(n => n[0]).join("").slice(0, 2) || "?"}
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
-                  {!isOwn && !showAvatar && <div className="w-8" />}
-                  <div
-                    className={`max-w-[70%] rounded-2xl px-4 py-2 ${
-                      isOwn
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
-                    }`}
-                  >
-                    {!isOwn && showAvatar && selectedConversation?.isGroup && (
-                      <p className="text-xs font-medium mb-1 opacity-70">{message.sender?.name}</p>
-                    )}
-                    <p className="break-words">{message.content}</p>
-                    <p className={`text-xs mt-1 ${isOwn ? "opacity-70" : "text-muted-foreground"}`}>
-                      {format(new Date(message.createdAt), "HH:mm")}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-            <div ref={messagesEndRef} />
-          </div>
-        )}
-      </ScrollArea>
-
-      {typingUsers.get(selectedConversation?.id || "") && (
-        <div className="px-4 py-2 text-sm text-muted-foreground italic">
-          {typingUsers.get(selectedConversation?.id || "")} is typing...
-        </div>
-      )}
-
-      <form onSubmit={handleSendMessage} className="p-4 border-t flex gap-2">
-        <Input
-          placeholder="Type a message..."
-          value={messageInput}
-          onChange={(e) => {
-            setMessageInput(e.target.value);
-            handleTyping();
-          }}
-          onKeyDown={(e) => e.stopPropagation()}
-          className="flex-1"
-          data-testid="input-message"
-        />
-        <Button type="submit" disabled={!messageInput.trim()} data-testid="button-send">
-          <Send className="h-4 w-4" />
-        </Button>
-      </form>
-    </div>
-  );
-
-  const EmptyState = () => (
-    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-      <MessageCircle className="h-16 w-16 mb-4 opacity-50" />
-      <h3 className="text-lg font-medium mb-2">Select a conversation</h3>
-      <p className="text-sm">Choose from your existing conversations or start a new one</p>
-    </div>
-  );
-
   return (
     <div className="h-[calc(100vh-8rem)]">
       <Card className="h-full overflow-hidden">
         <div className="flex h-full">
+          {/* Conversation List - inline */}
           <div className={`w-full md:w-80 lg:w-96 border-r ${isMobileViewingConvo ? "hidden md:flex md:flex-col" : "flex flex-col"}`}>
-            <ConversationList />
+            <div className="flex flex-col h-full">
+              <div className="p-4 border-b">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold flex items-center gap-2">
+                    <MessageCircle className="h-5 w-5" />
+                    Messages
+                  </h2>
+                  <div className="flex gap-2">
+                    <Dialog open={isNewChatOpen} onOpenChange={setIsNewChatOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" variant="outline" data-testid="button-new-chat">
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent onPointerDownOutside={(e) => e.preventDefault()}>
+                        <DialogHeader>
+                          <DialogTitle>New Conversation</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <p className="text-sm text-muted-foreground">Select a team member to start chatting:</p>
+                          <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {availableUsers.map((u) => (
+                              <Button
+                                key={u.id}
+                                variant="ghost"
+                                className="w-full justify-start"
+                                onClick={() => createDirectConversation.mutate(u.id)}
+                                disabled={createDirectConversation.isPending}
+                                data-testid={`button-start-chat-${u.id}`}
+                              >
+                                <Avatar className="h-8 w-8 mr-2">
+                                  <AvatarFallback>{u.name.split(" ").map(n => n[0]).join("").slice(0, 2)}</AvatarFallback>
+                                </Avatar>
+                                <span>{u.name}</span>
+                                <Badge variant="secondary" className="ml-auto">{u.role}</Badge>
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+
+                    <Dialog open={isNewGroupOpen} onOpenChange={setIsNewGroupOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" variant="outline" data-testid="button-new-group">
+                          <Users className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent onPointerDownOutside={(e) => e.preventDefault()}>
+                        <DialogHeader>
+                          <DialogTitle>Create Group Chat</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="group-name">Group Name</Label>
+                            <Input
+                              id="group-name"
+                              value={groupName}
+                              onChange={(e) => setGroupName(e.target.value)}
+                              onKeyDown={(e) => e.stopPropagation()}
+                              placeholder="e.g., Project Team"
+                              data-testid="input-group-name"
+                            />
+                          </div>
+                          <div>
+                            <Label>Select Members</Label>
+                            <div className="space-y-2 max-h-48 overflow-y-auto mt-2">
+                              {availableUsers.map((u) => (
+                                <div key={u.id} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`user-${u.id}`}
+                                    checked={selectedUsers.includes(u.id)}
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        setSelectedUsers([...selectedUsers, u.id]);
+                                      } else {
+                                        setSelectedUsers(selectedUsers.filter(id => id !== u.id));
+                                      }
+                                    }}
+                                    data-testid={`checkbox-user-${u.id}`}
+                                  />
+                                  <Label htmlFor={`user-${u.id}`} className="flex items-center gap-2 cursor-pointer">
+                                    {u.name}
+                                    <Badge variant="secondary" className="text-xs">{u.role}</Badge>
+                                  </Label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <Button
+                            onClick={() => createGroupConversation.mutate({ name: groupName, memberIds: selectedUsers })}
+                            disabled={selectedUsers.length === 0 || !groupName.trim() || createGroupConversation.isPending}
+                            className="w-full"
+                            data-testid="button-create-group"
+                          >
+                            Create Group
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search conversations..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    className="pl-10"
+                    data-testid="input-search-conversations"
+                  />
+                </div>
+              </div>
+
+              <ScrollArea className="flex-1">
+                {loadingConversations ? (
+                  <div className="flex justify-center p-8">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : filteredConversations.length === 0 ? (
+                  <div className="p-4 text-center text-muted-foreground">
+                    <p>No conversations yet</p>
+                    <p className="text-sm">Start a new conversation to chat with your team</p>
+                  </div>
+                ) : (
+                  filteredConversations.map((conversation) => (
+                    <div
+                      key={conversation.id}
+                      className={`flex items-center gap-3 p-4 cursor-pointer hover:bg-muted/50 transition-colors ${
+                        selectedConversation?.id === conversation.id ? "bg-muted" : ""
+                      }`}
+                      onClick={() => {
+                        setSelectedConversation(conversation);
+                        setIsMobileViewingConvo(true);
+                      }}
+                      data-testid={`conversation-item-${conversation.id}`}
+                    >
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback>{getConversationInitials(conversation)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium truncate">{getConversationName(conversation)}</span>
+                          {conversation.lastMessage && (
+                            <span className="text-xs text-muted-foreground">
+                              {formatMessageTime(conversation.lastMessage.createdAt)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-muted-foreground truncate">
+                            {typingUsers.get(conversation.id) ? (
+                              <span className="text-primary italic">typing...</span>
+                            ) : conversation.lastMessage ? (
+                              <>
+                                {conversation.lastMessage.sender?.id === user?.id ? "You: " : ""}
+                                {conversation.lastMessage.content}
+                              </>
+                            ) : (
+                              "No messages yet"
+                            )}
+                          </p>
+                          {conversation.unreadCount > 0 && (
+                            <Badge variant="default" className="ml-2">
+                              {conversation.unreadCount}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </ScrollArea>
+            </div>
           </div>
+
+          {/* Chat View / Empty State - inline */}
           <div className={`flex-1 ${!isMobileViewingConvo && !selectedConversation ? "hidden md:flex md:flex-col" : isMobileViewingConvo ? "flex flex-col" : "hidden md:flex md:flex-col"}`}>
-            {selectedConversation ? <ChatView /> : <EmptyState />}
+            {selectedConversation ? (
+              <div className="flex flex-col h-full">
+                <div className="p-4 border-b flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="md:hidden"
+                    onClick={() => setIsMobileViewingConvo(false)}
+                    data-testid="button-back-to-list"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback>{getConversationInitials(selectedConversation)}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h3 className="font-semibold">{getConversationName(selectedConversation)}</h3>
+                    {selectedConversation.isGroup && (
+                      <p className="text-xs text-muted-foreground">
+                        {selectedConversation.members.length} members
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <ScrollArea className="flex-1 p-4">
+                  {loadingMessages ? (
+                    <div className="flex justify-center p-8">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    </div>
+                  ) : messages.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                      <MessageCircle className="h-12 w-12 mb-2 opacity-50" />
+                      <p>No messages yet</p>
+                      <p className="text-sm">Send a message to start the conversation</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {messages.map((message, index) => {
+                        const isOwn = message.senderId === user?.id;
+                        const showAvatar = !isOwn && (index === 0 || messages[index - 1].senderId !== message.senderId);
+                        
+                        return (
+                          <div
+                            key={message.id}
+                            className={`flex items-end gap-2 ${isOwn ? "justify-end" : "justify-start"}`}
+                            data-testid={`message-${message.id}`}
+                          >
+                            {!isOwn && showAvatar && (
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback className="text-xs">
+                                  {message.sender?.name?.split(" ").map(n => n[0]).join("").slice(0, 2) || "?"}
+                                </AvatarFallback>
+                              </Avatar>
+                            )}
+                            {!isOwn && !showAvatar && <div className="w-8" />}
+                            <div
+                              className={`max-w-[70%] rounded-2xl px-4 py-2 ${
+                                isOwn
+                                  ? "bg-primary text-primary-foreground"
+                                  : "bg-muted"
+                              }`}
+                            >
+                              {!isOwn && showAvatar && selectedConversation?.isGroup && (
+                                <p className="text-xs font-medium mb-1 opacity-70">{message.sender?.name}</p>
+                              )}
+                              <p className="break-words">{message.content}</p>
+                              <p className={`text-xs mt-1 ${isOwn ? "opacity-70" : "text-muted-foreground"}`}>
+                                {format(new Date(message.createdAt), "HH:mm")}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  )}
+                </ScrollArea>
+
+                {typingUsers.get(selectedConversation?.id || "") && (
+                  <div className="px-4 py-2 text-sm text-muted-foreground italic">
+                    {typingUsers.get(selectedConversation?.id || "")} is typing...
+                  </div>
+                )}
+
+                <form onSubmit={handleSendMessage} className="p-4 border-t flex gap-2">
+                  <Input
+                    placeholder="Type a message..."
+                    value={messageInput}
+                    onChange={(e) => {
+                      setMessageInput(e.target.value);
+                      handleTyping();
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    className="flex-1"
+                    data-testid="input-message"
+                  />
+                  <Button type="submit" disabled={!messageInput.trim()} data-testid="button-send">
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </form>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                <MessageCircle className="h-16 w-16 mb-4 opacity-50" />
+                <h3 className="text-lg font-medium mb-2">Select a conversation</h3>
+                <p className="text-sm">Choose from your existing conversations or start a new one</p>
+              </div>
+            )}
           </div>
         </div>
       </Card>
