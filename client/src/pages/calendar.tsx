@@ -577,7 +577,23 @@ export default function CalendarPage() {
     }
 
     // Moving to a different cell
-    const [engineerId, dateStr] = targetId.split("_");
+    // targetId could be a cell ID (engineerId_date) or a job ID (if dropped on a job in different cell)
+    let engineerId: string | undefined;
+    let dateStr: string | undefined;
+    
+    if (targetId.includes("_")) {
+      // It's a cell ID
+      [engineerId, dateStr] = targetId.split("_");
+    } else if (overJob) {
+      // It's a job ID - get the cell info from the target job
+      const overJobDate = safeParseISO(overJob.date);
+      if (overJobDate) {
+        dateStr = format(overJobDate, "yyyy-MM-dd");
+        // Get engineer from the target job
+        engineerId = overJob.assignedToIds?.[0] || overJob.assignedToId || undefined;
+      }
+    }
+    
     if (!engineerId || !dateStr) return;
 
     const job = jobs.find((j) => j.id === activeId);
