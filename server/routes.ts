@@ -840,18 +840,49 @@ export async function registerRoutes(
 
   app.post("/api/quotes", requireAdmin, async (req, res) => {
     try {
+      console.log("Creating quote with body:", JSON.stringify(req.body, null, 2));
       const quoteNo = await storage.getNextQuoteNumber();
       const accessToken = crypto.randomUUID();
+      
+      // Sanitize line items to ensure numeric fields are numbers
+      const lineItems = (req.body.lineItems || []).map((item: any) => ({
+        ...item,
+        quantity: Number(item.quantity) || 0,
+        unitCost: Number(item.unitCost) || 0,
+        discount: Number(item.discount) || 0,
+        amount: Number(item.amount) || 0,
+      }));
+      
       const quote = await storage.createQuote({
-        ...req.body,
+        customerName: req.body.customerName,
+        customerEmail: req.body.customerEmail || null,
+        customerPhone: req.body.customerPhone || null,
+        customerId: req.body.customerId || null,
+        siteAddress: req.body.siteAddress || null,
+        sitePostcode: req.body.sitePostcode || null,
+        reference: req.body.reference || null,
+        quoteDate: req.body.quoteDate ? new Date(req.body.quoteDate) : new Date(),
+        expiryDate: req.body.expiryDate ? new Date(req.body.expiryDate) : null,
+        description: req.body.description || null,
+        lineItems,
+        subtotal: Number(req.body.subtotal) || 0,
+        discountTotal: Number(req.body.discountTotal) || 0,
+        vatRate: Number(req.body.vatRate) || 20,
+        vatAmount: Number(req.body.vatAmount) || 0,
+        total: Number(req.body.total) || 0,
+        terms: req.body.terms || null,
+        notes: req.body.notes || null,
+        status: req.body.status || "Draft",
         quoteNo,
         accessToken,
         createdById: req.session.userId,
       });
+      console.log("Quote created successfully:", quote.id);
       res.json(quote);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create quote:", error);
-      res.status(500).json({ error: "Failed to create quote" });
+      console.error("Error stack:", error?.stack);
+      res.status(500).json({ error: "Failed to create quote", details: error?.message });
     }
   });
 
@@ -869,7 +900,28 @@ export async function registerRoutes(
 
   app.put("/api/quotes/:id", requireAdmin, async (req, res) => {
     try {
-      const quote = await storage.updateQuote(req.params.id, req.body);
+      // Convert date strings to Date objects and sanitize numeric fields
+      const updates: any = { ...req.body };
+      if (updates.quoteDate) updates.quoteDate = new Date(updates.quoteDate);
+      if (updates.expiryDate) updates.expiryDate = new Date(updates.expiryDate);
+      if (updates.acceptedAt) updates.acceptedAt = new Date(updates.acceptedAt);
+      if (updates.declinedAt) updates.declinedAt = new Date(updates.declinedAt);
+      if (updates.sentAt) updates.sentAt = new Date(updates.sentAt);
+      if (updates.lineItems) {
+        updates.lineItems = updates.lineItems.map((item: any) => ({
+          ...item,
+          quantity: Number(item.quantity) || 0,
+          unitCost: Number(item.unitCost) || 0,
+          discount: Number(item.discount) || 0,
+          amount: Number(item.amount) || 0,
+        }));
+      }
+      if (updates.subtotal !== undefined) updates.subtotal = Number(updates.subtotal) || 0;
+      if (updates.vatRate !== undefined) updates.vatRate = Number(updates.vatRate) || 20;
+      if (updates.vatAmount !== undefined) updates.vatAmount = Number(updates.vatAmount) || 0;
+      if (updates.total !== undefined) updates.total = Number(updates.total) || 0;
+      
+      const quote = await storage.updateQuote(req.params.id, updates);
       if (!quote) {
         return res.status(404).json({ error: "Quote not found" });
       }

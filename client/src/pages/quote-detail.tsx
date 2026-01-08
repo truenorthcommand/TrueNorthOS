@@ -121,12 +121,22 @@ export default function QuoteDetail() {
 
   const updateLineItem = (index: number, field: keyof LineItem, value: any) => {
     const newItems = [...quote.lineItems];
-    newItems[index] = { ...newItems[index], [field]: value };
+    
+    // Coerce numeric fields from string to number
+    let finalValue = value;
+    if (["quantity", "unitCost", "discount"].includes(field)) {
+      finalValue = value === "" ? 0 : Number(value);
+    }
+    
+    newItems[index] = { ...newItems[index], [field]: finalValue };
     
     if (["quantity", "unitCost", "discount"].includes(field)) {
       const item = newItems[index];
-      const gross = item.quantity * item.unitCost;
-      const discountAmount = gross * (item.discount / 100);
+      const qty = Number(item.quantity) || 0;
+      const cost = Number(item.unitCost) || 0;
+      const disc = Number(item.discount) || 0;
+      const gross = qty * cost;
+      const discountAmount = gross * (disc / 100);
       newItems[index].amount = gross - discountAmount;
     }
     
