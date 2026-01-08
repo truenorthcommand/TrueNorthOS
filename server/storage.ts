@@ -11,7 +11,7 @@ import {
   users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, or, sql, isNull, and } from "drizzle-orm";
+import { eq, desc, or, sql, isNull, and, ne } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -134,9 +134,12 @@ export class DatabaseStorage implements IStorage {
 
   async getJobsByEngineer(engineerId: string): Promise<Job[]> {
     return db.select().from(jobs).where(
-      or(
-        eq(jobs.assignedToId, engineerId),
-        sql`${jobs.assignedToIds}::jsonb @> ${JSON.stringify([engineerId])}::jsonb`
+      and(
+        or(
+          eq(jobs.assignedToId, engineerId),
+          sql`${jobs.assignedToIds}::jsonb @> ${JSON.stringify([engineerId])}::jsonb`
+        ),
+        ne(jobs.status, "Draft")
       )
     ).orderBy(desc(jobs.createdAt));
   }
