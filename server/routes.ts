@@ -760,9 +760,16 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Maximum 2 updates per day reached" });
       }
 
+      const photoSchema = z.object({
+        id: z.string(),
+        url: z.string(),
+        timestamp: z.string(),
+        source: z.enum(['admin', 'engineer']).optional().default('engineer'),
+      });
+      
       const updateInput = z.object({
         notes: z.string().nullable().optional(),
-        photos: z.array(z.any()).optional().default([]),
+        photos: z.array(photoSchema).optional().default([]),
       }).safeParse(req.body);
       
       if (!updateInput.success) {
