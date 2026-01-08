@@ -274,7 +274,6 @@ export default function CalendarPage() {
 
   const getJobsForCell = (engineerId: string, date: Date): Job[] => {
     return jobs.filter((job) => {
-      if (job.status === "Draft") return false;
       const jobDate = safeParseISO(job.date);
       if (!jobDate || !isSameDay(jobDate, date)) return false;
       const assignedIds =
@@ -289,7 +288,6 @@ export default function CalendarPage() {
 
   const getUnassignedJobsForDay = (date: Date): Job[] => {
     return jobs.filter((job) => {
-      if (job.status === "Draft") return false;
       const jobDate = safeParseISO(job.date);
       if (!jobDate || !isSameDay(jobDate, date)) return false;
       const assignedIds =
