@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
 import type { IncomingMessage } from 'http';
 import { sessionMiddleware } from './session';
+import { storage } from './storage';
 
 interface NotificationClient {
   ws: WebSocket;
@@ -37,17 +38,74 @@ export function setupNotifications(server: Server) {
         return;
       }
 
-      if (session.userRole !== 'admin') {
-        ws.close(4003, 'Admin access required');
-        return;
-      }
-
       const client: NotificationClient = { 
         ws, 
         userId: session.userId, 
         userRole: session.userRole 
       };
       clients.push(client);
+
+      ws.on('message', async (data) => {
+        try {
+          const message = JSON.parse(data.toString());
+          
+          if (message.type === 'chat_message') {
+            const { conversationId, content } = message;
+            
+            if (!conversationId || !content) {
+              ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
+              return;
+            }
+
+            const createdMessage = await storage.createMessage({
+              conversationId,
+              senderId: session.userId,
+              content: content.trim(),
+            });
+
+            const user = await storage.getUser(session.userId);
+            const messageWithSender = {
+              ...createdMessage,
+              sender: user ? { id: user.id, name: user.name, role: user.role } : null,
+            };
+
+            const conversations = await storage.getUserConversations(session.userId);
+            const convo = conversations.find(c => c.id === conversationId);
+            
+            if (convo) {
+              const memberIds = convo.members.map(m => m.userId);
+              sendToUsers(memberIds, {
+                type: 'new_message',
+                conversationId,
+                message: messageWithSender,
+              });
+            }
+          } else if (message.type === 'typing') {
+            const { conversationId, isTyping } = message;
+            
+            const conversations = await storage.getUserConversations(session.userId);
+            const convo = conversations.find(c => c.id === conversationId);
+            
+            if (convo) {
+              const memberIds = convo.members.filter(m => m.userId !== session.userId).map(m => m.userId);
+              const user = await storage.getUser(session.userId);
+              
+              sendToUsers(memberIds, {
+                type: 'user_typing',
+                conversationId,
+                userId: session.userId,
+                userName: user?.name || 'Unknown',
+                isTyping,
+              });
+            }
+          } else if (message.type === 'mark_read') {
+            const { conversationId } = message;
+            await storage.markConversationRead(conversationId, session.userId);
+          }
+        } catch (error) {
+          console.error('WebSocket message error:', error);
+        }
+      });
 
       ws.on('close', () => {
         const index = clients.indexOf(client);
@@ -66,6 +124,16 @@ export function setupNotifications(server: Server) {
   });
 
   return wss;
+}
+
+export function sendToUsers(userIds: string[], payload: any) {
+  const message = JSON.stringify(payload);
+  
+  clients.forEach(client => {
+    if (userIds.includes(client.userId) && client.ws.readyState === WebSocket.OPEN) {
+      client.ws.send(message);
+    }
+  });
 }
 
 export function notifyAdmins(notification: {

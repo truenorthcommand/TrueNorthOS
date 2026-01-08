@@ -31,6 +31,7 @@ import InvoiceDetail from "@/pages/invoice-detail";
 import ClientInvoice from "@/pages/client-invoice";
 import Settings from "@/pages/settings";
 import Security from "@/pages/security";
+import Messages from "@/pages/messages";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { Loader2 } from "lucide-react";
@@ -109,6 +110,9 @@ function Router() {
       </Route>
       <Route path="/security">
         <PrivateRoute component={Security} />
+      </Route>
+      <Route path="/messages">
+        <PrivateRoute component={Messages} />
       </Route>
       <Route path="/ai-advisors">
         <PrivateRoute component={AiAdvisors} />

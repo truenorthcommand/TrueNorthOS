@@ -2000,5 +2000,159 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
+  // ==================== MESSAGING ROUTES ====================
+
+  // Get all conversations for current user
+  app.get("/api/messages/conversations", requireAuth, async (req, res) => {
+    try {
+      const conversations = await storage.getUserConversations(req.session.userId!);
+      res.json(conversations);
+    } catch (error) {
+      console.error("Get conversations error:", error);
+      res.status(500).json({ error: "Failed to get conversations" });
+    }
+  });
+
+  // Get or create direct message conversation with another user
+  app.post("/api/messages/conversations/direct", requireAuth, async (req, res) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({ error: "User ID is required" });
+      }
+
+      const conversation = await storage.getOrCreateDirectConversation(req.session.userId!, userId);
+      const conversations = await storage.getUserConversations(req.session.userId!);
+      const fullConversation = conversations.find(c => c.id === conversation.id);
+      
+      res.json(fullConversation || conversation);
+    } catch (error) {
+      console.error("Create direct conversation error:", error);
+      res.status(500).json({ error: "Failed to create conversation" });
+    }
+  });
+
+  // Create a group conversation
+  app.post("/api/messages/conversations/group", requireAuth, async (req, res) => {
+    try {
+      const { name, memberIds } = req.body;
+      if (!memberIds || !Array.isArray(memberIds) || memberIds.length === 0) {
+        return res.status(400).json({ error: "At least one member is required" });
+      }
+
+      const conversation = await storage.createConversation(
+        { name, isGroup: true, createdById: req.session.userId! },
+        memberIds
+      );
+      
+      const conversations = await storage.getUserConversations(req.session.userId!);
+      const fullConversation = conversations.find(c => c.id === conversation.id);
+      
+      res.json(fullConversation || conversation);
+    } catch (error) {
+      console.error("Create group conversation error:", error);
+      res.status(500).json({ error: "Failed to create group conversation" });
+    }
+  });
+
+  // Get messages for a conversation
+  app.get("/api/messages/conversations/:conversationId/messages", requireAuth, async (req, res) => {
+    try {
+      const { conversationId } = req.params;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const before = req.query.before ? new Date(req.query.before as string) : undefined;
+
+      // Verify user is a member of this conversation
+      const conversations = await storage.getUserConversations(req.session.userId!);
+      const isMember = conversations.some(c => c.id === conversationId);
+      
+      if (!isMember) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const messages = await storage.getMessages(conversationId, limit, before);
+      res.json(messages);
+    } catch (error) {
+      console.error("Get messages error:", error);
+      res.status(500).json({ error: "Failed to get messages" });
+    }
+  });
+
+  // Send a message
+  app.post("/api/messages/conversations/:conversationId/messages", requireAuth, async (req, res) => {
+    try {
+      const { conversationId } = req.params;
+      const { content } = req.body;
+
+      if (!content || typeof content !== 'string' || content.trim() === '') {
+        return res.status(400).json({ error: "Message content is required" });
+      }
+
+      // Verify user is a member of this conversation
+      const conversations = await storage.getUserConversations(req.session.userId!);
+      const isMember = conversations.some(c => c.id === conversationId);
+      
+      if (!isMember) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const message = await storage.createMessage({
+        conversationId,
+        senderId: req.session.userId!,
+        content: content.trim(),
+      });
+
+      // Get sender info for the response
+      const user = await storage.getUser(req.session.userId!);
+      const messageWithSender = {
+        ...message,
+        sender: user ? { id: user.id, name: user.name, role: user.role } : null,
+      };
+
+      res.json(messageWithSender);
+    } catch (error) {
+      console.error("Send message error:", error);
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
+  // Mark conversation as read
+  app.post("/api/messages/conversations/:conversationId/read", requireAuth, async (req, res) => {
+    try {
+      const { conversationId } = req.params;
+      await storage.markConversationRead(conversationId, req.session.userId!);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Mark read error:", error);
+      res.status(500).json({ error: "Failed to mark conversation as read" });
+    }
+  });
+
+  // Get total unread count
+  app.get("/api/messages/unread-count", requireAuth, async (req, res) => {
+    try {
+      const count = await storage.getUnreadCount(req.session.userId!);
+      res.json({ count });
+    } catch (error) {
+      console.error("Get unread count error:", error);
+      res.status(500).json({ error: "Failed to get unread count" });
+    }
+  });
+
+  // Get all users for starting new conversations
+  app.get("/api/messages/users", requireAuth, async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      // Exclude current user and return only necessary fields
+      const users = allUsers
+        .filter(u => u.id !== req.session.userId)
+        .map(u => ({ id: u.id, name: u.name, role: u.role }));
+      res.json(users);
+    } catch (error) {
+      console.error("Get users error:", error);
+      res.status(500).json({ error: "Failed to get users" });
+    }
+  });
+
   return httpServer;
 }

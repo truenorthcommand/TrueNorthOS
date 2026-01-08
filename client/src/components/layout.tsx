@@ -1,13 +1,15 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, Bell, Shield } from "lucide-react";
+import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, Bell, Shield, MessageCircle } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "@/hooks/use-notifications";
+import { useQuery } from "@tanstack/react-query";
+import { Badge } from "@/components/ui/badge";
 
 type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools';
 
@@ -19,6 +21,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [expandedSections, setExpandedSections] = useState<MenuSection[]>(['jobs']);
   
   useNotifications();
+
+  const { data: unreadData } = useQuery<{ count: number }>({
+    queryKey: ["/api/messages/unread-count"],
+    refetchInterval: 30000,
+  });
+  const unreadCount = unreadData?.count || 0;
 
   if (!user) {
     return <div className="min-h-screen bg-background">{children}</div>;
@@ -184,6 +192,50 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <NavLink href="/completed-jobs" icon={CheckCircle2}>Completed Jobs</NavLink>
           )}
         </MenuGroup>
+
+        {/* Messages - All Users */}
+        {collapsed ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link href="/messages">
+                <Button
+                  variant={location === "/messages" ? "secondary" : "ghost"}
+                  size="icon"
+                  className="w-10 h-10 relative"
+                  data-testid="nav-messages"
+                >
+                  <MessageCircle className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <Badge 
+                      variant="destructive" 
+                      className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                    >
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </Badge>
+                  )}
+                </Button>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right">Messages{unreadCount > 0 ? ` (${unreadCount})` : ""}</TooltipContent>
+          </Tooltip>
+        ) : (
+          <Link href="/messages">
+            <Button
+              variant={location === "/messages" ? "secondary" : "ghost"}
+              className="w-full justify-start h-12 text-lg font-medium relative"
+              onClick={() => setIsOpen(false)}
+              data-testid="nav-messages"
+            >
+              <MessageCircle className="mr-3 h-5 w-5" />
+              Messages
+              {unreadCount > 0 && (
+                <Badge variant="destructive" className="ml-auto">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </Badge>
+              )}
+            </Button>
+          </Link>
+        )}
 
         {/* Schedule Section - Admin Only */}
         {user.role === "admin" && (
