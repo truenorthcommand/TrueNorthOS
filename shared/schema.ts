@@ -339,3 +339,67 @@ export const insertCompanySettingsSchema = createInsertSchema(companySettings).o
 
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
 export type CompanySettings = typeof companySettings.$inferSelect;
+
+// Team Messaging - Conversations
+export const conversations = pgTable("conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name"), // null for direct messages, name for group chats
+  isGroup: boolean("is_group").notNull().default(false),
+  createdById: varchar("created_by_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertConversationSchema = createInsertSchema(conversations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type Conversation = typeof conversations.$inferSelect;
+
+// Team Messaging - Conversation Members
+export const conversationMembers = pgTable("conversation_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  lastReadAt: timestamp("last_read_at"),
+  joinedAt: timestamp("joined_at").defaultNow(),
+});
+
+export const insertConversationMemberSchema = createInsertSchema(conversationMembers).omit({
+  id: true,
+  joinedAt: true,
+});
+
+export type InsertConversationMember = z.infer<typeof insertConversationMemberSchema>;
+export type ConversationMember = typeof conversationMembers.$inferSelect;
+
+// Team Messaging - Messages
+export const messages = pgTable("messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull(),
+  senderId: varchar("sender_id").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMessageSchema = createInsertSchema(messages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Message = typeof messages.$inferSelect;
+
+// Extended types for UI
+export type ConversationWithDetails = Conversation & {
+  members: (ConversationMember & { user: Pick<User, 'id' | 'name' | 'role'> })[];
+  lastMessage?: Message & { sender: Pick<User, 'id' | 'name'> };
+  unreadCount: number;
+};
+
+export type MessageWithSender = Message & {
+  sender: Pick<User, 'id' | 'name' | 'role'>;
+};

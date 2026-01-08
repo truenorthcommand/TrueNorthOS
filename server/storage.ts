@@ -9,10 +9,15 @@ import {
   type CompanySettings, type InsertCompanySettings,
   type Client, type InsertClient,
   type JobUpdate, type InsertJobUpdate,
-  users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, jobUpdates
+  type Conversation, type InsertConversation,
+  type ConversationMember, type InsertConversationMember,
+  type Message, type InsertMessage,
+  type ConversationWithDetails, type MessageWithSender,
+  users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, jobUpdates,
+  conversations, conversationMembers, messages
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, or, sql, isNull, and, ne } from "drizzle-orm";
+import { eq, desc, or, sql, isNull, and, ne, inArray, gt, asc } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -81,6 +86,19 @@ export interface IStorage {
   getJobUpdates(jobId: string): Promise<JobUpdate[]>;
   getJobUpdatesForDate(jobId: string, workDate: Date): Promise<JobUpdate[]>;
   countJobUpdatesForDate(jobId: string, workDate: Date): Promise<number>;
+  
+  // Messaging
+  createConversation(conversation: InsertConversation, memberIds: string[]): Promise<Conversation>;
+  getConversation(id: string): Promise<Conversation | undefined>;
+  getUserConversations(userId: string): Promise<ConversationWithDetails[]>;
+  getOrCreateDirectConversation(userId1: string, userId2: string): Promise<Conversation>;
+  addConversationMember(conversationId: string, userId: string): Promise<ConversationMember>;
+  removeConversationMember(conversationId: string, userId: string): Promise<void>;
+  
+  createMessage(message: InsertMessage): Promise<Message>;
+  getMessages(conversationId: string, limit?: number, before?: Date): Promise<MessageWithSender[]>;
+  markConversationRead(conversationId: string, userId: string): Promise<void>;
+  getUnreadCount(userId: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -470,6 +488,237 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return Number(result[0]?.count || 0);
+  }
+
+  // Messaging implementation
+  async createConversation(conversation: InsertConversation, memberIds: string[]): Promise<Conversation> {
+    const [created] = await db.insert(conversations).values(conversation).returning();
+    
+    // Add all members including creator
+    const allMemberIds = [...new Set([conversation.createdById, ...memberIds])];
+    for (const memberId of allMemberIds) {
+      await db.insert(conversationMembers).values({
+        conversationId: created.id,
+        userId: memberId,
+      });
+    }
+    
+    return created;
+  }
+
+  async getConversation(id: string): Promise<Conversation | undefined> {
+    const [conversation] = await db.select().from(conversations).where(eq(conversations.id, id));
+    return conversation;
+  }
+
+  async getUserConversations(userId: string): Promise<ConversationWithDetails[]> {
+    // Get all conversation IDs for this user
+    const memberRecords = await db.select()
+      .from(conversationMembers)
+      .where(eq(conversationMembers.userId, userId));
+    
+    const conversationIds = memberRecords.map(m => m.conversationId);
+    if (conversationIds.length === 0) return [];
+
+    // Get conversations
+    const convos = await db.select()
+      .from(conversations)
+      .where(inArray(conversations.id, conversationIds))
+      .orderBy(desc(conversations.updatedAt));
+
+    // Build detailed conversations
+    const result: ConversationWithDetails[] = [];
+    
+    for (const convo of convos) {
+      // Get members with user info
+      const members = await db.select()
+        .from(conversationMembers)
+        .where(eq(conversationMembers.conversationId, convo.id));
+      
+      const membersWithUsers = await Promise.all(
+        members.map(async (member) => {
+          const [user] = await db.select({
+            id: users.id,
+            name: users.name,
+            role: users.role,
+          }).from(users).where(eq(users.id, member.userId));
+          return { ...member, user };
+        })
+      );
+
+      // Get last message
+      const [lastMsg] = await db.select()
+        .from(messages)
+        .where(eq(messages.conversationId, convo.id))
+        .orderBy(desc(messages.createdAt))
+        .limit(1);
+      
+      let lastMessage;
+      if (lastMsg) {
+        const [sender] = await db.select({
+          id: users.id,
+          name: users.name,
+        }).from(users).where(eq(users.id, lastMsg.senderId));
+        lastMessage = { ...lastMsg, sender };
+      }
+
+      // Get unread count
+      const userMember = members.find(m => m.userId === userId);
+      let unreadCount = 0;
+      if (userMember) {
+        if (userMember.lastReadAt) {
+          const unreadResult = await db.select({ count: sql<number>`count(*)` })
+            .from(messages)
+            .where(and(
+              eq(messages.conversationId, convo.id),
+              gt(messages.createdAt, userMember.lastReadAt),
+              ne(messages.senderId, userId)
+            ));
+          unreadCount = Number(unreadResult[0]?.count || 0);
+        } else {
+          const unreadResult = await db.select({ count: sql<number>`count(*)` })
+            .from(messages)
+            .where(and(
+              eq(messages.conversationId, convo.id),
+              ne(messages.senderId, userId)
+            ));
+          unreadCount = Number(unreadResult[0]?.count || 0);
+        }
+      }
+
+      result.push({
+        ...convo,
+        members: membersWithUsers,
+        lastMessage,
+        unreadCount,
+      });
+    }
+
+    return result;
+  }
+
+  async getOrCreateDirectConversation(userId1: string, userId2: string): Promise<Conversation> {
+    // Find existing direct conversation between these two users
+    const user1Convos = await db.select()
+      .from(conversationMembers)
+      .where(eq(conversationMembers.userId, userId1));
+    
+    for (const member of user1Convos) {
+      const [convo] = await db.select()
+        .from(conversations)
+        .where(and(
+          eq(conversations.id, member.conversationId),
+          eq(conversations.isGroup, false)
+        ));
+      
+      if (convo) {
+        const otherMember = await db.select()
+          .from(conversationMembers)
+          .where(and(
+            eq(conversationMembers.conversationId, convo.id),
+            eq(conversationMembers.userId, userId2)
+          ));
+        
+        if (otherMember.length > 0) {
+          return convo;
+        }
+      }
+    }
+
+    // Create new direct conversation
+    return this.createConversation({ createdById: userId1, isGroup: false }, [userId2]);
+  }
+
+  async addConversationMember(conversationId: string, userId: string): Promise<ConversationMember> {
+    const [member] = await db.insert(conversationMembers)
+      .values({ conversationId, userId })
+      .returning();
+    return member;
+  }
+
+  async removeConversationMember(conversationId: string, userId: string): Promise<void> {
+    await db.delete(conversationMembers)
+      .where(and(
+        eq(conversationMembers.conversationId, conversationId),
+        eq(conversationMembers.userId, userId)
+      ));
+  }
+
+  async createMessage(message: InsertMessage): Promise<Message> {
+    const [created] = await db.insert(messages).values(message).returning();
+    
+    // Update conversation's updatedAt
+    await db.update(conversations)
+      .set({ updatedAt: new Date() })
+      .where(eq(conversations.id, message.conversationId));
+    
+    return created;
+  }
+
+  async getMessages(conversationId: string, limit = 50, before?: Date): Promise<MessageWithSender[]> {
+    let query = db.select()
+      .from(messages)
+      .where(before 
+        ? and(eq(messages.conversationId, conversationId), sql`${messages.createdAt} < ${before}`)
+        : eq(messages.conversationId, conversationId))
+      .orderBy(desc(messages.createdAt))
+      .limit(limit);
+    
+    const msgs = await query;
+    
+    // Add sender info
+    const result = await Promise.all(
+      msgs.map(async (msg) => {
+        const [sender] = await db.select({
+          id: users.id,
+          name: users.name,
+          role: users.role,
+        }).from(users).where(eq(users.id, msg.senderId));
+        return { ...msg, sender };
+      })
+    );
+    
+    // Return in chronological order
+    return result.reverse();
+  }
+
+  async markConversationRead(conversationId: string, userId: string): Promise<void> {
+    await db.update(conversationMembers)
+      .set({ lastReadAt: new Date() })
+      .where(and(
+        eq(conversationMembers.conversationId, conversationId),
+        eq(conversationMembers.userId, userId)
+      ));
+  }
+
+  async getUnreadCount(userId: string): Promise<number> {
+    const memberRecords = await db.select()
+      .from(conversationMembers)
+      .where(eq(conversationMembers.userId, userId));
+    
+    let totalUnread = 0;
+    for (const member of memberRecords) {
+      if (member.lastReadAt) {
+        const result = await db.select({ count: sql<number>`count(*)` })
+          .from(messages)
+          .where(and(
+            eq(messages.conversationId, member.conversationId),
+            gt(messages.createdAt, member.lastReadAt),
+            ne(messages.senderId, userId)
+          ));
+        totalUnread += Number(result[0]?.count || 0);
+      } else {
+        const result = await db.select({ count: sql<number>`count(*)` })
+          .from(messages)
+          .where(and(
+            eq(messages.conversationId, member.conversationId),
+            ne(messages.senderId, userId)
+          ));
+        totalUnread += Number(result[0]?.count || 0);
+      }
+    }
+    
+    return totalUnread;
   }
 }
 
