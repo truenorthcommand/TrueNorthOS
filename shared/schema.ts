@@ -16,6 +16,8 @@ export const users = pgTable("users", {
   currentLat: doublePrecision("current_lat"),
   currentLng: doublePrecision("current_lng"),
   lastLocationUpdate: timestamp("last_location_update"),
+  twoFactorSecret: text("two_factor_secret"),
+  twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
