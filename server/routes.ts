@@ -564,6 +564,29 @@ export async function registerRoutes(
     }
   });
 
+  // Reorder jobs - update orderIndex for multiple jobs at once
+  // This must be defined BEFORE /api/jobs/:id to avoid :id matching "reorder"
+  app.patch("/api/jobs/reorder", requireAdmin, async (req, res) => {
+    try {
+      const { jobOrders } = req.body;
+      
+      if (!Array.isArray(jobOrders)) {
+        return res.status(400).json({ error: "jobOrders must be an array" });
+      }
+      
+      // Update each job's orderIndex
+      for (const { jobId, orderIndex } of jobOrders) {
+        if (typeof jobId === 'string' && typeof orderIndex === 'number') {
+          await storage.updateJob(jobId, { orderIndex });
+        }
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to reorder jobs" });
+    }
+  });
+
   app.patch("/api/jobs/:id", requireAuth, async (req, res) => {
     try {
       const existingJob = await storage.getJob(req.params.id);
@@ -603,28 +626,6 @@ export async function registerRoutes(
       res.json(job);
     } catch (error) {
       res.status(500).json({ error: "Failed to update job" });
-    }
-  });
-
-  // Reorder jobs - update orderIndex for multiple jobs at once
-  app.patch("/api/jobs/reorder", requireAdmin, async (req, res) => {
-    try {
-      const { jobOrders } = req.body;
-      
-      if (!Array.isArray(jobOrders)) {
-        return res.status(400).json({ error: "jobOrders must be an array" });
-      }
-      
-      // Update each job's orderIndex
-      for (const { jobId, orderIndex } of jobOrders) {
-        if (typeof jobId === 'string' && typeof orderIndex === 'number') {
-          await storage.updateJob(jobId, { orderIndex });
-        }
-      }
-      
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to reorder jobs" });
     }
   });
 

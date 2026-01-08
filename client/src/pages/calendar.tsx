@@ -55,6 +55,7 @@ import {
 import {
   DndContext,
   DragEndEvent,
+  DragOverEvent,
   DragOverlay,
   DragStartEvent,
   useSensor,
@@ -62,7 +63,12 @@ import {
   PointerSensor,
   useDroppable,
   closestCenter,
-  DragOverEvent,
+  closestCorners,
+  pointerWithin,
+  rectIntersection,
+  getFirstCollision,
+  CollisionDetection,
+  UniqueIdentifier,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -83,6 +89,54 @@ function safeParseISO(dateStr: string | null | undefined): Date | null {
     return null;
   }
 }
+
+// Custom collision detection that prioritizes sortable items over droppable containers
+const customCollisionDetection: CollisionDetection = (args) => {
+  const { active, droppableContainers, pointerCoordinates } = args;
+  
+  // Get all collisions using closestCorners (better for sortable items)
+  const cornerCollisions = closestCorners(args);
+  
+  // If we have corner collisions, prioritize job items over containers
+  if (cornerCollisions.length > 0) {
+    // Find the first non-active job collision
+    const jobCollision = cornerCollisions.find((collision) => {
+      const id = String(collision.id);
+      const isContainer = id.includes('_');
+      const isNotActive = id !== String(active.id);
+      return !isContainer && isNotActive;
+    });
+    
+    if (jobCollision) {
+      return [jobCollision];
+    }
+    
+    // Otherwise return first container collision
+    const containerCollision = cornerCollisions.find((collision) => {
+      const id = String(collision.id);
+      return id.includes('_');
+    });
+    
+    if (containerCollision) {
+      return [containerCollision];
+    }
+  }
+  
+  // Fallback to rectIntersection for container detection
+  const rectCollisions = rectIntersection(args);
+  if (rectCollisions.length > 0) {
+    const containerCollision = rectCollisions.find((collision) => {
+      const id = String(collision.id);
+      return id.includes('_');
+    });
+    if (containerCollision) {
+      return [containerCollision];
+    }
+    return [rectCollisions[0]];
+  }
+  
+  return closestCenter(args);
+};
 
 type Engineer = {
   id: string;
@@ -105,7 +159,7 @@ function SortableJobCard({
     isDragging,
   } = useSortable({
     id: job.id,
-    data: { job },
+    data: { type: 'job', job },
   });
 
   const style = {
@@ -144,7 +198,10 @@ function DroppableCell({
   children: React.ReactNode;
   isEmpty: boolean;
 }) {
-  const { isOver, setNodeRef } = useDroppable({ id });
+  const { isOver, setNodeRef } = useDroppable({ 
+    id,
+    data: { type: 'container', cellId: id },
+  });
 
   return (
     <div
@@ -209,6 +266,7 @@ export default function CalendarPage() {
   );
   const [visibleEngineerIds, setVisibleEngineerIds] = useState<string[]>([]);
   const [activeJob, setActiveJob] = useState<Job | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
   const [engineerDialogOpen, setEngineerDialogOpen] = useState(false);
 
   const sensors = useSensors(
@@ -396,22 +454,60 @@ export default function CalendarPage() {
     if (job) {
       setActiveJob(job);
     }
+    setOverId(null);
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    console.log('[DragOver] active:', active.id, 'over:', over?.id);
+    if (!over) {
+      setOverId(null);
+      return;
+    }
+    
+    const activeIdStr = active.id as string;
+    const overIdStr = over.id as string;
+    
+    // Only track if over is different from active
+    if (activeIdStr !== overIdStr) {
+      console.log('[DragOver] Tracking new overId:', overIdStr);
+      setOverId(overIdStr);
+    }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveJob(null);
 
-    if (!over) return;
-
+    // Use tracked overId if event.over.id equals active.id (collision detection bug workaround)
     const activeId = active.id as string;
-    const overId = over.id as string;
+    let targetId = over?.id as string;
+    
+    console.log('[DragEnd] activeId:', activeId, 'over?.id:', over?.id, 'tracked overId:', overId);
+    
+    // If collision detection returned the active item, use the last tracked overId
+    if (targetId === activeId && overId && overId !== activeId) {
+      targetId = overId;
+      console.log('[DragEnd] Using fallback overId:', targetId);
+    }
+    
+    setOverId(null);
+    
+    console.log('[DragEnd] Final targetId:', targetId);
+    
+    if (!targetId) return;
+
+    const overData = over?.data?.current as { type?: string; cellId?: string; job?: Job } | undefined;
+
+    // If dropped on itself, ignore
+    if (activeId === targetId) return;
 
     // Check if we dropped on another job (reordering within cell)
     const activeJob = jobs.find((j) => j.id === activeId);
-    const overJob = jobs.find((j) => j.id === overId);
+    const isOverJob = jobs.find((j) => j.id === targetId);
+    const overJob = jobs.find((j) => j.id === targetId);
 
-    if (activeJob && overJob && activeId !== overId) {
+    if (activeJob && overJob && isOverJob) {
       // Reordering within the same cell
       const activeDate = safeParseISO(activeJob.date);
       const overDate = safeParseISO(overJob.date);
@@ -440,7 +536,7 @@ export default function CalendarPage() {
           // Get all jobs in this cell and reorder
           const cellJobs = getJobsForCell(commonEngineerId, activeDate);
           const oldIndex = cellJobs.findIndex((j) => j.id === activeId);
-          const newIndex = cellJobs.findIndex((j) => j.id === overId);
+          const newIndex = cellJobs.findIndex((j) => j.id === targetId);
 
           if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
             const reorderedJobs = arrayMove(cellJobs, oldIndex, newIndex);
@@ -461,7 +557,7 @@ export default function CalendarPage() {
     }
 
     // Moving to a different cell
-    const [engineerId, dateStr] = overId.split("_");
+    const [engineerId, dateStr] = targetId.split("_");
     if (!engineerId || !dateStr) return;
 
     const job = jobs.find((j) => j.id === activeId);
@@ -925,8 +1021,9 @@ export default function CalendarPage() {
           <CardContent className="p-0 overflow-x-auto">
             <DndContext
               sensors={sensors}
-              collisionDetection={closestCenter}
+              collisionDetection={customCollisionDetection}
               onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
               onDragEnd={handleDragEnd}
             >
               <div className="min-w-[900px]">
