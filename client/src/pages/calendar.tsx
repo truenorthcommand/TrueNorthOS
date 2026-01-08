@@ -24,6 +24,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   Calendar as CalendarIcon,
   MapPin,
   Clock,
@@ -140,9 +142,17 @@ type Engineer = {
 function SortableJobCard({
   job,
   onRemoveFromDay,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp,
+  canMoveDown,
 }: {
   job: Job;
   onRemoveFromDay: (jobId: string) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
 }) {
   const {
     attributes,
@@ -167,18 +177,58 @@ function SortableJobCard({
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      className="bg-white dark:bg-slate-800 border rounded-md p-2 mb-1 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing"
+      className="bg-white dark:bg-slate-800 border rounded-md p-1.5 mb-1 shadow-sm hover:shadow-md transition-shadow group"
       data-testid={`planner-job-${job.id}`}
     >
-      <p className="text-xs font-medium truncate">{job.customerName}</p>
-      {job.postcode && (
-        <p className="text-xs text-muted-foreground truncate flex items-center">
-          <MapPin className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
-          {job.postcode}
-        </p>
-      )}
+      <div className="flex items-start gap-1">
+        {/* Drag handle */}
+        <div 
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded flex-shrink-0"
+        >
+          <GripVertical className="h-3 w-3 text-muted-foreground" />
+        </div>
+        
+        {/* Job info */}
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-medium truncate">{job.customerName}</p>
+          {job.postcode && (
+            <p className="text-xs text-muted-foreground truncate flex items-center">
+              <MapPin className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
+              {job.postcode}
+            </p>
+          )}
+        </div>
+        
+        {/* Up/Down buttons */}
+        <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onMoveUp?.();
+            }}
+            disabled={!canMoveUp}
+            className={`p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700 ${!canMoveUp ? 'opacity-30 cursor-not-allowed' : ''}`}
+            data-testid={`move-up-${job.id}`}
+            title="Move up"
+          >
+            <ChevronUp className="h-3 w-3" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onMoveDown?.();
+            }}
+            disabled={!canMoveDown}
+            className={`p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700 ${!canMoveDown ? 'opacity-30 cursor-not-allowed' : ''}`}
+            data-testid={`move-down-${job.id}`}
+            title="Move down"
+          >
+            <ChevronDown className="h-3 w-3" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -602,6 +652,26 @@ export default function CalendarPage() {
     toast({
       title: "Job removed from schedule",
       description: "The job has been removed from the planner but not deleted.",
+    });
+  };
+
+  const handleMoveJob = (jobId: string, direction: 'up' | 'down', cellJobs: Job[]) => {
+    const currentIndex = cellJobs.findIndex(j => j.id === jobId);
+    if (currentIndex === -1) return;
+    
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= cellJobs.length) return;
+    
+    const reorderedJobs = arrayMove(cellJobs, currentIndex, newIndex);
+    const jobOrders = reorderedJobs.map((job, index) => ({
+      jobId: job.id,
+      orderIndex: index,
+    }));
+    
+    reorderJobsMutation.mutate(jobOrders);
+    toast({
+      title: "Job order updated",
+      description: `Moved ${direction === 'up' ? 'up' : 'down'} in the list.`,
     });
   };
 
@@ -1062,11 +1132,15 @@ export default function CalendarPage() {
                               items={cellJobs.map((j) => j.id)}
                               strategy={verticalListSortingStrategy}
                             >
-                              {cellJobs.map((job) => (
+                              {cellJobs.map((job, index) => (
                                 <SortableJobCard
                                   key={job.id}
                                   job={job}
                                   onRemoveFromDay={handleRemoveFromDay}
+                                  onMoveUp={() => handleMoveJob(job.id, 'up', cellJobs)}
+                                  onMoveDown={() => handleMoveJob(job.id, 'down', cellJobs)}
+                                  canMoveUp={index > 0}
+                                  canMoveDown={index < cellJobs.length - 1}
                                 />
                               ))}
                             </SortableContext>
@@ -1094,11 +1168,15 @@ export default function CalendarPage() {
                             items={unassignedJobs.map((j) => j.id)}
                             strategy={verticalListSortingStrategy}
                           >
-                            {unassignedJobs.map((job) => (
+                            {unassignedJobs.map((job, index) => (
                               <SortableJobCard
                                 key={job.id}
                                 job={job}
                                 onRemoveFromDay={handleRemoveFromDay}
+                                onMoveUp={() => handleMoveJob(job.id, 'up', unassignedJobs)}
+                                onMoveDown={() => handleMoveJob(job.id, 'down', unassignedJobs)}
+                                canMoveUp={index > 0}
+                                canMoveDown={index < unassignedJobs.length - 1}
                               />
                             ))}
                           </SortableContext>
