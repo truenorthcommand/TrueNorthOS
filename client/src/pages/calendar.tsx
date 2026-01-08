@@ -346,6 +346,24 @@ export default function CalendarPage() {
     });
   };
 
+  const getUnassignedJobsForDay = (date: Date): Job[] => {
+    return jobs.filter((job) => {
+      if (job.status === "Draft") return false;
+      const jobDate = safeParseISO(job.date);
+      if (!jobDate || !isSameDay(jobDate, date)) return false;
+      const assignedIds =
+        job.assignedToIds && job.assignedToIds.length > 0
+          ? job.assignedToIds
+          : job.assignedToId
+          ? [job.assignedToId]
+          : [];
+      const hasNoAssignment = assignedIds.length === 0;
+      const assignedToHiddenEngineer = assignedIds.length > 0 && 
+        !assignedIds.some((id) => visibleEngineerIds.includes(id));
+      return hasNoAssignment || assignedToHiddenEngineer;
+    });
+  };
+
   const updateJobMutation = useMutation({
     mutationFn: async ({
       jobId,
@@ -904,6 +922,31 @@ export default function CalendarPage() {
                       })}
                     </>
                   ))}
+
+                  {/* Unassigned / Other Engineers Row */}
+                  <>
+                    <div className="p-2 font-medium text-sm border-r border-b bg-amber-50 dark:bg-amber-900/20 flex items-center text-amber-700 dark:text-amber-400">
+                      Unassigned / Other
+                    </div>
+                    {weekDays.map((day) => {
+                      const unassignedJobs = getUnassignedJobsForDay(day);
+                      return (
+                        <div
+                          key={`unassigned_${format(day, "yyyy-MM-dd")}`}
+                          className="min-h-[80px] p-1 border-r border-b bg-amber-50/50 dark:bg-amber-900/10"
+                        >
+                          {unassignedJobs.map((job) => (
+                            <DraggableJobCard
+                              key={job.id}
+                              job={job}
+                              onRemoveFromDay={handleRemoveFromDay}
+                              onClick={() => setLocation(`/jobs/${job.id}`)}
+                            />
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </>
 
                   {visibleEngineers.length === 0 && (
                     <div className="col-span-8 p-8 text-center text-muted-foreground">
