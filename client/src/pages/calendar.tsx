@@ -86,11 +86,9 @@ type Engineer = {
 function DraggableJobCard({
   job,
   onRemoveFromDay,
-  onClick,
 }: {
   job: Job;
   onRemoveFromDay: (jobId: string) => void;
-  onClick: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
@@ -103,80 +101,22 @@ function DraggableJobCard({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const getStatusColor = (status: JobStatus): string => {
-    switch (status) {
-      case "Draft":
-        return "bg-slate-500";
-      case "In Progress":
-        return "bg-blue-500";
-      case "Awaiting Signatures":
-        return "bg-amber-500";
-      case "Signed Off":
-        return "bg-emerald-500";
-      default:
-        return "bg-slate-500";
-    }
-  };
-
   return (
     <div
       ref={setNodeRef}
       style={style}
+      {...attributes}
+      {...listeners}
       className="bg-white dark:bg-slate-800 border rounded-md p-2 mb-1 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing"
       data-testid={`planner-job-${job.id}`}
     >
-      <div className="flex items-start gap-1">
-        <div
-          {...attributes}
-          {...listeners}
-          className="flex-shrink-0 pt-0.5 cursor-grab"
-        >
-          <GripVertical className="h-3 w-3 text-muted-foreground" />
-        </div>
-        <div className="flex-1 min-w-0" onClick={onClick}>
-          <div className="flex items-center gap-1 mb-1">
-            <Badge
-              className={`${getStatusColor(job.status)} text-xs px-1 py-0`}
-            >
-              {job.status === "Awaiting Signatures" ? "Await" : job.status}
-            </Badge>
-            {job.session && (
-              <span className="text-xs text-muted-foreground flex items-center">
-                <Clock className="h-2.5 w-2.5 mr-0.5" />
-                {job.session}
-              </span>
-            )}
-          </div>
-          <p className="text-xs font-medium truncate">{job.customerName}</p>
-          {job.postcode && (
-            <p className="text-xs text-muted-foreground truncate flex items-center">
-              <MapPin className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
-              {job.postcode}
-            </p>
-          )}
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-5 w-5 flex-shrink-0"
-              data-testid={`planner-job-menu-${job.id}`}
-            >
-              <MoreVertical className="h-3 w-3" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={() => onRemoveFromDay(job.id)}
-              data-testid={`planner-remove-job-${job.id}`}
-            >
-              <X className="h-4 w-4 mr-2" />
-              Remove from day
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      <p className="text-xs font-medium truncate">{job.customerName}</p>
+      {job.postcode && (
+        <p className="text-xs text-muted-foreground truncate flex items-center">
+          <MapPin className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
+          {job.postcode}
+        </p>
+      )}
     </div>
   );
 }
@@ -269,20 +209,6 @@ export default function CalendarPage() {
     refreshJobs();
   }, [refreshJobs]);
 
-  // Sync planner week with calendar month - show first week of the current month
-  useEffect(() => {
-    const monthStart = startOfMonth(currentMonth);
-    const newWeekStart = startOfWeek(monthStart, { weekStartsOn: 1 });
-    setWeekStart(newWeekStart);
-  }, [currentMonth]);
-
-  // When a date is selected on calendar, sync planner to that week
-  useEffect(() => {
-    if (selectedDate) {
-      const newWeekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
-      setWeekStart(newWeekStart);
-    }
-  }, [selectedDate]);
 
   useEffect(() => {
     if (user?.role === "admin") {
@@ -939,7 +865,6 @@ export default function CalendarPage() {
                                 key={job.id}
                                 job={job}
                                 onRemoveFromDay={handleRemoveFromDay}
-                                onClick={() => setLocation(`/jobs/${job.id}`)}
                               />
                             ))}
                           </DroppableCell>
@@ -965,7 +890,6 @@ export default function CalendarPage() {
                               key={job.id}
                               job={job}
                               onRemoveFromDay={handleRemoveFromDay}
-                              onClick={() => setLocation(`/jobs/${job.id}`)}
                             />
                           ))}
                         </div>
