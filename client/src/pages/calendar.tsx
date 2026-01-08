@@ -269,6 +269,21 @@ export default function CalendarPage() {
     refreshJobs();
   }, [refreshJobs]);
 
+  // Sync planner week with calendar month - show first week of the current month
+  useEffect(() => {
+    const monthStart = startOfMonth(currentMonth);
+    const newWeekStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+    setWeekStart(newWeekStart);
+  }, [currentMonth]);
+
+  // When a date is selected on calendar, sync planner to that week
+  useEffect(() => {
+    if (selectedDate) {
+      const newWeekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+      setWeekStart(newWeekStart);
+    }
+  }, [selectedDate]);
+
   useEffect(() => {
     if (user?.role === "admin") {
       fetch("/api/users", { credentials: "include" })
@@ -831,7 +846,11 @@ export default function CalendarPage() {
             <Button
               variant="outline"
               size="icon"
-              onClick={() => setWeekStart(subWeeks(weekStart, 1))}
+              onClick={() => {
+                const newWeek = subWeeks(weekStart, 1);
+                setWeekStart(newWeek);
+                setCurrentMonth(newWeek);
+              }}
               data-testid="button-prev-week"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -839,9 +858,11 @@ export default function CalendarPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() =>
-                setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))
-              }
+              onClick={() => {
+                const today = new Date();
+                setWeekStart(startOfWeek(today, { weekStartsOn: 1 }));
+                setCurrentMonth(today);
+              }}
               data-testid="button-this-week"
             >
               This Week
@@ -849,7 +870,11 @@ export default function CalendarPage() {
             <Button
               variant="outline"
               size="icon"
-              onClick={() => setWeekStart(addWeeks(weekStart, 1))}
+              onClick={() => {
+                const newWeek = addWeeks(weekStart, 1);
+                setWeekStart(newWeek);
+                setCurrentMonth(newWeek);
+              }}
               data-testid="button-next-week"
             >
               <ChevronRight className="h-4 w-4" />
