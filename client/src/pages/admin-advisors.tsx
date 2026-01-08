@@ -179,7 +179,7 @@ export default function AdminAdvisors() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Technical Advisor Settings</h1>
-          <p className="text-muted-foreground">Manage AI assistant configurations</p>
+          <p className="text-muted-foreground">Manage advisor configurations</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsDialogOpen(open); }}>
           <DialogTrigger asChild>
@@ -192,7 +192,7 @@ export default function AdminAdvisors() {
             <DialogHeader>
               <DialogTitle>{editingAdvisor ? "Edit Technical Advisor" : "Create Technical Advisor"}</DialogTitle>
               <DialogDescription>
-                Configure the AI advisor's personality and capabilities
+                Configure the advisor's personality and capabilities
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -269,7 +269,7 @@ export default function AdminAdvisors() {
                   id="systemPrompt"
                   value={formData.systemPrompt}
                   onChange={(e) => setFormData({ ...formData, systemPrompt: e.target.value })}
-                  placeholder="Enter the AI system prompt that defines the advisor's behavior and expertise..."
+                  placeholder="Enter the system prompt that defines the advisor's behavior and expertise..."
                   rows={10}
                   required
                   className="font-mono text-sm"
@@ -314,7 +314,7 @@ export default function AdminAdvisors() {
               <Bot className="h-16 w-16 text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No Technical Advisors</h3>
               <p className="text-muted-foreground text-center max-w-md mb-4">
-                Create your first AI advisor to get started
+                Create your first advisor to get started
               </p>
               <Button onClick={() => setIsDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />

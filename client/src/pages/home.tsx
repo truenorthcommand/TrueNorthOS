@@ -160,13 +160,13 @@ export default function Home() {
             <div className="text-center mb-12">
               <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-4">
                 <Bot className="h-4 w-4" />
-                AI-Powered Assistance
+                Expert Assistance
               </div>
               <h3 className="text-2xl md:text-3xl font-bold mb-4">
                 Expert Technical Advisors at Your Fingertips
               </h3>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                Get instant expert guidance from our specialist AI assistants. Upload photos for analysis or ask questions about any technical issue.
+                Get instant expert guidance from our specialist advisors. Upload photos for analysis or ask questions about any technical issue.
               </p>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">

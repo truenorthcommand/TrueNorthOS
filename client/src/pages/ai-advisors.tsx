@@ -107,7 +107,7 @@ export default function AiAdvisors() {
     onSuccess: (data) => {
       toast({
         title: "Success",
-        description: `${data.count} AI advisors have been initialized`,
+        description: `${data.count} advisors have been initialized`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/ai-advisors"] });
     },
@@ -200,7 +200,7 @@ export default function AiAdvisors() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Technical Advisor</h1>
-          <p className="text-muted-foreground">Expert AI assistants for field service tasks</p>
+          <p className="text-muted-foreground">Expert assistants for field service tasks</p>
         </div>
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">

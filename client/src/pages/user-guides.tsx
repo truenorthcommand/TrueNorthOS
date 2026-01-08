@@ -37,7 +37,7 @@ const adminGuideContent = `
 <li><strong>Staff Management</strong> - Add or remove staff members</li>
 <li><strong>Calendar</strong> - View jobs in calendar format</li>
 <li><strong>Live Map</strong> - Track engineer locations in real-time</li>
-<li><strong>Technical Advisor</strong> - AI-powered technical assistance</li>
+<li><strong>Technical Advisor</strong> - Expert technical assistance</li>
 </ul>
 
 <hr/>

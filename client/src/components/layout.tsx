@@ -194,7 +194,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               onClick={() => setIsOpen(false)}
             >
               <Bot className="mr-3 h-5 w-5" />
-              AI Settings
+              Advisor Settings
             </Button>
           </Link>
         )}
@@ -390,7 +390,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <Link href="/admin/advisors">
                     <DropdownMenuItem className="cursor-pointer">
                       <Bot className="mr-2 h-4 w-4" />
-                      AI Settings
+                      Advisor Settings
                     </DropdownMenuItem>
                   </Link>
                 )}
