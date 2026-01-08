@@ -19,6 +19,8 @@ This application enables field service companies to manage job sheets digitally.
 - **Print-friendly Output**: Generate PDF-ready job sheets
 - **PWA Support**: Installable as mobile app with offline caching
 - **Quoting System**: Create quotes with line items, discounts, VAT calculations (0/5/20%), send to clients via unique link
+- **Client Management**: Automatic client record creation/update when quotes are saved, with centralized client database
+- **Quote-to-Job Workflow**: Saving a quote automatically creates a draft job sheet linked to both the quote and client
 - **Client Quote Portal**: Clients can view, accept, or decline quotes with optional decline reason
 - **Invoice Management**: Generate invoices with bank transfer payment details
 - **Company Settings**: Configure company details, bank information, default VAT rates, and payment terms
@@ -44,8 +46,12 @@ This application enables field service companies to manage job sheets digitally.
 ### Database (PostgreSQL)
 - `users` - User accounts with roles, location tracking
 - `jobs` - Job records with materials, photos, signatures
+- `clients` - Client records (name, email, phone, address, postcode)
+- `quotes` - Quote records with line items, linked to clients and jobs
+- `invoices` - Invoice records with payment details
 - `engineer_locations` - Location history
 - `ai_advisors` - AI assistant configurations
+- `company_settings` - Company details, bank info, VAT rates
 
 ## Sign-off Validation Rules
 
