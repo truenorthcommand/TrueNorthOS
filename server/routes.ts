@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import OpenAI from "openai";
-import { TOTP } from "otpauth";
+import { TOTP, Secret } from "otpauth";
 import QRCode from "qrcode";
 import { storage } from "./storage";
 import { pool } from "./db";
@@ -94,13 +94,19 @@ export async function registerRoutes(
           });
         }
 
-        // Verify TOTP token
-        const totp = new TOTP({
-          secret: user.twoFactorSecret,
-          algorithm: 'SHA1',
-          digits: 6,
-          period: 30,
-        });
+        // Verify TOTP token using the stored base32 secret
+        let totp: TOTP;
+        try {
+          totp = new TOTP({
+            secret: Secret.fromBase32(user.twoFactorSecret),
+            algorithm: 'SHA1',
+            digits: 6,
+            period: 30,
+          });
+        } catch (secretError) {
+          console.error('Invalid 2FA secret format:', secretError);
+          return res.status(500).json({ error: "Two-factor authentication configuration error. Please contact support." });
+        }
 
         const delta = totp.validate({ token: totpToken, window: 2 });
         if (delta === null) {
@@ -172,8 +178,9 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Two-factor authentication is already enabled" });
       }
 
-      // Generate a random secret
-      const secret = crypto.randomBytes(20).toString('hex').toUpperCase();
+      // Generate a random secret using otpauth's Secret class
+      const secretObj = new Secret({ size: 20 });
+      const secretBase32 = secretObj.base32;
 
       // Create TOTP instance
       const totp = new TOTP({
@@ -182,18 +189,18 @@ export async function registerRoutes(
         algorithm: 'SHA1',
         digits: 6,
         period: 30,
-        secret: secret,
+        secret: secretObj,
       });
 
       // Generate QR code
       const otpauthUrl = totp.toString();
       const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
 
-      // Store secret temporarily (will be activated after verification)
-      await storage.updateUser(user.id, { twoFactorSecret: secret });
+      // Store secret in base32 format (will be activated after verification)
+      await storage.updateUser(user.id, { twoFactorSecret: secretBase32 });
 
       res.json({
-        secret: secret,
+        secret: secretBase32,
         qrCode: qrCodeDataUrl,
         message: "Scan the QR code with your authenticator app, then verify with a code"
       });
@@ -216,13 +223,20 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Two-factor authentication is already enabled" });
       }
 
-      // Verify the token
-      const totp = new TOTP({
-        secret: user.twoFactorSecret,
-        algorithm: 'SHA1',
-        digits: 6,
-        period: 30,
-      });
+      // Verify the token using the stored base32 secret
+      let totp: TOTP;
+      try {
+        totp = new TOTP({
+          secret: Secret.fromBase32(user.twoFactorSecret),
+          algorithm: 'SHA1',
+          digits: 6,
+          period: 30,
+        });
+      } catch (secretError) {
+        console.error('Invalid 2FA secret format during verify:', secretError);
+        await storage.updateUser(user.id, { twoFactorSecret: null });
+        return res.status(400).json({ error: "Invalid 2FA setup. Please try setting up again." });
+      }
 
       const delta = totp.validate({ token: token, window: 2 });
 

@@ -9,6 +9,8 @@ This application enables field service companies to manage job sheets digitally.
 ## Key Features
 
 - **Role-based Authentication**: Admin, Engineer, and Super Admin roles with different access levels
+- **Two-Factor Authentication (2FA)**: TOTP-based 2FA using authenticator apps (Google Authenticator, Authy, etc.)
+- **Password Management**: Users can change their passwords (minimum 8 characters required)
 - **Super Admin**: Only super admins can add/remove staff members (granted via /setup reset-admin)
 - **Job Management**: Create, edit, track job progress and status
 - **Photo Evidence**: Upload photos as job completion evidence (separated by admin reference and engineer evidence)
@@ -45,7 +47,7 @@ This application enables field service companies to manage job sheets digitally.
 - `/server/db.ts` - PostgreSQL connection
 
 ### Database (PostgreSQL)
-- `users` - User accounts with roles, location tracking
+- `users` - User accounts with roles, location tracking, 2FA settings (twoFactorSecret, twoFactorEnabled)
 - `jobs` - Job records with materials, photos, signatures
 - `clients` - Client records (name, email, phone, address, postcode)
 - `quotes` - Quote records with line items, linked to clients and jobs
