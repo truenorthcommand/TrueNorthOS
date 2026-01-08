@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, FilePlus, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown } from "lucide-react";
+import { LogOut, LayoutDashboard, FilePlus, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, LayoutGrid } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useState } from "react";
@@ -106,6 +106,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
             >
               <Calendar className="mr-3 h-5 w-5" />
               Calendar
+            </Button>
+          </Link>
+        )}
+
+        {user.role === "admin" && (
+          <Link href="/planner">
+            <Button
+              variant={location === "/planner" ? "secondary" : "ghost"}
+              className="w-full justify-start h-12 text-lg font-medium"
+              onClick={() => setIsOpen(false)}
+            >
+              <LayoutGrid className="mr-3 h-5 w-5" />
+              Planner Board
             </Button>
           </Link>
         )}
@@ -265,7 +278,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
-                    variant={["/completed-jobs", "/calendar", "/time-logs"].some(p => location === p) ? "secondary" : "ghost"} 
+                    variant={["/completed-jobs", "/calendar", "/planner", "/time-logs"].some(p => location === p) ? "secondary" : "ghost"} 
                     size="sm"
                   >
                     Schedule <ChevronDown className="ml-1 h-4 w-4" />
@@ -282,6 +295,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     <DropdownMenuItem className="cursor-pointer">
                       <Calendar className="mr-2 h-4 w-4" />
                       Calendar
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/planner">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <LayoutGrid className="mr-2 h-4 w-4" />
+                      Planner Board
                     </DropdownMenuItem>
                   </Link>
                   <Link href="/time-logs">

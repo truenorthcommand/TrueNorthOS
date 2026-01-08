@@ -16,6 +16,7 @@ import CompletedJobs from "@/pages/completed-jobs";
 import Staff from "@/pages/staff";
 import Home from "@/pages/home";
 import CalendarPage from "@/pages/calendar";
+import PlannerBoard from "@/pages/planner-board";
 import MapPage from "@/pages/map";
 import Pricing from "@/pages/pricing";
 import AiAdvisors from "@/pages/ai-advisors";
@@ -82,6 +83,9 @@ function Router() {
       </Route>
       <Route path="/calendar">
         <PrivateRoute component={CalendarPage} />
+      </Route>
+      <Route path="/planner">
+        <PrivateRoute component={PlannerBoard} />
       </Route>
       <Route path="/map">
         <PrivateRoute component={MapPage} />
