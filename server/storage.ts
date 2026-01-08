@@ -94,6 +94,7 @@ export interface IStorage {
   getOrCreateDirectConversation(userId1: string, userId2: string): Promise<Conversation>;
   addConversationMember(conversationId: string, userId: string): Promise<ConversationMember>;
   removeConversationMember(conversationId: string, userId: string): Promise<void>;
+  isConversationMember(conversationId: string, userId: string): Promise<boolean>;
   
   createMessage(message: InsertMessage): Promise<Message>;
   getMessages(conversationId: string, limit?: number, before?: Date): Promise<MessageWithSender[]>;
@@ -494,8 +495,8 @@ export class DatabaseStorage implements IStorage {
   async createConversation(conversation: InsertConversation, memberIds: string[]): Promise<Conversation> {
     const [created] = await db.insert(conversations).values(conversation).returning();
     
-    // Add all members including creator
-    const allMemberIds = [...new Set([conversation.createdById, ...memberIds])];
+    // Add all members including creator (deduplicated)
+    const allMemberIds = Array.from(new Set([conversation.createdById, ...memberIds]));
     for (const memberId of allMemberIds) {
       await db.insert(conversationMembers).values({
         conversationId: created.id,
@@ -642,6 +643,16 @@ export class DatabaseStorage implements IStorage {
         eq(conversationMembers.conversationId, conversationId),
         eq(conversationMembers.userId, userId)
       ));
+  }
+
+  async isConversationMember(conversationId: string, userId: string): Promise<boolean> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(conversationMembers)
+      .where(and(
+        eq(conversationMembers.conversationId, conversationId),
+        eq(conversationMembers.userId, userId)
+      ));
+    return Number(result[0]?.count || 0) > 0;
   }
 
   async createMessage(message: InsertMessage): Promise<Message> {

@@ -2062,9 +2062,8 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
       const limit = parseInt(req.query.limit as string) || 50;
       const before = req.query.before ? new Date(req.query.before as string) : undefined;
 
-      // Verify user is a member of this conversation
-      const conversations = await storage.getUserConversations(req.session.userId!);
-      const isMember = conversations.some(c => c.id === conversationId);
+      // Verify user is a member of this conversation (efficient check)
+      const isMember = await storage.isConversationMember(conversationId, req.session.userId!);
       
       if (!isMember) {
         return res.status(403).json({ error: "Access denied" });
@@ -2088,9 +2087,8 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
         return res.status(400).json({ error: "Message content is required" });
       }
 
-      // Verify user is a member of this conversation
-      const conversations = await storage.getUserConversations(req.session.userId!);
-      const isMember = conversations.some(c => c.id === conversationId);
+      // Verify user is a member of this conversation (efficient check)
+      const isMember = await storage.isConversationMember(conversationId, req.session.userId!);
       
       if (!isMember) {
         return res.status(403).json({ error: "Access denied" });
@@ -2120,6 +2118,13 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
   app.post("/api/messages/conversations/:conversationId/read", requireAuth, async (req, res) => {
     try {
       const { conversationId } = req.params;
+      
+      // Verify user is a member of this conversation
+      const isMember = await storage.isConversationMember(conversationId, req.session.userId!);
+      if (!isMember) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
       await storage.markConversationRead(conversationId, req.session.userId!);
       res.json({ success: true });
     } catch (error) {

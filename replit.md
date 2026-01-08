@@ -27,6 +27,7 @@ This application enables field service companies to manage job sheets digitally.
 - **Invoice Management**: Generate invoices with bank transfer payment details
 - **Company Settings**: Configure company details, bank information, default VAT rates, and payment terms
 - **Long-running Jobs**: Track multi-day projects with daily progress updates (max 2 per day), photo evidence per update, and update history grouped by date
+- **Team Messaging**: WhatsApp-style internal messaging for real-time team communication with direct messages, group chats, typing indicators, and unread badges
 
 ## User Credentials (Demo)
 
@@ -56,6 +57,9 @@ This application enables field service companies to manage job sheets digitally.
 - `ai_advisors` - AI assistant configurations
 - `company_settings` - Company details, bank info, VAT rates
 - `job_updates` - Daily progress updates for long-running jobs (max 2 per day)
+- `conversations` - Chat conversations (direct or group)
+- `conversation_members` - Members of each conversation with read status
+- `messages` - Chat messages with sender and timestamp
 
 ## Sign-off Validation Rules
 
