@@ -853,11 +853,37 @@ export async function registerRoutes(
         amount: Number(item.amount) || 0,
       }));
       
+      // Create or update the client record
+      const client = await storage.findOrCreateClient({
+        name: req.body.customerName,
+        email: req.body.customerEmail || null,
+        phone: req.body.customerPhone || null,
+        address: req.body.siteAddress || null,
+        postcode: req.body.sitePostcode || null,
+      });
+      
+      // Create a draft job for this quote
+      const jobCount = (await storage.getAllJobs()).length + 1;
+      const year = new Date().getFullYear();
+      const jobNo = `J-${year}-${String(jobCount).padStart(3, '0')}`;
+      
+      const draftJob = await storage.createJob({
+        jobNo,
+        customerName: req.body.customerName,
+        client: client.id,
+        address: req.body.siteAddress || undefined,
+        postcode: req.body.sitePostcode || undefined,
+        contactEmail: req.body.customerEmail || undefined,
+        contactPhone: req.body.customerPhone || undefined,
+        description: req.body.description || `Quote ${quoteNo}`,
+        status: "Draft",
+      });
+      
       const quote = await storage.createQuote({
         customerName: req.body.customerName,
         customerEmail: req.body.customerEmail || null,
         customerPhone: req.body.customerPhone || null,
-        customerId: req.body.customerId || null,
+        customerId: client.id,
         siteAddress: req.body.siteAddress || null,
         sitePostcode: req.body.sitePostcode || null,
         reference: req.body.reference || null,
@@ -876,9 +902,10 @@ export async function registerRoutes(
         quoteNo,
         accessToken,
         createdById: req.session.userId,
+        convertedJobId: draftJob.id,
       });
-      console.log("Quote created successfully:", quote.id);
-      res.json(quote);
+      console.log("Quote created successfully:", quote.id, "with client:", client.id, "and draft job:", draftJob.id);
+      res.json({ ...quote, client, draftJob });
     } catch (error: any) {
       console.error("Failed to create quote:", error);
       console.error("Error stack:", error?.stack);
@@ -973,6 +1000,59 @@ export async function registerRoutes(
       res.json({ job, quote: await storage.getQuote(quote.id) });
     } catch (error) {
       res.status(500).json({ error: "Failed to convert quote to job" });
+    }
+  });
+
+  // ==================== CLIENTS ROUTES ====================
+  
+  app.get("/api/clients", requireAdmin, async (req, res) => {
+    try {
+      const allClients = await storage.getAllClients();
+      res.json(allClients);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch clients" });
+    }
+  });
+
+  app.get("/api/clients/:id", requireAdmin, async (req, res) => {
+    try {
+      const client = await storage.getClient(req.params.id);
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      res.json(client);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch client" });
+    }
+  });
+
+  app.post("/api/clients", requireAdmin, async (req, res) => {
+    try {
+      const client = await storage.createClient(req.body);
+      res.json(client);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create client" });
+    }
+  });
+
+  app.put("/api/clients/:id", requireAdmin, async (req, res) => {
+    try {
+      const client = await storage.updateClient(req.params.id, req.body);
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      res.json(client);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update client" });
+    }
+  });
+
+  app.delete("/api/clients/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteClient(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete client" });
     }
   });
 
