@@ -18,6 +18,10 @@ This application enables field service companies to manage job sheets digitally.
 - **Further Actions**: Flag issues with priority levels (low/medium/high/urgent)
 - **Print-friendly Output**: Generate PDF-ready job sheets
 - **PWA Support**: Installable as mobile app with offline caching
+- **Quoting System**: Create quotes with line items, discounts, VAT calculations (0/5/20%), send to clients via unique link
+- **Client Quote Portal**: Clients can view, accept, or decline quotes with optional decline reason
+- **Invoice Management**: Generate invoices with bank transfer payment details
+- **Company Settings**: Configure company details, bank information, default VAT rates, and payment terms
 
 ## User Credentials (Demo)
 
