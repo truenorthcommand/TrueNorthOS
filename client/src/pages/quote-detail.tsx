@@ -58,6 +58,8 @@ export default function QuoteDetail() {
   const [isLoading, setIsLoading] = useState(!isNew);
   const [isSaving, setIsSaving] = useState(false);
   const [showSendDialog, setShowSendDialog] = useState(false);
+  const [expandedDescriptionIndex, setExpandedDescriptionIndex] = useState<number | null>(null);
+  const [expandedDescriptionValue, setExpandedDescriptionValue] = useState("");
 
   const [quote, setQuote] = useState<Quote>({
     id: "",
@@ -477,12 +479,16 @@ export default function QuoteDetail() {
                           />
                         </td>
                         <td className="py-2 px-2">
-                          <Input
-                            value={item.description}
-                            onChange={(e) => updateLineItem(index, "description", e.target.value)}
-                            placeholder="Description"
-                            className="h-8"
-                          />
+                          <div 
+                            onClick={() => {
+                              setExpandedDescriptionIndex(index);
+                              setExpandedDescriptionValue(item.description);
+                            }}
+                            className="min-h-[32px] px-3 py-1.5 border rounded-md cursor-pointer hover:bg-muted/50 flex items-center text-sm truncate"
+                            data-testid={`button-expand-description-${index}`}
+                          >
+                            {item.description || <span className="text-muted-foreground">Click to add description...</span>}
+                          </div>
                         </td>
                         <td className="py-2 px-2">
                           <Input
@@ -647,6 +653,47 @@ export default function QuoteDetail() {
             <Button onClick={() => { copyClientLink(); setShowSendDialog(false); }}>
               <Copy className="w-4 h-4 mr-2" />
               Copy Link
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog 
+        open={expandedDescriptionIndex !== null} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setExpandedDescriptionIndex(null);
+            setExpandedDescriptionValue("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Item Description</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Textarea
+              value={expandedDescriptionValue}
+              onChange={(e) => setExpandedDescriptionValue(e.target.value)}
+              placeholder="Enter a detailed description for this line item..."
+              rows={8}
+              className="resize-none"
+              autoFocus
+              data-testid="textarea-expanded-description"
+            />
+          </div>
+          <DialogFooter>
+            <Button 
+              onClick={() => {
+                if (expandedDescriptionIndex !== null) {
+                  updateLineItem(expandedDescriptionIndex, "description", expandedDescriptionValue);
+                }
+                setExpandedDescriptionIndex(null);
+                setExpandedDescriptionValue("");
+              }}
+              data-testid="button-done-description"
+            >
+              Done
             </Button>
           </DialogFooter>
         </DialogContent>
