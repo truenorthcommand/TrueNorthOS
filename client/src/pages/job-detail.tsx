@@ -763,8 +763,11 @@ export default function JobDetail() {
                         className="w-full bg-purple-600 hover:bg-purple-700"
                         data-testid="button-submit-update"
                       >
-                        {isSubmittingUpdate ? "Submitting..." : "Submit Progress Update"}
+                        {isSubmittingUpdate ? "Sending Update..." : "Send Update & Notify Admins"}
                       </Button>
+                      <p className="text-xs text-center text-muted-foreground mt-2">
+                        Admins will receive a notification when you submit this update
+                      </p>
                     </div>
                   )}
 

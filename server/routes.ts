@@ -1,7 +1,5 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import OpenAI from "openai";
@@ -9,6 +7,8 @@ import { storage } from "./storage";
 import { pool } from "./db";
 import { insertJobSchema, insertAiAdvisorSchema } from "@shared/schema";
 import { z } from "zod";
+import { notifyAdmins } from "./notifications";
+import { sessionMiddleware } from "./session";
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 function getOpenAIClient(): OpenAI | null {
@@ -19,13 +19,6 @@ function getOpenAIClient(): OpenAI | null {
 }
 
 const SALT_ROUNDS = 10;
-
-declare module "express-session" {
-  interface SessionData {
-    userId?: string;
-    userRole?: string;
-  }
-}
 
 const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   if (!req.session.userId) {
@@ -60,28 +53,11 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
-  // Use PostgreSQL session store for persistence across restarts
-  const PgSession = connectPgSimple(session);
-  
   // Trust proxy for secure cookies behind Replit's reverse proxy
   app.set('trust proxy', 1);
   
-  app.use(session({
-    store: new PgSession({
-      pool: pool as any,
-      tableName: 'session',
-      createTableIfMissing: true,
-    }),
-    secret: process.env.SESSION_SECRET || 'promains-field-view-secret-key-2024',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-      sameSite: 'lax', // Works across iPhone, Android, and web
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    }
-  }));
+  // Use shared session middleware (also used by WebSocket notifications)
+  app.use(sessionMiddleware);
 
   // ==================== AUTH ROUTES (PUBLIC) ====================
 
@@ -787,6 +763,17 @@ export async function registerRoutes(
         engineerId: req.session.userId || null,
       });
 
+      const engineer = req.session.userId ? await storage.getUser(req.session.userId) : null;
+      notifyAdmins({
+        type: 'job_update',
+        title: 'New Job Update',
+        message: `${engineer?.name || 'An engineer'} submitted an update for job ${job.jobNo}`,
+        jobId: job.id,
+        jobNo: job.jobNo,
+        engineerName: engineer?.name || 'Unknown',
+        timestamp: new Date().toISOString(),
+      });
+
       res.status(201).json(update);
     } catch (error) {
       res.status(500).json({ error: "Failed to create job update" });
@@ -1014,7 +1001,7 @@ export async function registerRoutes(
         sitePostcode: req.body.sitePostcode || null,
         reference: req.body.reference || null,
         quoteDate: req.body.quoteDate ? new Date(req.body.quoteDate) : new Date(),
-        expiryDate: req.body.expiryDate ? new Date(req.body.expiryDate) : null,
+        expiryDate: req.body.expiryDate ? new Date(req.body.expiryDate) : undefined,
         description: req.body.description || null,
         lineItems,
         subtotal: Number(req.body.subtotal) || 0,
