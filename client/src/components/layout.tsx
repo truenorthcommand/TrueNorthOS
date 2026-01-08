@@ -1,8 +1,9 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, FilePlus, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings } from "lucide-react";
+import { LogOut, LayoutDashboard, FilePlus, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useState } from "react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -247,92 +248,154 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <span className="text-xl font-bold tracking-tight">Field View</span>
           </div>
           
-          <nav className="flex items-center gap-4">
-             <Link href="/home">
-              <Button variant={location === "/home" ? "secondary" : "ghost"}>
+          <nav className="flex items-center gap-1">
+            <Link href="/home">
+              <Button variant={location === "/home" ? "secondary" : "ghost"} size="sm">
                 Home
               </Button>
             </Link>
-             {user.role === "admin" && (
-              <Link href="/clients">
-                <Button variant={location === "/clients" ? "secondary" : "ghost"}>
-                  Clients
-                </Button>
-              </Link>
-            )}
-             <Link href="/">
-              <Button variant={location === "/" ? "secondary" : "ghost"}>
-                Jobs List
+
+            <Link href="/">
+              <Button variant={location === "/" ? "secondary" : "ghost"} size="sm">
+                Jobs
               </Button>
             </Link>
-             {user.role === "admin" && (
-              <Link href="/engineers">
-                <Button variant={location === "/engineers" ? "secondary" : "ghost"}>
-                  Engineers
-                </Button>
-              </Link>
-            )}
-             {user.role === "admin" && (
-              <Link href="/completed-jobs">
-                <Button variant={location === "/completed-jobs" ? "secondary" : "ghost"}>
-                  Completed Jobs
-                </Button>
-              </Link>
-            )}
-             {user.role === "admin" && (
-              <Link href="/staff">
-                <Button variant={location === "/staff" ? "secondary" : "ghost"}>
-                  Staff
-                </Button>
-              </Link>
-            )}
-             {user.role === "admin" && (
-              <Link href="/calendar">
-                <Button variant={location === "/calendar" ? "secondary" : "ghost"}>
-                  Calendar
-                </Button>
-              </Link>
-            )}
-             {user.role === "admin" && (
-              <Link href="/map">
-                <Button variant={location === "/map" ? "secondary" : "ghost"}>
-                  Map
-                </Button>
-              </Link>
-            )}
+
             {user.role === "admin" && (
-              <Link href="/time-logs">
-                <Button variant={location === "/time-logs" ? "secondary" : "ghost"}>
-                  Time Logs
-                </Button>
-              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant={["/completed-jobs", "/calendar", "/time-logs"].some(p => location === p) ? "secondary" : "ghost"} 
+                    size="sm"
+                  >
+                    Schedule <ChevronDown className="ml-1 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <Link href="/completed-jobs">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Completed Jobs
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/calendar">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      Calendar
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/time-logs">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Clock className="mr-2 h-4 w-4" />
+                      Time Logs
+                    </DropdownMenuItem>
+                  </Link>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
+
             {user.role === "admin" && (
-              <Link href="/quotes">
-                <Button variant={location.startsWith("/quotes") ? "secondary" : "ghost"}>
-                  Quotes
-                </Button>
-              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant={["/clients", "/quotes", "/invoices"].some(p => location.startsWith(p)) ? "secondary" : "ghost"} 
+                    size="sm"
+                  >
+                    Sales <ChevronDown className="ml-1 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <Link href="/clients">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Building2Icon className="mr-2 h-4 w-4" />
+                      Clients
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/quotes">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <FileText className="mr-2 h-4 w-4" />
+                      Quotes
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/invoices">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Receipt className="mr-2 h-4 w-4" />
+                      Invoices
+                    </DropdownMenuItem>
+                  </Link>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
+
             {user.role === "admin" && (
-              <Link href="/invoices">
-                <Button variant={location.startsWith("/invoices") ? "secondary" : "ghost"}>
-                  Invoices
-                </Button>
-              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant={["/engineers", "/staff", "/map"].some(p => location === p) ? "secondary" : "ghost"} 
+                    size="sm"
+                  >
+                    Team <ChevronDown className="ml-1 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <Link href="/engineers">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <UserIcon className="mr-2 h-4 w-4" />
+                      Engineers
+                    </DropdownMenuItem>
+                  </Link>
+                  {user.superAdmin && (
+                    <Link href="/staff">
+                      <DropdownMenuItem className="cursor-pointer">
+                        <Users className="mr-2 h-4 w-4" />
+                        Staff Management
+                      </DropdownMenuItem>
+                    </Link>
+                  )}
+                  <Link href="/map">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <MapPin className="mr-2 h-4 w-4" />
+                      Live Map
+                    </DropdownMenuItem>
+                  </Link>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
-            {user.role === "admin" && (
-              <Link href="/settings">
-                <Button variant={location === "/settings" ? "secondary" : "ghost"}>
-                  Settings
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant={["/ai-advisors", "/settings", "/admin/advisors"].some(p => location === p) ? "secondary" : "ghost"} 
+                  size="sm"
+                >
+                  More <ChevronDown className="ml-1 h-4 w-4" />
                 </Button>
-              </Link>
-            )}
-            <Link href="/ai-advisors">
-              <Button variant={location === "/ai-advisors" ? "secondary" : "ghost"}>
-                Technical Advisor
-              </Button>
-            </Link>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <Link href="/ai-advisors">
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Bot className="mr-2 h-4 w-4" />
+                    Technical Advisor
+                  </DropdownMenuItem>
+                </Link>
+                {user.role === "admin" && (
+                  <Link href="/settings">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Settings
+                    </DropdownMenuItem>
+                  </Link>
+                )}
+                {user.role === "admin" && (
+                  <Link href="/admin/advisors">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Bot className="mr-2 h-4 w-4" />
+                      AI Settings
+                    </DropdownMenuItem>
+                  </Link>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </nav>
 
           <div className="ml-auto flex items-center gap-4">
