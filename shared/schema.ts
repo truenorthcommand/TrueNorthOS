@@ -50,6 +50,19 @@ export const jobs = pgTable("jobs", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const clients = pgTable("clients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  address: text("address"),
+  postcode: text("postcode"),
+  contactName: text("contact_name"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const engineerLocations = pgTable("engineer_locations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   engineerId: varchar("engineer_id").notNull(),
@@ -58,6 +71,15 @@ export const engineerLocations = pgTable("engineer_locations", {
   accuracy: doublePrecision("accuracy"),
   timestamp: timestamp("timestamp").defaultNow(),
 });
+
+export const insertClientSchema = createInsertSchema(clients).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertClient = z.infer<typeof insertClientSchema>;
+export type Client = typeof clients.$inferSelect;
 
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
