@@ -23,13 +23,14 @@ export default function JobDetail() {
   const { user } = useAuth();
   const [match, params] = useRoute("/jobs/:id");
   const [, setLocation] = useLocation();
-  const { getJob, updateJob, addMaterial, removeMaterial, addPhoto, removePhoto, deleteJob, jobs } = useStore();
+  const { getJob, updateJob, addMaterial, removeMaterial, addPhoto, removePhoto, deleteJob, jobs, refreshJobs, isLoading } = useStore();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const adminFileInputRef = useRef<HTMLInputElement>(null);
   const [actionDescription, setActionDescription] = useState("");
   const [selectedPriority, setSelectedPriority] = useState<ActionPriority>("medium");
   const [engineers, setEngineers] = useState<{id: string; name: string}[]>([]);
+  const [jobNotFoundAfterRefresh, setJobNotFoundAfterRefresh] = useState(false);
   
   const [formData, setFormData] = useState<{
     client: string;
@@ -71,7 +72,22 @@ export default function JobDetail() {
 
   const jobId = params?.id;
   const job = jobId ? getJob(jobId) : undefined;
+  const [hasTriedRefresh, setHasTriedRefresh] = useState(false);
   
+  // Refresh jobs if job not found in cache (may have been created elsewhere)
+  useEffect(() => {
+    if (jobId && !job && !isLoading && !hasTriedRefresh) {
+      setHasTriedRefresh(true);
+      refreshJobs();
+    }
+  }, [jobId, job, isLoading, hasTriedRefresh, refreshJobs]);
+  
+  // After refresh, check if job is still not found
+  useEffect(() => {
+    if (hasTriedRefresh && !isLoading && !job) {
+      setJobNotFoundAfterRefresh(true);
+    }
+  }, [hasTriedRefresh, isLoading, job]);
   
   useEffect(() => {
     if (job) {
@@ -107,6 +123,15 @@ export default function JobDetail() {
   };
 
   if (!job) {
+    // Show loading while trying to refresh/fetch the job
+    if (isLoading || (!jobNotFoundAfterRefresh && jobId)) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[50vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-4 text-muted-foreground">Loading job...</p>
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh]">
         <h2 className="text-2xl font-bold mb-4">Job Not Found</h2>
