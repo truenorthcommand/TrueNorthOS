@@ -2,11 +2,18 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, Role } from "./types";
 import { useLocation } from "wouter";
 
+interface LoginResult {
+  success: boolean;
+  requiresTwoFactor?: boolean;
+  error?: string;
+}
+
 interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string) => Promise<boolean>;
+  login: (username: string, password: string, totpToken?: string) => Promise<LoginResult>;
   logout: () => void;
   isLoading: boolean;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,7 +42,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
   }, []);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const refreshUser = async () => {
+    try {
+      const res = await fetch("/api/auth/me", { credentials: 'include' });
+      if (res.ok) {
+        const userData = await res.json();
+        setUser(userData);
+        localStorage.setItem("promains_user", JSON.stringify(userData));
+      }
+    } catch {
+      // Ignore errors on refresh
+    }
+  };
+
+  const login = async (username: string, password: string, totpToken?: string): Promise<LoginResult> => {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -44,23 +64,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: 'include',
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, totpToken }),
         signal: controller.signal,
       });
       
       clearTimeout(timeoutId);
+      const data = await response.json();
 
       if (!response.ok) {
-        return false;
+        return { success: false, error: data.error || "Login failed" };
       }
 
-      const userData = await response.json();
-      setUser(userData);
-      localStorage.setItem("promains_user", JSON.stringify(userData));
-      return true;
+      if (data.requiresTwoFactor) {
+        return { success: false, requiresTwoFactor: true };
+      }
+
+      setUser(data);
+      localStorage.setItem("promains_user", JSON.stringify(data));
+      return { success: true };
     } catch (error) {
       console.error("Login error:", error);
-      return false;
+      return { success: false, error: "Login failed. Please try again." };
     }
   };
 
@@ -74,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, logout, isLoading, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

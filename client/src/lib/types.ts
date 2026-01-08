@@ -7,6 +7,7 @@ export type User = {
   role: Role;
   username?: string;
   superAdmin?: boolean;
+  twoFactorEnabled?: boolean;
   currentLat?: number;
   currentLng?: number;
   lastLocationUpdate?: string;
