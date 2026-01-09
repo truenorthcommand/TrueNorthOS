@@ -4,128 +4,339 @@ import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { Job, JobStatus } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2, Pencil, Clock, Navigation, Briefcase, CheckCircle, LogIn, LogOut, Timer, Loader2 } from "lucide-react";
+import { Plus, Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2, Pencil, Clock, Navigation, Briefcase, CheckCircle, LogIn, LogOut, Timer, Loader2, FileText, Receipt, Users, Wallet, TrendingUp, AlertCircle, Building2, Truck } from "lucide-react";
 import { format, isToday, isTomorrow, isThisWeek, parseISO, formatDistanceToNow } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { jobs } = useStore();
   const [, setLocation] = useLocation();
-  const [searchTerm, setSearchTerm] = useState("");
 
   if (!user) return null;
 
-  // For engineers, show the engineer-specific dashboard
   if (user.role === "engineer") {
     return <EngineerDashboard />;
   }
 
-  const filteredJobs = jobs.filter((job) => {
-    const matchesSearch = 
-      job.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.jobNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (job.address || "").toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesRole = user.role === "admin" || job.assignedToId === user.id || (job.assignedToIds || []).includes(user.id);
+  return <AdminDashboard />;
+}
 
-    return matchesSearch && matchesRole;
+function AdminDashboard() {
+  const { user } = useAuth();
+  const { jobs } = useStore();
+  const [, setLocation] = useLocation();
+
+  const { data: quotes = [] } = useQuery<any[]>({
+    queryKey: ["/api/quotes"],
   });
 
-  const getStatusColor = (status: JobStatus) => {
-    switch (status) {
-      case "Draft": return "bg-slate-500 hover:bg-slate-600";
-      case "In Progress": return "bg-blue-500 hover:bg-blue-600";
-      case "Awaiting Signatures": return "bg-amber-500 hover:bg-amber-600";
-      case "Signed Off": return "bg-emerald-600 hover:bg-emerald-700";
-      default: return "bg-slate-500";
-    }
-  };
+  const { data: invoices = [] } = useQuery<any[]>({
+    queryKey: ["/api/invoices"],
+  });
 
-  const handleCreateJob = () => {
-    setLocation("/clients");
-  };
+  const { data: clients = [] } = useQuery<any[]>({
+    queryKey: ["/api/clients"],
+  });
+
+  const { data: engineers = [] } = useQuery<any[]>({
+    queryKey: ["/api/engineers"],
+  });
+
+  const { data: pendingTimesheets = [] } = useQuery<any[]>({
+    queryKey: ["/api/timesheets/pending"],
+  });
+
+  const { data: pendingExpenses = [] } = useQuery<any[]>({
+    queryKey: ["/api/expenses/pending"],
+  });
+
+  const activeJobs = jobs.filter(j => j.status === "In Progress" || j.status === "Draft");
+  const awaitingSignature = jobs.filter(j => j.status === "Awaiting Signatures");
+  const completedJobs = jobs.filter(j => j.status === "Signed Off");
+  const todayJobs = jobs.filter(j => j.date && isToday(parseISO(j.date)));
+
+  const pendingQuotes = quotes.filter((q: any) => q.status === "pending" || q.status === "sent");
+  const acceptedQuotes = quotes.filter((q: any) => q.status === "accepted");
+
+  const unpaidInvoices = invoices.filter((i: any) => i.status === "sent" || i.status === "overdue");
+  const overdueInvoices = invoices.filter((i: any) => i.status === "overdue");
+
+  const totalUnpaidAmount = unpaidInvoices.reduce((sum: number, inv: any) => sum + (inv.total || 0), 0);
+
+  if (!user) return null;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Jobs in Progress</h1>
+          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-dashboard-title">Dashboard</h1>
           <p className="text-muted-foreground">
-            {user.role === "admin" ? "Track all field operations and completion status" : "Track your assigned jobs"}
+            Welcome back, {user.name}. Here's your business overview.
           </p>
         </div>
-        
-        <Button size="lg" className="w-full sm:w-auto" onClick={handleCreateJob}>
-          <Plus className="mr-2 h-5 w-5" />
-          New Job Sheet
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setLocation("/clients")} data-testid="button-quick-client">
+            <Plus className="mr-2 h-4 w-4" />
+            New Client
+          </Button>
+          <Button onClick={() => setLocation("/quotes")} data-testid="button-quick-quote">
+            <FileText className="mr-2 h-4 w-4" />
+            New Quote
+          </Button>
+        </div>
       </div>
 
-      <div className="flex items-center space-x-2 bg-white dark:bg-slate-900 p-2 rounded-lg border shadow-sm">
-        <Search className="w-5 h-5 text-muted-foreground ml-2" />
-        <Input 
-          placeholder="Search jobs, customers, or addresses..." 
-          className="border-none shadow-none focus-visible:ring-0"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
-
-      <Tabs defaultValue="active" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[400px]">
-          <TabsTrigger value="active">Active</TabsTrigger>
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="signatures">Review</TabsTrigger>
-          <TabsTrigger value="done">Done</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="active" className="mt-6">
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredJobs.filter(j => j.status === "In Progress" || j.status === "Draft").length === 0 ? (
-              <div className="col-span-full text-center py-12 text-muted-foreground">
-                No active jobs. Great work!
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation("/jobs")} data-testid="card-active-jobs">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-500 rounded-lg">
+                <Briefcase className="h-5 w-5 text-white" />
               </div>
-            ) : filteredJobs.filter(j => j.status === "In Progress" || j.status === "Draft").map(job => (
-               <JobCard key={job.id} job={job} statusColor={getStatusColor(job.status)} isAdmin={user.role === 'admin'} />
-            ))}
-          </div>
-        </TabsContent>
+              <div>
+                <p className="text-2xl font-bold">{activeJobs.length}</p>
+                <p className="text-xs text-muted-foreground">Active Jobs</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        <TabsContent value="all" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredJobs.length === 0 ? (
-               <div className="col-span-full text-center py-12 text-muted-foreground">
-                 No jobs found.
-               </div>
-            ) : filteredJobs.map(job => (
-              <JobCard key={job.id} job={job} statusColor={getStatusColor(job.status)} isAdmin={user.role === 'admin'} />
-            ))}
-          </div>
-        </TabsContent>
-        
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation("/quotes")} data-testid="card-pending-quotes">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-500 rounded-lg">
+                <FileText className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{pendingQuotes.length}</p>
+                <p className="text-xs text-muted-foreground">Pending Quotes</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        <TabsContent value="signatures" className="mt-6">
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredJobs.filter(j => j.status === "Awaiting Signatures").map(job => (
-               <JobCard key={job.id} job={job} statusColor={getStatusColor(job.status)} isAdmin={user.role === 'admin'} />
-            ))}
-          </div>
-        </TabsContent>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation("/invoices")} data-testid="card-unpaid-invoices">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${overdueInvoices.length > 0 ? 'bg-red-500' : 'bg-emerald-500'}`}>
+                <Receipt className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{unpaidInvoices.length}</p>
+                <p className="text-xs text-muted-foreground">Unpaid Invoices</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        <TabsContent value="done" className="mt-6">
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredJobs.filter(j => j.status === "Signed Off").map(job => (
-               <JobCard key={job.id} job={job} statusColor={getStatusColor(job.status)} isAdmin={user.role === 'admin'} />
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation("/engineers")} data-testid="card-team">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-500 rounded-lg">
+                <Users className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{engineers.length}</p>
+                <p className="text-xs text-muted-foreground">Team Members</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {totalUnpaidAmount > 0 && (
+        <Card className="border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-500 rounded-lg">
+                  <Wallet className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-emerald-700 dark:text-emerald-300">Outstanding Revenue</p>
+                  <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-200">£{totalUnpaidAmount.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
+                </div>
+              </div>
+              <Button variant="outline" className="border-emerald-300" onClick={() => setLocation("/invoices")}>
+                View Invoices
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Calendar className="h-5 w-5 text-primary" />
+              Today's Schedule
+            </CardTitle>
+            <CardDescription>{format(new Date(), "EEEE, dd MMMM yyyy")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {todayJobs.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Calendar className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                <p>No jobs scheduled for today</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {todayJobs.slice(0, 5).map(job => (
+                  <div 
+                    key={job.id} 
+                    className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-900 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    onClick={() => setLocation(`/jobs/${job.id}`)}
+                    data-testid={`today-job-${job.id}`}
+                  >
+                    <Badge variant={job.status === "In Progress" ? "default" : "secondary"} className="shrink-0">
+                      {job.session || "TBD"}
+                    </Badge>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{job.customerName}</p>
+                      <p className="text-xs text-muted-foreground truncate">{job.address || "No address"}</p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                ))}
+                {todayJobs.length > 5 && (
+                  <Button variant="ghost" className="w-full" onClick={() => setLocation("/jobs")}>
+                    View all {todayJobs.length} jobs
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              Pending Approvals
+            </CardTitle>
+            <CardDescription>Items requiring your attention</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {awaitingSignature.length > 0 && (
+                <div 
+                  className="flex items-center justify-between p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                  onClick={() => setLocation("/jobs")}
+                  data-testid="pending-signatures"
+                >
+                  <div className="flex items-center gap-3">
+                    <Signature className="h-5 w-5 text-amber-600" />
+                    <span className="font-medium">Jobs Awaiting Sign-off</span>
+                  </div>
+                  <Badge variant="secondary">{awaitingSignature.length}</Badge>
+                </div>
+              )}
+              
+              {pendingTimesheets.length > 0 && (
+                <div 
+                  className="flex items-center justify-between p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                  onClick={() => setLocation("/timesheets")}
+                  data-testid="pending-timesheets"
+                >
+                  <div className="flex items-center gap-3">
+                    <Timer className="h-5 w-5 text-blue-600" />
+                    <span className="font-medium">Timesheets to Approve</span>
+                  </div>
+                  <Badge variant="secondary">{pendingTimesheets.length}</Badge>
+                </div>
+              )}
+
+              {pendingExpenses.length > 0 && (
+                <div 
+                  className="flex items-center justify-between p-3 rounded-lg bg-purple-50 dark:bg-purple-950/30 cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+                  onClick={() => setLocation("/expenses")}
+                  data-testid="pending-expenses"
+                >
+                  <div className="flex items-center gap-3">
+                    <Receipt className="h-5 w-5 text-purple-600" />
+                    <span className="font-medium">Expenses to Approve</span>
+                  </div>
+                  <Badge variant="secondary">{pendingExpenses.length}</Badge>
+                </div>
+              )}
+
+              {acceptedQuotes.length > 0 && (
+                <div 
+                  className="flex items-center justify-between p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors"
+                  onClick={() => setLocation("/quotes")}
+                  data-testid="accepted-quotes"
+                >
+                  <div className="flex items-center gap-3">
+                    <CheckCircle className="h-5 w-5 text-emerald-600" />
+                    <span className="font-medium">Accepted Quotes (Ready for Job)</span>
+                  </div>
+                  <Badge variant="secondary">{acceptedQuotes.length}</Badge>
+                </div>
+              )}
+
+              {awaitingSignature.length === 0 && pendingTimesheets.length === 0 && pendingExpenses.length === 0 && acceptedQuotes.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <CheckCircle className="h-10 w-10 mx-auto mb-2 opacity-50 text-emerald-500" />
+                  <p>All caught up!</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-4">
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation("/clients")} data-testid="card-clients">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-slate-500 rounded-lg">
+                <Building2 className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{clients.length}</p>
+                <p className="text-xs text-muted-foreground">Total Clients</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation("/completed-jobs")} data-testid="card-completed">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-500 rounded-lg">
+                <CheckCircle className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{completedJobs.length}</p>
+                <p className="text-xs text-muted-foreground">Completed Jobs</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation("/fleet")} data-testid="card-fleet">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-orange-500 rounded-lg">
+                <Truck className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="text-lg font-bold">Fleet</p>
+                <p className="text-xs text-muted-foreground">Manage Vehicles</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

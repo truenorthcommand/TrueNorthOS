@@ -8,6 +8,7 @@ import { StoreProvider } from "@/lib/store";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
+import Jobs from "@/pages/jobs";
 import JobDetail from "@/pages/job-detail";
 import SignOff from "@/pages/sign-off";
 import Clients from "@/pages/clients";
@@ -163,6 +164,9 @@ function Router() {
       </Route>
       <Route path="/">
         <PrivateRoute component={Dashboard} />
+      </Route>
+      <Route path="/jobs">
+        <PrivateRoute component={Jobs} />
       </Route>
       <Route path="/jobs/:id">
         <PrivateRoute component={JobDetail} />

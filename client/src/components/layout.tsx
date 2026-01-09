@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 
 type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools' | 'fleet' | 'finance';
+import { LayoutDashboard as DashboardIcon } from "lucide-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
@@ -158,29 +159,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {collapsed ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Link href="/home">
+              <Link href="/">
                 <Button
-                  variant={location === "/home" ? "secondary" : "ghost"}
+                  variant={location === "/" ? "secondary" : "ghost"}
                   size="icon"
                   className="w-10 h-10"
-                  data-testid="nav-home"
+                  data-testid="nav-dashboard"
                 >
-                  <Home className="h-5 w-5" />
+                  <LayoutDashboard className="h-5 w-5" />
                 </Button>
               </Link>
             </TooltipTrigger>
-            <TooltipContent side="right">Home</TooltipContent>
+            <TooltipContent side="right">Dashboard</TooltipContent>
           </Tooltip>
         ) : (
-          <Link href="/home">
+          <Link href="/">
             <Button
-              variant={location === "/home" ? "secondary" : "ghost"}
+              variant={location === "/" ? "secondary" : "ghost"}
               className="w-full justify-start h-12 text-lg font-medium"
               onClick={() => setIsOpen(false)}
-              data-testid="nav-home"
+              data-testid="nav-dashboard"
             >
-              <Home className="mr-3 h-5 w-5" />
-              Home
+              <LayoutDashboard className="mr-3 h-5 w-5" />
+              Dashboard
             </Button>
           </Link>
         )}
@@ -196,7 +197,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Jobs Section (Quotes convert to Jobs) */}
         <MenuGroup title="Jobs" icon={Briefcase} section="jobs">
-          <NavLink href="/" icon={LayoutDashboard}>Jobs List</NavLink>
+          <NavLink href="/jobs" icon={Briefcase}>Jobs List</NavLink>
           {user.role === "admin" && (
             <NavLink href="/completed-jobs" icon={CheckCircle2}>Completed Jobs</NavLink>
           )}
