@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, Bell, Shield, MessageCircle, Truck, ClipboardCheck, AlertTriangle } from "lucide-react";
+import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, Bell, Shield, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -11,7 +11,7 @@ import { useNotifications } from "@/hooks/use-notifications";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 
-type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools' | 'fleet';
+type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools' | 'fleet' | 'finance';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
@@ -264,6 +264,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <NavLink href="/map" icon={MapPin}>Live Map</NavLink>
           </MenuGroup>
         )}
+
+        {/* Finance Section */}
+        <MenuGroup title="Finance" icon={Wallet} section="finance">
+          <NavLink href="/timesheets" icon={Timer}>Timesheets</NavLink>
+          <NavLink href="/expenses" icon={Receipt}>Expenses</NavLink>
+          {user.role === "admin" && (
+            <NavLink href="/payments" icon={CreditCard}>Payments</NavLink>
+          )}
+        </MenuGroup>
 
         {/* Fleet Section */}
         <MenuGroup title="Fleet" icon={Truck} section="fleet">
