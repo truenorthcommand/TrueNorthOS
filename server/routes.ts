@@ -7,7 +7,7 @@ import { TOTP, Secret } from "otpauth";
 import QRCode from "qrcode";
 import { storage } from "./storage";
 import { pool } from "./db";
-import { insertJobSchema, insertAiAdvisorSchema } from "@shared/schema";
+import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalkaroundCheckSchema, insertCheckItemSchema, insertDefectSchema, insertDefectUpdateSchema } from "@shared/schema";
 import { z } from "zod";
 import { notifyAdmins } from "./notifications";
 import { sessionMiddleware } from "./session";
@@ -1967,6 +1967,311 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
+  // ==================== FLEET MAINTENANCE ====================
+
+  // Get fleet dashboard stats
+  app.get("/api/fleet/stats", requireAuth, async (req, res) => {
+    try {
+      const stats = await storage.getFleetDashboardStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Fleet stats error:", error);
+      res.status(500).json({ error: "Failed to get fleet stats" });
+    }
+  });
+
+  // Get all vehicles
+  app.get("/api/fleet/vehicles", requireAuth, async (req, res) => {
+    try {
+      const vehiclesWithStats = await storage.getVehiclesWithStats();
+      res.json(vehiclesWithStats);
+    } catch (error) {
+      console.error("Get vehicles error:", error);
+      res.status(500).json({ error: "Failed to get vehicles" });
+    }
+  });
+
+  // Get single vehicle
+  app.get("/api/fleet/vehicles/:id", requireAuth, async (req, res) => {
+    try {
+      const vehicle = await storage.getVehicle(req.params.id);
+      if (!vehicle) {
+        return res.status(404).json({ error: "Vehicle not found" });
+      }
+      res.json(vehicle);
+    } catch (error) {
+      console.error("Get vehicle error:", error);
+      res.status(500).json({ error: "Failed to get vehicle" });
+    }
+  });
+
+  // Create vehicle
+  app.post("/api/fleet/vehicles", requireAdmin, async (req, res) => {
+    try {
+      const parsed = insertVehicleSchema.parse(req.body);
+      const vehicle = await storage.createVehicle(parsed);
+      res.status(201).json(vehicle);
+    } catch (error: any) {
+      console.error("Create vehicle error:", error);
+      res.status(400).json({ error: error.message || "Failed to create vehicle" });
+    }
+  });
+
+  // Update vehicle
+  app.patch("/api/fleet/vehicles/:id", requireAdmin, async (req, res) => {
+    try {
+      const vehicle = await storage.updateVehicle(req.params.id, req.body);
+      if (!vehicle) {
+        return res.status(404).json({ error: "Vehicle not found" });
+      }
+      res.json(vehicle);
+    } catch (error) {
+      console.error("Update vehicle error:", error);
+      res.status(500).json({ error: "Failed to update vehicle" });
+    }
+  });
+
+  // Delete vehicle
+  app.delete("/api/fleet/vehicles/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteVehicle(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Delete vehicle error:", error);
+      res.status(500).json({ error: "Failed to delete vehicle" });
+    }
+  });
+
+  // Get all walkaround checks
+  app.get("/api/fleet/checks", requireAuth, async (req, res) => {
+    try {
+      const checks = await storage.getAllWalkaroundChecks();
+      res.json(checks);
+    } catch (error) {
+      console.error("Get checks error:", error);
+      res.status(500).json({ error: "Failed to get checks" });
+    }
+  });
+
+  // Get checks for a specific vehicle
+  app.get("/api/fleet/vehicles/:vehicleId/checks", requireAuth, async (req, res) => {
+    try {
+      const checks = await storage.getWalkaroundChecksByVehicle(req.params.vehicleId);
+      res.json(checks);
+    } catch (error) {
+      console.error("Get vehicle checks error:", error);
+      res.status(500).json({ error: "Failed to get vehicle checks" });
+    }
+  });
+
+  // Get single check with details
+  app.get("/api/fleet/checks/:id", requireAuth, async (req, res) => {
+    try {
+      const check = await storage.getWalkaroundCheckWithDetails(req.params.id);
+      if (!check) {
+        return res.status(404).json({ error: "Check not found" });
+      }
+      res.json(check);
+    } catch (error) {
+      console.error("Get check error:", error);
+      res.status(500).json({ error: "Failed to get check" });
+    }
+  });
+
+  // Create walkaround check
+  app.post("/api/fleet/checks", requireAuth, async (req, res) => {
+    try {
+      const { items, ...checkData } = req.body;
+      const parsedCheck = insertWalkaroundCheckSchema.parse({
+        ...checkData,
+        inspectorId: req.session.userId,
+      });
+      
+      // Validate items
+      const parsedItems = (items || []).map((item: any) => insertCheckItemSchema.parse({ ...item, checkId: '' }));
+      
+      // Determine overall status
+      const hasFailure = parsedItems.some((item: any) => item.status === 'fail');
+      parsedCheck.overallStatus = hasFailure ? 'fail' : 'pass';
+      
+      const check = await storage.createWalkaroundCheck(parsedCheck, parsedItems);
+      
+      // Auto-create defects for failed items
+      if (hasFailure) {
+        const failedItems = parsedItems.filter((item: any) => item.status === 'fail');
+        for (const failedItem of failedItems) {
+          await storage.createDefect({
+            vehicleId: parsedCheck.vehicleId,
+            checkId: check.id,
+            category: failedItem.itemName,
+            severity: failedItem.severity || 'minor',
+            description: failedItem.note || `Failed ${failedItem.itemName} check`,
+            photos: failedItem.photoUrl ? [failedItem.photoUrl] : [],
+            vehicleOffRoad: !parsedCheck.vehicleSafeToOperate,
+            reportedById: req.session.userId!,
+          });
+        }
+        
+        // Update vehicle status if not safe to operate
+        if (!parsedCheck.vehicleSafeToOperate) {
+          await storage.updateVehicle(parsedCheck.vehicleId, { status: 'off-road' });
+        }
+      }
+      
+      res.status(201).json(check);
+    } catch (error: any) {
+      console.error("Create check error:", error);
+      res.status(400).json({ error: error.message || "Failed to create check" });
+    }
+  });
+
+  // Get all defects
+  app.get("/api/fleet/defects", requireAuth, async (req, res) => {
+    try {
+      const { status, severity, vehicleId } = req.query;
+      let defectsData = await storage.getAllDefects();
+      
+      if (status) {
+        defectsData = defectsData.filter(d => d.status === status);
+      }
+      if (severity) {
+        defectsData = defectsData.filter(d => d.severity === severity);
+      }
+      if (vehicleId) {
+        defectsData = defectsData.filter(d => d.vehicleId === vehicleId);
+      }
+      
+      res.json(defectsData);
+    } catch (error) {
+      console.error("Get defects error:", error);
+      res.status(500).json({ error: "Failed to get defects" });
+    }
+  });
+
+  // Get open defects only
+  app.get("/api/fleet/defects/open", requireAuth, async (req, res) => {
+    try {
+      const openDefects = await storage.getOpenDefects();
+      res.json(openDefects);
+    } catch (error) {
+      console.error("Get open defects error:", error);
+      res.status(500).json({ error: "Failed to get open defects" });
+    }
+  });
+
+  // Get defects for a specific vehicle
+  app.get("/api/fleet/vehicles/:vehicleId/defects", requireAuth, async (req, res) => {
+    try {
+      const vehicleDefects = await storage.getDefectsByVehicle(req.params.vehicleId);
+      res.json(vehicleDefects);
+    } catch (error) {
+      console.error("Get vehicle defects error:", error);
+      res.status(500).json({ error: "Failed to get vehicle defects" });
+    }
+  });
+
+  // Get single defect with details
+  app.get("/api/fleet/defects/:id", requireAuth, async (req, res) => {
+    try {
+      const defect = await storage.getDefectWithDetails(req.params.id);
+      if (!defect) {
+        return res.status(404).json({ error: "Defect not found" });
+      }
+      res.json(defect);
+    } catch (error) {
+      console.error("Get defect error:", error);
+      res.status(500).json({ error: "Failed to get defect" });
+    }
+  });
+
+  // Create defect (standalone reporting)
+  app.post("/api/fleet/defects", requireAuth, async (req, res) => {
+    try {
+      const parsed = insertDefectSchema.parse({
+        ...req.body,
+        reportedById: req.session.userId,
+      });
+      const defect = await storage.createDefect(parsed);
+      
+      // If vehicle is marked off-road, update vehicle status
+      if (parsed.vehicleOffRoad) {
+        await storage.updateVehicle(parsed.vehicleId, { status: 'off-road' });
+      }
+      
+      res.status(201).json(defect);
+    } catch (error: any) {
+      console.error("Create defect error:", error);
+      res.status(400).json({ error: error.message || "Failed to create defect" });
+    }
+  });
+
+  // Update defect
+  app.patch("/api/fleet/defects/:id", requireAuth, async (req, res) => {
+    try {
+      const oldDefect = await storage.getDefect(req.params.id);
+      if (!oldDefect) {
+        return res.status(404).json({ error: "Defect not found" });
+      }
+      
+      const updates = req.body;
+      const defect = await storage.updateDefect(req.params.id, updates);
+      
+      // Create update entry if status changed
+      if (updates.status && updates.status !== oldDefect.status) {
+        await storage.createDefectUpdate({
+          defectId: req.params.id,
+          userId: req.session.userId!,
+          statusChange: updates.status,
+          comment: updates.comment || `Status changed to ${updates.status}`,
+        });
+        
+        // Update timestamps
+        if (updates.status === 'resolved') {
+          await storage.updateDefect(req.params.id, { resolvedAt: new Date() });
+        } else if (updates.status === 'closed') {
+          await storage.updateDefect(req.params.id, { closedAt: new Date() });
+        }
+      }
+      
+      res.json(defect);
+    } catch (error) {
+      console.error("Update defect error:", error);
+      res.status(500).json({ error: "Failed to update defect" });
+    }
+  });
+
+  // Add comment to defect
+  app.post("/api/fleet/defects/:id/comments", requireAuth, async (req, res) => {
+    try {
+      const { comment } = req.body;
+      if (!comment) {
+        return res.status(400).json({ error: "Comment required" });
+      }
+      
+      const update = await storage.createDefectUpdate({
+        defectId: req.params.id,
+        userId: req.session.userId!,
+        comment,
+      });
+      
+      res.status(201).json(update);
+    } catch (error) {
+      console.error("Add comment error:", error);
+      res.status(500).json({ error: "Failed to add comment" });
+    }
+  });
+
+  // Get defect update history
+  app.get("/api/fleet/defects/:id/history", requireAuth, async (req, res) => {
+    try {
+      const history = await storage.getDefectUpdates(req.params.id);
+      res.json(history);
+    } catch (error) {
+      console.error("Get defect history error:", error);
+      res.status(500).json({ error: "Failed to get defect history" });
+    }
+  });
+
   // ==================== SEED ROUTE (DEV ONLY) ====================
 
   // Simple GET endpoint to reset passwords - requires secret key
@@ -2194,6 +2499,123 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     } catch (error) {
       console.error("Seed advisors error:", error);
       res.status(500).json({ error: "Failed to seed AI advisors" });
+    }
+  });
+
+  // Seed fleet data
+  app.post("/api/seed-fleet", async (req, res) => {
+    try {
+      const existingVehicles = await storage.getAllVehicles();
+      if (existingVehicles.length > 0) {
+        return res.json({ message: "Fleet data already seeded" });
+      }
+
+      // Get admin user for defect reporting
+      const admin = await storage.getUserByUsername("admin");
+      const john = await storage.getUserByUsername("john");
+      if (!admin || !john) {
+        return res.status(400).json({ error: "Seed users first with POST /api/seed" });
+      }
+
+      // Create sample vehicles
+      const van1 = await storage.createVehicle({
+        registration: "AB12 CDE",
+        make: "Ford",
+        model: "Transit Custom",
+        year: 2022,
+        type: "Van",
+        status: "active",
+      });
+
+      const van2 = await storage.createVehicle({
+        registration: "CD34 EFG",
+        make: "Mercedes",
+        model: "Sprinter",
+        year: 2021,
+        type: "Van",
+        status: "active",
+      });
+
+      const truck = await storage.createVehicle({
+        registration: "EF56 GHI",
+        make: "Iveco",
+        model: "Daily",
+        year: 2020,
+        type: "Truck",
+        status: "off-road",
+      });
+
+      // Create a completed walkaround check for van1
+      const check = await storage.createWalkaroundCheck({
+        vehicleId: van1.id,
+        checkType: "pre",
+        odometer: 45230,
+        inspectorId: john.id,
+        overallStatus: "pass",
+        vehicleSafeToOperate: true,
+        notes: "Vehicle in good condition, ready for use",
+      }, [
+        { checkId: "", itemName: "tyres", status: "pass", note: null },
+        { checkId: "", itemName: "lights", status: "pass", note: null },
+        { checkId: "", itemName: "mirrors_windows", status: "pass", note: null },
+        { checkId: "", itemName: "brakes", status: "pass", note: null },
+        { checkId: "", itemName: "steering", status: "pass", note: null },
+        { checkId: "", itemName: "fluids", status: "pass", note: null },
+        { checkId: "", itemName: "leaks", status: "pass", note: null },
+        { checkId: "", itemName: "wipers", status: "pass", note: null },
+        { checkId: "", itemName: "body_damage", status: "pass", note: null },
+        { checkId: "", itemName: "dash_warnings", status: "pass", note: null },
+        { checkId: "", itemName: "doors_security", status: "pass", note: null },
+      ]);
+
+      // Create sample defects
+      const defect1 = await storage.createDefect({
+        vehicleId: truck.id,
+        category: "brakes",
+        severity: "critical",
+        description: "Brake pads worn below minimum thickness. Vehicle unsafe to operate until replaced.",
+        vehicleOffRoad: true,
+        reportedById: john.id,
+        photos: [],
+      });
+
+      const defect2 = await storage.createDefect({
+        vehicleId: van2.id,
+        category: "lights",
+        severity: "major",
+        description: "Rear left brake light not working. Bulb replacement required.",
+        vehicleOffRoad: false,
+        reportedById: admin.id,
+        assignedToId: john.id,
+        photos: [],
+      });
+
+      const defect3 = await storage.createDefect({
+        vehicleId: van1.id,
+        category: "body_damage",
+        severity: "minor",
+        description: "Small scratch on passenger door. Cosmetic only, no safety concern.",
+        vehicleOffRoad: false,
+        reportedById: john.id,
+        photos: [],
+      });
+
+      // Add comment to defect2
+      await storage.createDefectUpdate({
+        defectId: defect2.id,
+        userId: admin.id,
+        comment: "Assigned to John for repair. Bulb ordered.",
+      });
+
+      res.json({ 
+        message: "Fleet data seeded successfully",
+        vehicles: 3,
+        checks: 1,
+        defects: 3
+      });
+    } catch (error) {
+      console.error("Seed fleet error:", error);
+      res.status(500).json({ error: "Failed to seed fleet data: " + (error as Error).message });
     }
   });
 

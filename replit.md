@@ -30,6 +30,7 @@ This application enables field service companies to manage job sheets digitally.
 - **Long-running Jobs**: Track multi-day projects with daily progress updates (max 2 per day), photo evidence per update, and update history grouped by date
 - **Team Messaging**: WhatsApp-style internal messaging for real-time team communication with direct messages, group chats, typing indicators, and unread badges
 - **GDPR Compliance**: Cookie consent banner, privacy policy page, terms of service, data export, and account deletion request features
+- **Fleet Maintenance**: Vehicle fleet management with daily walkaround checks, defect reporting, defect workflow (open→in progress→resolved→closed), vehicle status tracking (active/off-road/maintenance)
 
 ## User Credentials (Demo)
 
@@ -62,6 +63,11 @@ This application enables field service companies to manage job sheets digitally.
 - `conversations` - Chat conversations (direct or group)
 - `conversation_members` - Members of each conversation with read status
 - `messages` - Chat messages with sender and timestamp
+- `vehicles` - Fleet vehicles (registration, make, model, status)
+- `walkaround_checks` - Daily vehicle checks (pre/post use)
+- `check_items` - Individual check items (tyres, lights, brakes, etc.)
+- `defects` - Vehicle defects with severity and workflow status
+- `defect_updates` - Comment/update history for defects
 
 ## Sign-off Validation Rules
 

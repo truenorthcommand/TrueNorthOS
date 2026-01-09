@@ -13,8 +13,15 @@ import {
   type ConversationMember, type InsertConversationMember,
   type Message, type InsertMessage,
   type ConversationWithDetails, type MessageWithSender,
+  type Vehicle, type InsertVehicle,
+  type WalkaroundCheck, type InsertWalkaroundCheck,
+  type CheckItem, type InsertCheckItem,
+  type Defect, type InsertDefect,
+  type DefectUpdate, type InsertDefectUpdate,
+  type WalkaroundCheckWithDetails, type DefectWithDetails, type VehicleWithStats,
   users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, jobUpdates,
-  conversations, conversationMembers, messages
+  conversations, conversationMembers, messages,
+  vehicles, walkaroundChecks, checkItems, defects, defectUpdates
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and, ne, inArray, gt, asc } from "drizzle-orm";
@@ -100,6 +107,38 @@ export interface IStorage {
   getMessages(conversationId: string, limit?: number, before?: Date): Promise<MessageWithSender[]>;
   markConversationRead(conversationId: string, userId: string): Promise<void>;
   getUnreadCount(userId: string): Promise<number>;
+  
+  // Fleet Maintenance
+  getVehicle(id: string): Promise<Vehicle | undefined>;
+  getAllVehicles(): Promise<Vehicle[]>;
+  getVehiclesWithStats(): Promise<VehicleWithStats[]>;
+  createVehicle(vehicle: InsertVehicle): Promise<Vehicle>;
+  updateVehicle(id: string, updates: Partial<Vehicle>): Promise<Vehicle | undefined>;
+  deleteVehicle(id: string): Promise<void>;
+  
+  getWalkaroundCheck(id: string): Promise<WalkaroundCheck | undefined>;
+  getWalkaroundCheckWithDetails(id: string): Promise<WalkaroundCheckWithDetails | undefined>;
+  getWalkaroundChecksByVehicle(vehicleId: string): Promise<WalkaroundCheckWithDetails[]>;
+  getAllWalkaroundChecks(): Promise<WalkaroundCheckWithDetails[]>;
+  getTodayChecks(): Promise<WalkaroundCheckWithDetails[]>;
+  createWalkaroundCheck(check: InsertWalkaroundCheck, items: InsertCheckItem[]): Promise<WalkaroundCheck>;
+  
+  getDefect(id: string): Promise<Defect | undefined>;
+  getDefectWithDetails(id: string): Promise<DefectWithDetails | undefined>;
+  getDefectsByVehicle(vehicleId: string): Promise<DefectWithDetails[]>;
+  getAllDefects(): Promise<DefectWithDetails[]>;
+  getOpenDefects(): Promise<DefectWithDetails[]>;
+  createDefect(defect: InsertDefect): Promise<Defect>;
+  updateDefect(id: string, updates: Partial<Defect>): Promise<Defect | undefined>;
+  
+  createDefectUpdate(update: InsertDefectUpdate): Promise<DefectUpdate>;
+  getDefectUpdates(defectId: string): Promise<(DefectUpdate & { user: Pick<User, 'id' | 'name'> })[]>;
+  
+  getFleetDashboardStats(): Promise<{
+    checksCompletedToday: number;
+    checksDueToday: number;
+    openDefectsBySeverity: { critical: number; major: number; minor: number };
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -730,6 +769,288 @@ export class DatabaseStorage implements IStorage {
     }
     
     return totalUnread;
+  }
+
+  // Fleet Maintenance Methods
+  async getVehicle(id: string): Promise<Vehicle | undefined> {
+    const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, id));
+    return vehicle;
+  }
+
+  async getAllVehicles(): Promise<Vehicle[]> {
+    return db.select().from(vehicles).orderBy(asc(vehicles.registration));
+  }
+
+  async getVehiclesWithStats(): Promise<VehicleWithStats[]> {
+    const allVehicles = await this.getAllVehicles();
+    return Promise.all(allVehicles.map(async (vehicle) => {
+      const [lastCheck] = await db.select()
+        .from(walkaroundChecks)
+        .where(eq(walkaroundChecks.vehicleId, vehicle.id))
+        .orderBy(desc(walkaroundChecks.createdAt))
+        .limit(1);
+      
+      const openDefectsResult = await db.select({ count: sql<number>`count(*)` })
+        .from(defects)
+        .where(and(
+          eq(defects.vehicleId, vehicle.id),
+          inArray(defects.status, ['open', 'in_progress'])
+        ));
+      
+      return {
+        ...vehicle,
+        lastCheckDate: lastCheck?.createdAt || null,
+        openDefectsCount: Number(openDefectsResult[0]?.count || 0),
+      };
+    }));
+  }
+
+  async createVehicle(vehicle: InsertVehicle): Promise<Vehicle> {
+    const [created] = await db.insert(vehicles).values(vehicle).returning();
+    return created;
+  }
+
+  async updateVehicle(id: string, updates: Partial<Vehicle>): Promise<Vehicle | undefined> {
+    const [updated] = await db.update(vehicles)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(vehicles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteVehicle(id: string): Promise<void> {
+    await db.delete(vehicles).where(eq(vehicles.id, id));
+  }
+
+  async getWalkaroundCheck(id: string): Promise<WalkaroundCheck | undefined> {
+    const [check] = await db.select().from(walkaroundChecks).where(eq(walkaroundChecks.id, id));
+    return check;
+  }
+
+  async getWalkaroundCheckWithDetails(id: string): Promise<WalkaroundCheckWithDetails | undefined> {
+    const check = await this.getWalkaroundCheck(id);
+    if (!check) return undefined;
+    
+    const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, check.vehicleId));
+    const [inspector] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, check.inspectorId));
+    const items = await db.select().from(checkItems).where(eq(checkItems.checkId, check.id));
+    
+    return { ...check, vehicle, inspector, items };
+  }
+
+  async getWalkaroundChecksByVehicle(vehicleId: string): Promise<WalkaroundCheckWithDetails[]> {
+    const checks = await db.select()
+      .from(walkaroundChecks)
+      .where(eq(walkaroundChecks.vehicleId, vehicleId))
+      .orderBy(desc(walkaroundChecks.createdAt));
+    
+    return Promise.all(checks.map(async (check) => {
+      const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, check.vehicleId));
+      const [inspector] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, check.inspectorId));
+      const items = await db.select().from(checkItems).where(eq(checkItems.checkId, check.id));
+      return { ...check, vehicle, inspector, items };
+    }));
+  }
+
+  async getAllWalkaroundChecks(): Promise<WalkaroundCheckWithDetails[]> {
+    const checks = await db.select()
+      .from(walkaroundChecks)
+      .orderBy(desc(walkaroundChecks.createdAt))
+      .limit(100);
+    
+    return Promise.all(checks.map(async (check) => {
+      const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, check.vehicleId));
+      const [inspector] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, check.inspectorId));
+      const items = await db.select().from(checkItems).where(eq(checkItems.checkId, check.id));
+      return { ...check, vehicle, inspector, items };
+    }));
+  }
+
+  async getTodayChecks(): Promise<WalkaroundCheckWithDetails[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const checks = await db.select()
+      .from(walkaroundChecks)
+      .where(gt(walkaroundChecks.createdAt, today))
+      .orderBy(desc(walkaroundChecks.createdAt));
+    
+    return Promise.all(checks.map(async (check) => {
+      const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, check.vehicleId));
+      const [inspector] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, check.inspectorId));
+      const items = await db.select().from(checkItems).where(eq(checkItems.checkId, check.id));
+      return { ...check, vehicle, inspector, items };
+    }));
+  }
+
+  async createWalkaroundCheck(check: InsertWalkaroundCheck, items: InsertCheckItem[]): Promise<WalkaroundCheck> {
+    const [created] = await db.insert(walkaroundChecks).values(check).returning();
+    
+    if (items.length > 0) {
+      const itemsWithCheckId = items.map(item => ({ ...item, checkId: created.id }));
+      await db.insert(checkItems).values(itemsWithCheckId);
+    }
+    
+    return created;
+  }
+
+  async getDefect(id: string): Promise<Defect | undefined> {
+    const [defect] = await db.select().from(defects).where(eq(defects.id, id));
+    return defect;
+  }
+
+  async getDefectWithDetails(id: string): Promise<DefectWithDetails | undefined> {
+    const defect = await this.getDefect(id);
+    if (!defect) return undefined;
+    
+    const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, defect.vehicleId));
+    const [reportedBy] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, defect.reportedById));
+    
+    let assignedTo = null;
+    if (defect.assignedToId) {
+      const [assigned] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, defect.assignedToId));
+      assignedTo = assigned;
+    }
+    
+    let check = null;
+    if (defect.checkId) {
+      const [c] = await db.select().from(walkaroundChecks).where(eq(walkaroundChecks.id, defect.checkId));
+      check = c;
+    }
+    
+    return { ...defect, vehicle, reportedBy, assignedTo, check };
+  }
+
+  async getDefectsByVehicle(vehicleId: string): Promise<DefectWithDetails[]> {
+    const allDefects = await db.select()
+      .from(defects)
+      .where(eq(defects.vehicleId, vehicleId))
+      .orderBy(desc(defects.createdAt));
+    
+    return Promise.all(allDefects.map(async (defect) => {
+      const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, defect.vehicleId));
+      const [reportedBy] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, defect.reportedById));
+      let assignedTo = null;
+      if (defect.assignedToId) {
+        const [assigned] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, defect.assignedToId));
+        assignedTo = assigned;
+      }
+      return { ...defect, vehicle, reportedBy, assignedTo };
+    }));
+  }
+
+  async getAllDefects(): Promise<DefectWithDetails[]> {
+    const allDefects = await db.select()
+      .from(defects)
+      .orderBy(desc(defects.createdAt))
+      .limit(100);
+    
+    return Promise.all(allDefects.map(async (defect) => {
+      const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, defect.vehicleId));
+      const [reportedBy] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, defect.reportedById));
+      let assignedTo = null;
+      if (defect.assignedToId) {
+        const [assigned] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, defect.assignedToId));
+        assignedTo = assigned;
+      }
+      return { ...defect, vehicle, reportedBy, assignedTo };
+    }));
+  }
+
+  async getOpenDefects(): Promise<DefectWithDetails[]> {
+    const openDefects = await db.select()
+      .from(defects)
+      .where(inArray(defects.status, ['open', 'in_progress']))
+      .orderBy(desc(defects.createdAt));
+    
+    return Promise.all(openDefects.map(async (defect) => {
+      const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, defect.vehicleId));
+      const [reportedBy] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, defect.reportedById));
+      let assignedTo = null;
+      if (defect.assignedToId) {
+        const [assigned] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, defect.assignedToId));
+        assignedTo = assigned;
+      }
+      return { ...defect, vehicle, reportedBy, assignedTo };
+    }));
+  }
+
+  async createDefect(defect: InsertDefect): Promise<Defect> {
+    const [created] = await db.insert(defects).values(defect).returning();
+    return created;
+  }
+
+  async updateDefect(id: string, updates: Partial<Defect>): Promise<Defect | undefined> {
+    const [updated] = await db.update(defects)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(defects.id, id))
+      .returning();
+    return updated;
+  }
+
+  async createDefectUpdate(update: InsertDefectUpdate): Promise<DefectUpdate> {
+    const [created] = await db.insert(defectUpdates).values(update).returning();
+    return created;
+  }
+
+  async getDefectUpdates(defectId: string): Promise<(DefectUpdate & { user: Pick<User, 'id' | 'name'> })[]> {
+    const updates = await db.select()
+      .from(defectUpdates)
+      .where(eq(defectUpdates.defectId, defectId))
+      .orderBy(asc(defectUpdates.createdAt));
+    
+    return Promise.all(updates.map(async (update) => {
+      const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, update.userId));
+      return { ...update, user };
+    }));
+  }
+
+  async getFleetDashboardStats(): Promise<{
+    checksCompletedToday: number;
+    checksDueToday: number;
+    openDefectsBySeverity: { critical: number; major: number; minor: number };
+  }> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const checksResult = await db.select({ count: sql<number>`count(*)` })
+      .from(walkaroundChecks)
+      .where(gt(walkaroundChecks.createdAt, today));
+    
+    const vehicleCount = await db.select({ count: sql<number>`count(*)` })
+      .from(vehicles)
+      .where(eq(vehicles.status, 'active'));
+    
+    const criticalResult = await db.select({ count: sql<number>`count(*)` })
+      .from(defects)
+      .where(and(
+        eq(defects.severity, 'critical'),
+        inArray(defects.status, ['open', 'in_progress'])
+      ));
+    
+    const majorResult = await db.select({ count: sql<number>`count(*)` })
+      .from(defects)
+      .where(and(
+        eq(defects.severity, 'major'),
+        inArray(defects.status, ['open', 'in_progress'])
+      ));
+    
+    const minorResult = await db.select({ count: sql<number>`count(*)` })
+      .from(defects)
+      .where(and(
+        eq(defects.severity, 'minor'),
+        inArray(defects.status, ['open', 'in_progress'])
+      ));
+    
+    return {
+      checksCompletedToday: Number(checksResult[0]?.count || 0),
+      checksDueToday: Number(vehicleCount[0]?.count || 0),
+      openDefectsBySeverity: {
+        critical: Number(criticalResult[0]?.count || 0),
+        major: Number(majorResult[0]?.count || 0),
+        minor: Number(minorResult[0]?.count || 0),
+      }
+    };
   }
 }
 

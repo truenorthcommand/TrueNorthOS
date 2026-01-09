@@ -406,3 +406,137 @@ export type ConversationWithDetails = Conversation & {
 export type MessageWithSender = Message & {
   sender: Pick<User, 'id' | 'name' | 'role'>;
 };
+
+// Fleet Maintenance - Vehicles
+export const vehicles = pgTable("vehicles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  registration: text("registration").notNull().unique(),
+  make: text("make"),
+  model: text("model"),
+  year: integer("year"),
+  type: text("type"), // Van, Truck, Car, etc.
+  status: text("status").notNull().default("active"), // active, off-road, maintenance
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertVehicleSchema = createInsertSchema(vehicles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
+export type Vehicle = typeof vehicles.$inferSelect;
+
+// Fleet Maintenance - Walkaround Checks
+export const walkaroundChecks = pgTable("walkaround_checks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vehicleId: varchar("vehicle_id").notNull(),
+  checkType: text("check_type").notNull(), // pre, post
+  odometer: integer("odometer"),
+  inspectorId: varchar("inspector_id").notNull(),
+  overallStatus: text("overall_status").notNull().default("pass"), // pass, fail
+  vehicleSafeToOperate: boolean("vehicle_safe_to_operate").default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWalkaroundCheckSchema = createInsertSchema(walkaroundChecks, {
+  createdAt: z.coerce.date().optional(),
+}).omit({
+  id: true,
+});
+
+export type InsertWalkaroundCheck = z.infer<typeof insertWalkaroundCheckSchema>;
+export type WalkaroundCheck = typeof walkaroundChecks.$inferSelect;
+
+// Fleet Maintenance - Check Items (individual items in a walkaround check)
+export const checkItems = pgTable("check_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  checkId: varchar("check_id").notNull(),
+  itemName: text("item_name").notNull(), // tyres, lights, mirrors, etc.
+  status: text("status").notNull(), // pass, fail, na
+  note: text("note"),
+  photoUrl: text("photo_url"),
+  severity: text("severity"), // critical, major, minor - only if fail
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCheckItemSchema = createInsertSchema(checkItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCheckItem = z.infer<typeof insertCheckItemSchema>;
+export type CheckItem = typeof checkItems.$inferSelect;
+
+// Fleet Maintenance - Defects
+export const defects = pgTable("defects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vehicleId: varchar("vehicle_id").notNull(),
+  checkId: varchar("check_id"), // null if standalone, linked if from walkaround
+  checkItemId: varchar("check_item_id"), // which check item caused this defect
+  category: text("category").notNull(), // tyres, lights, brakes, etc.
+  severity: text("severity").notNull(), // critical, major, minor
+  description: text("description").notNull(),
+  photos: jsonb("photos").default([]),
+  vehicleOffRoad: boolean("vehicle_off_road").notNull().default(false),
+  status: text("status").notNull().default("open"), // open, in_progress, resolved, closed
+  reportedById: varchar("reported_by_id").notNull(),
+  assignedToId: varchar("assigned_to_id"),
+  resolvedAt: timestamp("resolved_at"),
+  closedAt: timestamp("closed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDefectSchema = createInsertSchema(defects, {
+  resolvedAt: z.coerce.date().optional(),
+  closedAt: z.coerce.date().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDefect = z.infer<typeof insertDefectSchema>;
+export type Defect = typeof defects.$inferSelect;
+
+// Fleet Maintenance - Defect Updates (comment/update history)
+export const defectUpdates = pgTable("defect_updates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  defectId: varchar("defect_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  comment: text("comment"),
+  statusChange: text("status_change"), // what status it changed to
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDefectUpdateSchema = createInsertSchema(defectUpdates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertDefectUpdate = z.infer<typeof insertDefectUpdateSchema>;
+export type DefectUpdate = typeof defectUpdates.$inferSelect;
+
+// Extended types for Fleet Maintenance UI
+export type WalkaroundCheckWithDetails = WalkaroundCheck & {
+  vehicle: Vehicle;
+  inspector: Pick<User, 'id' | 'name'>;
+  items: CheckItem[];
+};
+
+export type DefectWithDetails = Defect & {
+  vehicle: Vehicle;
+  reportedBy: Pick<User, 'id' | 'name'>;
+  assignedTo?: Pick<User, 'id' | 'name'> | null;
+  check?: WalkaroundCheck | null;
+};
+
+export type VehicleWithStats = Vehicle & {
+  lastCheckDate: Date | null;
+  openDefectsCount: number;
+};

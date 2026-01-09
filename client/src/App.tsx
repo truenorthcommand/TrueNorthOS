@@ -34,6 +34,12 @@ import Security from "@/pages/security";
 import Messages from "@/pages/messages";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
+import Fleet from "@/pages/fleet";
+import FleetVehicles from "@/pages/fleet-vehicles";
+import VehicleDetail from "@/pages/vehicle-detail";
+import WalkaroundCheck from "@/pages/walkaround-check";
+import ReportDefect from "@/pages/report-defect";
+import DefectDetail from "@/pages/defect-detail";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -118,6 +124,24 @@ function Router() {
       </Route>
       <Route path="/messages">
         <PrivateRoute component={Messages} />
+      </Route>
+      <Route path="/fleet">
+        <PrivateRoute component={Fleet} />
+      </Route>
+      <Route path="/fleet/vehicles">
+        <PrivateRoute component={FleetVehicles} />
+      </Route>
+      <Route path="/fleet/vehicles/:id">
+        <PrivateRoute component={VehicleDetail} />
+      </Route>
+      <Route path="/fleet/walkaround">
+        <PrivateRoute component={WalkaroundCheck} />
+      </Route>
+      <Route path="/fleet/report-defect">
+        <PrivateRoute component={ReportDefect} />
+      </Route>
+      <Route path="/fleet/defects/:id">
+        <PrivateRoute component={DefectDetail} />
       </Route>
       <Route path="/ai-advisors">
         <PrivateRoute component={AiAdvisors} />
