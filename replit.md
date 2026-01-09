@@ -17,6 +17,7 @@ This application enables field service companies to manage job sheets digitally.
 - **Digital Signatures**: Capture engineer and customer signatures
 - **GPS Tracking**: Live engineer locations on map, geolocation-stamped sign-offs with reverse geocoding
 - **AI Advisors**: Specialist AI assistants (Snagging Pro, Trade Parts Finder, Gas & Heating Expert, Electrical Expert) with photo analysis
+- **AI Writing Assistant**: Accessibility feature for users with dyslexia or literacy challenges - includes spelling/grammar correction, text simplification, note expansion, professional rewriting, voice-to-text dictation, and text-to-speech read-aloud
 - **Further Actions**: Flag issues with priority levels (low/medium/high/urgent)
 - **Print-friendly Output**: Generate PDF-ready job sheets
 - **PWA Support**: Installable as mobile app with offline caching

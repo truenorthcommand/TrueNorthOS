@@ -1952,7 +1952,6 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
           { role: "user", content: userPrompt }
         ],
         max_completion_tokens: 1024,
-        temperature: 0.3,
       });
 
       const result = response.choices[0].message.content?.trim() || text;
