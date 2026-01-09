@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AIInput } from "@/components/ui/ai-assist";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -535,7 +536,7 @@ export default function Messages() {
                 )}
 
                 <form onSubmit={handleSendMessage} className="p-4 border-t flex gap-2">
-                  <Input
+                  <AIInput
                     placeholder="Type a message..."
                     value={messageInput}
                     onChange={(e) => {
@@ -544,6 +545,7 @@ export default function Messages() {
                     }}
                     onKeyDown={(e) => e.stopPropagation()}
                     className="flex-1"
+                    aiContext="team chat message"
                     data-testid="input-message"
                   />
                   <Button type="submit" disabled={!messageInput.trim()} data-testid="button-send">

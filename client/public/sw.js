@@ -1,4 +1,4 @@
-const CACHE_NAME = 'truenorth-fieldview-v4';
+const CACHE_NAME = 'truenorth-fieldview-v5';
 
 const STATIC_ASSETS = [
   '/manifest.json',

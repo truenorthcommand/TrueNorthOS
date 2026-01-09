@@ -1895,6 +1895,71 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
+  // ==================== AI WRITING ASSISTANT ====================
+  
+  // AI text assistance for accessibility - helps with spelling, grammar, simplification
+  app.post("/api/ai/assist", requireAuth, async (req, res) => {
+    try {
+      const openai = getOpenAIClient();
+      if (!openai) {
+        return res.status(503).json({ error: "AI service not configured" });
+      }
+
+      const { text, mode, context } = req.body;
+      
+      if (!text || typeof text !== 'string') {
+        return res.status(400).json({ error: "Text is required" });
+      }
+
+      if (!mode || !['fix', 'simplify', 'expand', 'professional'].includes(mode)) {
+        return res.status(400).json({ error: "Valid mode required: fix, simplify, expand, or professional" });
+      }
+
+      let systemPrompt = '';
+      let userPrompt = '';
+
+      switch (mode) {
+        case 'fix':
+          systemPrompt = `You are a helpful writing assistant. Your job is to fix spelling and grammar mistakes while keeping the original meaning and tone. Only output the corrected text, nothing else. If the text is already correct, return it unchanged. Keep it natural and conversational - don't make it overly formal.`;
+          userPrompt = `Fix any spelling and grammar mistakes in this text:\n\n${text}`;
+          break;
+        case 'simplify':
+          systemPrompt = `You are a helpful writing assistant. Your job is to simplify text to make it easier to read and understand. Use shorter sentences and simpler words. Only output the simplified text, nothing else.`;
+          userPrompt = `Simplify this text to make it easier to read:\n\n${text}`;
+          break;
+        case 'expand':
+          systemPrompt = `You are a helpful writing assistant. Your job is to expand brief notes into complete, clear sentences. Keep the same meaning but make it more detailed and professional. Only output the expanded text, nothing else.`;
+          userPrompt = `Expand these brief notes into complete sentences:\n\n${text}${context ? `\n\nContext: ${context}` : ''}`;
+          break;
+        case 'professional':
+          systemPrompt = `You are a helpful writing assistant for field service engineers. Your job is to rewrite text in a professional, clear manner suitable for job reports and client communication. Only output the rewritten text, nothing else.`;
+          userPrompt = `Rewrite this in a professional, clear manner for a job report:\n\n${text}`;
+          break;
+      }
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        max_completion_tokens: 1024,
+        temperature: 0.3,
+      });
+
+      const result = response.choices[0].message.content?.trim() || text;
+      
+      res.json({ 
+        original: text,
+        result,
+        mode 
+      });
+    } catch (error: any) {
+      console.error("AI assist error:", error);
+      res.status(500).json({ error: error.message || "AI assistance failed" });
+    }
+  });
+
   // ==================== SEED ROUTE (DEV ONLY) ====================
 
   // Simple GET endpoint to reset passwords - requires secret key

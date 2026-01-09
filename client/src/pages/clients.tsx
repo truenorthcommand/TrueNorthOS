@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { AITextarea } from "@/components/ui/ai-assist";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -457,24 +458,26 @@ export default function Clients() {
 
                 <div className="space-y-2">
                   <Label>Description of Works *</Label>
-                  <Textarea
+                  <AITextarea
                     placeholder="Describe the work to be carried out..."
                     value={jobForm.description}
                     onChange={(e) => setJobForm({ ...jobForm, description: e.target.value })}
                     className="min-h-[120px]"
                     required
                     data-testid="input-description"
+                    aiContext="job description for field service work"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label>Notes (Optional)</Label>
-                  <Textarea
+                  <AITextarea
                     placeholder="Access codes, parking info, special instructions..."
                     value={jobForm.notes}
                     onChange={(e) => setJobForm({ ...jobForm, notes: e.target.value })}
                     className="min-h-[80px]"
                     data-testid="input-notes"
+                    aiContext="job notes and instructions"
                   />
                 </div>
 

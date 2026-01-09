@@ -4,6 +4,7 @@ import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { AITextarea } from "@/components/ui/ai-assist";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -634,13 +635,14 @@ export default function JobDetail() {
           <CardContent className="space-y-6 pt-6 print:pt-0">
             <div className="space-y-2">
               <Label>Description of Works</Label>
-              <Textarea 
+              <AITextarea 
                 value={formData.description} 
                 onChange={(e) => handleFieldChange('description', e.target.value)}
                 onBlur={() => handleFieldBlur('description')}
                 disabled={isAdminFieldReadOnly}
                 className="min-h-[120px] text-base print:border-none print:p-0"
                 placeholder="Describe the work to be carried out..."
+                aiContext="job description for field service work"
               />
             </div>
 
@@ -649,7 +651,7 @@ export default function JobDetail() {
                 Works Completed
                 <Badge variant="outline" className="text-xs font-normal">Engineer</Badge>
               </Label>
-              <Textarea 
+              <AITextarea 
                 value={formData.worksCompleted} 
                 onChange={(e) => handleFieldChange('worksCompleted', e.target.value)}
                 onBlur={() => handleFieldBlur('worksCompleted')}
@@ -657,19 +659,21 @@ export default function JobDetail() {
                 className="min-h-[120px] text-base print:border-none print:p-0 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800"
                 placeholder="Describe the work that has been completed..."
                 data-testid="input-works-completed"
+                aiContext="engineer work completed notes and observations"
               />
               <p className="text-xs text-muted-foreground">Enter details of all work completed on this job</p>
             </div>
             
             <div className="space-y-2">
               <Label>Internal Notes</Label>
-              <Textarea 
+              <AITextarea 
                 value={formData.notes} 
                 onChange={(e) => handleFieldChange('notes', e.target.value)}
                 onBlur={() => handleFieldBlur('notes')}
                 disabled={isReadOnly}
                 className="min-h-[80px] print:hidden"
                 placeholder="Access codes, parking info, etc."
+                aiContext="engineer job notes and observations"
               />
               <div className="hidden print:block text-sm italic text-muted-foreground">
                 {job.notes}
@@ -713,12 +717,13 @@ export default function JobDetail() {
                       
                       <div className="space-y-2">
                         <Label>Update Notes *</Label>
-                        <Textarea
+                        <AITextarea
                           placeholder="Describe today's progress, work completed, issues encountered..."
                           value={updateNotes}
                           onChange={(e) => setUpdateNotes(e.target.value)}
                           className="min-h-[100px]"
                           data-testid="textarea-update-notes"
+                          aiContext="engineer daily progress update notes"
                         />
                       </div>
 
@@ -1104,11 +1109,12 @@ export default function JobDetail() {
               <div className="space-y-4 mb-6 p-4 bg-white dark:bg-slate-900/50 rounded-lg border">
                 <div className="space-y-2">
                   <Label>Action Description</Label>
-                  <Textarea
+                  <AITextarea
                     placeholder="Describe any further actions needed, issues found, or follow-up work required..."
                     value={actionDescription}
                     onChange={(e) => setActionDescription(e.target.value)}
                     className="min-h-[80px]"
+                    aiContext="job follow-up action description"
                   />
                 </div>
 

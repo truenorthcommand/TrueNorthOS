@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { AITextarea } from "@/components/ui/ai-assist";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -435,12 +436,13 @@ export default function QuoteDetail() {
               <CardTitle>Description</CardTitle>
             </CardHeader>
             <CardContent>
-              <Textarea
+              <AITextarea
                 value={quote.description || ""}
                 onChange={(e) => setQuote({ ...quote, description: e.target.value })}
                 placeholder="Enter a description of the work..."
                 rows={4}
                 data-testid="input-description"
+                aiContext="quote work description"
               />
             </CardContent>
           </Card>
@@ -549,20 +551,22 @@ export default function QuoteDetail() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Terms & Conditions</Label>
-                <Textarea
+                <AITextarea
                   value={quote.terms || ""}
                   onChange={(e) => setQuote({ ...quote, terms: e.target.value })}
                   placeholder="Enter terms and conditions..."
                   rows={3}
+                  aiContext="quote terms and conditions"
                 />
               </div>
               <div className="space-y-2">
                 <Label>Notes</Label>
-                <Textarea
+                <AITextarea
                   value={quote.notes || ""}
                   onChange={(e) => setQuote({ ...quote, notes: e.target.value })}
                   placeholder="Additional notes..."
                   rows={3}
+                  aiContext="quote notes for customer"
                 />
               </div>
             </CardContent>
@@ -672,7 +676,7 @@ export default function QuoteDetail() {
             <DialogTitle>Item Description</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <Textarea
+            <AITextarea
               value={expandedDescriptionValue}
               onChange={(e) => setExpandedDescriptionValue(e.target.value)}
               placeholder="Enter a detailed description for this line item..."
@@ -680,6 +684,7 @@ export default function QuoteDetail() {
               className="resize-none"
               autoFocus
               data-testid="textarea-expanded-description"
+              aiContext="quote line item description"
             />
           </div>
           <DialogFooter>
