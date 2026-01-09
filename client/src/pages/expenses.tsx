@@ -204,7 +204,7 @@ export default function Expenses() {
       amount: parseFloat(amount),
       vatAmount: vatAmount ? parseFloat(vatAmount) : 0,
       receiptUrl: receiptUrl || null,
-      jobId: jobId || null,
+      jobId: (jobId && jobId !== "none") ? jobId : null,
       notes: notes || null,
     };
 
@@ -398,7 +398,7 @@ export default function Expenses() {
                     <SelectValue placeholder="Select job (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No job linked</SelectItem>
+                    <SelectItem value="none">No job linked</SelectItem>
                     {jobs.map((job) => (
                       <SelectItem key={job.id} value={job.id}>
                         {job.jobNo} - {job.customerName}
