@@ -5,12 +5,22 @@ import crypto from "crypto";
 import OpenAI from "openai";
 import { TOTP, Secret } from "otpauth";
 import QRCode from "qrcode";
+import Stripe from "stripe";
 import { storage } from "./storage";
 import { pool } from "./db";
 import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalkaroundCheckSchema, insertCheckItemSchema, insertDefectSchema, insertDefectUpdateSchema, insertTimesheetSchema, insertExpenseSchema, insertPaymentSchema } from "@shared/schema";
 import { z } from "zod";
 import { notifyAdmins } from "./notifications";
 import { sessionMiddleware } from "./session";
+
+function getStripeClient(): Stripe | null {
+  if (process.env.STRIPE_SECRET_KEY) {
+    return new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: "2025-05-28.basil",
+    });
+  }
+  return null;
+}
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 function getOpenAIClient(): OpenAI | null {
@@ -3000,6 +3010,121 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
       console.error("Update payment error:", error);
       res.status(500).json({ error: "Failed to update payment" });
     }
+  });
+
+  // ==================== STRIPE PAYMENT ROUTES ====================
+
+  app.post("/api/stripe/create-payment-intent", async (req, res) => {
+    try {
+      const stripe = getStripeClient();
+      if (!stripe) {
+        return res.status(500).json({ error: "Stripe is not configured" });
+      }
+
+      const { invoiceId } = req.body;
+      if (!invoiceId) {
+        return res.status(400).json({ error: "Invoice ID is required" });
+      }
+
+      const invoice = await storage.getInvoice(invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      if (invoice.status === "paid") {
+        return res.status(400).json({ error: "Invoice is already paid" });
+      }
+
+      const amountInPence = Math.round((invoice.total || 0) * 100);
+      if (amountInPence < 30) {
+        return res.status(400).json({ error: "Amount must be at least £0.30" });
+      }
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amountInPence,
+        currency: "gbp",
+        metadata: {
+          invoiceId: invoice.id,
+          invoiceNo: invoice.invoiceNo,
+          customerName: invoice.customerName,
+        },
+        description: `Payment for Invoice ${invoice.invoiceNo}`,
+        receipt_email: invoice.customerEmail || undefined,
+      });
+
+      res.json({
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+      });
+    } catch (error: any) {
+      console.error("Create payment intent error:", error);
+      res.status(500).json({ error: error.message || "Failed to create payment intent" });
+    }
+  });
+
+  app.post("/api/stripe/webhook", async (req, res) => {
+    const stripe = getStripeClient();
+    if (!stripe) {
+      return res.status(500).json({ error: "Stripe is not configured" });
+    }
+
+    const sig = req.headers["stripe-signature"] as string;
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!webhookSecret) {
+      console.warn("Stripe webhook secret not configured");
+      return res.status(400).json({ error: "Webhook secret not configured" });
+    }
+
+    let event: Stripe.Event;
+
+    try {
+      const rawBody = (req as any).rawBody;
+      if (!rawBody) {
+        return res.status(400).json({ error: "Raw body not available for webhook verification" });
+      }
+      event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+    } catch (err: any) {
+      console.error("Webhook signature verification failed:", err.message);
+      return res.status(400).json({ error: `Webhook Error: ${err.message}` });
+    }
+
+    if (event.type === "payment_intent.succeeded") {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent;
+      const invoiceId = paymentIntent.metadata.invoiceId;
+
+      if (invoiceId) {
+        try {
+          const payment = await storage.createPayment({
+            invoiceId,
+            amount: paymentIntent.amount / 100,
+            method: "card",
+            reference: paymentIntent.id,
+            stripePaymentIntentId: paymentIntent.id,
+            paidAt: new Date(),
+          });
+
+          await storage.updateInvoice(invoiceId, {
+            status: "paid",
+            paidAt: new Date(),
+          });
+
+          console.log(`Payment recorded for invoice ${invoiceId}`);
+        } catch (error) {
+          console.error("Error recording payment:", error);
+        }
+      }
+    }
+
+    res.json({ received: true });
+  });
+
+  app.get("/api/stripe/config", async (req, res) => {
+    const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
+    if (!publishableKey) {
+      return res.status(500).json({ error: "Stripe is not configured" });
+    }
+    res.json({ publishableKey });
   });
 
   // ==================== MESSAGING ROUTES ====================
