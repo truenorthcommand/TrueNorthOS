@@ -11,6 +11,10 @@ declare module "express-session" {
 
 const PgSession = connectPgSimple(session);
 
+// Detect if running on Replit (always HTTPS in production)
+const isProduction = process.env.NODE_ENV === 'production';
+const isReplit = !!process.env.REPL_ID;
+
 export const sessionMiddleware = session({
   store: new PgSession({
     pool: pool as any,
@@ -20,10 +24,11 @@ export const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || 'promains-field-view-secret-key-2024',
   resave: false,
   saveUninitialized: false,
+  proxy: isReplit, // Trust Replit's proxy for secure cookies
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: isReplit || isProduction, // Always secure on Replit
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: isReplit ? 'none' : 'lax', // 'none' required for cross-site cookies on mobile PWA
     maxAge: 7 * 24 * 60 * 60 * 1000,
   }
 });
