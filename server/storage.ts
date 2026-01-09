@@ -19,9 +19,13 @@ import {
   type Defect, type InsertDefect,
   type DefectUpdate, type InsertDefectUpdate,
   type WalkaroundCheckWithDetails, type DefectWithDetails, type VehicleWithStats,
+  type Timesheet, type InsertTimesheet, type TimesheetWithUser,
+  type Expense, type InsertExpense, type ExpenseWithDetails,
+  type Payment, type InsertPayment, type PaymentWithInvoice,
   users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, jobUpdates,
   conversations, conversationMembers, messages,
-  vehicles, walkaroundChecks, checkItems, defects, defectUpdates
+  vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
+  timesheets, expenses, payments
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and, ne, inArray, gt, asc } from "drizzle-orm";
@@ -139,6 +143,30 @@ export interface IStorage {
     checksDueToday: number;
     openDefectsBySeverity: { critical: number; major: number; minor: number };
   }>;
+  
+  // Timesheets
+  getTimesheet(id: string): Promise<Timesheet | undefined>;
+  getTimesheetsByUser(userId: string): Promise<TimesheetWithUser[]>;
+  getAllTimesheets(): Promise<TimesheetWithUser[]>;
+  createTimesheet(timesheet: InsertTimesheet): Promise<Timesheet>;
+  updateTimesheet(id: string, updates: Partial<Timesheet>): Promise<Timesheet | undefined>;
+  deleteTimesheet(id: string): Promise<void>;
+  getActiveClockIn(userId: string): Promise<Timesheet | undefined>;
+  
+  // Expenses
+  getExpense(id: string): Promise<Expense | undefined>;
+  getExpensesByUser(userId: string): Promise<ExpenseWithDetails[]>;
+  getAllExpenses(): Promise<ExpenseWithDetails[]>;
+  createExpense(expense: InsertExpense): Promise<Expense>;
+  updateExpense(id: string, updates: Partial<Expense>): Promise<Expense | undefined>;
+  deleteExpense(id: string): Promise<void>;
+  
+  // Payments
+  getPayment(id: string): Promise<Payment | undefined>;
+  getPaymentsByInvoice(invoiceId: string): Promise<Payment[]>;
+  getAllPayments(): Promise<PaymentWithInvoice[]>;
+  createPayment(payment: InsertPayment): Promise<Payment>;
+  updatePayment(id: string, updates: Partial<Payment>): Promise<Payment | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1051,6 +1079,179 @@ export class DatabaseStorage implements IStorage {
         minor: Number(minorResult[0]?.count || 0),
       }
     };
+  }
+
+  // ==================== TIMESHEETS ====================
+
+  async getTimesheet(id: string): Promise<Timesheet | undefined> {
+    const [timesheet] = await db.select().from(timesheets).where(eq(timesheets.id, id));
+    return timesheet;
+  }
+
+  async getTimesheetsByUser(userId: string): Promise<TimesheetWithUser[]> {
+    const results = await db.select().from(timesheets)
+      .where(eq(timesheets.userId, userId))
+      .orderBy(desc(timesheets.date));
+    
+    return Promise.all(results.map(async (timesheet) => {
+      const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, timesheet.userId));
+      let approvedBy = null;
+      if (timesheet.approvedById) {
+        const [approver] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, timesheet.approvedById));
+        approvedBy = approver || null;
+      }
+      return { ...timesheet, user, approvedBy };
+    }));
+  }
+
+  async getAllTimesheets(): Promise<TimesheetWithUser[]> {
+    const results = await db.select().from(timesheets).orderBy(desc(timesheets.date));
+    
+    return Promise.all(results.map(async (timesheet) => {
+      const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, timesheet.userId));
+      let approvedBy = null;
+      if (timesheet.approvedById) {
+        const [approver] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, timesheet.approvedById));
+        approvedBy = approver || null;
+      }
+      return { ...timesheet, user, approvedBy };
+    }));
+  }
+
+  async createTimesheet(timesheet: InsertTimesheet): Promise<Timesheet> {
+    const [created] = await db.insert(timesheets).values(timesheet).returning();
+    return created;
+  }
+
+  async updateTimesheet(id: string, updates: Partial<Timesheet>): Promise<Timesheet | undefined> {
+    const [updated] = await db.update(timesheets)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(timesheets.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTimesheet(id: string): Promise<void> {
+    await db.delete(timesheets).where(eq(timesheets.id, id));
+  }
+
+  async getActiveClockIn(userId: string): Promise<Timesheet | undefined> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const [activeTimesheet] = await db.select().from(timesheets)
+      .where(and(
+        eq(timesheets.userId, userId),
+        gt(timesheets.date, today),
+        sql`${timesheets.date} < ${tomorrow}`,
+        sql`${timesheets.clockIn} IS NOT NULL`,
+        isNull(timesheets.clockOut)
+      ))
+      .orderBy(desc(timesheets.clockIn))
+      .limit(1);
+    
+    return activeTimesheet;
+  }
+
+  // ==================== EXPENSES ====================
+
+  async getExpense(id: string): Promise<Expense | undefined> {
+    const [expense] = await db.select().from(expenses).where(eq(expenses.id, id));
+    return expense;
+  }
+
+  async getExpensesByUser(userId: string): Promise<ExpenseWithDetails[]> {
+    const results = await db.select().from(expenses)
+      .where(eq(expenses.userId, userId))
+      .orderBy(desc(expenses.date));
+    
+    return Promise.all(results.map(async (expense) => {
+      const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, expense.userId));
+      let approvedBy = null;
+      if (expense.approvedById) {
+        const [approver] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, expense.approvedById));
+        approvedBy = approver || null;
+      }
+      let job = null;
+      if (expense.jobId) {
+        const [jobRecord] = await db.select({ id: jobs.id, jobNo: jobs.jobNo, customerName: jobs.customerName }).from(jobs).where(eq(jobs.id, expense.jobId));
+        job = jobRecord || null;
+      }
+      return { ...expense, user, approvedBy, job };
+    }));
+  }
+
+  async getAllExpenses(): Promise<ExpenseWithDetails[]> {
+    const results = await db.select().from(expenses).orderBy(desc(expenses.date));
+    
+    return Promise.all(results.map(async (expense) => {
+      const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, expense.userId));
+      let approvedBy = null;
+      if (expense.approvedById) {
+        const [approver] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, expense.approvedById));
+        approvedBy = approver || null;
+      }
+      let job = null;
+      if (expense.jobId) {
+        const [jobRecord] = await db.select({ id: jobs.id, jobNo: jobs.jobNo, customerName: jobs.customerName }).from(jobs).where(eq(jobs.id, expense.jobId));
+        job = jobRecord || null;
+      }
+      return { ...expense, user, approvedBy, job };
+    }));
+  }
+
+  async createExpense(expense: InsertExpense): Promise<Expense> {
+    const [created] = await db.insert(expenses).values(expense).returning();
+    return created;
+  }
+
+  async updateExpense(id: string, updates: Partial<Expense>): Promise<Expense | undefined> {
+    const [updated] = await db.update(expenses)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(expenses.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteExpense(id: string): Promise<void> {
+    await db.delete(expenses).where(eq(expenses.id, id));
+  }
+
+  // ==================== PAYMENTS ====================
+
+  async getPayment(id: string): Promise<Payment | undefined> {
+    const [payment] = await db.select().from(payments).where(eq(payments.id, id));
+    return payment;
+  }
+
+  async getPaymentsByInvoice(invoiceId: string): Promise<Payment[]> {
+    return db.select().from(payments)
+      .where(eq(payments.invoiceId, invoiceId))
+      .orderBy(desc(payments.createdAt));
+  }
+
+  async getAllPayments(): Promise<PaymentWithInvoice[]> {
+    const results = await db.select().from(payments).orderBy(desc(payments.createdAt));
+    
+    return Promise.all(results.map(async (payment) => {
+      const [invoice] = await db.select().from(invoices).where(eq(invoices.id, payment.invoiceId));
+      return { ...payment, invoice };
+    }));
+  }
+
+  async createPayment(payment: InsertPayment): Promise<Payment> {
+    const [created] = await db.insert(payments).values(payment).returning();
+    return created;
+  }
+
+  async updatePayment(id: string, updates: Partial<Payment>): Promise<Payment | undefined> {
+    const [updated] = await db.update(payments)
+      .set(updates)
+      .where(eq(payments.id, id))
+      .returning();
+    return updated;
   }
 }
 

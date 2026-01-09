@@ -540,3 +540,117 @@ export type VehicleWithStats = Vehicle & {
   lastCheckDate: Date | null;
   openDefectsCount: number;
 };
+
+// ==================== TIMESHEETS ====================
+
+export const timesheets = pgTable("timesheets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  date: timestamp("date").notNull(),
+  clockIn: timestamp("clock_in"),
+  clockOut: timestamp("clock_out"),
+  breakMinutes: integer("break_minutes").default(0),
+  totalHours: doublePrecision("total_hours"),
+  jobId: varchar("job_id"), // optional link to job
+  notes: text("notes"),
+  status: text("status").notNull().default("pending"), // pending, approved, rejected
+  approvedById: varchar("approved_by_id"),
+  approvedAt: timestamp("approved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTimesheetSchema = createInsertSchema(timesheets, {
+  date: z.coerce.date(),
+  clockIn: z.coerce.date().optional(),
+  clockOut: z.coerce.date().optional(),
+  approvedAt: z.coerce.date().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertTimesheet = z.infer<typeof insertTimesheetSchema>;
+export type Timesheet = typeof timesheets.$inferSelect;
+
+// ==================== EXPENSES ====================
+
+export const expenses = pgTable("expenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  date: timestamp("date").notNull(),
+  category: text("category").notNull(), // mileage, materials, tools, fuel, subsistence, other
+  description: text("description").notNull(),
+  amount: doublePrecision("amount").notNull(),
+  vatAmount: doublePrecision("vat_amount").default(0),
+  receiptUrl: text("receipt_url"),
+  mileage: doublePrecision("mileage"), // for mileage claims
+  mileageRate: doublePrecision("mileage_rate"), // pence per mile
+  jobId: varchar("job_id"), // optional link to job
+  clientId: varchar("client_id"), // optional link to client
+  status: text("status").notNull().default("pending"), // pending, approved, rejected, paid
+  approvedById: varchar("approved_by_id"),
+  approvedAt: timestamp("approved_at"),
+  paidAt: timestamp("paid_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertExpenseSchema = createInsertSchema(expenses, {
+  date: z.coerce.date(),
+  approvedAt: z.coerce.date().optional(),
+  paidAt: z.coerce.date().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertExpense = z.infer<typeof insertExpenseSchema>;
+export type Expense = typeof expenses.$inferSelect;
+
+// ==================== PAYMENTS ====================
+
+export const payments = pgTable("payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull(),
+  amount: doublePrecision("amount").notNull(),
+  method: text("method").notNull(), // card, bank_transfer, cash, cheque
+  status: text("status").notNull().default("pending"), // pending, completed, failed, refunded
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  stripeChargeId: text("stripe_charge_id"),
+  cardLast4: text("card_last4"),
+  cardBrand: text("card_brand"),
+  reference: text("reference"), // bank transfer ref, cheque number, etc.
+  notes: text("notes"),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPaymentSchema = createInsertSchema(payments, {
+  paidAt: z.coerce.date().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+export type Payment = typeof payments.$inferSelect;
+
+// Extended types for Finance UI
+export type TimesheetWithUser = Timesheet & {
+  user: Pick<User, 'id' | 'name'>;
+  approvedBy?: Pick<User, 'id' | 'name'> | null;
+};
+
+export type ExpenseWithDetails = Expense & {
+  user: Pick<User, 'id' | 'name'>;
+  approvedBy?: Pick<User, 'id' | 'name'> | null;
+  job?: Pick<Job, 'id' | 'jobNo' | 'customerName'> | null;
+};
+
+export type PaymentWithInvoice = Payment & {
+  invoice: Invoice;
+};
