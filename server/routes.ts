@@ -7,7 +7,7 @@ import { TOTP, Secret } from "otpauth";
 import QRCode from "qrcode";
 import { storage } from "./storage";
 import { pool } from "./db";
-import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalkaroundCheckSchema, insertCheckItemSchema, insertDefectSchema, insertDefectUpdateSchema } from "@shared/schema";
+import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalkaroundCheckSchema, insertCheckItemSchema, insertDefectSchema, insertDefectUpdateSchema, insertTimesheetSchema, insertExpenseSchema, insertPaymentSchema } from "@shared/schema";
 import { z } from "zod";
 import { notifyAdmins } from "./notifications";
 import { sessionMiddleware } from "./session";
@@ -2616,6 +2616,389 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     } catch (error) {
       console.error("Seed fleet error:", error);
       res.status(500).json({ error: "Failed to seed fleet data: " + (error as Error).message });
+    }
+  });
+
+  // ==================== TIMESHEETS ROUTES ====================
+
+  app.get("/api/timesheets", requireAuth, async (req, res) => {
+    try {
+      let timesheets;
+      if (req.session.userRole === "admin") {
+        timesheets = await storage.getAllTimesheets();
+      } else {
+        timesheets = await storage.getTimesheetsByUser(req.session.userId!);
+      }
+      res.json(timesheets);
+    } catch (error) {
+      console.error("Get timesheets error:", error);
+      res.status(500).json({ error: "Failed to get timesheets" });
+    }
+  });
+
+  app.get("/api/timesheets/active", requireAuth, async (req, res) => {
+    try {
+      const activeTimesheet = await storage.getActiveClockIn(req.session.userId!);
+      res.json(activeTimesheet || null);
+    } catch (error) {
+      console.error("Get active clock-in error:", error);
+      res.status(500).json({ error: "Failed to get active clock-in" });
+    }
+  });
+
+  app.get("/api/timesheets/:id", requireAuth, async (req, res) => {
+    try {
+      const timesheet = await storage.getTimesheet(req.params.id);
+      if (!timesheet) {
+        return res.status(404).json({ error: "Timesheet not found" });
+      }
+      if (req.session.userRole !== "admin" && timesheet.userId !== req.session.userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      res.json(timesheet);
+    } catch (error) {
+      console.error("Get timesheet error:", error);
+      res.status(500).json({ error: "Failed to get timesheet" });
+    }
+  });
+
+  app.post("/api/timesheets", requireAuth, async (req, res) => {
+    try {
+      const data = insertTimesheetSchema.parse({
+        ...req.body,
+        userId: req.body.userId || req.session.userId,
+      });
+      if (req.session.userRole !== "admin" && data.userId !== req.session.userId) {
+        return res.status(403).json({ error: "Cannot create timesheet for another user" });
+      }
+      const timesheet = await storage.createTimesheet(data);
+      res.status(201).json(timesheet);
+    } catch (error) {
+      console.error("Create timesheet error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create timesheet" });
+    }
+  });
+
+  app.post("/api/timesheets/clock-in", requireAuth, async (req, res) => {
+    try {
+      const existingActive = await storage.getActiveClockIn(req.session.userId!);
+      if (existingActive) {
+        return res.status(400).json({ error: "Already clocked in. Please clock out first." });
+      }
+      const now = new Date();
+      const timesheet = await storage.createTimesheet({
+        userId: req.session.userId!,
+        date: now,
+        clockIn: now,
+        status: "pending",
+      });
+      res.status(201).json(timesheet);
+    } catch (error) {
+      console.error("Clock in error:", error);
+      res.status(500).json({ error: "Failed to clock in" });
+    }
+  });
+
+  app.post("/api/timesheets/clock-out", requireAuth, async (req, res) => {
+    try {
+      const activeTimesheet = await storage.getActiveClockIn(req.session.userId!);
+      if (!activeTimesheet) {
+        return res.status(400).json({ error: "No active clock-in found" });
+      }
+      const clockOut = new Date();
+      const clockIn = new Date(activeTimesheet.clockIn!);
+      const breakMinutes = activeTimesheet.breakMinutes || 0;
+      const diffMs = clockOut.getTime() - clockIn.getTime();
+      const totalHours = (diffMs / (1000 * 60 * 60)) - (breakMinutes / 60);
+      const updated = await storage.updateTimesheet(activeTimesheet.id, {
+        clockOut,
+        totalHours: Math.max(0, totalHours),
+      });
+      res.json(updated);
+    } catch (error) {
+      console.error("Clock out error:", error);
+      res.status(500).json({ error: "Failed to clock out" });
+    }
+  });
+
+  app.put("/api/timesheets/:id", requireAuth, async (req, res) => {
+    try {
+      const timesheet = await storage.getTimesheet(req.params.id);
+      if (!timesheet) {
+        return res.status(404).json({ error: "Timesheet not found" });
+      }
+      if (req.session.userRole !== "admin" && timesheet.userId !== req.session.userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const updated = await storage.updateTimesheet(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Update timesheet error:", error);
+      res.status(500).json({ error: "Failed to update timesheet" });
+    }
+  });
+
+  app.delete("/api/timesheets/:id", requireAdmin, async (req, res) => {
+    try {
+      const timesheet = await storage.getTimesheet(req.params.id);
+      if (!timesheet) {
+        return res.status(404).json({ error: "Timesheet not found" });
+      }
+      await storage.deleteTimesheet(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete timesheet error:", error);
+      res.status(500).json({ error: "Failed to delete timesheet" });
+    }
+  });
+
+  app.put("/api/timesheets/:id/approve", requireAdmin, async (req, res) => {
+    try {
+      const timesheet = await storage.getTimesheet(req.params.id);
+      if (!timesheet) {
+        return res.status(404).json({ error: "Timesheet not found" });
+      }
+      const updated = await storage.updateTimesheet(req.params.id, {
+        status: "approved",
+        approvedById: req.session.userId,
+        approvedAt: new Date(),
+      });
+      res.json(updated);
+    } catch (error) {
+      console.error("Approve timesheet error:", error);
+      res.status(500).json({ error: "Failed to approve timesheet" });
+    }
+  });
+
+  app.put("/api/timesheets/:id/reject", requireAdmin, async (req, res) => {
+    try {
+      const timesheet = await storage.getTimesheet(req.params.id);
+      if (!timesheet) {
+        return res.status(404).json({ error: "Timesheet not found" });
+      }
+      const updated = await storage.updateTimesheet(req.params.id, {
+        status: "rejected",
+        approvedById: req.session.userId,
+        approvedAt: new Date(),
+      });
+      res.json(updated);
+    } catch (error) {
+      console.error("Reject timesheet error:", error);
+      res.status(500).json({ error: "Failed to reject timesheet" });
+    }
+  });
+
+  // ==================== EXPENSES ROUTES ====================
+
+  app.get("/api/expenses", requireAuth, async (req, res) => {
+    try {
+      let expenses;
+      if (req.session.userRole === "admin") {
+        expenses = await storage.getAllExpenses();
+      } else {
+        expenses = await storage.getExpensesByUser(req.session.userId!);
+      }
+      res.json(expenses);
+    } catch (error) {
+      console.error("Get expenses error:", error);
+      res.status(500).json({ error: "Failed to get expenses" });
+    }
+  });
+
+  app.get("/api/expenses/:id", requireAuth, async (req, res) => {
+    try {
+      const expense = await storage.getExpense(req.params.id);
+      if (!expense) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      if (req.session.userRole !== "admin" && expense.userId !== req.session.userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      res.json(expense);
+    } catch (error) {
+      console.error("Get expense error:", error);
+      res.status(500).json({ error: "Failed to get expense" });
+    }
+  });
+
+  app.post("/api/expenses", requireAuth, async (req, res) => {
+    try {
+      const data = insertExpenseSchema.parse({
+        ...req.body,
+        userId: req.body.userId || req.session.userId,
+      });
+      if (req.session.userRole !== "admin" && data.userId !== req.session.userId) {
+        return res.status(403).json({ error: "Cannot create expense for another user" });
+      }
+      const expense = await storage.createExpense(data);
+      res.status(201).json(expense);
+    } catch (error) {
+      console.error("Create expense error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create expense" });
+    }
+  });
+
+  app.put("/api/expenses/:id", requireAuth, async (req, res) => {
+    try {
+      const expense = await storage.getExpense(req.params.id);
+      if (!expense) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      if (req.session.userRole !== "admin" && expense.userId !== req.session.userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const updated = await storage.updateExpense(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Update expense error:", error);
+      res.status(500).json({ error: "Failed to update expense" });
+    }
+  });
+
+  app.delete("/api/expenses/:id", requireAuth, async (req, res) => {
+    try {
+      const expense = await storage.getExpense(req.params.id);
+      if (!expense) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      if (req.session.userRole !== "admin" && expense.userId !== req.session.userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      await storage.deleteExpense(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete expense error:", error);
+      res.status(500).json({ error: "Failed to delete expense" });
+    }
+  });
+
+  app.put("/api/expenses/:id/approve", requireAdmin, async (req, res) => {
+    try {
+      const expense = await storage.getExpense(req.params.id);
+      if (!expense) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      const updated = await storage.updateExpense(req.params.id, {
+        status: "approved",
+        approvedById: req.session.userId,
+        approvedAt: new Date(),
+      });
+      res.json(updated);
+    } catch (error) {
+      console.error("Approve expense error:", error);
+      res.status(500).json({ error: "Failed to approve expense" });
+    }
+  });
+
+  app.put("/api/expenses/:id/reject", requireAdmin, async (req, res) => {
+    try {
+      const expense = await storage.getExpense(req.params.id);
+      if (!expense) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      const updated = await storage.updateExpense(req.params.id, {
+        status: "rejected",
+        approvedById: req.session.userId,
+        approvedAt: new Date(),
+      });
+      res.json(updated);
+    } catch (error) {
+      console.error("Reject expense error:", error);
+      res.status(500).json({ error: "Failed to reject expense" });
+    }
+  });
+
+  app.put("/api/expenses/:id/mark-paid", requireAdmin, async (req, res) => {
+    try {
+      const expense = await storage.getExpense(req.params.id);
+      if (!expense) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      const updated = await storage.updateExpense(req.params.id, {
+        status: "paid",
+        paidAt: new Date(),
+      });
+      res.json(updated);
+    } catch (error) {
+      console.error("Mark expense paid error:", error);
+      res.status(500).json({ error: "Failed to mark expense as paid" });
+    }
+  });
+
+  // ==================== PAYMENTS ROUTES ====================
+
+  app.get("/api/payments", requireAuth, async (req, res) => {
+    try {
+      const payments = await storage.getAllPayments();
+      res.json(payments);
+    } catch (error) {
+      console.error("Get payments error:", error);
+      res.status(500).json({ error: "Failed to get payments" });
+    }
+  });
+
+  app.get("/api/payments/:id", requireAuth, async (req, res) => {
+    try {
+      const payment = await storage.getPayment(req.params.id);
+      if (!payment) {
+        return res.status(404).json({ error: "Payment not found" });
+      }
+      res.json(payment);
+    } catch (error) {
+      console.error("Get payment error:", error);
+      res.status(500).json({ error: "Failed to get payment" });
+    }
+  });
+
+  app.get("/api/invoices/:id/payments", requireAuth, async (req, res) => {
+    try {
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      const payments = await storage.getPaymentsByInvoice(req.params.id);
+      res.json(payments);
+    } catch (error) {
+      console.error("Get invoice payments error:", error);
+      res.status(500).json({ error: "Failed to get invoice payments" });
+    }
+  });
+
+  app.post("/api/payments", requireAuth, async (req, res) => {
+    try {
+      const data = insertPaymentSchema.parse(req.body);
+      const invoice = await storage.getInvoice(data.invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      const payment = await storage.createPayment(data);
+      res.status(201).json(payment);
+    } catch (error) {
+      console.error("Create payment error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create payment" });
+    }
+  });
+
+  app.put("/api/payments/:id", requireAuth, async (req, res) => {
+    try {
+      const payment = await storage.getPayment(req.params.id);
+      if (!payment) {
+        return res.status(404).json({ error: "Payment not found" });
+      }
+      const updated = await storage.updatePayment(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Update payment error:", error);
+      res.status(500).json({ error: "Failed to update payment" });
     }
   });
 

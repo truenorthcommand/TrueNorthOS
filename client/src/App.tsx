@@ -40,6 +40,8 @@ import VehicleDetail from "@/pages/vehicle-detail";
 import WalkaroundCheck from "@/pages/walkaround-check";
 import ReportDefect from "@/pages/report-defect";
 import DefectDetail from "@/pages/defect-detail";
+import Timesheets from "@/pages/timesheets";
+import Expenses from "@/pages/expenses";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -101,6 +103,12 @@ function Router() {
       </Route>
       <Route path="/time-logs">
         <PrivateRoute component={TimeLogs} />
+      </Route>
+      <Route path="/timesheets">
+        <PrivateRoute component={Timesheets} />
+      </Route>
+      <Route path="/expenses">
+        <PrivateRoute component={Expenses} />
       </Route>
       <Route path="/quotes">
         <PrivateRoute component={Quotes} />
