@@ -1,36 +1,72 @@
 # TrueNorth Field View
 
-A web-based job sheet application for field engineers with authentication, job management, photo uploads, signature capture, GPS tracking, AI assistants, and PDF generation.
+A comprehensive Field Service ERP Suite for UK field engineers and tradespeople. Run your entire business from one platform — jobs, quotes, invoices, timesheets, expenses, fleet, team messaging, and AI-powered tools.
 
 ## Overview
 
-This application enables field service companies to manage job sheets digitally. Engineers can view assigned jobs, add materials, upload photos, capture signatures, and sign off jobs. Admins can manage all jobs and staff.
+TrueNorth Field View is a "business in a box" platform that enables field service companies to manage all aspects of their operation digitally. From job management and quoting to financial tracking and fleet maintenance, everything is integrated and built specifically for UK tradespeople.
 
-## Key Features
+## Platform Classification
 
-- **Role-based Authentication**: Admin, Engineer, and Super Admin roles with different access levels
-- **Two-Factor Authentication (2FA)**: TOTP-based 2FA using authenticator apps (Google Authenticator, Authy, etc.)
-- **Password Management**: Users can change their passwords (minimum 8 characters required)
-- **Super Admin**: Only super admins can add/remove staff members (granted via /setup reset-admin)
-- **Job Management**: Create, edit, track job progress and status
-- **Photo Evidence**: Upload photos as job completion evidence (separated by admin reference and engineer evidence)
-- **Digital Signatures**: Capture engineer and customer signatures
-- **GPS Tracking**: Live engineer locations on map, geolocation-stamped sign-offs with reverse geocoding
-- **AI Advisors**: Specialist AI assistants (Snagging Pro, Trade Parts Finder, Gas & Heating Expert, Electrical Expert) with photo analysis
-- **AI Writing Assistant**: Accessibility feature for users with dyslexia or literacy challenges - includes spelling/grammar correction, text simplification, note expansion, professional rewriting, voice-to-text dictation, and text-to-speech read-aloud
-- **Further Actions**: Flag issues with priority levels (low/medium/high/urgent)
-- **Print-friendly Output**: Generate PDF-ready job sheets
-- **PWA Support**: Installable as mobile app with offline caching
-- **Quoting System**: Create quotes with line items, discounts, VAT calculations (0/5/20%), send to clients via unique link
-- **Client Management**: Automatic client record creation/update when quotes are saved, with centralized client database
-- **Quote-to-Job Workflow**: Saving a quote automatically creates a draft job sheet linked to both the quote and client
-- **Client Quote Portal**: Clients can view, accept, or decline quotes with optional decline reason
-- **Invoice Management**: Generate invoices with bank transfer payment details
-- **Company Settings**: Configure company details, bank information, default VAT rates, and payment terms
-- **Long-running Jobs**: Track multi-day projects with daily progress updates (max 2 per day), photo evidence per update, and update history grouped by date
-- **Team Messaging**: WhatsApp-style internal messaging for real-time team communication with direct messages, group chats, typing indicators, and unread badges
-- **GDPR Compliance**: Cookie consent banner, privacy policy page, terms of service, data export, and account deletion request features
-- **Fleet Maintenance**: Vehicle fleet management with daily walkaround checks, defect reporting, defect workflow (open→in progress→resolved→closed), vehicle status tracking (active/off-road/maintenance)
+**Field Service ERP / All-in-One Operations Suite** — comparable to ServiceTitan, Simpro, and Jobber Pro.
+
+## Six Integrated Modules
+
+### 1. Operations
+- Job management with full lifecycle tracking
+- Quoting with VAT calculations (0/5/20%)
+- Invoice generation with bank transfer details
+- Client CRM with automatic record creation
+- Quote-to-job workflow automation
+- Client portal for quote acceptance
+- Photo evidence (admin reference & engineer evidence)
+- Digital signatures for sign-off
+- Long-running job tracking with daily updates
+
+### 2. Finance
+- Timesheets with clock in/out
+- Expense tracking with receipt upload
+- Mileage calculator (HMRC rates: 45p/25p per mile)
+- Payment collection and tracking
+- Financial reporting
+- Approval workflows for timesheets and expenses
+
+### 3. Fleet
+- Vehicle registry management
+- Daily walkaround checks (pre/post use)
+- Defect reporting and tracking
+- Defect workflow (open → in progress → resolved → closed)
+- Vehicle status tracking (active/off-road/maintenance)
+- Compliance record keeping
+
+### 4. Workforce
+- Team messaging (WhatsApp-style)
+- Live GPS tracking with map view
+- Role-based access (Admin, Engineer, Super Admin)
+- Weekly planner
+- Engineer assignment and workload management
+
+### 5. Compliance
+- Two-Factor Authentication (TOTP-based 2FA)
+- GDPR compliance (consent tracking, data export, deletion requests)
+- Geo-verified sign-offs with reverse geocoding
+- Full audit trails
+- Cookie consent and privacy controls
+
+### 6. Intelligence (AI-Powered)
+- Snagging Pro - Quality assessment specialist
+- Trade Parts Finder - UK parts sourcing
+- Gas & Heating Expert - Boiler diagnostics & Gas Safe
+- Electrical Expert - BS 7671 wiring regulations
+- AI Writing Assistant - Spelling, grammar, voice-to-text, read-aloud
+- Photo analysis capabilities
+
+## Key Features Summary
+
+- **Role-based Authentication**: Admin, Engineer, and Super Admin roles
+- **Two-Factor Authentication (2FA)**: TOTP-based using authenticator apps
+- **PWA Support**: Installable mobile app with offline caching
+- **UK-Focused**: HMRC mileage rates, UK VAT, Gas Safe, BS 7671 built in
 
 ## User Credentials (Demo)
 
@@ -51,17 +87,20 @@ This application enables field service companies to manage job sheets digitally.
 - `/server/db.ts` - PostgreSQL connection
 
 ### Database (PostgreSQL)
-- `users` - User accounts with roles, location tracking, 2FA settings (twoFactorSecret, twoFactorEnabled), GDPR consent tracking (gdprConsentDate, gdprConsentVersion, deletionRequestedAt)
+- `users` - User accounts with roles, location tracking, 2FA settings, GDPR consent
 - `jobs` - Job records with materials, photos, signatures
 - `clients` - Client records (name, email, phone, address, postcode)
 - `quotes` - Quote records with line items, linked to clients and jobs
 - `invoices` - Invoice records with payment details
-- `engineer_locations` - Location history
+- `timesheets` - Clock in/out records with approval workflow
+- `expenses` - Expense claims with mileage, receipts, approval workflow
+- `payments` - Payment records linked to invoices
+- `engineer_locations` - Location history for GPS tracking
 - `ai_advisors` - AI assistant configurations
 - `company_settings` - Company details, bank info, VAT rates
-- `job_updates` - Daily progress updates for long-running jobs (max 2 per day)
+- `job_updates` - Daily progress updates for long-running jobs
 - `conversations` - Chat conversations (direct or group)
-- `conversation_members` - Members of each conversation with read status
+- `conversation_members` - Members with read status
 - `messages` - Chat messages with sender and timestamp
 - `vehicles` - Fleet vehicles (registration, make, model, status)
 - `walkaround_checks` - Daily vehicle checks (pre/post use)
@@ -85,11 +124,11 @@ All API routes (except login and seed) require authentication via session cookie
 
 - `OPENAI_API_KEY` - Required for AI Advisors functionality
 - `GOOGLE_MAPS_API_KEY` - Required for live map and geocoding
-- `SETUP_KEY` - Required to enable the /setup password reset endpoint (set to disable after initial setup)
+- `SETUP_KEY` - Required to enable the /setup password reset endpoint
 
 ## Pricing Tiers
 
-- **Starter**: Free for 2 users, +£10/user after
-- **Professional**: £99/month, +£10/user up to 35
-- **Business**: £300/month, +£10/user up to 35
-- **Enterprise**: Custom pricing, unlimited users
+- **Starter**: £29/user/month - Core operations and basic finance
+- **Professional**: £49/user/month - Full finance, team messaging, GPS, AI advisors
+- **Business**: £79/user/month - Everything plus fleet management and advanced features
+- **Enterprise**: Custom pricing - Unlimited users, white-label, custom integrations

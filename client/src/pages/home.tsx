@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { 
   ClipboardList, 
   Camera, 
@@ -16,52 +17,164 @@ import {
   HardHat,
   Search,
   Flame,
-  Zap
+  Zap,
+  Clock,
+  Receipt,
+  CreditCard,
+  Car,
+  MessageSquare,
+  FileText,
+  PoundSterling,
+  Building2,
+  Lock,
+  Smartphone,
+  Globe,
+  BarChart3,
+  CalendarDays,
+  Truck,
+  Gauge,
+  Brain,
+  Mic,
+  ShieldCheck
 } from "lucide-react";
+
+const modules = [
+  {
+    id: "operations",
+    name: "Operations",
+    description: "End-to-end job lifecycle management",
+    icon: ClipboardList,
+    color: "bg-blue-500",
+    features: [
+      { icon: ClipboardList, label: "Job Management" },
+      { icon: FileText, label: "Quoting & Invoicing" },
+      { icon: Users, label: "Client CRM" },
+      { icon: Camera, label: "Photo Evidence" },
+      { icon: Signature, label: "Digital Signatures" },
+      { icon: CalendarDays, label: "Weekly Planner" },
+    ]
+  },
+  {
+    id: "finance",
+    name: "Finance",
+    description: "Complete financial control",
+    icon: PoundSterling,
+    color: "bg-green-500",
+    features: [
+      { icon: Clock, label: "Timesheets" },
+      { icon: Receipt, label: "Expense Tracking" },
+      { icon: CreditCard, label: "Payment Collection" },
+      { icon: Car, label: "Mileage Calculator" },
+      { icon: FileText, label: "Invoice Generation" },
+      { icon: BarChart3, label: "Financial Reports" },
+    ]
+  },
+  {
+    id: "fleet",
+    name: "Fleet",
+    description: "Vehicle & asset management",
+    icon: Truck,
+    color: "bg-orange-500",
+    features: [
+      { icon: Car, label: "Vehicle Registry" },
+      { icon: CheckCircle2, label: "Walkaround Checks" },
+      { icon: Wrench, label: "Defect Tracking" },
+      { icon: Gauge, label: "Status Monitoring" },
+      { icon: FileText, label: "Compliance Records" },
+      { icon: Clock, label: "Service History" },
+    ]
+  },
+  {
+    id: "workforce",
+    name: "Workforce",
+    description: "Team coordination & communication",
+    icon: Users,
+    color: "bg-purple-500",
+    features: [
+      { icon: MessageSquare, label: "Team Messaging" },
+      { icon: MapPin, label: "Live GPS Tracking" },
+      { icon: Users, label: "Role Management" },
+      { icon: CalendarDays, label: "Shift Planning" },
+      { icon: Clock, label: "Time Tracking" },
+      { icon: BarChart3, label: "Performance Insights" },
+    ]
+  },
+  {
+    id: "compliance",
+    name: "Compliance",
+    description: "Security & regulatory compliance",
+    icon: ShieldCheck,
+    color: "bg-red-500",
+    features: [
+      { icon: Lock, label: "Two-Factor Auth (2FA)" },
+      { icon: Shield, label: "Role-Based Access" },
+      { icon: FileText, label: "GDPR Compliance" },
+      { icon: MapPin, label: "Geo-Verified Sign-offs" },
+      { icon: Clock, label: "Audit Trails" },
+      { icon: FileText, label: "Privacy Controls" },
+    ]
+  },
+  {
+    id: "intelligence",
+    name: "Intelligence",
+    description: "AI-powered productivity tools",
+    icon: Brain,
+    color: "bg-indigo-500",
+    features: [
+      { icon: Bot, label: "Technical Advisors" },
+      { icon: Camera, label: "Photo Analysis" },
+      { icon: FileText, label: "Smart Writing Assistant" },
+      { icon: Mic, label: "Voice-to-Text" },
+      { icon: Search, label: "Parts Finder" },
+      { icon: Zap, label: "Fault Diagnosis" },
+    ]
+  },
+];
+
+const stats = [
+  { value: "6", label: "Integrated Modules" },
+  { value: "50+", label: "Features" },
+  { value: "100%", label: "UK Focused" },
+  { value: "24/7", label: "Cloud Access" },
+];
+
+const advisors = [
+  {
+    icon: HardHat,
+    name: "Snagging Pro",
+    description: "Quality assessment & defects",
+    bgClass: "bg-amber-100 dark:bg-amber-900/30",
+    iconClass: "text-amber-600",
+    hoverClass: "hover:border-amber-500",
+  },
+  {
+    icon: Search,
+    name: "Parts Finder",
+    description: "UK parts sourcing",
+    bgClass: "bg-blue-100 dark:bg-blue-900/30",
+    iconClass: "text-blue-600",
+    hoverClass: "hover:border-blue-500",
+  },
+  {
+    icon: Flame,
+    name: "Gas & Heating",
+    description: "Boiler & Gas Safe",
+    bgClass: "bg-orange-100 dark:bg-orange-900/30",
+    iconClass: "text-orange-600",
+    hoverClass: "hover:border-orange-500",
+  },
+  {
+    icon: Zap,
+    name: "Electrical",
+    description: "BS 7671 wiring",
+    bgClass: "bg-yellow-100 dark:bg-yellow-900/30",
+    iconClass: "text-yellow-600",
+    hoverClass: "hover:border-yellow-500",
+  },
+];
 
 export default function Home() {
   const { user } = useAuth();
-
-  const features = [
-    {
-      icon: ClipboardList,
-      title: "Digital Job Sheets",
-      description: "Create and manage job sheets digitally. Track materials, notes, and job progress in real-time."
-    },
-    {
-      icon: Camera,
-      title: "Photo Evidence",
-      description: "Upload photos as evidence of completed work. Document before and after states."
-    },
-    {
-      icon: Signature,
-      title: "Digital Signatures",
-      description: "Capture engineer and customer signatures digitally for job sign-off verification."
-    },
-    {
-      icon: MapPin,
-      title: "GPS Tracking",
-      description: "Location-stamped sign-offs with reverse geocoding. Verify work location automatically."
-    },
-    {
-      icon: Users,
-      title: "Team Management",
-      description: "Assign jobs to engineers, track workloads, and manage your field service team."
-    },
-    {
-      icon: Shield,
-      title: "Secure Access",
-      description: "Role-based access control with secure authentication for admins and engineers."
-    },
-  ];
-
-  const quickLinks = [
-    { href: "/", label: "Jobs Dashboard", icon: ClipboardList, description: "View and manage all job sheets" },
-    { href: "/clients", label: "Clients", icon: Users, description: "Manage clients and create jobs", adminOnly: true },
-    { href: "/engineers", label: "Engineers", icon: Wrench, description: "View team and assignments", adminOnly: true },
-    { href: "/completed-jobs", label: "Completed Jobs", icon: CheckCircle2, description: "Review signed-off jobs", adminOnly: true },
-    { href: "/staff", label: "Staff Management", icon: Shield, description: "Add or remove staff members", adminOnly: true },
-  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900">
@@ -76,9 +189,14 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Link href="/guides">
-                <Button variant="outline" data-testid="button-guides">
-                  User Guides
+              <Link href="/pricing">
+                <Button variant="ghost" data-testid="button-pricing">
+                  Pricing
+                </Button>
+              </Link>
+              <Link href="/user-guides">
+                <Button variant="ghost" data-testid="button-guides">
+                  Guides
                 </Button>
               </Link>
               {user ? (
@@ -103,14 +221,19 @@ export default function Home() {
 
       <main>
         <section className="py-16 md:py-24 px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-6">
-              Digital Job Sheet Management for
-              <span className="text-primary"> Field Engineers</span>
+          <div className="max-w-5xl mx-auto text-center">
+            <Badge className="mb-6 bg-primary/10 text-primary hover:bg-primary/20" data-testid="badge-erp">
+              <Building2 className="h-3 w-3 mr-1" />
+              Field Service ERP Suite
+            </Badge>
+            <h2 className="text-4xl md:text-6xl font-bold tracking-tight mb-6" data-testid="text-hero-title">
+              The Complete Business Platform for
+              <span className="text-primary block mt-2">UK Field Engineers</span>
             </h2>
-            <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Streamline your field service operations with digital job sheets, photo evidence, 
-              GPS tracking, and digital signatures. Everything your team needs in one place.
+            <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto" data-testid="text-hero-description">
+              Run your entire field service operation from one platform. Jobs, quotes, invoices, 
+              timesheets, expenses, fleet, team messaging, and AI-powered tools — all integrated 
+              and built for UK tradespeople.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               {user ? (
@@ -121,33 +244,71 @@ export default function Home() {
                   </Button>
                 </Link>
               ) : (
-                <Link href="/auth">
-                  <Button size="lg" className="w-full sm:w-auto" data-testid="button-get-started">
-                    Get Started
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                </Link>
+                <>
+                  <Link href="/auth">
+                    <Button size="lg" className="w-full sm:w-auto" data-testid="button-get-started">
+                      Start Free Trial
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                  <Link href="/pricing">
+                    <Button size="lg" variant="outline" className="w-full sm:w-auto" data-testid="button-view-pricing">
+                      View Pricing
+                    </Button>
+                  </Link>
+                </>
               )}
             </div>
           </div>
         </section>
 
-        <section className="py-16 bg-slate-100/50 dark:bg-slate-900/50 px-4">
-          <div className="max-w-6xl mx-auto">
-            <h3 className="text-2xl md:text-3xl font-bold text-center mb-12">
-              Everything You Need for Field Service
-            </h3>
+        <section className="py-8 border-y bg-slate-50/50 dark:bg-slate-900/50">
+          <div className="max-w-6xl mx-auto px-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+              {stats.map((stat, index) => (
+                <div key={index} className="text-center" data-testid={`stat-${index}`}>
+                  <div className="text-3xl md:text-4xl font-bold text-primary">{stat.value}</div>
+                  <div className="text-sm text-muted-foreground">{stat.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="py-16 md:py-24 px-4">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center mb-12">
+              <h3 className="text-3xl md:text-4xl font-bold mb-4" data-testid="text-modules-title">
+                Six Integrated Modules, One Platform
+              </h3>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Everything you need to run a field service business. No more juggling multiple apps 
+                or manual spreadsheets.
+              </p>
+            </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {features.map((feature, index) => (
-                <Card key={index} className="border-0 shadow-sm hover:shadow-md transition-shadow" data-testid={`feature-card-${index}`}>
+              {modules.map((module) => (
+                <Card key={module.id} className="border-2 hover:border-primary/50 hover:shadow-lg transition-all" data-testid={`module-card-${module.id}`}>
                   <CardHeader>
-                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                      <feature.icon className="h-6 w-6 text-primary" />
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className={`w-10 h-10 rounded-lg ${module.color} flex items-center justify-center`}>
+                        <module.icon className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">{module.name}</CardTitle>
+                        <CardDescription className="text-xs">{module.description}</CardDescription>
+                      </div>
                     </div>
-                    <CardTitle className="text-lg">{feature.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <CardDescription className="text-sm">{feature.description}</CardDescription>
+                    <div className="grid grid-cols-2 gap-2">
+                      {module.features.map((feature, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <feature.icon className="h-3.5 w-3.5 text-primary" />
+                          <span>{feature.label}</span>
+                        </div>
+                      ))}
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -155,74 +316,41 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="py-16 px-4">
+        <section className="py-16 bg-slate-100/50 dark:bg-slate-900/50 px-4">
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-12">
-              <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-4">
-                <Bot className="h-4 w-4" />
-                Expert Assistance
-              </div>
-              <h3 className="text-2xl md:text-3xl font-bold mb-4">
-                Expert Technical Advisors at Your Fingertips
+              <Badge className="mb-4 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+                <Bot className="h-3 w-3 mr-1" />
+                AI-Powered
+              </Badge>
+              <h3 className="text-2xl md:text-3xl font-bold mb-4" data-testid="text-ai-title">
+                Expert Technical Advisors
               </h3>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                Get instant expert guidance from our specialist advisors. Upload photos for analysis or ask questions about any technical issue.
+                Get instant expert guidance from AI specialists. Upload photos for analysis 
+                or ask questions about any technical issue.
               </p>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className="border-2 hover:border-amber-500 hover:shadow-lg transition-all cursor-pointer group" data-testid="advisor-card-snagging">
-                <CardHeader className="text-center pb-2">
-                  <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-                    <HardHat className="h-8 w-8 text-amber-600" />
-                  </div>
-                  <CardTitle className="text-lg">Snagging Pro</CardTitle>
-                </CardHeader>
-                <CardContent className="text-center">
-                  <CardDescription>Quality assessment & refurbishment defects specialist</CardDescription>
-                </CardContent>
-              </Card>
-              
-              <Card className="border-2 hover:border-blue-500 hover:shadow-lg transition-all cursor-pointer group" data-testid="advisor-card-parts">
-                <CardHeader className="text-center pb-2">
-                  <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-                    <Search className="h-8 w-8 text-blue-600" />
-                  </div>
-                  <CardTitle className="text-lg">Trade Parts Finder</CardTitle>
-                </CardHeader>
-                <CardContent className="text-center">
-                  <CardDescription>UK parts sourcing from photos & descriptions</CardDescription>
-                </CardContent>
-              </Card>
-              
-              <Card className="border-2 hover:border-orange-500 hover:shadow-lg transition-all cursor-pointer group" data-testid="advisor-card-gas">
-                <CardHeader className="text-center pb-2">
-                  <div className="w-16 h-16 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-                    <Flame className="h-8 w-8 text-orange-600" />
-                  </div>
-                  <CardTitle className="text-lg">Gas & Heating</CardTitle>
-                </CardHeader>
-                <CardContent className="text-center">
-                  <CardDescription>Boiler diagnostics & Gas Safe compliance</CardDescription>
-                </CardContent>
-              </Card>
-              
-              <Card className="border-2 hover:border-yellow-500 hover:shadow-lg transition-all cursor-pointer group" data-testid="advisor-card-electrical">
-                <CardHeader className="text-center pb-2">
-                  <div className="w-16 h-16 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-                    <Zap className="h-8 w-8 text-yellow-600" />
-                  </div>
-                  <CardTitle className="text-lg">Electrical Expert</CardTitle>
-                </CardHeader>
-                <CardContent className="text-center">
-                  <CardDescription>BS 7671 wiring regs & fault diagnosis</CardDescription>
-                </CardContent>
-              </Card>
+              {advisors.map((advisor, index) => (
+                <Card key={index} className={`border-2 ${advisor.hoverClass} hover:shadow-lg transition-all cursor-pointer group`} data-testid={`advisor-card-${index}`}>
+                  <CardHeader className="text-center pb-2">
+                    <div className={`w-16 h-16 rounded-full ${advisor.bgClass} flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform`}>
+                      <advisor.icon className={`h-8 w-8 ${advisor.iconClass}`} />
+                    </div>
+                    <CardTitle className="text-lg">{advisor.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-center">
+                    <CardDescription>{advisor.description}</CardDescription>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
             <div className="text-center mt-8">
               <Link href={user ? "/ai-advisors" : "/auth"}>
                 <Button size="lg" variant="outline" className="gap-2" data-testid="button-try-ai-advisors">
                   <Bot className="h-5 w-5" />
-                  {user ? "Chat with Technical Advisor" : "Sign in to Try Technical Advisor"}
+                  {user ? "Chat with Technical Advisor" : "Try AI Advisors Free"}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
@@ -230,67 +358,98 @@ export default function Home() {
           </div>
         </section>
 
-        {user && (
-          <section className="py-16 bg-slate-100/50 dark:bg-slate-900/50 px-4">
-            <div className="max-w-4xl mx-auto">
-              <h3 className="text-2xl md:text-3xl font-bold text-center mb-8">
-                Quick Navigation
+        <section className="py-16 px-4">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-12">
+              <h3 className="text-2xl md:text-3xl font-bold mb-4" data-testid="text-why-title">
+                Built for UK Field Service Businesses
               </h3>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {quickLinks
-                  .filter(link => !link.adminOnly || user.role === 'admin')
-                  .map((link, index) => (
-                    <Link key={index} href={link.href}>
-                      <Card className="hover:border-primary hover:shadow-md transition-all cursor-pointer h-full" data-testid={`quick-link-${index}`}>
-                        <CardHeader className="pb-2">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                              <link.icon className="h-5 w-5 text-primary" />
-                            </div>
-                            <CardTitle className="text-base">{link.label}</CardTitle>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground">{link.description}</p>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  ))}
+            </div>
+            <div className="grid md:grid-cols-3 gap-8">
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                  <Smartphone className="h-8 w-8 text-primary" />
+                </div>
+                <h4 className="font-semibold mb-2">Mobile-First PWA</h4>
+                <p className="text-sm text-muted-foreground">
+                  Works on any device. Install as an app with offline support for field use.
+                </p>
+              </div>
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                  <Globe className="h-8 w-8 text-primary" />
+                </div>
+                <h4 className="font-semibold mb-2">UK-Focused</h4>
+                <p className="text-sm text-muted-foreground">
+                  HMRC mileage rates, UK VAT, Gas Safe references, BS 7671 wiring regs built in.
+                </p>
+              </div>
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                  <Lock className="h-8 w-8 text-primary" />
+                </div>
+                <h4 className="font-semibold mb-2">Secure & Compliant</h4>
+                <p className="text-sm text-muted-foreground">
+                  GDPR compliant with 2FA, role-based access, and full audit trails.
+                </p>
               </div>
             </div>
-          </section>
-        )}
+          </div>
+        </section>
 
         <section className="py-16 bg-primary text-primary-foreground px-4">
           <div className="max-w-4xl mx-auto text-center">
-            <h3 className="text-2xl md:text-3xl font-bold mb-4">
-              Ready to Get Started?
+            <h3 className="text-2xl md:text-3xl font-bold mb-4" data-testid="text-cta-title">
+              Ready to Streamline Your Business?
             </h3>
             <p className="text-lg opacity-90 mb-8">
-              Sign in to access your job sheets and manage your field service operations.
+              Join field service companies across the UK who are saving hours every week 
+              with TrueNorth Field View.
             </p>
-            {user ? (
-              <Link href="/">
-                <Button size="lg" variant="secondary" data-testid="button-view-jobs">
-                  View Your Jobs
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-              </Link>
-            ) : (
-              <Link href="/auth">
-                <Button size="lg" variant="secondary" data-testid="button-sign-in-cta">
-                  Sign In Now
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-              </Link>
-            )}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              {user ? (
+                <Link href="/">
+                  <Button size="lg" variant="secondary" data-testid="button-view-jobs">
+                    Go to Dashboard
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+              ) : (
+                <>
+                  <Link href="/auth">
+                    <Button size="lg" variant="secondary" data-testid="button-start-trial">
+                      Start Free Trial
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                  <Link href="/pricing">
+                    <Button size="lg" variant="outline" className="border-white/30 hover:bg-white/10" data-testid="button-see-pricing">
+                      See Pricing
+                    </Button>
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
         </section>
       </main>
 
       <footer className="border-t py-8 px-4">
-        <div className="max-w-6xl mx-auto text-center text-sm text-muted-foreground">
-          <p>TrueNorth Field View - Digital Job Sheet Management</p>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-2">
+              <img src="/logo.png" alt="TrueNorth Logo" className="w-8 h-8 rounded" />
+              <span className="font-semibold">TrueNorth Field View</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              The Complete Field Service ERP Suite
+            </p>
+            <div className="flex gap-4 text-sm text-muted-foreground">
+              <Link href="/privacy-policy">Privacy</Link>
+              <Link href="/terms-of-service">Terms</Link>
+              <Link href="/user-guides">Help</Link>
+            </div>
+          </div>
         </div>
       </footer>
     </div>
