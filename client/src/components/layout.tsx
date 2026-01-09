@@ -185,13 +185,41 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Link>
         )}
 
-        {/* Jobs Section */}
+        {/* Sales Section - Admin Only (Clients → Quotes → Invoices follows natural workflow) */}
+        {user.role === "admin" && (
+          <MenuGroup title="Sales" icon={BarChart3} section="sales">
+            <NavLink href="/clients" icon={Building2Icon}>Clients</NavLink>
+            <NavLink href="/quotes" icon={FileText}>Quotes</NavLink>
+            <NavLink href="/invoices" icon={Receipt}>Invoices</NavLink>
+          </MenuGroup>
+        )}
+
+        {/* Jobs Section (Quotes convert to Jobs) */}
         <MenuGroup title="Jobs" icon={Briefcase} section="jobs">
           <NavLink href="/" icon={LayoutDashboard}>Jobs List</NavLink>
           {user.role === "admin" && (
             <NavLink href="/completed-jobs" icon={CheckCircle2}>Completed Jobs</NavLink>
           )}
         </MenuGroup>
+
+        {/* Schedule Section - Admin Only */}
+        {user.role === "admin" && (
+          <MenuGroup title="Schedule" icon={Calendar} section="schedule">
+            <NavLink href="/calendar" icon={Calendar}>Calendar</NavLink>
+            <NavLink href="/time-logs" icon={Clock}>Time Logs</NavLink>
+          </MenuGroup>
+        )}
+
+        {/* Team Section - Admin Only */}
+        {user.role === "admin" && (
+          <MenuGroup title="Team" icon={Users} section="team">
+            <NavLink href="/engineers" icon={UserIcon}>Engineers</NavLink>
+            {user.superAdmin && (
+              <NavLink href="/staff" icon={Users}>Staff Management</NavLink>
+            )}
+            <NavLink href="/map" icon={MapPin}>Live Map</NavLink>
+          </MenuGroup>
+        )}
 
         {/* Messages - All Users */}
         {collapsed ? (
@@ -235,34 +263,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
               )}
             </Button>
           </Link>
-        )}
-
-        {/* Schedule Section - Admin Only */}
-        {user.role === "admin" && (
-          <MenuGroup title="Schedule" icon={Calendar} section="schedule">
-            <NavLink href="/calendar" icon={Calendar}>Calendar</NavLink>
-            <NavLink href="/time-logs" icon={Clock}>Time Logs</NavLink>
-          </MenuGroup>
-        )}
-
-        {/* Sales Section - Admin Only */}
-        {user.role === "admin" && (
-          <MenuGroup title="Sales" icon={BarChart3} section="sales">
-            <NavLink href="/clients" icon={Building2Icon}>Clients</NavLink>
-            <NavLink href="/quotes" icon={FileText}>Quotes</NavLink>
-            <NavLink href="/invoices" icon={Receipt}>Invoices</NavLink>
-          </MenuGroup>
-        )}
-
-        {/* Team Section - Admin Only */}
-        {user.role === "admin" && (
-          <MenuGroup title="Team" icon={Users} section="team">
-            <NavLink href="/engineers" icon={UserIcon}>Engineers</NavLink>
-            {user.superAdmin && (
-              <NavLink href="/staff" icon={Users}>Staff Management</NavLink>
-            )}
-            <NavLink href="/map" icon={MapPin}>Live Map</NavLink>
-          </MenuGroup>
         )}
 
         {/* Finance Section */}
