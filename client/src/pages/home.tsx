@@ -194,7 +194,7 @@ export default function Home() {
                   Pricing
                 </Button>
               </Link>
-              <Link href="/user-guides">
+              <Link href="/guides">
                 <Button variant="ghost" data-testid="button-guides">
                   Guides
                 </Button>
@@ -447,7 +447,7 @@ export default function Home() {
             <div className="flex gap-4 text-sm text-muted-foreground">
               <Link href="/privacy-policy">Privacy</Link>
               <Link href="/terms-of-service">Terms</Link>
-              <Link href="/user-guides">Help</Link>
+              <Link href="/guides">Help</Link>
             </div>
           </div>
         </div>
