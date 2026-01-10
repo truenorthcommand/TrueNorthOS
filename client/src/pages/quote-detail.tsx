@@ -9,10 +9,11 @@ import { AITextarea } from "@/components/ui/ai-assist";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Plus, Trash2, Save, Send, FileText, Loader2, Copy, ExternalLink } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, Send, FileText, Loader2, Copy, ExternalLink, Sparkles, AlertTriangle, TrendingUp, CheckCircle, Info } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type LineItem = {
   id: string;
@@ -50,6 +51,34 @@ type Quote = {
   convertedJobId: string | null;
 };
 
+type AISuggestion = {
+  description: string;
+  quantity: number;
+  unitCost: number;
+  confidence: 'high' | 'medium' | 'low';
+  reasoning: string;
+};
+
+type QuoteAnalysis = {
+  overallAssessment: 'good' | 'caution' | 'warning';
+  assessmentSummary: string;
+  underpricedItems: {
+    description: string;
+    currentPrice: number;
+    suggestedPrice: number;
+    historicalAverage: number;
+    reasoning: string;
+  }[];
+  recommendations: string[];
+  warnings: {
+    itemDescription: string;
+    currentPrice: number;
+    avgPrice: number;
+    percentBelow: number;
+    severity: string;
+  }[];
+};
+
 export default function QuoteDetail() {
   const params = useParams();
   const [, setLocation] = useLocation();
@@ -61,6 +90,13 @@ export default function QuoteDetail() {
   const [showSendDialog, setShowSendDialog] = useState(false);
   const [expandedDescriptionIndex, setExpandedDescriptionIndex] = useState<number | null>(null);
   const [expandedDescriptionValue, setExpandedDescriptionValue] = useState("");
+  
+  const [showAIPricing, setShowAIPricing] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
+  const [quoteAnalysis, setQuoteAnalysis] = useState<QuoteAnalysis | null>(null);
+  const [aiNotes, setAiNotes] = useState("");
 
   const [quote, setQuote] = useState<Quote>({
     id: "",
@@ -265,6 +301,114 @@ export default function QuoteDetail() {
   const copyClientLink = () => {
     navigator.clipboard.writeText(getClientLink());
     toast({ title: "Copied", description: "Client link copied to clipboard" });
+  };
+
+  const fetchAISuggestions = async () => {
+    if (!quote.description?.trim()) {
+      toast({ title: "Enter Description", description: "Please enter a job description first", variant: "destructive" });
+      return;
+    }
+    setIsLoadingSuggestions(true);
+    setAiSuggestions([]);
+    try {
+      const res = await fetch(`/api/ai/quote-suggestions?description=${encodeURIComponent(quote.description)}`, {
+        credentials: "include"
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAiSuggestions(data.suggestions || []);
+        setAiNotes(data.notes || '');
+        setShowAIPricing(true);
+      } else {
+        const err = await res.json();
+        toast({ title: "Error", description: err.error || "Failed to get suggestions", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to get AI suggestions", variant: "destructive" });
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
+
+  const analyzeQuote = async () => {
+    if (quote.lineItems.length === 0) {
+      toast({ title: "Add Items", description: "Please add line items before analyzing", variant: "destructive" });
+      return;
+    }
+    setIsAnalyzing(true);
+    setQuoteAnalysis(null);
+    try {
+      const res = await fetch("/api/ai/analyze-quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          lineItems: quote.lineItems,
+          subtotal: quote.subtotal,
+          total: quote.total,
+          description: quote.description
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setQuoteAnalysis(data);
+        setShowAIPricing(true);
+      } else {
+        const err = await res.json();
+        toast({ title: "Error", description: err.error || "Failed to analyze quote", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to analyze quote", variant: "destructive" });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const applySuggestion = (suggestion: AISuggestion) => {
+    const newItem: LineItem = {
+      id: crypto.randomUUID(),
+      itemCode: "",
+      description: suggestion.description,
+      quantity: suggestion.quantity,
+      unitCost: suggestion.unitCost,
+      discount: 0,
+      amount: suggestion.quantity * suggestion.unitCost,
+    };
+    const newItems = [...quote.lineItems, newItem];
+    const totals = calculateTotals(newItems, quote.vatRate);
+    setQuote({ ...quote, lineItems: newItems, ...totals });
+    toast({ title: "Applied", description: `Added "${suggestion.description}" to quote` });
+  };
+
+  const applyPriceAdjustment = (itemDescription: string, suggestedPrice: number) => {
+    const newItems = quote.lineItems.map(item => {
+      if (item.description === itemDescription) {
+        const amount = item.quantity * suggestedPrice * (1 - item.discount / 100);
+        return { ...item, unitCost: suggestedPrice, amount };
+      }
+      return item;
+    });
+    const totals = calculateTotals(newItems, quote.vatRate);
+    setQuote({ ...quote, lineItems: newItems, ...totals });
+    toast({ title: "Updated", description: `Price adjusted for "${itemDescription}"` });
+  };
+
+  const getConfidenceBadge = (confidence: string) => {
+    switch (confidence) {
+      case 'high': return <Badge className="bg-emerald-500 text-white">High</Badge>;
+      case 'medium': return <Badge className="bg-amber-500 text-white">Medium</Badge>;
+      case 'low': return <Badge variant="secondary">Low</Badge>;
+      default: return <Badge variant="secondary">{confidence}</Badge>;
+    }
+  };
+
+  const getAssessmentIcon = (assessment: string) => {
+    switch (assessment) {
+      case 'good': return <CheckCircle className="w-5 h-5 text-emerald-500" />;
+      case 'caution': return <AlertTriangle className="w-5 h-5 text-amber-500" />;
+      case 'warning': return <AlertTriangle className="w-5 h-5 text-red-500" />;
+      default: return <Info className="w-5 h-5 text-blue-500" />;
+    }
   };
 
   if (isLoading) {
@@ -616,6 +760,178 @@ export default function QuoteDetail() {
               </div>
             </CardContent>
           </Card>
+
+          <Card className="border-primary/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Sparkles className="w-5 h-5 text-primary" />
+                AI Pricing Help
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex flex-col gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={fetchAISuggestions}
+                  disabled={isLoadingSuggestions}
+                  data-testid="button-get-suggestions"
+                >
+                  {isLoadingSuggestions ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <TrendingUp className="w-4 h-4 mr-2" />
+                  )}
+                  Get Suggestions
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={analyzeQuote}
+                  disabled={isAnalyzing || quote.lineItems.length === 0}
+                  data-testid="button-analyze-quote"
+                >
+                  {isAnalyzing ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 mr-2" />
+                  )}
+                  Check Pricing
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Get AI-powered pricing suggestions based on your historical quotes and invoices.
+              </p>
+            </CardContent>
+          </Card>
+
+          {showAIPricing && (aiSuggestions.length > 0 || quoteAnalysis) && (
+            <Card data-testid="panel-ai-pricing-results">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-primary" />
+                    AI Analysis
+                  </span>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => { setShowAIPricing(false); setAiSuggestions([]); setQuoteAnalysis(null); }}
+                  >
+                    ×
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {quoteAnalysis && (
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50">
+                      {getAssessmentIcon(quoteAnalysis.overallAssessment)}
+                      <div>
+                        <p className="font-medium text-sm capitalize">{quoteAnalysis.overallAssessment}</p>
+                        <p className="text-xs text-muted-foreground">{quoteAnalysis.assessmentSummary}</p>
+                      </div>
+                    </div>
+
+                    {quoteAnalysis.underpricedItems.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium flex items-center gap-1">
+                          <AlertTriangle className="w-4 h-4 text-amber-500" />
+                          Underpriced Items
+                        </h4>
+                        {quoteAnalysis.underpricedItems.map((item, idx) => (
+                          <div key={idx} className="p-2 border rounded-md text-xs space-y-1" data-testid={`underpriced-item-${idx}`}>
+                            <div className="flex justify-between">
+                              <span className="font-medium">{item.description}</span>
+                            </div>
+                            <div className="flex justify-between text-muted-foreground">
+                              <span>Current: £{item.currentPrice.toFixed(2)}</span>
+                              <span>Suggested: £{item.suggestedPrice.toFixed(2)}</span>
+                            </div>
+                            <p className="text-muted-foreground italic">{item.reasoning}</p>
+                            <Button 
+                              variant="secondary" 
+                              size="sm" 
+                              className="w-full mt-1"
+                              onClick={() => applyPriceAdjustment(item.description, item.suggestedPrice)}
+                              data-testid={`button-apply-adjustment-${idx}`}
+                            >
+                              Apply £{item.suggestedPrice.toFixed(2)}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {quoteAnalysis.warnings.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium">Pricing Warnings</h4>
+                        {quoteAnalysis.warnings.map((warning, idx) => (
+                          <div key={idx} className="p-2 border border-amber-200 bg-amber-50 dark:bg-amber-950/20 rounded-md text-xs" data-testid={`warning-item-${idx}`}>
+                            <p className="font-medium">{warning.itemDescription}</p>
+                            <p className="text-muted-foreground">
+                              £{warning.currentPrice.toFixed(2)} is {warning.percentBelow}% below avg (£{warning.avgPrice.toFixed(2)})
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {quoteAnalysis.recommendations.length > 0 && (
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-medium">Recommendations</h4>
+                        <ul className="text-xs text-muted-foreground space-y-1">
+                          {quoteAnalysis.recommendations.map((rec, idx) => (
+                            <li key={idx} className="flex items-start gap-1">
+                              <span className="text-primary">•</span>
+                              <span>{rec}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {aiSuggestions.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium flex items-center gap-1">
+                      <TrendingUp className="w-4 h-4 text-primary" />
+                      Suggested Line Items
+                    </h4>
+                    {aiSuggestions.map((suggestion, idx) => (
+                      <div key={idx} className="p-2 border rounded-md text-xs space-y-1" data-testid={`suggestion-item-${idx}`}>
+                        <div className="flex justify-between items-start gap-2">
+                          <span className="font-medium">{suggestion.description}</span>
+                          {getConfidenceBadge(suggestion.confidence)}
+                        </div>
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>Qty: {suggestion.quantity}</span>
+                          <span>£{suggestion.unitCost.toFixed(2)} each</span>
+                        </div>
+                        <p className="text-muted-foreground italic">{suggestion.reasoning}</p>
+                        <Button 
+                          variant="secondary" 
+                          size="sm" 
+                          className="w-full mt-1"
+                          onClick={() => applySuggestion(suggestion)}
+                          data-testid={`button-apply-suggestion-${idx}`}
+                        >
+                          <Plus className="w-3 h-3 mr-1" />
+                          Add to Quote
+                        </Button>
+                      </div>
+                    ))}
+                    {aiNotes && (
+                      <p className="text-xs text-muted-foreground p-2 bg-muted/50 rounded-md">
+                        {aiNotes}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {quote.accessToken && quote.status !== "Draft" && (
             <Card>

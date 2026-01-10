@@ -45,6 +45,7 @@ import Timesheets from "@/pages/timesheets";
 import Expenses from "@/pages/expenses";
 import Payments from "@/pages/payments";
 import Analytics from "@/pages/analytics";
+import VoiceNotes from "@/pages/voice-notes";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -162,6 +163,9 @@ function Router() {
       </Route>
       <Route path="/ai-advisors">
         <PrivateRoute component={AiAdvisors} />
+      </Route>
+      <Route path="/voice-notes">
+        <PrivateRoute component={VoiceNotes} />
       </Route>
       <Route path="/admin/advisors">
         <PrivateRoute component={AdminAdvisors} />

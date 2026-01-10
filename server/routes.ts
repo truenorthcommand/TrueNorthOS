@@ -2022,6 +2022,360 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
+  // Voice notes summarization for field engineers
+  app.post("/api/ai/summarize-notes", requireAuth, async (req, res) => {
+    try {
+      const openai = getOpenAIClient();
+      if (!openai) {
+        return res.status(503).json({ error: "AI service not configured" });
+      }
+
+      const { transcript, jobContext } = req.body;
+      
+      if (!transcript || typeof transcript !== 'string') {
+        return res.status(400).json({ error: "Transcript is required" });
+      }
+
+      // Require minimum content to avoid empty/too-short transcripts
+      const trimmedTranscript = transcript.trim();
+      if (trimmedTranscript.length < 10) {
+        return res.status(400).json({ error: "Transcript is too short. Please record more content." });
+      }
+
+      const systemPrompt = `You are a professional assistant for field service engineers. Your job is to process spoken voice notes and convert them into professional documentation.
+
+Given a raw voice transcript from an engineer on-site, you must:
+1. Clean up the text - fix any transcription errors, remove filler words (um, uh, like, you know), and correct grammar
+2. Create a professional summary suitable for client-facing job updates
+3. Extract any action items or follow-up tasks mentioned
+
+Keep the engineer's meaning intact but make it clear and professional. The output should be suitable for formal job documentation and client communication.
+
+${jobContext ? `Job Context: ${jobContext}` : ''}
+
+Respond in JSON format with the following structure:
+{
+  "cleanedNotes": "The cleaned up version of the transcript",
+  "clientSummary": "A professional, client-friendly summary suitable for job updates",
+  "actionItems": ["Array of action items if any were mentioned"]
+}`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Process this voice note transcript:\n\n${transcript}` }
+        ],
+        max_completion_tokens: 2048,
+        response_format: { type: "json_object" }
+      });
+
+      const content = response.choices[0].message.content;
+      if (!content) {
+        throw new Error("No response from AI");
+      }
+
+      const result = JSON.parse(content);
+      
+      res.json({
+        original: transcript,
+        cleanedNotes: result.cleanedNotes || transcript,
+        clientSummary: result.clientSummary || result.cleanedNotes || transcript,
+        actionItems: result.actionItems || []
+      });
+    } catch (error: any) {
+      console.error("Voice notes summarize error:", error);
+      res.status(500).json({ error: error.message || "Failed to summarize voice notes" });
+    }
+  });
+
+  // ==================== QUOTE PRICING ADVISOR ====================
+
+  // Get AI-powered quote suggestions based on job description
+  app.get("/api/ai/quote-suggestions", requireAdmin, async (req, res) => {
+    try {
+      const openai = getOpenAIClient();
+      if (!openai) {
+        return res.status(503).json({ error: "AI service not configured" });
+      }
+
+      const { description } = req.query;
+      if (!description || typeof description !== 'string') {
+        return res.status(400).json({ error: "Job description is required" });
+      }
+
+      // Fetch historical data from quotes and invoices
+      const [allQuotes, allInvoices] = await Promise.all([
+        storage.getAllQuotes(),
+        storage.getAllInvoices()
+      ]);
+
+      // Extract relevant pricing data from historical records
+      const historicalData: { description: string; lineItems: any[]; total: number; status: string }[] = [];
+
+      for (const quote of allQuotes) {
+        if (quote.status === 'Accepted' || quote.status === 'Converted') {
+          historicalData.push({
+            description: quote.description || '',
+            lineItems: (quote.lineItems as any[]) || [],
+            total: quote.total || 0,
+            status: quote.status
+          });
+        }
+      }
+
+      for (const invoice of allInvoices) {
+        if (invoice.status === 'Paid') {
+          historicalData.push({
+            description: invoice.notes || '',
+            lineItems: (invoice.lineItems as any[]) || [],
+            total: invoice.total || 0,
+            status: invoice.status
+          });
+        }
+      }
+
+      // Calculate average prices for common line item types
+      const priceStats: Record<string, { prices: number[]; avg: number; min: number; max: number }> = {};
+      for (const record of historicalData) {
+        for (const item of record.lineItems) {
+          if (item.description && item.unitCost > 0) {
+            const key = item.description.toLowerCase().trim();
+            if (!priceStats[key]) {
+              priceStats[key] = { prices: [], avg: 0, min: 0, max: 0 };
+            }
+            priceStats[key].prices.push(item.unitCost);
+          }
+        }
+      }
+
+      // Calculate statistics
+      for (const key in priceStats) {
+        const prices = priceStats[key].prices;
+        priceStats[key].avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+        priceStats[key].min = Math.min(...prices);
+        priceStats[key].max = Math.max(...prices);
+      }
+
+      const systemPrompt = `You are a pricing advisor for a field service business. Based on historical quote and invoice data, suggest appropriate line items and pricing for new quotes.
+
+Historical Pricing Data Summary:
+${Object.entries(priceStats).slice(0, 50).map(([desc, stats]) => 
+  `- "${desc}": avg £${stats.avg.toFixed(2)}, range £${stats.min.toFixed(2)}-£${stats.max.toFixed(2)} (${stats.prices.length} records)`
+).join('\n')}
+
+Recent Successful Jobs (last 10):
+${historicalData.slice(0, 10).map(job => 
+  `- Description: "${job.description?.substring(0, 100) || 'N/A'}", Total: £${job.total.toFixed(2)}, Items: ${job.lineItems.length}`
+).join('\n')}
+
+Respond with a JSON object containing:
+{
+  "suggestedLineItems": [
+    {
+      "description": "Item description",
+      "quantity": 1,
+      "unitCost": 100.00,
+      "confidence": "high|medium|low",
+      "reasoning": "Why this price was suggested"
+    }
+  ],
+  "estimatedTotal": 500.00,
+  "similarJobs": [
+    {
+      "description": "Similar job brief description",
+      "total": 450.00
+    }
+  ],
+  "notes": "Any additional pricing notes or recommendations"
+}`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Generate suggested line items and pricing for this job:\n\n${description}` }
+        ],
+        max_completion_tokens: 2048,
+        response_format: { type: "json_object" }
+      });
+
+      const content = response.choices[0].message.content;
+      if (!content) {
+        throw new Error("No response from AI");
+      }
+
+      const result = JSON.parse(content);
+      
+      res.json({
+        suggestions: result.suggestedLineItems || [],
+        estimatedTotal: result.estimatedTotal || 0,
+        similarJobs: result.similarJobs || [],
+        notes: result.notes || '',
+        historicalDataCount: historicalData.length
+      });
+    } catch (error: any) {
+      console.error("Quote suggestions error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate quote suggestions" });
+    }
+  });
+
+  // Analyze a draft quote against historical data
+  app.post("/api/ai/analyze-quote", requireAdmin, async (req, res) => {
+    try {
+      const openai = getOpenAIClient();
+      if (!openai) {
+        return res.status(503).json({ error: "AI service not configured" });
+      }
+
+      const { lineItems, subtotal, total, description } = req.body;
+      
+      if (!lineItems || !Array.isArray(lineItems)) {
+        return res.status(400).json({ error: "Line items array is required" });
+      }
+
+      // Fetch historical data
+      const [allQuotes, allInvoices] = await Promise.all([
+        storage.getAllQuotes(),
+        storage.getAllInvoices()
+      ]);
+
+      // Build price statistics from historical data
+      const priceStats: Record<string, { prices: number[]; avg: number; min: number; max: number; count: number }> = {};
+      
+      const processLineItems = (items: any[]) => {
+        for (const item of items) {
+          if (item.description && item.unitCost > 0) {
+            const key = item.description.toLowerCase().trim();
+            if (!priceStats[key]) {
+              priceStats[key] = { prices: [], avg: 0, min: 0, max: 0, count: 0 };
+            }
+            priceStats[key].prices.push(item.unitCost);
+          }
+        }
+      };
+
+      for (const quote of allQuotes) {
+        if (quote.status === 'Accepted' || quote.status === 'Converted') {
+          processLineItems((quote.lineItems as any[]) || []);
+        }
+      }
+
+      for (const invoice of allInvoices) {
+        if (invoice.status === 'Paid') {
+          processLineItems((invoice.lineItems as any[]) || []);
+        }
+      }
+
+      // Calculate statistics
+      for (const key in priceStats) {
+        const prices = priceStats[key].prices;
+        priceStats[key].avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+        priceStats[key].min = Math.min(...prices);
+        priceStats[key].max = Math.max(...prices);
+        priceStats[key].count = prices.length;
+      }
+
+      // Check for underpriced items
+      const warnings: { itemDescription: string; currentPrice: number; avgPrice: number; percentBelow: number; severity: string }[] = [];
+      
+      for (const item of lineItems) {
+        if (item.description && item.unitCost > 0) {
+          const key = item.description.toLowerCase().trim();
+          const stats = priceStats[key];
+          
+          if (stats && stats.count >= 2) {
+            const percentBelow = ((stats.avg - item.unitCost) / stats.avg) * 100;
+            if (percentBelow > 15) {
+              warnings.push({
+                itemDescription: item.description,
+                currentPrice: item.unitCost,
+                avgPrice: stats.avg,
+                percentBelow: Math.round(percentBelow),
+                severity: percentBelow > 30 ? 'high' : 'medium'
+              });
+            }
+          }
+        }
+      }
+
+      const systemPrompt = `You are a pricing advisor for a field service business. Analyze this quote against historical pricing data and provide recommendations.
+
+Historical Pricing Statistics (from successful quotes/invoices):
+${Object.entries(priceStats).slice(0, 40).map(([desc, stats]) => 
+  `- "${desc}": avg £${stats.avg.toFixed(2)}, range £${stats.min.toFixed(2)}-£${stats.max.toFixed(2)} (${stats.count} records)`
+).join('\n')}
+
+Quote Being Analyzed:
+${lineItems.map((item: any) => 
+  `- "${item.description}": Qty ${item.quantity}, Unit £${item.unitCost?.toFixed(2) || '0.00'}, Total £${item.amount?.toFixed(2) || '0.00'}`
+).join('\n')}
+
+Subtotal: £${(subtotal || 0).toFixed(2)}
+Total (inc VAT): £${(total || 0).toFixed(2)}
+${description ? `Job Description: ${description}` : ''}
+
+Pre-identified potential underpricing warnings:
+${warnings.length > 0 ? warnings.map(w => 
+  `- "${w.itemDescription}": £${w.currentPrice.toFixed(2)} vs avg £${w.avgPrice.toFixed(2)} (${w.percentBelow}% below)`
+).join('\n') : 'None detected'}
+
+Respond with a JSON object:
+{
+  "overallAssessment": "good|caution|warning",
+  "assessmentSummary": "Brief overall assessment of the quote pricing",
+  "underpricedItems": [
+    {
+      "description": "Item name",
+      "currentPrice": 50.00,
+      "suggestedPrice": 75.00,
+      "historicalAverage": 72.50,
+      "reasoning": "Why this appears underpriced"
+    }
+  ],
+  "recommendations": [
+    "Specific recommendation 1",
+    "Specific recommendation 2"
+  ],
+  "similarJobsComparison": {
+    "averageTotal": 500.00,
+    "thisQuoteVsAverage": "-10%",
+    "assessment": "Brief comparison assessment"
+  }
+}`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: "Analyze this quote and provide pricing recommendations." }
+        ],
+        max_completion_tokens: 2048,
+        response_format: { type: "json_object" }
+      });
+
+      const content = response.choices[0].message.content;
+      if (!content) {
+        throw new Error("No response from AI");
+      }
+
+      const result = JSON.parse(content);
+      
+      res.json({
+        overallAssessment: result.overallAssessment || 'good',
+        assessmentSummary: result.assessmentSummary || '',
+        underpricedItems: result.underpricedItems || [],
+        recommendations: result.recommendations || [],
+        similarJobsComparison: result.similarJobsComparison || null,
+        warnings,
+        historicalDataCount: Object.keys(priceStats).length
+      });
+    } catch (error: any) {
+      console.error("Analyze quote error:", error);
+      res.status(500).json({ error: error.message || "Failed to analyze quote" });
+    }
+  });
+
   // ==================== FLEET MAINTENANCE ====================
 
   // Get fleet dashboard stats

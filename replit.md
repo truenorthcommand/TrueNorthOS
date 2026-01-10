@@ -60,6 +60,8 @@ TrueNorth Field View is a "business in a box" platform that enables field servic
 - Electrical Expert - BS 7671 wiring regulations
 - AI Writing Assistant - Spelling, grammar, voice-to-text, read-aloud
 - Photo analysis capabilities
+- **Voice Notes** - Speech-to-text transcription with AI summarization for job updates
+- **Quote Pricing Advisor** - AI-powered pricing suggestions based on historical data
 
 ## Key Features Summary
 
