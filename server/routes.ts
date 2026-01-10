@@ -2344,22 +2344,74 @@ Respond with a JSON object:
   }
 }`;
 
-      const response = await openai.chat.completions.create({
-        model: "gpt-5",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: "Analyze this quote and provide pricing recommendations." }
-        ],
-        max_completion_tokens: 2048,
-        response_format: { type: "json_object" }
-      });
-
-      const content = response.choices[0].message.content;
-      if (!content) {
-        throw new Error("No response from AI");
+      const historicalDataCount = Object.keys(priceStats).length;
+      
+      // If no historical data, provide a basic response without AI
+      if (historicalDataCount === 0) {
+        return res.json({
+          overallAssessment: 'good',
+          assessmentSummary: 'No historical pricing data available yet. As you complete more jobs, the system will learn your typical pricing and provide better recommendations.',
+          underpricedItems: [],
+          recommendations: [
+            'Continue using the system to build up pricing history.',
+            'Once you have accepted quotes and paid invoices, this tool will compare against your historical data.',
+            'Consider reviewing market rates for similar services in your area.'
+          ],
+          similarJobsComparison: null,
+          warnings: [],
+          historicalDataCount: 0
+        });
       }
 
-      const result = JSON.parse(content);
+      // Try AI analysis with retry, gracefully falling back on any failure
+      let result = null;
+      let aiError = null;
+      
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          console.log(`Analyze quote: attempt ${attempt}`);
+          const response = await openai.chat.completions.create({
+            model: "gpt-5",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: "Analyze this quote and provide pricing recommendations. Return valid JSON." }
+            ],
+            max_completion_tokens: 2048,
+            response_format: { type: "json_object" }
+          });
+
+          const content = response.choices[0]?.message?.content;
+          if (!content) {
+            console.log(`Analyze quote: attempt ${attempt} returned empty content`);
+            if (attempt < 2) continue;
+            aiError = "Empty response from AI";
+          } else {
+            result = JSON.parse(content);
+            console.log(`Analyze quote: attempt ${attempt} succeeded`);
+            break;
+          }
+        } catch (err: any) {
+          console.log(`Analyze quote: attempt ${attempt} failed - ${err.message}`);
+          aiError = err.message;
+          if (attempt < 2) continue;
+        }
+      }
+      
+      // Use fallback if AI failed - don't throw, just provide computed analysis
+      if (!result) {
+        console.log(`Analyze quote: using fallback due to: ${aiError}`);
+        result = {
+          overallAssessment: warnings.length > 0 ? 'caution' : 'good',
+          assessmentSummary: warnings.length > 0 
+            ? 'Some items may be priced below your historical averages. Review the warnings below.'
+            : 'Pricing appears consistent with your historical data.',
+          underpricedItems: [],
+          recommendations: warnings.length > 0 
+            ? ['Consider reviewing highlighted items before sending this quote.']
+            : ['Quote pricing looks appropriate based on your history.'],
+          similarJobsComparison: null
+        };
+      }
       
       res.json({
         overallAssessment: result.overallAssessment || 'good',
@@ -2368,7 +2420,7 @@ Respond with a JSON object:
         recommendations: result.recommendations || [],
         similarJobsComparison: result.similarJobsComparison || null,
         warnings,
-        historicalDataCount: Object.keys(priceStats).length
+        historicalDataCount
       });
     } catch (error: any) {
       console.error("Analyze quote error:", error);
