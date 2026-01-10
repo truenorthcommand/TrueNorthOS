@@ -10,7 +10,7 @@ import { storage } from "./storage";
 import { pool } from "./db";
 import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalkaroundCheckSchema, insertCheckItemSchema, insertDefectSchema, insertDefectUpdateSchema, insertTimesheetSchema, insertExpenseSchema, insertPaymentSchema } from "@shared/schema";
 import { z } from "zod";
-import { notifyAdmins } from "./notifications";
+import { notifyAdmins, notifyUser } from "./notifications";
 import { sessionMiddleware } from "./session";
 
 function getStripeClient(): Stripe | null {
@@ -879,6 +879,26 @@ export async function registerRoutes(
     try {
       const data = insertJobSchema.parse(req.body);
       const job = await storage.createJob(data);
+      
+      // Check if job is scheduled for today and notify assigned engineer
+      if (job && job.date && job.assignedToId) {
+        const jobDate = new Date(job.date);
+        const today = new Date();
+        const isToday = jobDate.toDateString() === today.toDateString();
+        
+        if (isToday) {
+          notifyUser(job.assignedToId, {
+            type: 'urgent_job_assigned',
+            title: 'URGENT: New Job Today',
+            message: `You have been assigned a new job for TODAY: ${job.customerName || 'Customer'} at ${job.address || 'Site address'}`,
+            urgent: true,
+            jobId: job.id,
+            jobNo: job.jobNo || undefined,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+      
       res.status(201).json(job);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -941,12 +961,37 @@ export async function registerRoutes(
         }
       }
 
+      // Track if date is being changed
+      const oldDate = existingJob.date;
+      const newDate = updates.date;
+      const isDateChanging = newDate !== undefined && newDate !== null;
+
       // Convert date string to Date object for Drizzle
       if (updates.date !== undefined) {
         updates.date = updates.date ? new Date(updates.date) : null;
       }
 
       const job = await storage.updateJob(req.params.id, updates);
+      
+      // Check if job was rescheduled to today and notify assigned engineer
+      if (job && isDateChanging && job.assignedToId) {
+        const jobDate = new Date(newDate);
+        const today = new Date();
+        const isRescheduledToToday = jobDate.toDateString() === today.toDateString();
+        const wasNotToday = !oldDate || new Date(oldDate).toDateString() !== today.toDateString();
+        
+        if (isRescheduledToToday && wasNotToday) {
+          notifyUser(job.assignedToId, {
+            type: 'job_rescheduled_today',
+            title: 'Job Rescheduled to Today',
+            message: `Job ${job.jobNo || ''} for ${job.customerName || 'Customer'} has been rescheduled to TODAY.`,
+            jobId: job.id,
+            jobNo: job.jobNo || undefined,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+      
       res.json(job);
     } catch (error) {
       res.status(500).json({ error: "Failed to update job" });
@@ -2208,6 +2253,20 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
         await storage.updateVehicle(parsed.vehicleId, { status: 'off-road' });
       }
       
+      // Notify admins about the new defect
+      const vehicle = await storage.getVehicle(parsed.vehicleId);
+      const reporter = await storage.getUser(req.session.userId!);
+      const severityLabel = parsed.severity === 'critical' ? 'CRITICAL' : 
+                           parsed.severity === 'major' ? 'Major' : 'Minor';
+      
+      notifyAdmins({
+        type: 'defect_reported',
+        title: `${severityLabel} Defect Reported`,
+        message: `${reporter?.name || 'An engineer'} reported a ${parsed.severity} defect on ${vehicle?.registration || 'a vehicle'}: ${parsed.description?.substring(0, 50) || 'No description'}`,
+        timestamp: new Date().toISOString(),
+        urgent: parsed.severity === 'critical',
+      });
+      
       res.status(201).json(defect);
     } catch (error: any) {
       console.error("Create defect error:", error);
@@ -2899,6 +2958,18 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
         approvedById: req.session.userId,
         approvedAt: new Date(),
       });
+      
+      // Notify the engineer who submitted the expense
+      if (expense.userId) {
+        notifyUser(expense.userId, {
+          type: 'expense_approved',
+          title: 'Expense Approved',
+          message: `Your expense claim for £${expense.amount?.toFixed(2) || '0.00'} has been approved.`,
+          expenseId: expense.id,
+          timestamp: new Date().toISOString(),
+        });
+      }
+      
       res.json(updated);
     } catch (error) {
       console.error("Approve expense error:", error);
@@ -2917,6 +2988,18 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
         approvedById: req.session.userId,
         approvedAt: new Date(),
       });
+      
+      // Notify the engineer who submitted the expense
+      if (expense.userId) {
+        notifyUser(expense.userId, {
+          type: 'expense_rejected',
+          title: 'Expense Rejected',
+          message: `Your expense claim for £${expense.amount?.toFixed(2) || '0.00'} has been rejected.`,
+          expenseId: expense.id,
+          timestamp: new Date().toISOString(),
+        });
+      }
+      
       res.json(updated);
     } catch (error) {
       console.error("Reject expense error:", error);

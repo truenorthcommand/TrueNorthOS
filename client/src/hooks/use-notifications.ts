@@ -9,6 +9,9 @@ export interface Notification {
   jobId?: string;
   jobNo?: string;
   engineerName?: string;
+  expenseId?: string;
+  defectId?: string;
+  urgent?: boolean;
   timestamp: string;
 }
 
@@ -46,7 +49,7 @@ export function useNotifications(onNotification?: (notification: Notification) =
   }, []);
 
   const connect = useCallback(() => {
-    if (!user?.id || user?.role !== 'admin') return;
+    if (!user?.id) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -70,6 +73,8 @@ export function useNotifications(onNotification?: (notification: Notification) =
         toast({
           title: notification.title,
           description: notification.message,
+          variant: notification.urgent ? 'destructive' : 'default',
+          duration: notification.urgent ? 10000 : 5000,
         });
 
         showBrowserNotification(notification);
@@ -91,10 +96,10 @@ export function useNotifications(onNotification?: (notification: Notification) =
     ws.onerror = () => {
       ws.close();
     };
-  }, [user?.id, user?.role, toast, showBrowserNotification, onNotification]);
+  }, [user?.id, toast, showBrowserNotification, onNotification]);
 
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (user?.id) {
       requestNotificationPermission();
       connect();
     }
@@ -107,7 +112,7 @@ export function useNotifications(onNotification?: (notification: Notification) =
         wsRef.current.close();
       }
     };
-  }, [user?.role, connect, requestNotificationPermission]);
+  }, [user?.id, connect, requestNotificationPermission]);
 
   return { connected };
 }

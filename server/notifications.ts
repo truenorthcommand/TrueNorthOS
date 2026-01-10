@@ -144,6 +144,7 @@ export function notifyAdmins(notification: {
   jobNo?: string;
   engineerName?: string;
   timestamp: string;
+  urgent?: boolean;
 }) {
   const adminClients = clients.filter(c => c.userRole === 'admin');
   const payload = JSON.stringify(notification);
@@ -155,4 +156,49 @@ export function notifyAdmins(notification: {
   });
 
   return adminClients.length;
+}
+
+export function notifyUser(userId: string, notification: {
+  type: string;
+  title: string;
+  message: string;
+  urgent?: boolean;
+  jobId?: string;
+  jobNo?: string;
+  expenseId?: string;
+  defectId?: string;
+  timestamp: string;
+}) {
+  const payload = JSON.stringify(notification);
+  let sent = 0;
+  
+  clients.forEach(client => {
+    if (client.userId === userId && client.ws.readyState === WebSocket.OPEN) {
+      client.ws.send(payload);
+      sent++;
+    }
+  });
+
+  return sent;
+}
+
+export function notifyEngineers(notification: {
+  type: string;
+  title: string;
+  message: string;
+  urgent?: boolean;
+  jobId?: string;
+  jobNo?: string;
+  timestamp: string;
+}) {
+  const engineerClients = clients.filter(c => c.userRole === 'engineer');
+  const payload = JSON.stringify(notification);
+
+  engineerClients.forEach(client => {
+    if (client.ws.readyState === WebSocket.OPEN) {
+      client.ws.send(payload);
+    }
+  });
+
+  return engineerClients.length;
 }
