@@ -25,9 +25,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
   useNotifications();
   const { isOnline, pendingActions, syncOfflineQueue } = useOffline();
 
-  const { data: unreadData } = useQuery<{ count: number }>({
+  const { data: unreadData } = useQuery<{ count: number } | null>({
     queryKey: ["/api/messages/unread-count"],
     refetchInterval: 30000,
+    retry: false,
+    throwOnError: false,
+    queryFn: async () => {
+      try {
+        const res = await fetch("/api/messages/unread-count", { credentials: "include" });
+        if (!res.ok) return null;
+        return await res.json();
+      } catch {
+        return null;
+      }
+    },
   });
   const unreadCount = unreadData?.count || 0;
 

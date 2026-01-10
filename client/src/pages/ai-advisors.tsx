@@ -64,6 +64,17 @@ export default function AiAdvisors() {
 
   const { data: advisors = [], isLoading } = useQuery<AiAdvisor[]>({
     queryKey: ["/api/ai-advisors"],
+    retry: false,
+    throwOnError: false,
+    queryFn: async () => {
+      try {
+        const res = await fetch("/api/ai-advisors", { credentials: "include" });
+        if (!res.ok) return [];
+        return await res.json();
+      } catch {
+        return [];
+      }
+    },
   });
 
   const chatMutation = useMutation({
