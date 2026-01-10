@@ -125,6 +125,19 @@ All API routes (except login and seed) require authentication via session cookie
 - `OPENAI_API_KEY` - Required for AI Advisors functionality
 - `GOOGLE_MAPS_API_KEY` - Required for live map and geocoding
 - `SETUP_KEY` - Required to enable the /setup password reset endpoint
+- `STRIPE_SECRET_KEY` - Required for Stripe card payments (server-side)
+- `STRIPE_PUBLISHABLE_KEY` - Required for Stripe card payments (client-side)
+- `STRIPE_WEBHOOK_SECRET` - Required to verify Stripe webhook signatures
+
+## Payment Integration
+
+### Stripe Card Payments
+The client invoice portal supports card payments via Stripe. When configured:
+- Customers can pay invoices directly by card from the client portal
+- Payments are processed in GBP with proper pence conversion
+- Webhook handlers automatically record payments and update invoice status
+- Payment intent creation requires valid invoice access token or session auth
+- Duplicate webhook deliveries are handled idempotently
 
 ## Pricing Tiers
 
