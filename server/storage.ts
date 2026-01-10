@@ -163,6 +163,7 @@ export interface IStorage {
   
   // Payments
   getPayment(id: string): Promise<Payment | undefined>;
+  getPaymentByStripeIntentId(intentId: string): Promise<Payment | undefined>;
   getPaymentsByInvoice(invoiceId: string): Promise<Payment[]>;
   getAllPayments(): Promise<PaymentWithInvoice[]>;
   createPayment(payment: InsertPayment): Promise<Payment>;
@@ -1223,6 +1224,11 @@ export class DatabaseStorage implements IStorage {
 
   async getPayment(id: string): Promise<Payment | undefined> {
     const [payment] = await db.select().from(payments).where(eq(payments.id, id));
+    return payment;
+  }
+
+  async getPaymentByStripeIntentId(intentId: string): Promise<Payment | undefined> {
+    const [payment] = await db.select().from(payments).where(eq(payments.stripePaymentIntentId, intentId));
     return payment;
   }
 

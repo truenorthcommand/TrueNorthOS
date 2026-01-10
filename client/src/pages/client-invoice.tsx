@@ -3,8 +3,11 @@ import { useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, XCircle, Phone, Mail, MapPin, Building, CreditCard, CheckCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, XCircle, Phone, Mail, MapPin, CreditCard, CheckCircle, Banknote } from "lucide-react";
 import { format } from "date-fns";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
 type LineItem = {
   id: string;
@@ -44,16 +47,92 @@ type CompanySettings = {
   vatNumber: string | null;
 };
 
+function PaymentForm({ invoiceId, onSuccess }: { invoiceId: string; onSuccess: () => void }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+
+    setIsProcessing(true);
+    setPaymentError(null);
+
+    const { error } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: window.location.href,
+      },
+      redirect: "if_required",
+    });
+
+    if (error) {
+      setPaymentError(error.message || "Payment failed");
+      setIsProcessing(false);
+    } else {
+      onSuccess();
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <PaymentElement />
+      {paymentError && (
+        <p className="text-sm text-destructive">{paymentError}</p>
+      )}
+      <Button
+        type="submit"
+        disabled={!stripe || isProcessing}
+        className="w-full"
+        data-testid="button-pay-now"
+      >
+        {isProcessing ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Processing...
+          </>
+        ) : (
+          "Pay Now"
+        )}
+      </Button>
+    </form>
+  );
+}
+
 export default function ClientInvoice() {
   const params = useParams();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [company, setCompany] = useState<CompanySettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "bank">("card");
+  const [stripePromise, setStripePromise] = useState<Promise<any> | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [stripeEnabled, setStripeEnabled] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [paymentInitError, setPaymentInitError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchInvoice();
+    checkStripe();
   }, [params.token]);
+
+  const checkStripe = async () => {
+    try {
+      const res = await fetch("/api/stripe/config");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.publishableKey) {
+          setStripePromise(loadStripe(data.publishableKey));
+          setStripeEnabled(true);
+        }
+      }
+    } catch (err) {
+      console.log("Stripe not configured");
+    }
+  };
 
   const fetchInvoice = async () => {
     try {
@@ -70,6 +149,42 @@ export default function ClientInvoice() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const initializeCardPayment = async () => {
+    if (!invoice) return;
+    setPaymentInitError(null);
+    setClientSecret(null);
+    try {
+      const res = await fetch("/api/stripe/create-payment-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invoiceId: invoice.id, accessToken: params.token }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setClientSecret(data.clientSecret);
+      } else {
+        const data = await res.json();
+        setPaymentInitError(data.error || "Failed to initialize payment");
+        if (data.error === "Invoice is already paid") {
+          fetchInvoice();
+        }
+      }
+    } catch (err) {
+      setPaymentInitError("Failed to initialize payment. Please try again.");
+    }
+  };
+
+  useEffect(() => {
+    if (paymentMethod === "card" && stripeEnabled && invoice && invoice.status !== "Paid") {
+      initializeCardPayment();
+    }
+  }, [paymentMethod, stripeEnabled, invoice]);
+
+  const handlePaymentSuccess = () => {
+    setPaymentSuccess(true);
+    fetchInvoice();
   };
 
   if (isLoading) {
@@ -210,7 +325,7 @@ export default function ClientInvoice() {
           </CardContent>
         </Card>
 
-        {invoice.status === "Paid" ? (
+        {invoice.status === "Paid" || paymentSuccess ? (
           <Card className="border-2 border-emerald-500 bg-emerald-50">
             <CardContent className="p-6 text-center">
               <CheckCircle className="h-12 w-12 text-emerald-500 mx-auto mb-3" />
@@ -218,56 +333,122 @@ export default function ClientInvoice() {
               <p className="text-emerald-600">Thank you for your payment!</p>
             </CardContent>
           </Card>
-        ) : company?.bankAccountNumber ? (
+        ) : (stripeEnabled || company?.bankAccountNumber) ? (
           <Card className="border-2 border-primary">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="w-5 h-5" />
-                Payment Details
+                Payment
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-muted-foreground">
-                Please make payment by bank transfer using the details below:
-              </p>
-              <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 space-y-3">
-                {company.bankName && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Bank</span>
-                    <span className="font-medium">{company.bankName}</span>
-                  </div>
-                )}
-                {company.bankAccountName && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Account Name</span>
-                    <span className="font-medium">{company.bankAccountName}</span>
-                  </div>
-                )}
-                {company.bankSortCode && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Sort Code</span>
-                    <span className="font-mono font-medium">{company.bankSortCode}</span>
-                  </div>
-                )}
-                {company.bankAccountNumber && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Account Number</span>
-                    <span className="font-mono font-medium">{company.bankAccountNumber}</span>
-                  </div>
-                )}
-                <Separator />
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Reference</span>
-                  <span className="font-mono font-medium">{invoice.invoiceNo}</span>
+              {stripeEnabled && company?.bankAccountNumber && (
+                <div className="flex gap-2 mb-4">
+                  <Button
+                    variant={paymentMethod === "card" ? "default" : "outline"}
+                    className="flex-1"
+                    onClick={() => setPaymentMethod("card")}
+                    data-testid="button-pay-card"
+                  >
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    Pay by Card
+                  </Button>
+                  <Button
+                    variant={paymentMethod === "bank" ? "default" : "outline"}
+                    className="flex-1"
+                    onClick={() => setPaymentMethod("bank")}
+                    data-testid="button-pay-bank"
+                  >
+                    <Banknote className="w-4 h-4 mr-2" />
+                    Bank Transfer
+                  </Button>
                 </div>
-                <div className="flex justify-between text-lg">
-                  <span className="font-semibold">Amount</span>
-                  <span className="font-bold">£{invoice.total.toFixed(2)}</span>
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground text-center">
-                Please use the invoice number as your payment reference
-              </p>
+              )}
+
+              {(paymentMethod === "card" && stripeEnabled) ? (
+                <>
+                  <p className="text-muted-foreground">
+                    Pay securely with your credit or debit card:
+                  </p>
+                  <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                    <div className="flex justify-between text-lg mb-4">
+                      <span className="font-semibold">Amount to Pay</span>
+                      <span className="font-bold">£{invoice.total.toFixed(2)}</span>
+                    </div>
+                    {paymentInitError ? (
+                      <div className="text-center py-4">
+                        <p className="text-destructive mb-2">{paymentInitError}</p>
+                        <Button variant="outline" onClick={initializeCardPayment}>
+                          Try Again
+                        </Button>
+                      </div>
+                    ) : stripePromise && clientSecret ? (
+                      <Elements
+                        stripe={stripePromise}
+                        options={{
+                          clientSecret,
+                          appearance: {
+                            theme: "stripe",
+                            variables: {
+                              colorPrimary: "#2563eb",
+                            },
+                          },
+                        }}
+                      >
+                        <PaymentForm invoiceId={invoice.id} onSuccess={handlePaymentSuccess} />
+                      </Elements>
+                    ) : (
+                      <div className="flex justify-center py-4">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : company?.bankAccountNumber ? (
+                <>
+                  <p className="text-muted-foreground">
+                    Please make payment by bank transfer using the details below:
+                  </p>
+                  <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 space-y-3">
+                    {company.bankName && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Bank</span>
+                        <span className="font-medium">{company.bankName}</span>
+                      </div>
+                    )}
+                    {company.bankAccountName && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Account Name</span>
+                        <span className="font-medium">{company.bankAccountName}</span>
+                      </div>
+                    )}
+                    {company.bankSortCode && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Sort Code</span>
+                        <span className="font-mono font-medium">{company.bankSortCode}</span>
+                      </div>
+                    )}
+                    {company.bankAccountNumber && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Account Number</span>
+                        <span className="font-mono font-medium">{company.bankAccountNumber}</span>
+                      </div>
+                    )}
+                    <Separator />
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Reference</span>
+                      <span className="font-mono font-medium">{invoice.invoiceNo}</span>
+                    </div>
+                    <div className="flex justify-between text-lg">
+                      <span className="font-semibold">Amount</span>
+                      <span className="font-bold">£{invoice.total.toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground text-center">
+                    Please use the invoice number as your payment reference
+                  </p>
+                </>
+              ) : null}
             </CardContent>
           </Card>
         ) : null}

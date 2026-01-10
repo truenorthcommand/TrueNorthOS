@@ -3021,7 +3021,7 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
         return res.status(500).json({ error: "Stripe is not configured" });
       }
 
-      const { invoiceId } = req.body;
+      const { invoiceId, accessToken } = req.body;
       if (!invoiceId) {
         return res.status(400).json({ error: "Invoice ID is required" });
       }
@@ -3031,7 +3031,14 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
         return res.status(404).json({ error: "Invoice not found" });
       }
 
-      if (invoice.status === "paid") {
+      const isAuthenticated = req.session?.userId;
+      const isValidToken = accessToken && invoice.accessToken === accessToken;
+      
+      if (!isAuthenticated && !isValidToken) {
+        return res.status(401).json({ error: "Unauthorized access to invoice" });
+      }
+
+      if (invoice.status?.toLowerCase() === "paid") {
         return res.status(400).json({ error: "Invoice is already paid" });
       }
 
@@ -3068,25 +3075,29 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
       return res.status(500).json({ error: "Stripe is not configured" });
     }
 
-    const sig = req.headers["stripe-signature"] as string;
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
     if (!webhookSecret) {
       console.warn("Stripe webhook secret not configured");
       return res.status(400).json({ error: "Webhook secret not configured" });
     }
 
-    let event: Stripe.Event;
+    const signature = req.headers["stripe-signature"] as string | undefined;
+    if (!signature) {
+      return res.status(400).json({ error: "Missing Stripe signature header" });
+    }
 
+    const rawBody = (req as Request & { rawBody?: unknown }).rawBody;
+    if (!rawBody || !(rawBody instanceof Buffer)) {
+      return res.status(400).json({ error: "Raw request body is required for signature verification" });
+    }
+
+    let event: Stripe.Event;
     try {
-      const rawBody = (req as any).rawBody;
-      if (!rawBody) {
-        return res.status(400).json({ error: "Raw body not available for webhook verification" });
-      }
-      event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
-    } catch (err: any) {
-      console.error("Webhook signature verification failed:", err.message);
-      return res.status(400).json({ error: `Webhook Error: ${err.message}` });
+      event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      console.error("Stripe webhook signature verification failed:", message);
+      return res.status(400).json({ error: `Webhook Error: ${message}` });
     }
 
     if (event.type === "payment_intent.succeeded") {
@@ -3095,17 +3106,24 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
       if (invoiceId) {
         try {
-          const payment = await storage.createPayment({
+          const existingPayment = await storage.getPaymentByStripeIntentId(paymentIntent.id);
+          if (existingPayment) {
+            console.log(`Payment for intent ${paymentIntent.id} already recorded, skipping`);
+            return res.json({ received: true });
+          }
+
+          await storage.createPayment({
             invoiceId,
             amount: paymentIntent.amount / 100,
             method: "card",
+            status: "completed",
             reference: paymentIntent.id,
             stripePaymentIntentId: paymentIntent.id,
             paidAt: new Date(),
           });
 
           await storage.updateInvoice(invoiceId, {
-            status: "paid",
+            status: "Paid",
             paidAt: new Date(),
           });
 
