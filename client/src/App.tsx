@@ -44,6 +44,7 @@ import DefectDetail from "@/pages/defect-detail";
 import Timesheets from "@/pages/timesheets";
 import Expenses from "@/pages/expenses";
 import Payments from "@/pages/payments";
+import Analytics from "@/pages/analytics";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -114,6 +115,9 @@ function Router() {
       </Route>
       <Route path="/payments">
         <PrivateRoute component={Payments} />
+      </Route>
+      <Route path="/analytics">
+        <PrivateRoute component={Analytics} />
       </Route>
       <Route path="/quotes">
         <PrivateRoute component={Quotes} />

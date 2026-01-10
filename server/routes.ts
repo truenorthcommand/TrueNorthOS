@@ -3024,6 +3024,111 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
+  app.post("/api/expenses/bulk-approve", requireAdmin, async (req, res) => {
+    try {
+      const { expenseIds } = req.body;
+      if (!Array.isArray(expenseIds) || expenseIds.length === 0) {
+        return res.status(400).json({ error: "expenseIds array is required" });
+      }
+      
+      let approvedCount = 0;
+      for (const id of expenseIds) {
+        const expense = await storage.getExpense(id);
+        if (expense && expense.status === "pending") {
+          await storage.updateExpense(id, {
+            status: "approved",
+            approvedById: req.session.userId,
+            approvedAt: new Date(),
+          });
+          
+          if (expense.userId) {
+            notifyUser(expense.userId, {
+              type: 'expense_approved',
+              title: 'Expense Approved',
+              message: `Your expense claim for £${expense.amount?.toFixed(2) || '0.00'} has been approved.`,
+              expenseId: expense.id,
+              timestamp: new Date().toISOString(),
+            });
+          }
+          approvedCount++;
+        }
+      }
+      
+      res.json({ success: true, count: approvedCount });
+    } catch (error) {
+      console.error("Bulk approve expenses error:", error);
+      res.status(500).json({ error: "Failed to bulk approve expenses" });
+    }
+  });
+
+  app.post("/api/expenses/bulk-reject", requireAdmin, async (req, res) => {
+    try {
+      const { expenseIds } = req.body;
+      if (!Array.isArray(expenseIds) || expenseIds.length === 0) {
+        return res.status(400).json({ error: "expenseIds array is required" });
+      }
+      
+      let rejectedCount = 0;
+      for (const id of expenseIds) {
+        const expense = await storage.getExpense(id);
+        if (expense && expense.status === "pending") {
+          await storage.updateExpense(id, {
+            status: "rejected",
+            approvedById: req.session.userId,
+            approvedAt: new Date(),
+          });
+          
+          if (expense.userId) {
+            notifyUser(expense.userId, {
+              type: 'expense_rejected',
+              title: 'Expense Rejected',
+              message: `Your expense claim for £${expense.amount?.toFixed(2) || '0.00'} has been rejected.`,
+              expenseId: expense.id,
+              timestamp: new Date().toISOString(),
+            });
+          }
+          rejectedCount++;
+        }
+      }
+      
+      res.json({ success: true, count: rejectedCount });
+    } catch (error) {
+      console.error("Bulk reject expenses error:", error);
+      res.status(500).json({ error: "Failed to bulk reject expenses" });
+    }
+  });
+
+  app.post("/api/jobs/bulk-assign", requireAdmin, async (req, res) => {
+    try {
+      const { jobIds, assignedToId } = req.body;
+      if (!Array.isArray(jobIds) || jobIds.length === 0) {
+        return res.status(400).json({ error: "jobIds array is required" });
+      }
+      if (!assignedToId) {
+        return res.status(400).json({ error: "assignedToId is required" });
+      }
+      
+      const assignedUser = await storage.getUser(assignedToId);
+      if (!assignedUser) {
+        return res.status(404).json({ error: "Assigned user not found" });
+      }
+      
+      let updatedCount = 0;
+      for (const id of jobIds) {
+        const job = await storage.getJob(id);
+        if (job) {
+          await storage.updateJob(id, { assignedToId });
+          updatedCount++;
+        }
+      }
+      
+      res.json({ success: true, count: updatedCount });
+    } catch (error) {
+      console.error("Bulk assign jobs error:", error);
+      res.status(500).json({ error: "Failed to bulk assign jobs" });
+    }
+  });
+
   // ==================== PAYMENTS ROUTES ====================
 
   app.get("/api/payments", requireAuth, async (req, res) => {
@@ -3384,6 +3489,140 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     } catch (error) {
       console.error("Get users error:", error);
       res.status(500).json({ error: "Failed to get users" });
+    }
+  });
+
+  // ==================== ANALYTICS ====================
+
+  app.get("/api/analytics", requireAdmin, async (req, res) => {
+    try {
+      const now = new Date();
+      const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+      // Get all invoices, jobs, expenses, and engineers
+      const allInvoices = await storage.getAllInvoices();
+      const allJobs = await storage.getAllJobs();
+      const allExpenses = await storage.getAllExpenses();
+      const allEngineers = await storage.getAllEngineers();
+
+      // Revenue data - monthly revenue from paid invoices over last 6 months
+      const monthlyRevenue: { month: string; revenue: number }[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+        const monthName = monthDate.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+        
+        const monthRevenue = allInvoices
+          .filter(inv => {
+            if (inv.status !== 'Paid' || !inv.paidAt) return false;
+            const paidDate = new Date(inv.paidAt);
+            return paidDate >= monthDate && paidDate <= monthEnd;
+          })
+          .reduce((sum, inv) => sum + (inv.total || 0), 0);
+        
+        monthlyRevenue.push({ month: monthName, revenue: monthRevenue });
+      }
+
+      // Jobs data - jobs completed per month
+      const jobsByMonth: { month: string; completed: number }[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+        const monthName = monthDate.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+        
+        const completed = allJobs.filter(job => {
+          if (job.status !== 'Signed Off' || !job.signOffTimestamp) return false;
+          const signOffDate = new Date(job.signOffTimestamp);
+          return signOffDate >= monthDate && signOffDate <= monthEnd;
+        }).length;
+        
+        jobsByMonth.push({ month: monthName, completed });
+      }
+
+      // Jobs by status
+      const jobsByStatus = [
+        { name: 'Draft', value: allJobs.filter(j => j.status === 'Draft').length, fill: '#94a3b8' },
+        { name: 'In Progress', value: allJobs.filter(j => j.status === 'In Progress').length, fill: '#3b82f6' },
+        { name: 'Awaiting Signatures', value: allJobs.filter(j => j.status === 'Awaiting Signatures').length, fill: '#f59e0b' },
+        { name: 'Signed Off', value: allJobs.filter(j => j.status === 'Signed Off').length, fill: '#22c55e' },
+      ];
+
+      // Expenses data - monthly expenses
+      const monthlyExpenses: { month: string; amount: number }[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+        const monthName = monthDate.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+        
+        const monthAmount = allExpenses
+          .filter(exp => {
+            const expDate = new Date(exp.date);
+            return expDate >= monthDate && expDate <= monthEnd;
+          })
+          .reduce((sum, exp) => sum + (exp.amount || 0), 0);
+        
+        monthlyExpenses.push({ month: monthName, amount: monthAmount });
+      }
+
+      // Expenses by category
+      const expenseCategories = ['mileage', 'materials', 'tools', 'fuel', 'subsistence', 'other'];
+      const expensesByCategory = expenseCategories.map(category => ({
+        category: category.charAt(0).toUpperCase() + category.slice(1),
+        amount: allExpenses
+          .filter(exp => exp.category === category)
+          .reduce((sum, exp) => sum + (exp.amount || 0), 0)
+      })).filter(item => item.amount > 0);
+
+      // Team performance - jobs completed per engineer
+      const teamPerformance = allEngineers.map(engineer => {
+        const engineerJobs = allJobs.filter(job => {
+          if (job.assignedToId === engineer.id) return true;
+          if (Array.isArray(job.assignedToIds) && job.assignedToIds.includes(engineer.id)) return true;
+          return false;
+        });
+        
+        const completedJobs = engineerJobs.filter(j => j.status === 'Signed Off').length;
+        const inProgressJobs = engineerJobs.filter(j => j.status === 'In Progress').length;
+        
+        return {
+          id: engineer.id,
+          name: engineer.name,
+          completedJobs,
+          inProgressJobs,
+          totalJobs: engineerJobs.length,
+        };
+      }).sort((a, b) => b.completedJobs - a.completedJobs);
+
+      // Summary KPIs
+      const totalRevenue = allInvoices
+        .filter(inv => inv.status === 'Paid')
+        .reduce((sum, inv) => sum + (inv.total || 0), 0);
+      
+      const totalCompletedJobs = allJobs.filter(j => j.status === 'Signed Off').length;
+      
+      const pendingExpenses = allExpenses
+        .filter(exp => exp.status === 'pending')
+        .reduce((sum, exp) => sum + (exp.amount || 0), 0);
+      
+      const activeEngineers = allEngineers.filter(e => e.status === 'active').length;
+
+      res.json({
+        summary: {
+          totalRevenue,
+          totalCompletedJobs,
+          pendingExpenses,
+          activeEngineers,
+        },
+        monthlyRevenue,
+        jobsByMonth,
+        jobsByStatus,
+        monthlyExpenses,
+        expensesByCategory,
+        teamPerformance,
+      });
+    } catch (error) {
+      console.error("Analytics error:", error);
+      res.status(500).json({ error: "Failed to fetch analytics data" });
     }
   });
 

@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, CalendarIcon, Car, Package, Wrench, Fuel, Utensils, MoreHorizontal, Check, X, Loader2, Wallet } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { toast } from "sonner";
@@ -78,6 +79,7 @@ export default function Expenses() {
   const [selectedUserId, setSelectedUserId] = useState<string>("all");
   const [addExpenseOpen, setAddExpenseOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<ExpenseWithDetails | null>(null);
+  const [selectedExpenseIds, setSelectedExpenseIds] = useState<Set<string>>(new Set());
 
   const [expenseDate, setExpenseDate] = useState<Date | undefined>(new Date());
   const [category, setCategory] = useState<ExpenseCategory>("other");
@@ -170,6 +172,36 @@ export default function Expenses() {
     },
   });
 
+  const bulkApproveMutation = useMutation({
+    mutationFn: async (expenseIds: string[]) => {
+      const res = await apiRequest("POST", "/api/expenses/bulk-approve", { expenseIds });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      setSelectedExpenseIds(new Set());
+      toast.success(`${data.count} expense(s) approved`);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to bulk approve expenses");
+    },
+  });
+
+  const bulkRejectMutation = useMutation({
+    mutationFn: async (expenseIds: string[]) => {
+      const res = await apiRequest("POST", "/api/expenses/bulk-reject", { expenseIds });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      setSelectedExpenseIds(new Set());
+      toast.success(`${data.count} expense(s) rejected`);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to bulk reject expenses");
+    },
+  });
+
   const resetForm = () => {
     setExpenseDate(new Date());
     setCategory("other");
@@ -249,6 +281,34 @@ export default function Expenses() {
     .reduce((sum, exp) => sum + (exp.amount || 0), 0);
 
   const isAdmin = user?.role === "admin";
+
+  const pendingExpenses = filteredExpenses.filter((exp) => exp.status === "pending");
+  const allPendingSelected = pendingExpenses.length > 0 && pendingExpenses.every((exp) => selectedExpenseIds.has(exp.id));
+  const somePendingSelected = pendingExpenses.some((exp) => selectedExpenseIds.has(exp.id));
+
+  const toggleExpenseSelection = (id: string) => {
+    setSelectedExpenseIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleAllPending = () => {
+    if (allPendingSelected) {
+      setSelectedExpenseIds(new Set());
+    } else {
+      setSelectedExpenseIds(new Set(pendingExpenses.map((exp) => exp.id)));
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedExpenseIds(new Set());
+  };
 
   return (
     <div className="container mx-auto p-4 pb-24 md:pb-4 space-y-6">
@@ -519,6 +579,17 @@ export default function Expenses() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {isAdmin && (
+                      <TableHead className="w-[50px]">
+                        <Checkbox
+                          checked={allPendingSelected}
+                          onCheckedChange={toggleAllPending}
+                          aria-label="Select all pending expenses"
+                          data-testid="checkbox-select-all"
+                          className={somePendingSelected && !allPendingSelected ? "opacity-50" : ""}
+                        />
+                      </TableHead>
+                    )}
                     <TableHead>Date</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Description</TableHead>
@@ -531,7 +602,7 @@ export default function Expenses() {
                 <TableBody>
                   {filteredExpenses.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={isAdmin && viewAllStaff ? 7 : 6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={isAdmin ? (viewAllStaff ? 9 : 8) : 6} className="text-center py-8 text-muted-foreground">
                         No expenses found
                       </TableCell>
                     </TableRow>
@@ -543,6 +614,17 @@ export default function Expenses() {
                         onClick={() => setSelectedExpense(expense)}
                         data-testid={`row-expense-${expense.id}`}
                       >
+                        {isAdmin && (
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={selectedExpenseIds.has(expense.id)}
+                              onCheckedChange={() => toggleExpenseSelection(expense.id)}
+                              disabled={expense.status !== "pending"}
+                              aria-label={`Select expense ${expense.id}`}
+                              data-testid={`checkbox-expense-${expense.id}`}
+                            />
+                          </TableCell>
+                        )}
                         <TableCell className="whitespace-nowrap">
                           {format(new Date(expense.date), "dd MMM yyyy")}
                         </TableCell>
@@ -710,6 +792,46 @@ export default function Expenses() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {isAdmin && selectedExpenseIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg p-4 z-50">
+          <div className="container mx-auto flex items-center justify-between gap-4 flex-wrap">
+            <span className="text-sm font-medium" data-testid="text-selected-count">
+              {selectedExpenseIds.size} expense(s) selected
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="default"
+                className="bg-green-600 hover:bg-green-700"
+                onClick={() => bulkApproveMutation.mutate(Array.from(selectedExpenseIds))}
+                disabled={bulkApproveMutation.isPending || bulkRejectMutation.isPending}
+                data-testid="button-bulk-approve"
+              >
+                {bulkApproveMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                <Check className="h-4 w-4 mr-2" />
+                Approve Selected ({selectedExpenseIds.size})
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => bulkRejectMutation.mutate(Array.from(selectedExpenseIds))}
+                disabled={bulkApproveMutation.isPending || bulkRejectMutation.isPending}
+                data-testid="button-bulk-reject"
+              >
+                {bulkRejectMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                <X className="h-4 w-4 mr-2" />
+                Reject Selected ({selectedExpenseIds.size})
+              </Button>
+              <Button
+                variant="outline"
+                onClick={clearSelection}
+                data-testid="button-clear-selection"
+              >
+                Clear Selection
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

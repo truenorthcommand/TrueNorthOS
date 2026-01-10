@@ -1,13 +1,14 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, Bell, Shield, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard } from "lucide-react";
+import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, Bell, Shield, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "@/hooks/use-notifications";
+import { useOffline } from "@/hooks/use-offline";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 
@@ -22,6 +23,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [expandedSections, setExpandedSections] = useState<MenuSection[]>(['jobs']);
   
   useNotifications();
+  const { isOnline, pendingActions, syncOfflineQueue } = useOffline();
 
   const { data: unreadData } = useQuery<{ count: number }>({
     queryKey: ["/api/messages/unread-count"],
@@ -271,7 +273,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <NavLink href="/timesheets" icon={Timer}>Timesheets</NavLink>
           <NavLink href="/expenses" icon={Receipt}>Expenses</NavLink>
           {user.role === "admin" && (
-            <NavLink href="/payments" icon={CreditCard}>Payments</NavLink>
+            <>
+              <NavLink href="/payments" icon={CreditCard}>Payments</NavLink>
+              <NavLink href="/analytics" icon={PieChart}>Analytics</NavLink>
+            </>
           )}
         </MenuGroup>
 
@@ -398,6 +403,33 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </Button>
             </div>
           </header>
+
+          {(!isOnline || pendingActions > 0) && (
+            <div className={cn(
+              "px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-2",
+              !isOnline ? "bg-red-500 text-white" : "bg-amber-500 text-white"
+            )}>
+              {!isOnline ? (
+                <>
+                  <WifiOff className="h-4 w-4" />
+                  <span>You are offline. Changes will sync when reconnected.</span>
+                </>
+              ) : pendingActions > 0 ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <span>{pendingActions} pending action{pendingActions > 1 ? 's' : ''} syncing...</span>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 text-white hover:text-white hover:bg-white/20"
+                    onClick={() => syncOfflineQueue()}
+                  >
+                    Sync Now
+                  </Button>
+                </>
+              ) : null}
+            </div>
+          )}
 
           <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full no-print">
             {children}

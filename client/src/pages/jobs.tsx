@@ -1,22 +1,79 @@
 import { useState, memo } from "react";
 import { Link, useLocation } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
+import { apiRequest } from "@/lib/queryClient";
 import { Job, JobStatus } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2, Pencil } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2, Pencil, Users, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { toast } from "sonner";
+import type { User as UserType } from "@shared/schema";
 
 export default function Jobs() {
   const { user } = useAuth();
-  const { jobs } = useStore();
+  const { jobs, refreshJobs } = useStore();
+  const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
+  const [assignToEngineerId, setAssignToEngineerId] = useState<string>("");
+
+  const { data: users = [] } = useQuery<UserType[]>({
+    queryKey: ["/api/users"],
+    enabled: user?.role === "admin",
+  });
+
+  const engineers = users.filter((u) => u.role === "engineer" || u.role === "admin");
+
+  const bulkAssignMutation = useMutation({
+    mutationFn: async ({ jobIds, assignedToId }: { jobIds: string[]; assignedToId: string }) => {
+      const res = await apiRequest("POST", "/api/jobs/bulk-assign", { jobIds, assignedToId });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      refreshJobs();
+      setSelectedJobIds(new Set());
+      setAssignToEngineerId("");
+      toast.success(`${data.count} job(s) assigned`);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to bulk assign jobs");
+    },
+  });
+
+  const toggleJobSelection = (id: string) => {
+    setSelectedJobIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedJobIds(new Set());
+    setAssignToEngineerId("");
+  };
+
+  const handleBulkAssign = () => {
+    if (!assignToEngineerId) {
+      toast.error("Please select an engineer");
+      return;
+    }
+    bulkAssignMutation.mutate({ jobIds: Array.from(selectedJobIds), assignedToId: assignToEngineerId });
+  };
 
   if (!user) return null;
 
@@ -89,7 +146,14 @@ export default function Jobs() {
                 No active jobs. Great work!
               </div>
             ) : filteredJobs.filter(j => j.status === "In Progress" || j.status === "Draft").map(job => (
-               <JobCard key={job.id} job={job} statusColor={getStatusColor(job.status)} isAdmin={user.role === 'admin'} />
+               <JobCard 
+                 key={job.id} 
+                 job={job} 
+                 statusColor={getStatusColor(job.status)} 
+                 isAdmin={user.role === 'admin'}
+                 isSelected={selectedJobIds.has(job.id)}
+                 onToggleSelection={toggleJobSelection}
+               />
             ))}
           </div>
         </TabsContent>
@@ -101,7 +165,14 @@ export default function Jobs() {
                  No jobs found.
                </div>
             ) : filteredJobs.map(job => (
-              <JobCard key={job.id} job={job} statusColor={getStatusColor(job.status)} isAdmin={user.role === 'admin'} />
+              <JobCard 
+                key={job.id} 
+                job={job} 
+                statusColor={getStatusColor(job.status)} 
+                isAdmin={user.role === 'admin'}
+                isSelected={selectedJobIds.has(job.id)}
+                onToggleSelection={toggleJobSelection}
+              />
             ))}
           </div>
         </TabsContent>
@@ -114,7 +185,14 @@ export default function Jobs() {
                 No jobs awaiting signatures.
               </div>
             ) : filteredJobs.filter(j => j.status === "Awaiting Signatures").map(job => (
-               <JobCard key={job.id} job={job} statusColor={getStatusColor(job.status)} isAdmin={user.role === 'admin'} />
+               <JobCard 
+                 key={job.id} 
+                 job={job} 
+                 statusColor={getStatusColor(job.status)} 
+                 isAdmin={user.role === 'admin'}
+                 isSelected={selectedJobIds.has(job.id)}
+                 onToggleSelection={toggleJobSelection}
+               />
             ))}
           </div>
         </TabsContent>
@@ -126,16 +204,76 @@ export default function Jobs() {
                 No completed jobs.
               </div>
             ) : filteredJobs.filter(j => j.status === "Signed Off").map(job => (
-               <JobCard key={job.id} job={job} statusColor={getStatusColor(job.status)} isAdmin={user.role === 'admin'} />
+               <JobCard 
+                 key={job.id} 
+                 job={job} 
+                 statusColor={getStatusColor(job.status)} 
+                 isAdmin={user.role === 'admin'}
+                 isSelected={selectedJobIds.has(job.id)}
+                 onToggleSelection={toggleJobSelection}
+               />
             ))}
           </div>
         </TabsContent>
       </Tabs>
+
+      {user.role === "admin" && selectedJobIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg p-4 z-50">
+          <div className="container mx-auto flex items-center justify-between gap-4 flex-wrap">
+            <span className="text-sm font-medium" data-testid="text-jobs-selected-count">
+              {selectedJobIds.size} job(s) selected
+            </span>
+            <div className="flex items-center gap-2">
+              <Select value={assignToEngineerId} onValueChange={setAssignToEngineerId}>
+                <SelectTrigger className="w-[200px]" data-testid="select-assign-engineer">
+                  <SelectValue placeholder="Select engineer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {engineers.map((eng) => (
+                    <SelectItem key={eng.id} value={eng.id}>
+                      {eng.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="default"
+                onClick={handleBulkAssign}
+                disabled={!assignToEngineerId || bulkAssignMutation.isPending}
+                data-testid="button-bulk-assign"
+              >
+                {bulkAssignMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                <Users className="h-4 w-4 mr-2" />
+                Assign to Engineer
+              </Button>
+              <Button
+                variant="outline"
+                onClick={clearSelection}
+                data-testid="button-clear-job-selection"
+              >
+                Clear Selection
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function JobCard({ job, statusColor, isAdmin }: { job: Job, statusColor: string, isAdmin: boolean }) {
+function JobCard({ 
+  job, 
+  statusColor, 
+  isAdmin,
+  isSelected,
+  onToggleSelection,
+}: { 
+  job: Job; 
+  statusColor: string; 
+  isAdmin: boolean;
+  isSelected?: boolean;
+  onToggleSelection?: (id: string) => void;
+}) {
   const [, setLocation] = useLocation();
   const photos = job.photos || [];
   const signatures = job.signatures || [];
@@ -167,7 +305,18 @@ function JobCard({ job, statusColor, isAdmin }: { job: Job, statusColor: string,
       <div className="h-full flex flex-col">
         <CardHeader className="pb-3">
           <div className="flex justify-between items-start mb-2">
-            <Badge className={statusColor}>{job.status}</Badge>
+            <div className="flex items-center gap-2">
+              {isAdmin && onToggleSelection && (
+                <Checkbox
+                  checked={isSelected}
+                  onCheckedChange={() => onToggleSelection(job.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  aria-label={`Select job ${job.id}`}
+                  data-testid={`checkbox-job-${job.id}`}
+                />
+              )}
+              <Badge className={statusColor}>{job.status}</Badge>
+            </div>
             <span className="text-xs font-mono text-muted-foreground">{job.jobNo}</span>
           </div>
           <CardTitle className="text-lg leading-tight group-hover:text-primary transition-colors">
