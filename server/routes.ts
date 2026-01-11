@@ -113,6 +113,17 @@ export async function registerRoutes(
   // Use shared session middleware (also used by WebSocket notifications)
   app.use(sessionMiddleware);
 
+  // ==================== VERSION ENDPOINT (PUBLIC) ====================
+  // Used to verify which code version is running in production
+  const BUILD_VERSION = new Date().toISOString();
+  app.get("/api/version", (req, res) => {
+    res.json({ 
+      version: BUILD_VERSION,
+      environment: process.env.NODE_ENV || 'development',
+      timestamp: new Date().toISOString()
+    });
+  });
+
   // ==================== AUTH ROUTES (PUBLIC) ====================
 
   app.post("/api/auth/login", async (req, res) => {
