@@ -465,6 +465,7 @@ export const vehicles = pgTable("vehicles", {
   year: integer("year"),
   type: text("type"), // Van, Truck, Car, etc.
   status: text("status").notNull().default("active"), // active, off-road, maintenance
+  assignedUserId: varchar("assigned_user_id"), // Staff member assigned to this vehicle
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
