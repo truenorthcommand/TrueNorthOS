@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
+import { hasRole } from "@/lib/types";
 import { LeafletMap, MapMarker } from "@/components/leaflet-map";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -44,14 +45,14 @@ export default function MapPage() {
   };
 
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (hasRole(user, 'admin')) {
       fetchEngineerLocations();
       const interval = setInterval(fetchEngineerLocations, 30000);
       return () => clearInterval(interval);
     }
   }, [user]);
 
-  if (!user || user.role !== "admin") {
+  if (!user || !hasRole(user, 'admin')) {
     return (
       <div className="text-center py-12">
         <p className="text-muted-foreground">Access denied. Admin only.</p>

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
-import { Job, JobStatus, User as UserType } from "@/lib/types";
+import { Job, JobStatus, User as UserType, hasRole } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -673,7 +673,7 @@ export default function CalendarPage() {
     );
   };
 
-  if (!user || user.role !== "admin") {
+  if (!user || !hasRole(user, 'admin')) {
     return (
       <div className="text-center py-12">
         <p className="text-muted-foreground">Access denied. Admin only.</p>
