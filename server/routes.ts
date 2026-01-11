@@ -3239,6 +3239,43 @@ Return ONLY valid JSON.`;
     }
   });
 
+  // Get available vehicles (unassigned)
+  app.get("/api/fleet/vehicles-available", requireAuth, async (req, res) => {
+    try {
+      const vehicles = await storage.getAvailableVehicles();
+      res.json(vehicles);
+    } catch (error) {
+      console.error("Get available vehicles error:", error);
+      res.status(500).json({ error: "Failed to get available vehicles" });
+    }
+  });
+
+  // Get vehicles assigned to a user
+  app.get("/api/users/:userId/vehicles", requireAuth, async (req, res) => {
+    try {
+      const vehicles = await storage.getVehiclesByUserId(req.params.userId);
+      res.json(vehicles);
+    } catch (error) {
+      console.error("Get user vehicles error:", error);
+      res.status(500).json({ error: "Failed to get user vehicles" });
+    }
+  });
+
+  // Assign vehicle to user
+  app.post("/api/fleet/vehicles/:vehicleId/assign", requireAdmin, async (req, res) => {
+    try {
+      const { userId } = req.body;
+      const vehicle = await storage.assignVehicleToUser(req.params.vehicleId, userId || null);
+      if (!vehicle) {
+        return res.status(404).json({ error: "Vehicle not found" });
+      }
+      res.json(vehicle);
+    } catch (error) {
+      console.error("Assign vehicle error:", error);
+      res.status(500).json({ error: "Failed to assign vehicle" });
+    }
+  });
+
   // Get all walkaround checks
   app.get("/api/fleet/checks", requireAuth, async (req, res) => {
     try {
