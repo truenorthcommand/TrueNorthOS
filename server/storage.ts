@@ -23,11 +23,16 @@ import {
   type Expense, type InsertExpense, type ExpenseWithDetails,
   type Payment, type InsertPayment, type PaymentWithInvoice,
   type Skill,
+  type Inspection, type InsertInspection, type InspectionWithDetails,
+  type InspectionItem, type InsertInspectionItem,
+  type SnaggingSheet, type InsertSnaggingSheet, type SnaggingSheetWithDetails,
+  type SnagItem, type InsertSnagItem,
   users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, jobUpdates,
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
   timesheets, expenses, payments,
-  skills, userSkills
+  skills, userSkills,
+  inspections, inspectionItems, snaggingSheets, snagItems
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and, ne, inArray, gt, asc } from "drizzle-orm";
@@ -183,6 +188,30 @@ export interface IStorage {
   updateUserManager(userId: string, managerId: string | null): Promise<User | undefined>;
   getTeamTimesheets(managerId: string): Promise<TimesheetWithUser[]>;
   getTeamExpenses(managerId: string): Promise<ExpenseWithDetails[]>;
+  
+  // Inspections
+  getInspections(): Promise<Inspection[]>;
+  getInspection(id: string): Promise<InspectionWithDetails | undefined>;
+  createInspection(data: InsertInspection): Promise<Inspection>;
+  updateInspection(id: string, data: Partial<Inspection>): Promise<Inspection | undefined>;
+  deleteInspection(id: string): Promise<void>;
+  getInspectionItems(inspectionId: string): Promise<InspectionItem[]>;
+  createInspectionItem(data: InsertInspectionItem): Promise<InspectionItem>;
+  updateInspectionItem(id: string, data: Partial<InspectionItem>): Promise<InspectionItem | undefined>;
+  deleteInspectionItem(id: string): Promise<void>;
+  getNextInspectionNo(): Promise<string>;
+  
+  // Snagging Sheets
+  getSnaggingSheets(): Promise<SnaggingSheet[]>;
+  getSnaggingSheet(id: string): Promise<SnaggingSheetWithDetails | undefined>;
+  createSnaggingSheet(data: InsertSnaggingSheet): Promise<SnaggingSheet>;
+  updateSnaggingSheet(id: string, data: Partial<SnaggingSheet>): Promise<SnaggingSheet | undefined>;
+  deleteSnaggingSheet(id: string): Promise<void>;
+  getSnagItems(sheetId: string): Promise<SnagItem[]>;
+  createSnagItem(data: InsertSnagItem): Promise<SnagItem>;
+  updateSnagItem(id: string, data: Partial<SnagItem>): Promise<SnagItem | undefined>;
+  deleteSnagItem(id: string): Promise<void>;
+  getNextSnaggingSheetNo(): Promise<string>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1380,6 +1409,196 @@ export class DatabaseStorage implements IStorage {
       }
       return { ...expense, user, approvedBy, job };
     }));
+  }
+
+  // ==================== INSPECTIONS ====================
+
+  async getInspections(): Promise<Inspection[]> {
+    return db.select().from(inspections).orderBy(desc(inspections.createdAt));
+  }
+
+  async getInspection(id: string): Promise<InspectionWithDetails | undefined> {
+    const [inspection] = await db.select().from(inspections).where(eq(inspections.id, id));
+    if (!inspection) return undefined;
+
+    const [inspector] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, inspection.inspectorId));
+    const items = await db.select().from(inspectionItems).where(eq(inspectionItems.inspectionId, id)).orderBy(inspectionItems.category, inspectionItems.orderIndex);
+
+    let job = null;
+    if (inspection.jobId) {
+      const [jobRecord] = await db.select({ id: jobs.id, jobNo: jobs.jobNo, customerName: jobs.customerName }).from(jobs).where(eq(jobs.id, inspection.jobId));
+      job = jobRecord || null;
+    }
+
+    let client = null;
+    if (inspection.clientId) {
+      const [clientRecord] = await db.select({ id: clients.id, name: clients.name }).from(clients).where(eq(clients.id, inspection.clientId));
+      client = clientRecord || null;
+    }
+
+    return { ...inspection, inspector, items, job, client };
+  }
+
+  async createInspection(data: InsertInspection): Promise<Inspection> {
+    const [created] = await db.insert(inspections).values(data).returning();
+    return created;
+  }
+
+  async updateInspection(id: string, data: Partial<Inspection>): Promise<Inspection | undefined> {
+    const [updated] = await db.update(inspections)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(inspections.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteInspection(id: string): Promise<void> {
+    await db.delete(inspectionItems).where(eq(inspectionItems.inspectionId, id));
+    await db.delete(inspections).where(eq(inspections.id, id));
+  }
+
+  async getInspectionItems(inspectionId: string): Promise<InspectionItem[]> {
+    return db.select().from(inspectionItems)
+      .where(eq(inspectionItems.inspectionId, inspectionId))
+      .orderBy(inspectionItems.category, inspectionItems.orderIndex);
+  }
+
+  async createInspectionItem(data: InsertInspectionItem): Promise<InspectionItem> {
+    const [created] = await db.insert(inspectionItems).values(data).returning();
+    return created;
+  }
+
+  async updateInspectionItem(id: string, data: Partial<InspectionItem>): Promise<InspectionItem | undefined> {
+    const [updated] = await db.update(inspectionItems)
+      .set(data)
+      .where(eq(inspectionItems.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteInspectionItem(id: string): Promise<void> {
+    await db.delete(inspectionItems).where(eq(inspectionItems.id, id));
+  }
+
+  async getNextInspectionNo(): Promise<string> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(inspections);
+    const count = Number(result[0]?.count || 0) + 1;
+    const year = new Date().getFullYear();
+    return `INS-${year}-${String(count).padStart(4, '0')}`;
+  }
+
+  // ==================== SNAGGING SHEETS ====================
+
+  async getSnaggingSheets(): Promise<SnaggingSheet[]> {
+    return db.select().from(snaggingSheets).orderBy(desc(snaggingSheets.createdAt));
+  }
+
+  async getSnaggingSheet(id: string): Promise<SnaggingSheetWithDetails | undefined> {
+    const [sheet] = await db.select().from(snaggingSheets).where(eq(snaggingSheets.id, id));
+    if (!sheet) return undefined;
+
+    const [createdBy] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, sheet.createdById));
+    const snags = await db.select().from(snagItems)
+      .where(eq(snagItems.snaggingSheetId, id))
+      .orderBy(snagItems.location, snagItems.orderIndex);
+
+    let job = null;
+    if (sheet.jobId) {
+      const [jobRecord] = await db.select({ id: jobs.id, jobNo: jobs.jobNo, customerName: jobs.customerName }).from(jobs).where(eq(jobs.id, sheet.jobId));
+      job = jobRecord || null;
+    }
+
+    let client = null;
+    if (sheet.clientId) {
+      const [clientRecord] = await db.select({ id: clients.id, name: clients.name }).from(clients).where(eq(clients.id, sheet.clientId));
+      client = clientRecord || null;
+    }
+
+    return { ...sheet, createdBy, snags, job, client };
+  }
+
+  async createSnaggingSheet(data: InsertSnaggingSheet): Promise<SnaggingSheet> {
+    const [created] = await db.insert(snaggingSheets).values(data).returning();
+    return created;
+  }
+
+  async updateSnaggingSheet(id: string, data: Partial<SnaggingSheet>): Promise<SnaggingSheet | undefined> {
+    const [updated] = await db.update(snaggingSheets)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(snaggingSheets.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSnaggingSheet(id: string): Promise<void> {
+    await db.delete(snagItems).where(eq(snagItems.snaggingSheetId, id));
+    await db.delete(snaggingSheets).where(eq(snaggingSheets.id, id));
+  }
+
+  async getSnagItems(sheetId: string): Promise<SnagItem[]> {
+    return db.select().from(snagItems)
+      .where(eq(snagItems.snaggingSheetId, sheetId))
+      .orderBy(snagItems.location, snagItems.orderIndex);
+  }
+
+  async createSnagItem(data: InsertSnagItem): Promise<SnagItem> {
+    const [created] = await db.insert(snagItems).values(data).returning();
+    const sheet = await db.select().from(snaggingSheets).where(eq(snaggingSheets.id, data.snaggingSheetId));
+    if (sheet[0]) {
+      const totalSnags = (sheet[0].totalSnags || 0) + 1;
+      await db.update(snaggingSheets).set({ totalSnags, updatedAt: new Date() }).where(eq(snaggingSheets.id, data.snaggingSheetId));
+    }
+    return created;
+  }
+
+  async updateSnagItem(id: string, data: Partial<SnagItem>): Promise<SnagItem | undefined> {
+    const [existing] = await db.select().from(snagItems).where(eq(snagItems.id, id));
+    const [updated] = await db.update(snagItems)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(snagItems.id, id))
+      .returning();
+    
+    if (updated && existing) {
+      const wasResolved = existing.status === 'resolved' || existing.status === 'verified';
+      const isNowResolved = updated.status === 'resolved' || updated.status === 'verified';
+      
+      if (!wasResolved && isNowResolved) {
+        const sheet = await db.select().from(snaggingSheets).where(eq(snaggingSheets.id, updated.snaggingSheetId));
+        if (sheet[0]) {
+          const resolvedSnags = (sheet[0].resolvedSnags || 0) + 1;
+          await db.update(snaggingSheets).set({ resolvedSnags, updatedAt: new Date() }).where(eq(snaggingSheets.id, updated.snaggingSheetId));
+        }
+      } else if (wasResolved && !isNowResolved) {
+        const sheet = await db.select().from(snaggingSheets).where(eq(snaggingSheets.id, updated.snaggingSheetId));
+        if (sheet[0]) {
+          const resolvedSnags = Math.max(0, (sheet[0].resolvedSnags || 0) - 1);
+          await db.update(snaggingSheets).set({ resolvedSnags, updatedAt: new Date() }).where(eq(snaggingSheets.id, updated.snaggingSheetId));
+        }
+      }
+    }
+    
+    return updated;
+  }
+
+  async deleteSnagItem(id: string): Promise<void> {
+    const [snag] = await db.select().from(snagItems).where(eq(snagItems.id, id));
+    if (snag) {
+      await db.delete(snagItems).where(eq(snagItems.id, id));
+      const sheet = await db.select().from(snaggingSheets).where(eq(snaggingSheets.id, snag.snaggingSheetId));
+      if (sheet[0]) {
+        const totalSnags = Math.max(0, (sheet[0].totalSnags || 0) - 1);
+        const wasResolved = snag.status === 'resolved' || snag.status === 'verified';
+        const resolvedSnags = wasResolved ? Math.max(0, (sheet[0].resolvedSnags || 0) - 1) : sheet[0].resolvedSnags;
+        await db.update(snaggingSheets).set({ totalSnags, resolvedSnags, updatedAt: new Date() }).where(eq(snaggingSheets.id, snag.snaggingSheetId));
+      }
+    }
+  }
+
+  async getNextSnaggingSheetNo(): Promise<string> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(snaggingSheets);
+    const count = Number(result[0]?.count || 0) + 1;
+    const year = new Date().getFullYear();
+    return `SNG-${year}-${String(count).padStart(4, '0')}`;
   }
 }
 

@@ -4581,5 +4581,223 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
+  // ==================== INSPECTIONS ====================
+
+  app.get("/api/inspections", requireRoles('admin', 'surveyor', 'works_manager'), async (req, res) => {
+    try {
+      const allInspections = await storage.getInspections();
+      res.json(allInspections);
+    } catch (error) {
+      console.error("Get inspections error:", error);
+      res.status(500).json({ error: "Failed to fetch inspections" });
+    }
+  });
+
+  app.get("/api/inspections/:id", requireRoles('admin', 'surveyor', 'works_manager'), async (req, res) => {
+    try {
+      const inspection = await storage.getInspection(req.params.id);
+      if (!inspection) {
+        return res.status(404).json({ error: "Inspection not found" });
+      }
+      res.json(inspection);
+    } catch (error) {
+      console.error("Get inspection error:", error);
+      res.status(500).json({ error: "Failed to fetch inspection" });
+    }
+  });
+
+  app.post("/api/inspections", requireRoles('admin', 'surveyor', 'works_manager'), async (req, res) => {
+    try {
+      const inspectionNo = await storage.getNextInspectionNo();
+      const inspection = await storage.createInspection({
+        ...req.body,
+        inspectionNo,
+        inspectorId: req.body.inspectorId || req.session.userId,
+      });
+      res.status(201).json(inspection);
+    } catch (error) {
+      console.error("Create inspection error:", error);
+      res.status(500).json({ error: "Failed to create inspection" });
+    }
+  });
+
+  app.patch("/api/inspections/:id", requireRoles('admin', 'surveyor', 'works_manager'), async (req, res) => {
+    try {
+      const inspection = await storage.updateInspection(req.params.id, req.body);
+      if (!inspection) {
+        return res.status(404).json({ error: "Inspection not found" });
+      }
+      res.json(inspection);
+    } catch (error) {
+      console.error("Update inspection error:", error);
+      res.status(500).json({ error: "Failed to update inspection" });
+    }
+  });
+
+  app.delete("/api/inspections/:id", requireRoles('admin', 'surveyor'), async (req, res) => {
+    try {
+      await storage.deleteInspection(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Delete inspection error:", error);
+      res.status(500).json({ error: "Failed to delete inspection" });
+    }
+  });
+
+  app.post("/api/inspections/:id/items", requireRoles('admin', 'surveyor', 'works_manager'), async (req, res) => {
+    try {
+      const item = await storage.createInspectionItem({
+        ...req.body,
+        inspectionId: req.params.id,
+      });
+      res.status(201).json(item);
+    } catch (error) {
+      console.error("Create inspection item error:", error);
+      res.status(500).json({ error: "Failed to create inspection item" });
+    }
+  });
+
+  app.patch("/api/inspection-items/:id", requireRoles('admin', 'surveyor', 'works_manager'), async (req, res) => {
+    try {
+      const item = await storage.updateInspectionItem(req.params.id, req.body);
+      if (!item) {
+        return res.status(404).json({ error: "Inspection item not found" });
+      }
+      res.json(item);
+    } catch (error) {
+      console.error("Update inspection item error:", error);
+      res.status(500).json({ error: "Failed to update inspection item" });
+    }
+  });
+
+  app.delete("/api/inspection-items/:id", requireRoles('admin', 'surveyor'), async (req, res) => {
+    try {
+      await storage.deleteInspectionItem(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Delete inspection item error:", error);
+      res.status(500).json({ error: "Failed to delete inspection item" });
+    }
+  });
+
+  // ==================== SNAGGING SHEETS ====================
+
+  app.get("/api/snagging", requireRoles('admin', 'surveyor', 'works_manager'), async (req, res) => {
+    try {
+      const sheets = await storage.getSnaggingSheets();
+      res.json(sheets);
+    } catch (error) {
+      console.error("Get snagging sheets error:", error);
+      res.status(500).json({ error: "Failed to fetch snagging sheets" });
+    }
+  });
+
+  app.get("/api/snagging/:id", requireRoles('admin', 'surveyor', 'works_manager'), async (req, res) => {
+    try {
+      const sheet = await storage.getSnaggingSheet(req.params.id);
+      if (!sheet) {
+        return res.status(404).json({ error: "Snagging sheet not found" });
+      }
+      res.json(sheet);
+    } catch (error) {
+      console.error("Get snagging sheet error:", error);
+      res.status(500).json({ error: "Failed to fetch snagging sheet" });
+    }
+  });
+
+  app.post("/api/snagging", requireRoles('admin', 'surveyor', 'works_manager'), async (req, res) => {
+    try {
+      const sheetNo = await storage.getNextSnaggingSheetNo();
+      const sheet = await storage.createSnaggingSheet({
+        ...req.body,
+        sheetNo,
+        createdById: req.session.userId!,
+      });
+      res.status(201).json(sheet);
+    } catch (error) {
+      console.error("Create snagging sheet error:", error);
+      res.status(500).json({ error: "Failed to create snagging sheet" });
+    }
+  });
+
+  app.patch("/api/snagging/:id", requireRoles('admin', 'surveyor', 'works_manager'), async (req, res) => {
+    try {
+      const sheet = await storage.updateSnaggingSheet(req.params.id, req.body);
+      if (!sheet) {
+        return res.status(404).json({ error: "Snagging sheet not found" });
+      }
+      res.json(sheet);
+    } catch (error) {
+      console.error("Update snagging sheet error:", error);
+      res.status(500).json({ error: "Failed to update snagging sheet" });
+    }
+  });
+
+  app.delete("/api/snagging/:id", requireRoles('admin', 'surveyor'), async (req, res) => {
+    try {
+      await storage.deleteSnaggingSheet(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Delete snagging sheet error:", error);
+      res.status(500).json({ error: "Failed to delete snagging sheet" });
+    }
+  });
+
+  app.post("/api/snagging/:id/snags", requireRoles('admin', 'surveyor', 'works_manager'), async (req, res) => {
+    try {
+      const snag = await storage.createSnagItem({
+        ...req.body,
+        snaggingSheetId: req.params.id,
+      });
+      res.status(201).json(snag);
+    } catch (error) {
+      console.error("Create snag error:", error);
+      res.status(500).json({ error: "Failed to create snag" });
+    }
+  });
+
+  app.patch("/api/snags/:id", requireRoles('admin', 'surveyor', 'works_manager'), async (req, res) => {
+    try {
+      const snag = await storage.updateSnagItem(req.params.id, req.body);
+      if (!snag) {
+        return res.status(404).json({ error: "Snag not found" });
+      }
+      res.json(snag);
+    } catch (error) {
+      console.error("Update snag error:", error);
+      res.status(500).json({ error: "Failed to update snag" });
+    }
+  });
+
+  app.delete("/api/snags/:id", requireRoles('admin', 'surveyor'), async (req, res) => {
+    try {
+      await storage.deleteSnagItem(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Delete snag error:", error);
+      res.status(500).json({ error: "Failed to delete snag" });
+    }
+  });
+
+  app.patch("/api/snags/:id/resolve", requireRoles('admin', 'surveyor', 'works_manager', 'engineer'), async (req, res) => {
+    try {
+      const { completionPhotos, notes } = req.body;
+      const snag = await storage.updateSnagItem(req.params.id, {
+        status: 'resolved',
+        resolvedAt: new Date(),
+        resolvedById: req.session.userId,
+        completionPhotos: completionPhotos || [],
+        notes: notes || undefined,
+      });
+      if (!snag) {
+        return res.status(404).json({ error: "Snag not found" });
+      }
+      res.json(snag);
+    } catch (error) {
+      console.error("Resolve snag error:", error);
+      res.status(500).json({ error: "Failed to resolve snag" });
+    }
+  });
+
   return httpServer;
 }

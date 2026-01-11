@@ -13,7 +13,7 @@ import { useOffline } from "@/hooks/use-offline";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 
-type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools' | 'fleet' | 'finance' | 'works_manager';
+type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools' | 'fleet' | 'finance' | 'works_manager' | 'quality';
 import { LayoutDashboard as DashboardIcon } from "lucide-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -311,6 +311,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <NavLink href="/fleet/walkaround" icon={ClipboardCheck}>Walkaround Check</NavLink>
           <NavLink href="/fleet/report-defect" icon={AlertTriangle}>Report Defect</NavLink>
         </MenuGroup>
+
+        {/* Quality Section - Admin, Surveyor & Works Manager */}
+        {hasRole(user, 'admin', 'surveyor', 'works_manager') && (
+          <MenuGroup title="Quality" icon={ClipboardCheck} section="quality">
+            <NavLink href="/inspections" icon={ClipboardCheck}>Site Inspections</NavLink>
+            <NavLink href="/snagging" icon={AlertTriangle}>Snagging Sheets</NavLink>
+          </MenuGroup>
+        )}
 
         {/* Tools Section */}
         <MenuGroup title="Tools" icon={Wrench} section="tools">

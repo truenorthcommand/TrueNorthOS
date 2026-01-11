@@ -51,6 +51,10 @@ import WorksManagerDashboard from "@/pages/works-manager-dashboard";
 import WorksManagerJobs from "@/pages/works-manager-jobs";
 import WorksManagerMap from "@/pages/works-manager-map";
 import WorksManagerApprovals from "@/pages/works-manager-approvals";
+import Inspections from "@/pages/inspections";
+import InspectionDetail from "@/pages/inspection-detail";
+import SnaggingSheets from "@/pages/snagging-sheets";
+import SnaggingDetail from "@/pages/snagging-detail";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -189,6 +193,18 @@ function Router() {
       </Route>
       <Route path="/works-manager/approvals">
         <PrivateRoute component={WorksManagerApprovals} />
+      </Route>
+      <Route path="/inspections">
+        <PrivateRoute component={Inspections} />
+      </Route>
+      <Route path="/inspections/:id">
+        <PrivateRoute component={InspectionDetail} />
+      </Route>
+      <Route path="/snagging">
+        <PrivateRoute component={SnaggingSheets} />
+      </Route>
+      <Route path="/snagging/:id">
+        <PrivateRoute component={SnaggingDetail} />
       </Route>
       <Route path="/">
         <PrivateRoute component={Dashboard} />

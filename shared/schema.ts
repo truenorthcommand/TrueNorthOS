@@ -702,3 +702,139 @@ export type ExpenseWithDetails = Expense & {
 export type PaymentWithInvoice = Payment & {
   invoice: Invoice;
 };
+
+// ==================== SITE INSPECTIONS ====================
+
+export const inspections = pgTable("inspections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  inspectionNo: text("inspection_no").notNull(),
+  jobId: varchar("job_id"),
+  clientId: varchar("client_id"),
+  siteAddress: text("site_address").notNull(),
+  postcode: text("postcode"),
+  inspectionType: text("inspection_type").notNull(), // pre_start, progress, final, handover
+  inspectorId: varchar("inspector_id").notNull(),
+  inspectionDate: timestamp("inspection_date").defaultNow(),
+  status: text("status").notNull().default("draft"), // draft, in_progress, completed, signed_off
+  overallResult: text("overall_result"), // pass, pass_with_conditions, fail
+  notes: text("notes"),
+  weatherConditions: text("weather_conditions"),
+  photos: jsonb("photos").default([]),
+  signature: jsonb("signature"), // inspector signature
+  clientSignature: jsonb("client_signature"),
+  signOffLat: doublePrecision("sign_off_lat"),
+  signOffLng: doublePrecision("sign_off_lng"),
+  signOffAddress: text("sign_off_address"),
+  signOffTimestamp: timestamp("sign_off_timestamp"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const inspectionItems = pgTable("inspection_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  inspectionId: varchar("inspection_id").notNull(),
+  category: text("category").notNull(), // structure, electrical, plumbing, safety, finish, etc.
+  itemName: text("item_name").notNull(),
+  description: text("description"),
+  result: text("result").notNull().default("not_checked"), // not_checked, pass, fail, na
+  severity: text("severity"), // minor, major, critical (for failures)
+  notes: text("notes"),
+  photos: jsonb("photos").default([]),
+  orderIndex: integer("order_index").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInspectionSchema = createInsertSchema(inspections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertInspection = z.infer<typeof insertInspectionSchema>;
+export type Inspection = typeof inspections.$inferSelect;
+
+export const insertInspectionItemSchema = createInsertSchema(inspectionItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertInspectionItem = z.infer<typeof insertInspectionItemSchema>;
+export type InspectionItem = typeof inspectionItems.$inferSelect;
+
+// ==================== SNAGGING SHEETS ====================
+
+export const snaggingSheets = pgTable("snagging_sheets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sheetNo: text("sheet_no").notNull(),
+  jobId: varchar("job_id"),
+  clientId: varchar("client_id"),
+  inspectionId: varchar("inspection_id"), // optional link to inspection
+  siteAddress: text("site_address").notNull(),
+  postcode: text("postcode"),
+  createdById: varchar("created_by_id").notNull(),
+  status: text("status").notNull().default("open"), // open, in_progress, completed, signed_off
+  totalSnags: integer("total_snags").default(0),
+  resolvedSnags: integer("resolved_snags").default(0),
+  notes: text("notes"),
+  clientSignature: jsonb("client_signature"),
+  signOffLat: doublePrecision("sign_off_lat"),
+  signOffLng: doublePrecision("sign_off_lng"),
+  signOffAddress: text("sign_off_address"),
+  signOffTimestamp: timestamp("sign_off_timestamp"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const snagItems = pgTable("snag_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  snaggingSheetId: varchar("snagging_sheet_id").notNull(),
+  location: text("location").notNull(), // room, area, floor
+  category: text("category").notNull(), // decoration, joinery, plumbing, electrical, etc.
+  description: text("description").notNull(),
+  priority: text("priority").notNull().default("medium"), // low, medium, high, critical
+  status: text("status").notNull().default("open"), // open, in_progress, resolved, verified
+  assignedToId: varchar("assigned_to_id"),
+  photos: jsonb("photos").default([]),
+  completionPhotos: jsonb("completion_photos").default([]),
+  notes: text("notes"),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedById: varchar("resolved_by_id"),
+  verifiedAt: timestamp("verified_at"),
+  verifiedById: varchar("verified_by_id"),
+  orderIndex: integer("order_index").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSnaggingSheetSchema = createInsertSchema(snaggingSheets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSnaggingSheet = z.infer<typeof insertSnaggingSheetSchema>;
+export type SnaggingSheet = typeof snaggingSheets.$inferSelect;
+
+export const insertSnagItemSchema = createInsertSchema(snagItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSnagItem = z.infer<typeof insertSnagItemSchema>;
+export type SnagItem = typeof snagItems.$inferSelect;
+
+// Extended types
+export type InspectionWithDetails = Inspection & {
+  inspector: Pick<User, 'id' | 'name'>;
+  items: InspectionItem[];
+  job?: Pick<Job, 'id' | 'jobNo' | 'customerName'> | null;
+  client?: Pick<Client, 'id' | 'name'> | null;
+};
+
+export type SnaggingSheetWithDetails = SnaggingSheet & {
+  createdBy: Pick<User, 'id' | 'name'>;
+  snags: SnagItem[];
+  job?: Pick<Job, 'id' | 'jobNo' | 'customerName'> | null;
+  client?: Pick<Client, 'id' | 'name'> | null;
+};
