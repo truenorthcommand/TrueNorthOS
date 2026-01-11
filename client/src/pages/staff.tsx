@@ -14,6 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 type Role = 'admin' | 'engineer' | 'surveyor' | 'fleet_manager' | 'works_manager' | 'accounts';
 type Skill = { id: string; name: string; category: string; icon?: string; };
+type Vehicle = { id: string; registration: string; make: string | null; model: string | null; type: string | null; assignedUserId: string | null; };
 
 interface StaffMember {
   id: string;
@@ -63,6 +64,8 @@ export default function Staff() {
   const { toast } = useToast();
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
+  const [availableVehicles, setAvailableVehicles] = useState<Vehicle[]>([]);
+  const [allVehicles, setAllVehicles] = useState<Vehicle[]>([]);
   const [worksManagers, setWorksManagers] = useState<WorksManager[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -103,6 +106,8 @@ export default function Staff() {
   });
   const [editSkills, setEditSkills] = useState<Skill[]>([]);
   const [newStaffSkills, setNewStaffSkills] = useState<Skill[]>([]);
+  const [newStaffVehicleId, setNewStaffVehicleId] = useState<string>("");
+  const [editVehicleId, setEditVehicleId] = useState<string>("");
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -133,6 +138,7 @@ export default function Staff() {
         fetchStaff();
         fetchSkills();
         fetchWorksManagers();
+        fetchVehicles();
       } else {
         const data = await res.json();
         toast({
@@ -161,6 +167,25 @@ export default function Staff() {
       }
     } catch (error) {
       console.error('Failed to fetch skills:', error);
+    }
+  };
+
+  const fetchVehicles = async () => {
+    try {
+      const [availableRes, allRes] = await Promise.all([
+        fetch('/api/fleet/vehicles-available', { credentials: 'include' }),
+        fetch('/api/fleet/vehicles', { credentials: 'include' })
+      ]);
+      if (availableRes.ok) {
+        const data = await availableRes.json();
+        setAvailableVehicles(data);
+      }
+      if (allRes.ok) {
+        const data = await allRes.json();
+        setAllVehicles(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch vehicles:', error);
     }
   };
 
@@ -218,6 +243,7 @@ export default function Staff() {
       fetchStaff();
       fetchSkills();
       fetchWorksManagers();
+      fetchVehicles();
     } else {
       setIsLoading(false);
     }
@@ -425,6 +451,20 @@ export default function Staff() {
         }
       }
 
+      // Assign selected vehicle to the new user
+      if (newStaffVehicleId) {
+        try {
+          await fetch(`/api/fleet/vehicles/${newStaffVehicleId}/assign`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ userId: data.id }),
+          });
+        } catch (e) {
+          console.error('Failed to assign vehicle:', e);
+        }
+      }
+
       setStaff([...staff, { ...data, skills: assignedSkills }]);
       setNewStaff({ 
         name: "", email: "", phone: "", username: "", password: "", 
@@ -433,7 +473,9 @@ export default function Staff() {
         dayRate: ""
       });
       setNewStaffSkills([]);
+      setNewStaffVehicleId("");
       setShowPassword(false);
+      fetchVehicles(); // Refresh available vehicles
 
       toast({
         title: "Staff Added",
@@ -469,14 +511,28 @@ export default function Staff() {
       dayRate: member.dayRate?.toString() || "",
     });
     
-    // Refresh skills and works managers when opening edit dialog
+    // Refresh skills, works managers, and vehicles when opening edit dialog
     await Promise.all([
       fetchSkills(),
-      fetchWorksManagers()
+      fetchWorksManagers(),
+      fetchVehicles()
     ]);
     
     const skills = await fetchUserSkills(member.id);
     setEditSkills(skills);
+    
+    // Fetch user's assigned vehicle
+    try {
+      const vehicleRes = await fetch(`/api/users/${member.id}/vehicles`, { credentials: 'include' });
+      if (vehicleRes.ok) {
+        const userVehicles = await vehicleRes.json();
+        setEditVehicleId(userVehicles.length > 0 ? userVehicles[0].id : "");
+      }
+    } catch (error) {
+      console.error('Failed to fetch user vehicles:', error);
+      setEditVehicleId("");
+    }
+    
     setShowEditPassword(false);
   };
 
@@ -551,6 +607,32 @@ export default function Staff() {
 
       if (!res.ok) {
         throw new Error(data.error || 'Failed to update staff member');
+      }
+
+      // Handle vehicle assignment change
+      const currentVehicle = allVehicles.find(v => v.assignedUserId === editingStaff.id);
+      const currentVehicleId = currentVehicle?.id || "";
+      
+      if (editVehicleId !== currentVehicleId) {
+        // Unassign from current vehicle if it exists
+        if (currentVehicleId) {
+          await fetch(`/api/fleet/vehicles/${currentVehicleId}/assign`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ userId: null }),
+          });
+        }
+        // Assign to new vehicle if selected
+        if (editVehicleId) {
+          await fetch(`/api/fleet/vehicles/${editVehicleId}/assign`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ userId: editingStaff.id }),
+          });
+        }
+        fetchVehicles(); // Refresh vehicle data
       }
 
       setStaff(staff.map(s => s.id === editingStaff.id ? { ...data, skills: editSkills } : s));
@@ -946,6 +1028,30 @@ export default function Staff() {
               )}
             </div>
 
+            <div className="border-t pt-4 mt-4">
+              <Label className="text-base font-medium mb-3 block flex items-center gap-2">
+                <Truck className="h-4 w-4" />
+                Assign Vehicle (Optional)
+              </Label>
+              <Select
+                value={newStaffVehicleId}
+                onValueChange={(value) => setNewStaffVehicleId(value === "none" ? "" : value)}
+              >
+                <SelectTrigger data-testid="select-new-staff-vehicle">
+                  <SelectValue placeholder="Select a vehicle to assign..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No vehicle assigned</SelectItem>
+                  {availableVehicles.map(vehicle => (
+                    <SelectItem key={vehicle.id} value={vehicle.id}>
+                      {vehicle.registration} {vehicle.make && vehicle.model ? `- ${vehicle.make} ${vehicle.model}` : ''} {vehicle.type ? `(${vehicle.type})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">Assign a company vehicle to this staff member</p>
+            </div>
+
             <Button 
               type="submit" 
               className="bg-emerald-600 hover:bg-emerald-700"
@@ -1235,6 +1341,33 @@ export default function Staff() {
                     </p>
                   </div>
                 )}
+              </div>
+
+              <div className="border-t pt-4">
+                <Label className="text-base font-medium mb-3 block flex items-center gap-2">
+                  <Truck className="h-4 w-4" />
+                  Assigned Vehicle
+                </Label>
+                <Select
+                  value={editVehicleId || "none"}
+                  onValueChange={(value) => setEditVehicleId(value === "none" ? "" : value)}
+                >
+                  <SelectTrigger data-testid="select-edit-vehicle">
+                    <SelectValue placeholder="Select a vehicle to assign..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No vehicle assigned</SelectItem>
+                    {allVehicles
+                      .filter(v => !v.assignedUserId || v.assignedUserId === editingStaff?.id || v.id === editVehicleId)
+                      .map(vehicle => (
+                        <SelectItem key={vehicle.id} value={vehicle.id}>
+                          {vehicle.registration} {vehicle.make && vehicle.model ? `- ${vehicle.make} ${vehicle.model}` : ''} {vehicle.type ? `(${vehicle.type})` : ''}
+                          {vehicle.assignedUserId === editingStaff?.id ? ' (Currently assigned)' : ''}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">Assign a company vehicle to this staff member</p>
               </div>
 
               <DialogFooter className="mt-6">
