@@ -776,7 +776,7 @@ export async function registerRoutes(
         return res.status(403).json({ error: "Cannot demote a super admin" });
       }
 
-      const { name, email, phone, username, password, role } = req.body;
+      const { name, email, phone, username, password, role, roles, addressLine1, addressLine2, city, county, homePostcode } = req.body;
       const updates: Record<string, any> = {};
 
       if (name) updates.name = name;
@@ -798,6 +798,14 @@ export async function registerRoutes(
       if (role && (role === 'admin' || role === 'engineer')) {
         updates.role = role;
       }
+      if (roles && Array.isArray(roles)) {
+        updates.roles = roles;
+      }
+      if (addressLine1 !== undefined) updates.addressLine1 = addressLine1 || null;
+      if (addressLine2 !== undefined) updates.addressLine2 = addressLine2 || null;
+      if (city !== undefined) updates.city = city || null;
+      if (county !== undefined) updates.county = county || null;
+      if (homePostcode !== undefined) updates.homePostcode = homePostcode || null;
 
       const updatedUser = await storage.updateUser(req.params.id, updates);
       res.json({
@@ -806,6 +814,7 @@ export async function registerRoutes(
         email: updatedUser!.email,
         phone: updatedUser!.phone,
         role: updatedUser!.role,
+        roles: updatedUser!.roles,
         username: updatedUser!.username,
       });
     } catch (error) {
