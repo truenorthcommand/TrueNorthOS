@@ -3785,6 +3785,15 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
   app.post("/api/expenses", requireAuth, async (req, res) => {
     try {
+      const MAX_RECEIPT_SIZE = 2 * 1024 * 1024;
+      
+      if (req.body.receiptUrl && req.body.receiptUrl.startsWith("data:image/")) {
+        const base64Size = req.body.receiptUrl.length * 0.75;
+        if (base64Size > MAX_RECEIPT_SIZE) {
+          return res.status(400).json({ error: "Receipt image is too large. Please use a smaller image." });
+        }
+      }
+      
       const data = insertExpenseSchema.parse({
         ...req.body,
         userId: req.body.userId || req.session.userId,
@@ -3793,6 +3802,20 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
         return res.status(403).json({ error: "Cannot create expense for another user" });
       }
       const expense = await storage.createExpense(data);
+      
+      if (data.receiptUrl && data.receiptUrl.startsWith("data:image/")) {
+        try {
+          await storage.createAccountsReceipt({
+            expenseId: expense.id,
+            uploadedById: req.session.userId!,
+            imageUrl: data.receiptUrl,
+            isProcessed: false,
+          });
+        } catch (receiptError) {
+          console.error("Failed to create accounts receipt:", receiptError);
+        }
+      }
+      
       res.status(201).json(expense);
     } catch (error) {
       console.error("Create expense error:", error);
