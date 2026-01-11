@@ -302,12 +302,9 @@ export class DatabaseStorage implements IStorage {
 
   async getJobsByEngineer(engineerId: string): Promise<Job[]> {
     return db.select().from(jobs).where(
-      and(
-        or(
-          eq(jobs.assignedToId, engineerId),
-          sql`${jobs.assignedToIds}::jsonb @> ${JSON.stringify([engineerId])}::jsonb`
-        ),
-        ne(jobs.status, "Draft")
+      or(
+        eq(jobs.assignedToId, engineerId),
+        sql`${jobs.assignedToIds}::jsonb @> ${JSON.stringify([engineerId])}::jsonb`
       )
     ).orderBy(desc(jobs.createdAt));
   }

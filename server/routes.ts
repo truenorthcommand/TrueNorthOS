@@ -943,16 +943,22 @@ export async function registerRoutes(
       const engineerId = req.query.engineerId as string;
       let jobsList;
       
+      console.log(`[jobs] Fetching jobs - userRole: ${req.session.userRole}, userId: ${req.session.userId}, engineerId param: ${engineerId}`);
+      
       if (req.session.userRole === 'engineer') {
         jobsList = await storage.getJobsByEngineer(req.session.userId!);
+        console.log(`[jobs] Engineer ${req.session.userId} - found ${jobsList.length} jobs`);
       } else if (engineerId) {
         jobsList = await storage.getJobsByEngineer(engineerId);
+        console.log(`[jobs] Admin fetching for engineer ${engineerId} - found ${jobsList.length} jobs`);
       } else {
         jobsList = await storage.getAllJobs();
+        console.log(`[jobs] Admin fetching all - found ${jobsList.length} jobs`);
       }
       
       res.json(jobsList);
     } catch (error) {
+      console.error(`[jobs] Error fetching jobs:`, error);
       res.status(500).json({ error: "Failed to fetch jobs" });
     }
   });
