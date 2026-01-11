@@ -48,7 +48,7 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4">
-            <img src="/logo-pms.png" alt="Pro Main Solutions Logo" className="h-16 object-contain" />
+            <img src="/logo-pms.png" alt="Pro Main Solutions Logo" className="h-10 object-contain" />
           </div>
           <CardTitle className="text-2xl font-bold">Pro Main Solutions</CardTitle>
           <CardDescription>
