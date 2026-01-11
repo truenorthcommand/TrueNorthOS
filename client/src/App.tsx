@@ -47,6 +47,7 @@ import Payments from "@/pages/payments";
 import Analytics from "@/pages/analytics";
 import VoiceNotes from "@/pages/voice-notes";
 import DocumentScanner from "@/pages/document-scanner";
+import Proposal from "@/pages/proposal";
 import UserGuide from "@/pages/user-guide";
 import WorksManagerDashboard from "@/pages/works-manager-dashboard";
 import WorksManagerJobs from "@/pages/works-manager-jobs";
@@ -98,6 +99,7 @@ function Router() {
       <Route path="/setup" component={Setup} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
+      <Route path="/proposal" component={Proposal} />
       <Route path="/clients">
         <PrivateRoute component={Clients} />
       </Route>
