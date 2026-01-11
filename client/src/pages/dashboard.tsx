@@ -7,12 +7,92 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2, Pencil, Clock, Navigation, Briefcase, CheckCircle, LogIn, LogOut, Timer, Loader2, FileText, Receipt, Users, Wallet, TrendingUp, AlertCircle, Building2, Truck, Shield } from "lucide-react";
+import { Plus, Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2, Pencil, Clock, Navigation, Briefcase, CheckCircle, LogIn, LogOut, Timer, Loader2, FileText, Receipt, Users, Wallet, TrendingUp, AlertCircle, Building2, Truck, Shield, ClipboardCheck, type LucideIcon } from "lucide-react";
 import { format, isToday, isTomorrow, isThisWeek, parseISO, formatDistanceToNow } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
+
+interface PortalConfig {
+  role: string;
+  title: string;
+  description: string;
+  path: string;
+  icon: LucideIcon;
+  gradient: string;
+}
+
+const PORTAL_CONFIGS: PortalConfig[] = [
+  {
+    role: 'works_manager',
+    title: 'Works Manager Portal',
+    description: 'Manage your team, approvals, and quality oversight',
+    path: '/works-manager',
+    icon: Shield,
+    gradient: 'from-blue-600 to-blue-800',
+  },
+  {
+    role: 'fleet_manager',
+    title: 'Fleet Manager Portal',
+    description: 'Vehicle checks, defect management, and fleet oversight',
+    path: '/fleet',
+    icon: Truck,
+    gradient: 'from-orange-500 to-orange-700',
+  },
+  {
+    role: 'surveyor',
+    title: 'Surveyor Portal',
+    description: 'Quotes, client management, and site surveys',
+    path: '/quotes',
+    icon: ClipboardCheck,
+    gradient: 'from-purple-600 to-purple-800',
+  },
+];
+
+function RolePortals({ user, setLocation }: { user: any; setLocation: (path: string) => void }) {
+  const userRoles = user.roles && user.roles.length > 0 ? user.roles : [user.role];
+  const availablePortals = PORTAL_CONFIGS.filter(portal => userRoles.includes(portal.role));
+  
+  if (availablePortals.length === 0) return null;
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {availablePortals.map(portal => {
+        const Icon = portal.icon;
+        return (
+          <Card 
+            key={portal.role}
+            className={`bg-gradient-to-r ${portal.gradient} text-white cursor-pointer hover:shadow-lg transition-shadow`}
+            onClick={() => setLocation(portal.path)}
+            data-testid={`card-${portal.role}-portal`}
+          >
+            <CardContent className="p-5">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                  <Icon className="h-6 w-6" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-lg font-bold truncate">{portal.title}</h3>
+                  <p className="text-sm opacity-90 truncate">{portal.description}</p>
+                </div>
+              </div>
+              <Button 
+                variant="secondary" 
+                size="sm"
+                className="mt-4 w-full bg-white/20 hover:bg-white/30 text-white border-0" 
+                data-testid={`button-open-${portal.role}`}
+              >
+                Open Portal
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -151,31 +231,7 @@ function AdminDashboard() {
         </Card>
       </div>
 
-      {hasRole(user, 'works_manager') && (
-        <Card 
-          className="bg-gradient-to-r from-blue-600 to-blue-800 text-white cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => setLocation("/works-manager")}
-          data-testid="card-works-manager-portal"
-        >
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
-                  <Shield className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold">Works Manager Portal</h3>
-                  <p className="text-blue-100">Manage your team, approvals, and quality oversight</p>
-                </div>
-              </div>
-              <Button variant="secondary" className="bg-white/20 hover:bg-white/30 text-white border-0" data-testid="button-open-works-manager">
-                Open Portal
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <RolePortals user={user} setLocation={setLocation} />
 
       {totalUnpaidAmount > 0 && (
         <Card className="border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800">
@@ -712,6 +768,9 @@ function EngineerDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Role-Based Portal Launchers */}
+      <RolePortals user={user} setLocation={setLocation} />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

@@ -3225,7 +3225,67 @@ Please analyze and rank the engineers for this job. Return only valid JSON array
         });
       }
 
-      res.json({ message: "Demo accounts reset successfully! Login with admin/admin123" });
+      // Upsert works manager demo user
+      const existingWorksManager = await storage.getUserByUsername("worksmanager");
+      if (existingWorksManager) {
+        await storage.updateUser(existingWorksManager.id, { 
+          password: "worksmanager123", 
+          role: "engineer",
+          roles: ["works_manager"]
+        });
+      } else {
+        await storage.createUser({
+          username: "worksmanager",
+          password: "worksmanager123",
+          name: "Mike Wilson",
+          email: "mike@promains.com",
+          role: "engineer",
+          roles: ["works_manager"],
+          status: "active",
+        });
+      }
+
+      // Upsert fleet manager demo user
+      const existingFleetManager = await storage.getUserByUsername("fleetmanager");
+      if (existingFleetManager) {
+        await storage.updateUser(existingFleetManager.id, { 
+          password: "fleetmanager123", 
+          role: "engineer",
+          roles: ["fleet_manager"]
+        });
+      } else {
+        await storage.createUser({
+          username: "fleetmanager",
+          password: "fleetmanager123",
+          name: "Tom Driver",
+          email: "tom@promains.com",
+          role: "engineer",
+          roles: ["fleet_manager"],
+          status: "active",
+        });
+      }
+
+      // Upsert surveyor demo user
+      const existingSurveyor = await storage.getUserByUsername("surveyor");
+      if (existingSurveyor) {
+        await storage.updateUser(existingSurveyor.id, { 
+          password: "surveyor123", 
+          role: "engineer",
+          roles: ["surveyor"]
+        });
+      } else {
+        await storage.createUser({
+          username: "surveyor",
+          password: "surveyor123",
+          name: "Emma Survey",
+          email: "emma@promains.com",
+          role: "engineer",
+          roles: ["surveyor"],
+          status: "active",
+        });
+      }
+
+      res.json({ message: "Demo accounts reset successfully! Login with admin/admin123, worksmanager/worksmanager123, fleetmanager/fleetmanager123, surveyor/surveyor123" });
     } catch (error) {
       console.error("Seed error:", error);
       res.status(500).json({ error: "Failed to seed database: " + (error as Error).message });
