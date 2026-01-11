@@ -346,12 +346,19 @@ export default function CalendarPage() {
       if (savedIds) {
         try {
           const parsed = JSON.parse(savedIds);
+          // Keep previously visible IDs that still exist
           const validIds = parsed.filter((id: string) =>
             engineersData.some((e: Engineer) => e.id === id)
           );
-          setVisibleEngineerIds(
-            validIds.length > 0 ? validIds : engineersData.map((e: Engineer) => e.id)
-          );
+          // Find new engineer IDs that weren't in the saved list (newly added engineers)
+          const newIds = engineersData
+            .filter((e: Engineer) => !parsed.includes(e.id))
+            .map((e: Engineer) => e.id);
+          // Merge: keep existing visible + add new engineers
+          const mergedIds = validIds.length > 0 
+            ? [...validIds, ...newIds]
+            : engineersData.map((e: Engineer) => e.id);
+          setVisibleEngineerIds(mergedIds);
         } catch {
           setVisibleEngineerIds(engineersData.map((e: Engineer) => e.id));
         }
