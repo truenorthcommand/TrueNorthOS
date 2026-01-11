@@ -6,12 +6,13 @@ import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { useNotifications } from "@/hooks/use-notifications";
+import { useNotifications, Notification } from "@/hooks/use-notifications";
 import { useOffline } from "@/hooks/use-offline";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
+import { useStore } from "@/lib/store";
 
 type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools' | 'fleet' | 'finance';
 import { LayoutDashboard as DashboardIcon } from "lucide-react";
@@ -22,8 +23,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [expandedSections, setExpandedSections] = useState<MenuSection[]>(['jobs']);
+  const { refreshJobs } = useStore();
   
-  useNotifications();
+  const handleNotification = useCallback((notification: Notification) => {
+    if (notification.type === 'urgent_job_assigned' || 
+        notification.type === 'job_rescheduled_today' ||
+        notification.type === 'job_assigned' ||
+        notification.jobId) {
+      refreshJobs();
+    }
+  }, [refreshJobs]);
+  
+  useNotifications(handleNotification);
   const { isOnline, pendingActions, syncOfflineQueue } = useOffline();
 
   const { data: unreadData } = useQuery<{ count: number } | null>({

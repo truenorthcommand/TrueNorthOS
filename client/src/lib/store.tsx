@@ -60,6 +60,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, refreshJobs]);
 
+  useEffect(() => {
+    if (user?.role === 'engineer') {
+      const interval = setInterval(() => {
+        refreshJobs();
+      }, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user, refreshJobs]);
+
   const getJob = useCallback((id: string) => jobs.find((j) => j.id === id), [jobs]);
 
   const addJob = async (jobData: Partial<Job>): Promise<Job | null> => {
