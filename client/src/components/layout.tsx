@@ -13,7 +13,7 @@ import { useOffline } from "@/hooks/use-offline";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 
-type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools' | 'fleet' | 'finance' | 'works_manager';
+type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools' | 'fleet' | 'finance';
 import { LayoutDashboard as DashboardIcon } from "lucide-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -224,18 +224,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <MenuGroup title="Schedule" icon={Calendar} section="schedule">
             <NavLink href="/calendar" icon={Calendar}>Calendar</NavLink>
             <NavLink href="/time-logs" icon={Clock}>Time Logs</NavLink>
-          </MenuGroup>
-        )}
-
-        {/* Works Manager Section */}
-        {hasRole(user, 'works_manager') && (
-          <MenuGroup title="Works Manager" icon={Users} section="works_manager">
-            <NavLink href="/works-manager" icon={LayoutDashboard}>Dashboard</NavLink>
-            <NavLink href="/works-manager/jobs" icon={Briefcase}>Team Jobs</NavLink>
-            <NavLink href="/works-manager/map" icon={MapPin}>Team Map</NavLink>
-            <NavLink href="/works-manager/approvals" icon={CheckCircle2}>Approvals</NavLink>
-            <NavLink href="/inspections" icon={ClipboardCheck}>Site Inspections</NavLink>
-            <NavLink href="/snagging" icon={AlertTriangle}>Snagging Sheets</NavLink>
           </MenuGroup>
         )}
 

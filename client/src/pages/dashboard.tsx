@@ -2,12 +2,12 @@ import { useState, useMemo, memo, useEffect, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
-import { Job, JobStatus } from "@/lib/types";
+import { Job, JobStatus, hasRole } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2, Pencil, Clock, Navigation, Briefcase, CheckCircle, LogIn, LogOut, Timer, Loader2, FileText, Receipt, Users, Wallet, TrendingUp, AlertCircle, Building2, Truck } from "lucide-react";
+import { Plus, Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2, Pencil, Clock, Navigation, Briefcase, CheckCircle, LogIn, LogOut, Timer, Loader2, FileText, Receipt, Users, Wallet, TrendingUp, AlertCircle, Building2, Truck, Shield } from "lucide-react";
 import { format, isToday, isTomorrow, isThisWeek, parseISO, formatDistanceToNow } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
@@ -150,6 +150,32 @@ function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {hasRole(user, 'works_manager') && (
+        <Card 
+          className="bg-gradient-to-r from-blue-600 to-blue-800 text-white cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => setLocation("/works-manager")}
+          data-testid="card-works-manager-portal"
+        >
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
+                  <Shield className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold">Works Manager Portal</h3>
+                  <p className="text-blue-100">Manage your team, approvals, and quality oversight</p>
+                </div>
+              </div>
+              <Button variant="secondary" className="bg-white/20 hover:bg-white/30 text-white border-0" data-testid="button-open-works-manager">
+                Open Portal
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {totalUnpaidAmount > 0 && (
         <Card className="border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800">
