@@ -2852,6 +2852,318 @@ Please analyze and rank the engineers for this job. Return only valid JSON array
     }
   });
 
+  // ==================== AI-POWERED REPORT GENERATION ====================
+
+  // Generate professional job completion report
+  app.post("/api/jobs/:id/generate-report", requireAuth, async (req, res) => {
+    try {
+      const job = await storage.getJob(req.params.id);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      // Get company settings for branding
+      const companySettings = await storage.getCompanySettings();
+
+      // Get assigned engineers
+      const allUsers = await storage.getAllUsers();
+      const assignedIds = (job.assignedToIds as string[]) || (job.assignedToId ? [job.assignedToId] : []);
+      const assignedEngineers = allUsers.filter(u => assignedIds.includes(u.id));
+
+      // Get job updates if it's a long-running job
+      let jobUpdates: any[] = [];
+      if (job.isLongRunning) {
+        jobUpdates = await storage.getJobUpdates(job.id);
+      }
+
+      // Prepare job data for report
+      const photos = (job.photos as any[]) || [];
+      const materials = (job.materials as any[]) || [];
+      const signatures = (job.signatures as any[]) || [];
+      const furtherActions = (job.furtherActions as any[]) || [];
+
+      const openai = getOpenAIClient();
+      
+      let professionalSummary = "";
+      let aiPowered = false;
+
+      if (openai) {
+        try {
+          const systemPrompt = `You are a professional report writer for a UK field service company. Generate a concise, professional summary for a job completion report.
+
+Write in formal British English. Be factual and professional. Focus on:
+1. Work scope and what was accomplished
+2. Key materials used (if any)
+3. Any notable findings or actions taken
+4. Overall job outcome
+
+Keep the summary to 2-3 paragraphs maximum. Do not include signatures or photos - those are handled separately.`;
+
+          const jobContext = `
+Job Number: ${job.jobNo}
+Customer: ${job.customerName}
+Address: ${job.address || 'N/A'}, ${job.postcode || ''}
+Date: ${job.date ? new Date(job.date).toLocaleDateString('en-GB') : 'N/A'}
+Status: ${job.status}
+
+Description:
+${job.description || 'No description provided'}
+
+Works Completed:
+${job.worksCompleted || 'No completion notes'}
+
+Engineer Notes:
+${job.notes || 'No additional notes'}
+
+Materials Used:
+${materials.length > 0 ? materials.map((m: any) => `- ${m.quantity}x ${m.description}`).join('\n') : 'None recorded'}
+
+Further Actions Required:
+${furtherActions.length > 0 ? furtherActions.map((a: any) => `- [${a.priority}] ${a.description}`).join('\n') : 'None'}
+
+${jobUpdates.length > 0 ? `
+Daily Progress Updates:
+${jobUpdates.map((u: any) => `- ${new Date(u.workDate).toLocaleDateString('en-GB')}: ${u.notes || 'No notes'}`).join('\n')}
+` : ''}`;
+
+          const response = await openai.chat.completions.create({
+            model: "gpt-5",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: `Generate a professional summary for this job:\n${jobContext}` }
+            ],
+            max_completion_tokens: 500,
+          });
+
+          professionalSummary = response.choices[0]?.message?.content || "";
+          aiPowered = true;
+        } catch (aiError) {
+          console.error("AI report generation error:", aiError);
+        }
+      }
+
+      // If AI failed, create a basic summary
+      if (!professionalSummary) {
+        professionalSummary = `This report documents the completion of Job ${job.jobNo} for ${job.customerName}${job.address ? ` at ${job.address}` : ''}. ${job.worksCompleted || job.description || 'Works have been completed as specified.'}`;
+      }
+
+      // Build the report
+      const report = {
+        generatedAt: new Date().toISOString(),
+        aiPowered,
+        company: {
+          name: companySettings?.companyName || 'TrueNorth Field Services',
+          address: companySettings?.companyAddress || '',
+          phone: companySettings?.companyPhone || '',
+          email: companySettings?.companyEmail || '',
+        },
+        job: {
+          jobNo: job.jobNo,
+          customerName: job.customerName,
+          address: job.address,
+          postcode: job.postcode,
+          contactName: job.contactName,
+          contactPhone: job.contactPhone,
+          contactEmail: job.contactEmail,
+          date: job.date,
+          status: job.status,
+          description: job.description,
+          worksCompleted: job.worksCompleted,
+          notes: job.notes,
+        },
+        engineers: assignedEngineers.map(e => ({
+          name: e.name,
+          role: e.role,
+        })),
+        materials: materials,
+        photos: photos.filter((p: any) => p.isEvidence), // Only evidence photos
+        adminPhotos: photos.filter((p: any) => !p.isEvidence), // Admin reference photos
+        signatures: signatures,
+        furtherActions: furtherActions,
+        jobUpdates: jobUpdates.map((u: any) => ({
+          date: u.workDate,
+          notes: u.notes,
+          photos: u.photos,
+        })),
+        professionalSummary,
+        signOff: job.signOffTimestamp ? {
+          timestamp: job.signOffTimestamp,
+          address: job.signOffAddress,
+          lat: job.signOffLat,
+          lng: job.signOffLng,
+        } : null,
+      };
+
+      res.json(report);
+    } catch (error: any) {
+      console.error("Report generation error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate report" });
+    }
+  });
+
+  // ==================== AI-POWERED DOCUMENT SCANNER ====================
+
+  // Scan document (invoice, certificate, contract) and extract data
+  app.post("/api/ai/scan-document", requireAuth, async (req, res) => {
+    try {
+      const { image, documentType } = req.body;
+
+      if (!image) {
+        return res.status(400).json({ error: "Image is required" });
+      }
+
+      const validTypes = ['invoice', 'certificate', 'contract', 'receipt', 'other'];
+      const docType = validTypes.includes(documentType) ? documentType : 'other';
+
+      const openai = getOpenAIClient();
+      if (!openai) {
+        return res.status(503).json({ error: "AI service not available. Please configure OpenAI API key." });
+      }
+
+      let systemPrompt = "";
+      let extractionSchema = {};
+
+      switch (docType) {
+        case 'invoice':
+          systemPrompt = `You are a document scanner specialized in UK supplier invoices. Extract key information from the uploaded invoice image.
+
+Extract and return as JSON:
+- vendorName: The supplier/vendor company name
+- vendorAddress: Full vendor address
+- invoiceNumber: Invoice number/reference
+- invoiceDate: Date in DD/MM/YYYY format
+- dueDate: Payment due date in DD/MM/YYYY format (if visible)
+- subtotal: Amount before VAT (as number)
+- vatAmount: VAT amount (as number)
+- vatRate: VAT percentage (as number, e.g., 20)
+- total: Total amount including VAT (as number)
+- currency: Currency code (default GBP)
+- lineItems: Array of {description, quantity, unitPrice, total}
+- paymentDetails: Bank details if visible
+- purchaseOrderRef: PO reference if visible
+
+Return ONLY valid JSON. Use null for fields not found.`;
+          break;
+
+        case 'certificate':
+          systemPrompt = `You are a document scanner specialized in UK trade certificates (Gas Safe, NICEIC, etc.). Extract key information from the uploaded certificate image.
+
+Extract and return as JSON:
+- certificateType: Type of certificate (e.g., "Gas Safe", "NICEIC", "Part P", "F-Gas")
+- certificateNumber: Certificate/registration number
+- holderName: Name of certificate holder
+- companyName: Company name if applicable
+- issueDate: Issue date in DD/MM/YYYY format
+- expiryDate: Expiry date in DD/MM/YYYY format
+- issuingBody: Name of issuing organization
+- categories: Array of work categories/scopes covered
+- address: Registered address if visible
+
+Return ONLY valid JSON. Use null for fields not found.`;
+          break;
+
+        case 'contract':
+          systemPrompt = `You are a document scanner specialized in UK service contracts. Extract key information from the uploaded contract image.
+
+Extract and return as JSON:
+- contractTitle: Title or type of contract
+- partyA: First party name (usually your company)
+- partyB: Second party name (client)
+- contractDate: Contract date in DD/MM/YYYY format
+- startDate: Service start date in DD/MM/YYYY format
+- endDate: Service end date in DD/MM/YYYY format
+- contractValue: Total contract value (as number)
+- paymentTerms: Payment terms description
+- scope: Brief description of work scope
+- keyTerms: Array of key terms or conditions
+
+Return ONLY valid JSON. Use null for fields not found.`;
+          break;
+
+        case 'receipt':
+          systemPrompt = `You are a document scanner specialized in UK purchase receipts. Extract key information from the uploaded receipt image.
+
+Extract and return as JSON:
+- vendorName: Shop/vendor name
+- vendorAddress: Address if visible
+- receiptDate: Date in DD/MM/YYYY format
+- receiptNumber: Receipt number if visible
+- items: Array of {description, quantity, price}
+- subtotal: Amount before VAT (as number)
+- vatAmount: VAT amount if shown (as number)
+- total: Total amount (as number)
+- paymentMethod: How it was paid (cash, card, etc.)
+- currency: Currency code (default GBP)
+
+Return ONLY valid JSON. Use null for fields not found.`;
+          break;
+
+        default:
+          systemPrompt = `You are a document scanner. Extract any useful information from the uploaded document image.
+
+Extract and return as JSON:
+- documentType: Your best guess at the document type
+- title: Document title if visible
+- date: Any date found in DD/MM/YYYY format
+- parties: Any company or person names mentioned
+- keyValues: Object with any key-value pairs found
+- summary: Brief summary of the document content
+
+Return ONLY valid JSON.`;
+      }
+
+      // Build message content with image
+      const messageContent: any[] = [
+        { type: "text", text: `Please scan this ${docType} and extract the relevant information.` }
+      ];
+
+      // Handle base64 image
+      if (image.startsWith('data:')) {
+        messageContent.push({
+          type: "image_url",
+          image_url: { url: image }
+        });
+      } else {
+        // Assume it's a URL
+        messageContent.push({
+          type: "image_url",
+          image_url: { url: image }
+        });
+      }
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: messageContent }
+        ],
+        max_completion_tokens: 1024,
+        response_format: { type: "json_object" },
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ error: "No response from AI" });
+      }
+
+      const extractedData = JSON.parse(content);
+
+      res.json({
+        success: true,
+        documentType: docType,
+        extractedData,
+        confidence: "high", // Could be enhanced with actual confidence scoring
+        aiPowered: true,
+      });
+    } catch (error: any) {
+      console.error("Document scan error:", error);
+      if (error.message?.includes('JSON')) {
+        return res.status(500).json({ error: "Failed to parse extracted data" });
+      }
+      res.status(500).json({ error: error.message || "Failed to scan document" });
+    }
+  });
+
   // ==================== FLEET MAINTENANCE ====================
 
   // Get fleet dashboard stats

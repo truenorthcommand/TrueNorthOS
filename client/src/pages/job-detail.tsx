@@ -13,7 +13,7 @@ import {
   ArrowLeft, Save, Printer, Trash2, Plus, 
   MapPin, Phone, Mail, Calendar, Upload, X, FileCheck,
   AlertCircle, AlertTriangle, AlertOctagon, Users, ChevronDown, ClipboardList,
-  Sparkles, Loader2, Briefcase, User, Navigation
+  Sparkles, Loader2, Briefcase, User, Navigation, FileText
 } from "lucide-react";
 import {
   Dialog,
@@ -66,6 +66,12 @@ export default function JobDetail() {
     factors: { skills: number; workload: number; proximity: number; };
   }>>([]);
   const [suggestionsAiPowered, setSuggestionsAiPowered] = useState(false);
+  
+  // Report generation state
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [report, setReport] = useState<any>(null);
   
   const [formData, setFormData] = useState<{
     client: string;
@@ -331,7 +337,7 @@ export default function JobDetail() {
       
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Failed to fetch suggestions');
+        throw new Error(error.error || 'Failed to fetch suggestions');
       }
       
       const data = await response.json();
@@ -356,6 +362,155 @@ export default function JobDetail() {
       title: "Engineer Assigned",
       description: `Job assigned to ${engineerName}.`
     });
+  };
+
+  // Generate professional report
+  const generateReport = async () => {
+    if (!job) return;
+    
+    setReportDialogOpen(true);
+    setReportLoading(true);
+    setReportError(null);
+    setReport(null);
+    
+    try {
+      const response = await fetch(`/api/jobs/${job.id}/generate-report`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to generate report');
+      }
+      
+      const data = await response.json();
+      setReport(data);
+    } catch (error) {
+      setReportError(error instanceof Error ? error.message : 'Failed to generate report');
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  // Print report
+  const printReport = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow || !report) return;
+    
+    const photos = report.photos || [];
+    const signatures = report.signatures || [];
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Job Report - ${report.job.jobNo}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; color: #333; }
+          .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #1e40af; padding-bottom: 20px; }
+          .company-name { font-size: 24px; font-weight: bold; color: #1e40af; }
+          .company-info { font-size: 12px; color: #666; margin-top: 5px; }
+          .report-title { font-size: 20px; margin-top: 15px; }
+          .section { margin: 25px 0; }
+          .section-title { font-size: 16px; font-weight: bold; color: #1e40af; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 15px; }
+          .row { display: flex; margin: 8px 0; }
+          .label { font-weight: 600; width: 140px; color: #555; }
+          .value { flex: 1; }
+          .summary { background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; line-height: 1.6; }
+          .ai-badge { display: inline-block; background: #10b981; color: white; font-size: 10px; padding: 2px 8px; border-radius: 10px; margin-left: 10px; }
+          .materials-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+          .materials-table th, .materials-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          .materials-table th { background: #f1f5f9; }
+          .photos { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
+          .photo { width: 150px; height: 150px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; }
+          .signature { max-height: 80px; border: 1px solid #ddd; border-radius: 4px; margin: 5px 0; }
+          .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; text-align: center; }
+          @media print { body { padding: 20px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="company-name">${report.company.name}</div>
+          <div class="company-info">
+            ${report.company.address ? `${report.company.address}<br>` : ''}
+            ${report.company.phone ? `Tel: ${report.company.phone} | ` : ''}
+            ${report.company.email || ''}
+          </div>
+          <div class="report-title">Job Completion Report ${report.aiPowered ? '<span class="ai-badge">AI Enhanced</span>' : ''}</div>
+        </div>
+        
+        <div class="section">
+          <div class="section-title">Job Details</div>
+          <div class="row"><div class="label">Job Number:</div><div class="value">${report.job.jobNo}</div></div>
+          <div class="row"><div class="label">Customer:</div><div class="value">${report.job.customerName}</div></div>
+          <div class="row"><div class="label">Site Address:</div><div class="value">${report.job.address || 'N/A'}${report.job.postcode ? ', ' + report.job.postcode : ''}</div></div>
+          <div class="row"><div class="label">Date:</div><div class="value">${report.job.date ? new Date(report.job.date).toLocaleDateString('en-GB') : 'N/A'}</div></div>
+          <div class="row"><div class="label">Status:</div><div class="value">${report.job.status}</div></div>
+          ${report.engineers.length > 0 ? `<div class="row"><div class="label">Engineer(s):</div><div class="value">${report.engineers.map((e: any) => e.name).join(', ')}</div></div>` : ''}
+        </div>
+        
+        <div class="section">
+          <div class="section-title">Professional Summary</div>
+          <div class="summary">${report.professionalSummary.replace(/\n/g, '<br>')}</div>
+        </div>
+        
+        ${report.job.description ? `
+        <div class="section">
+          <div class="section-title">Work Description</div>
+          <p>${report.job.description}</p>
+        </div>` : ''}
+        
+        ${report.job.worksCompleted ? `
+        <div class="section">
+          <div class="section-title">Works Completed</div>
+          <p>${report.job.worksCompleted}</p>
+        </div>` : ''}
+        
+        ${report.materials.length > 0 ? `
+        <div class="section">
+          <div class="section-title">Materials Used</div>
+          <table class="materials-table">
+            <tr><th>Qty</th><th>Description</th></tr>
+            ${report.materials.map((m: any) => `<tr><td>${m.quantity}</td><td>${m.description}</td></tr>`).join('')}
+          </table>
+        </div>` : ''}
+        
+        ${photos.length > 0 ? `
+        <div class="section">
+          <div class="section-title">Evidence Photos</div>
+          <div class="photos">
+            ${photos.map((p: any) => `<img src="${p.data || p.url}" class="photo" alt="${p.caption || 'Evidence photo'}">`).join('')}
+          </div>
+        </div>` : ''}
+        
+        ${signatures.length > 0 ? `
+        <div class="section">
+          <div class="section-title">Signatures</div>
+          ${signatures.map((s: any) => `
+            <div style="margin: 15px 0;">
+              <strong>${s.type === 'engineer' ? 'Engineer' : 'Customer'} Signature:</strong>
+              <img src="${s.data}" class="signature" alt="${s.type} signature">
+            </div>
+          `).join('')}
+        </div>` : ''}
+        
+        ${report.signOff ? `
+        <div class="section">
+          <div class="section-title">Sign-off Details</div>
+          <div class="row"><div class="label">Signed off:</div><div class="value">${new Date(report.signOff.timestamp).toLocaleString('en-GB')}</div></div>
+          ${report.signOff.address ? `<div class="row"><div class="label">Location:</div><div class="value">${report.signOff.address}</div></div>` : ''}
+        </div>` : ''}
+        
+        <div class="footer">
+          Report generated on ${new Date(report.generatedAt).toLocaleString('en-GB')}
+          ${report.aiPowered ? ' | AI-enhanced summary' : ''}
+        </div>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
   };
 
   // Group updates by date for display
@@ -470,6 +625,15 @@ export default function JobDetail() {
           <Button variant="outline" onClick={handlePrint} className="flex-1 sm:flex-none">
             <Printer className="mr-2 h-4 w-4" />
             Print / PDF
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={generateReport} 
+            className="flex-1 sm:flex-none"
+            data-testid="button-generate-report"
+          >
+            <FileText className="mr-2 h-4 w-4" />
+            Report
           </Button>
           
           {job.status !== "Signed Off" && (
@@ -1396,6 +1560,188 @@ export default function JobDetail() {
             </Button>
          </div>
        )}
+
+      {/* Report Generation Dialog */}
+      <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              Job Completion Report
+              {report?.aiPowered && (
+                <Badge variant="secondary" className="ml-2 bg-emerald-100 text-emerald-700">
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  AI Enhanced
+                </Badge>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              Professional report generated from job data
+            </DialogDescription>
+          </DialogHeader>
+
+          {reportLoading && (
+            <div className="flex flex-col items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
+              <p className="text-sm text-muted-foreground">Generating professional report...</p>
+              <p className="text-xs text-muted-foreground mt-1">This may take a few seconds</p>
+            </div>
+          )}
+
+          {reportError && (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <AlertCircle className="h-8 w-8 text-destructive mb-3" />
+              <p className="text-sm text-destructive font-medium">Failed to generate report</p>
+              <p className="text-xs text-muted-foreground mt-1">{reportError}</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="mt-4"
+                onClick={generateReport}
+              >
+                Try Again
+              </Button>
+            </div>
+          )}
+
+          {!reportLoading && !reportError && report && (
+            <div className="space-y-6">
+              {/* Company & Job Header */}
+              <div className="text-center border-b pb-4">
+                <h3 className="text-lg font-bold text-primary">{report.company.name}</h3>
+                {report.company.address && (
+                  <p className="text-xs text-muted-foreground">{report.company.address}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {report.company.phone && `Tel: ${report.company.phone}`}
+                  {report.company.phone && report.company.email && ' | '}
+                  {report.company.email}
+                </p>
+              </div>
+
+              {/* Job Details */}
+              <div>
+                <h4 className="font-semibold text-sm mb-3 text-primary">Job Details</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div><span className="text-muted-foreground">Job No:</span> {report.job.jobNo}</div>
+                  <div><span className="text-muted-foreground">Status:</span> {report.job.status}</div>
+                  <div><span className="text-muted-foreground">Customer:</span> {report.job.customerName}</div>
+                  <div><span className="text-muted-foreground">Date:</span> {report.job.date ? new Date(report.job.date).toLocaleDateString('en-GB') : 'N/A'}</div>
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">Address:</span> {report.job.address || 'N/A'}{report.job.postcode ? `, ${report.job.postcode}` : ''}
+                  </div>
+                  {report.engineers.length > 0 && (
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">Engineer(s):</span> {report.engineers.map((e: any) => e.name).join(', ')}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Professional Summary */}
+              <div>
+                <h4 className="font-semibold text-sm mb-3 text-primary flex items-center gap-2">
+                  Professional Summary
+                  {report.aiPowered && <Sparkles className="h-3 w-3 text-amber-500" />}
+                </h4>
+                <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg text-sm whitespace-pre-wrap">
+                  {report.professionalSummary}
+                </div>
+              </div>
+
+              {/* Materials */}
+              {report.materials.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-sm mb-3 text-primary">Materials Used</h4>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-50 dark:bg-slate-900/50">
+                        <tr>
+                          <th className="text-left p-2 font-medium">Qty</th>
+                          <th className="text-left p-2 font-medium">Description</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {report.materials.map((m: any, i: number) => (
+                          <tr key={i} className="border-t">
+                            <td className="p-2">{m.quantity}</td>
+                            <td className="p-2">{m.description}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Evidence Photos */}
+              {report.photos.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-sm mb-3 text-primary">Evidence Photos</h4>
+                  <div className="grid grid-cols-3 gap-2">
+                    {report.photos.slice(0, 6).map((p: any, i: number) => (
+                      <img 
+                        key={i} 
+                        src={p.data || p.url} 
+                        alt={p.caption || 'Evidence'} 
+                        className="w-full h-24 object-cover rounded border"
+                      />
+                    ))}
+                  </div>
+                  {report.photos.length > 6 && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      +{report.photos.length - 6} more photos
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Signatures */}
+              {report.signatures.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-sm mb-3 text-primary">Signatures</h4>
+                  <div className="flex gap-4">
+                    {report.signatures.map((s: any, i: number) => (
+                      <div key={i} className="flex-1">
+                        <p className="text-xs text-muted-foreground mb-1 capitalize">{s.type}</p>
+                        <img 
+                          src={s.data} 
+                          alt={`${s.type} signature`} 
+                          className="h-16 border rounded bg-white"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Sign-off Details */}
+              {report.signOff && (
+                <div>
+                  <h4 className="font-semibold text-sm mb-3 text-primary">Sign-off Details</h4>
+                  <div className="text-sm space-y-1">
+                    <div><span className="text-muted-foreground">Signed off:</span> {new Date(report.signOff.timestamp).toLocaleString('en-GB')}</div>
+                    {report.signOff.address && (
+                      <div><span className="text-muted-foreground">Location:</span> {report.signOff.address}</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Print Button */}
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button variant="outline" onClick={() => setReportDialogOpen(false)}>
+                  Close
+                </Button>
+                <Button onClick={printReport}>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Print Report
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

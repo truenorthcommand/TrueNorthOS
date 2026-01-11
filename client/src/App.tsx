@@ -46,6 +46,7 @@ import Expenses from "@/pages/expenses";
 import Payments from "@/pages/payments";
 import Analytics from "@/pages/analytics";
 import VoiceNotes from "@/pages/voice-notes";
+import DocumentScanner from "@/pages/document-scanner";
 import UserGuide from "@/pages/user-guide";
 import WorksManagerDashboard from "@/pages/works-manager-dashboard";
 import WorksManagerJobs from "@/pages/works-manager-jobs";
@@ -176,6 +177,9 @@ function Router() {
       </Route>
       <Route path="/voice-notes">
         <PrivateRoute component={VoiceNotes} />
+      </Route>
+      <Route path="/document-scanner">
+        <PrivateRoute component={DocumentScanner} />
       </Route>
       <Route path="/user-guide">
         <PrivateRoute component={UserGuide} />
