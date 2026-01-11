@@ -838,3 +838,99 @@ export type SnaggingSheetWithDetails = SnaggingSheet & {
   job?: Pick<Job, 'id' | 'jobNo' | 'customerName'> | null;
   client?: Pick<Client, 'id' | 'name'> | null;
 };
+
+// ==================== ACCOUNTS PORTAL ====================
+
+export const accountsReceipts = pgTable("accounts_receipts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  expenseId: varchar("expense_id"),
+  uploadedById: varchar("uploaded_by_id").notNull(),
+  imageUrl: text("image_url").notNull(),
+  ocrVendor: text("ocr_vendor"),
+  ocrAmount: doublePrecision("ocr_amount"),
+  ocrDate: timestamp("ocr_date"),
+  ocrCategory: text("ocr_category"),
+  ocrRawData: jsonb("ocr_raw_data"),
+  isProcessed: boolean("is_processed").notNull().default(false),
+  isVerified: boolean("is_verified").notNull().default(false),
+  verifiedById: varchar("verified_by_id"),
+  verifiedAt: timestamp("verified_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAccountsReceiptSchema = createInsertSchema(accountsReceipts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAccountsReceipt = z.infer<typeof insertAccountsReceiptSchema>;
+export type AccountsReceipt = typeof accountsReceipts.$inferSelect;
+
+export const invoiceChaseLogs = pgTable("invoice_chase_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull(),
+  chaseNumber: integer("chase_number").notNull().default(1),
+  method: text("method").notNull().default("email"),
+  message: text("message").notNull(),
+  sentAt: timestamp("sent_at"),
+  sentById: varchar("sent_by_id"),
+  response: text("response"),
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInvoiceChaseLogSchema = createInsertSchema(invoiceChaseLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertInvoiceChaseLog = z.infer<typeof insertInvoiceChaseLogSchema>;
+export type InvoiceChaseLog = typeof invoiceChaseLogs.$inferSelect;
+
+export const fixedCosts = pgTable("fixed_costs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
+  amount: doublePrecision("amount").notNull(),
+  frequency: text("frequency").notNull().default("monthly"),
+  startDate: timestamp("start_date").defaultNow(),
+  endDate: timestamp("end_date"),
+  notes: text("notes"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdById: varchar("created_by_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFixedCostSchema = createInsertSchema(fixedCosts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFixedCost = z.infer<typeof insertFixedCostSchema>;
+export type FixedCost = typeof fixedCosts.$inferSelect;
+
+export type InvoiceWithChaseInfo = Invoice & {
+  client?: Pick<Client, 'id' | 'name' | 'email' | 'phone'> | null;
+  daysOverdue?: number;
+  lastChaseDate?: Date | null;
+  chaseCount?: number;
+};
+
+export type FinancialSummary = {
+  totalRevenue: number;
+  paidInvoices: number;
+  pendingInvoices: number;
+  overdueInvoices: number;
+  totalCosts: number;
+  staffCosts: number;
+  vehicleCosts: number;
+  materialsCosts: number;
+  fixedCosts: number;
+  netProfit: number;
+  period: string;
+};

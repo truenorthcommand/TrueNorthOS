@@ -27,12 +27,17 @@ import {
   type InspectionItem, type InsertInspectionItem,
   type SnaggingSheet, type InsertSnaggingSheet, type SnaggingSheetWithDetails,
   type SnagItem, type InsertSnagItem,
+  type AccountsReceipt, type InsertAccountsReceipt,
+  type InvoiceChaseLog, type InsertInvoiceChaseLog,
+  type FixedCost, type InsertFixedCost,
+  type InvoiceWithChaseInfo, type FinancialSummary,
   users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, jobUpdates,
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
   timesheets, expenses, payments,
   skills, userSkills,
-  inspections, inspectionItems, snaggingSheets, snagItems
+  inspections, inspectionItems, snaggingSheets, snagItems,
+  accountsReceipts, invoiceChaseLogs, fixedCosts
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and, ne, inArray, gt, asc } from "drizzle-orm";
@@ -212,6 +217,26 @@ export interface IStorage {
   updateSnagItem(id: string, data: Partial<SnagItem>): Promise<SnagItem | undefined>;
   deleteSnagItem(id: string): Promise<void>;
   getNextSnaggingSheetNo(): Promise<string>;
+  
+  // Accounts Portal
+  getAccountsReceipts(): Promise<AccountsReceipt[]>;
+  getAccountsReceipt(id: string): Promise<AccountsReceipt | undefined>;
+  createAccountsReceipt(data: InsertAccountsReceipt): Promise<AccountsReceipt>;
+  updateAccountsReceipt(id: string, data: Partial<AccountsReceipt>): Promise<AccountsReceipt | undefined>;
+  deleteAccountsReceipt(id: string): Promise<void>;
+  
+  getInvoiceChaseLogs(invoiceId: string): Promise<InvoiceChaseLog[]>;
+  createInvoiceChaseLog(data: InsertInvoiceChaseLog): Promise<InvoiceChaseLog>;
+  
+  getFixedCosts(): Promise<FixedCost[]>;
+  getFixedCost(id: string): Promise<FixedCost | undefined>;
+  createFixedCost(data: InsertFixedCost): Promise<FixedCost>;
+  updateFixedCost(id: string, data: Partial<FixedCost>): Promise<FixedCost | undefined>;
+  deleteFixedCost(id: string): Promise<void>;
+  
+  getInvoicesWithChaseInfo(): Promise<InvoiceWithChaseInfo[]>;
+  getOverdueInvoices(daysOverdue?: number): Promise<InvoiceWithChaseInfo[]>;
+  getFinancialSummary(startDate?: Date, endDate?: Date): Promise<FinancialSummary>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1599,6 +1624,181 @@ export class DatabaseStorage implements IStorage {
     const count = Number(result[0]?.count || 0) + 1;
     const year = new Date().getFullYear();
     return `SNG-${year}-${String(count).padStart(4, '0')}`;
+  }
+
+  // ==================== ACCOUNTS PORTAL ====================
+
+  async getAccountsReceipts(): Promise<AccountsReceipt[]> {
+    return db.select().from(accountsReceipts).orderBy(desc(accountsReceipts.createdAt));
+  }
+
+  async getAccountsReceipt(id: string): Promise<AccountsReceipt | undefined> {
+    const [receipt] = await db.select().from(accountsReceipts).where(eq(accountsReceipts.id, id));
+    return receipt;
+  }
+
+  async createAccountsReceipt(data: InsertAccountsReceipt): Promise<AccountsReceipt> {
+    const [created] = await db.insert(accountsReceipts).values(data).returning();
+    return created;
+  }
+
+  async updateAccountsReceipt(id: string, data: Partial<AccountsReceipt>): Promise<AccountsReceipt | undefined> {
+    const [updated] = await db.update(accountsReceipts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(accountsReceipts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteAccountsReceipt(id: string): Promise<void> {
+    await db.delete(accountsReceipts).where(eq(accountsReceipts.id, id));
+  }
+
+  async getInvoiceChaseLogs(invoiceId: string): Promise<InvoiceChaseLog[]> {
+    return db.select().from(invoiceChaseLogs)
+      .where(eq(invoiceChaseLogs.invoiceId, invoiceId))
+      .orderBy(desc(invoiceChaseLogs.createdAt));
+  }
+
+  async createInvoiceChaseLog(data: InsertInvoiceChaseLog): Promise<InvoiceChaseLog> {
+    const [created] = await db.insert(invoiceChaseLogs).values(data).returning();
+    return created;
+  }
+
+  async getFixedCosts(): Promise<FixedCost[]> {
+    return db.select().from(fixedCosts).orderBy(asc(fixedCosts.category), asc(fixedCosts.name));
+  }
+
+  async getFixedCost(id: string): Promise<FixedCost | undefined> {
+    const [cost] = await db.select().from(fixedCosts).where(eq(fixedCosts.id, id));
+    return cost;
+  }
+
+  async createFixedCost(data: InsertFixedCost): Promise<FixedCost> {
+    const [created] = await db.insert(fixedCosts).values(data).returning();
+    return created;
+  }
+
+  async updateFixedCost(id: string, data: Partial<FixedCost>): Promise<FixedCost | undefined> {
+    const [updated] = await db.update(fixedCosts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(fixedCosts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteFixedCost(id: string): Promise<void> {
+    await db.delete(fixedCosts).where(eq(fixedCosts.id, id));
+  }
+
+  async getInvoicesWithChaseInfo(): Promise<InvoiceWithChaseInfo[]> {
+    const allInvoices = await db.select().from(invoices).orderBy(desc(invoices.createdAt));
+    const allClients = await db.select().from(clients);
+    const allChaseLogs = await db.select().from(invoiceChaseLogs);
+    
+    const clientMap = new Map(allClients.map(c => [c.id, c]));
+    
+    return allInvoices.map(inv => {
+      const invChaseLogs = allChaseLogs.filter(cl => cl.invoiceId === inv.id);
+      const daysOverdue = inv.dueDate && inv.status !== 'Paid' 
+        ? Math.max(0, Math.floor((Date.now() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24)))
+        : 0;
+      const lastChase = invChaseLogs.sort((a, b) => 
+        new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()
+      )[0];
+      
+      return {
+        ...inv,
+        client: inv.customerId ? clientMap.get(inv.customerId) || null : null,
+        daysOverdue,
+        lastChaseDate: lastChase?.sentAt || null,
+        chaseCount: invChaseLogs.length,
+      };
+    });
+  }
+
+  async getOverdueInvoices(daysOverdue: number = 14): Promise<InvoiceWithChaseInfo[]> {
+    const allInvoicesWithInfo = await this.getInvoicesWithChaseInfo();
+    return allInvoicesWithInfo.filter(inv => 
+      inv.status !== 'Paid' && 
+      inv.status !== 'Cancelled' && 
+      (inv.daysOverdue || 0) >= daysOverdue
+    );
+  }
+
+  async getFinancialSummary(startDate?: Date, endDate?: Date): Promise<FinancialSummary> {
+    const start = startDate || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = endDate || new Date();
+    const period = `${start.toISOString().slice(0, 10)} to ${end.toISOString().slice(0, 10)}`;
+
+    // Get all invoices
+    const allInvoices = await db.select().from(invoices);
+    const filteredInvoices = allInvoices.filter(inv => {
+      const invDate = inv.invoiceDate ? new Date(inv.invoiceDate) : null;
+      return invDate && invDate >= start && invDate <= end;
+    });
+
+    const paidInvoices = filteredInvoices.filter(inv => inv.status === 'Paid');
+    const pendingInvoices = filteredInvoices.filter(inv => inv.status === 'Sent' || inv.status === 'Draft');
+    const overdueInvoices = filteredInvoices.filter(inv => {
+      if (inv.status === 'Paid' || inv.status === 'Cancelled') return false;
+      if (!inv.dueDate) return false;
+      return new Date(inv.dueDate) < new Date();
+    });
+
+    const totalRevenue = paidInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+
+    // Get timesheets for staff costs
+    const allTimesheets = await db.select().from(timesheets);
+    const filteredTimesheets = allTimesheets.filter(ts => {
+      const tsDate = ts.date ? new Date(ts.date) : null;
+      return tsDate && tsDate >= start && tsDate <= end;
+    });
+    const staffCosts = filteredTimesheets.reduce((sum, ts) => {
+      const hours = ts.totalHours || 0;
+      const rate = 15; // Default hourly rate
+      return sum + (hours * rate);
+    }, 0);
+
+    // Get expenses including vehicle costs
+    const allExpenses = await db.select().from(expenses);
+    const filteredExpenses = allExpenses.filter(exp => {
+      const expDate = exp.date ? new Date(exp.date) : null;
+      return expDate && expDate >= start && expDate <= end && exp.status === 'approved';
+    });
+    
+    const vehicleCosts = filteredExpenses
+      .filter(exp => exp.mileage || exp.category === 'fuel' || exp.category === 'vehicle')
+      .reduce((sum, exp) => sum + (exp.amount || 0), 0);
+
+    const materialsCosts = filteredExpenses
+      .filter(exp => exp.category === 'materials' || exp.category === 'parts')
+      .reduce((sum, exp) => sum + (exp.amount || 0), 0);
+
+    // Get fixed costs
+    const allFixedCosts = await db.select().from(fixedCosts).where(eq(fixedCosts.isActive, true));
+    const monthlyFixedCosts = allFixedCosts.reduce((sum, fc) => {
+      if (fc.frequency === 'monthly') return sum + (fc.amount || 0);
+      if (fc.frequency === 'weekly') return sum + ((fc.amount || 0) * 4.33);
+      if (fc.frequency === 'yearly') return sum + ((fc.amount || 0) / 12);
+      return sum + (fc.amount || 0);
+    }, 0);
+
+    const totalCosts = staffCosts + vehicleCosts + materialsCosts + monthlyFixedCosts;
+
+    return {
+      totalRevenue,
+      paidInvoices: paidInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0),
+      pendingInvoices: pendingInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0),
+      overdueInvoices: overdueInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0),
+      totalCosts,
+      staffCosts,
+      vehicleCosts,
+      materialsCosts,
+      fixedCosts: monthlyFixedCosts,
+      netProfit: totalRevenue - totalCosts,
+      period,
+    };
   }
 }
 

@@ -4961,5 +4961,293 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
+  // ==================== ACCOUNTS PORTAL ====================
+
+  app.get("/api/accounts/receipts", requireRoles('admin', 'accounts'), async (req, res) => {
+    try {
+      const receipts = await storage.getAccountsReceipts();
+      res.json(receipts);
+    } catch (error) {
+      console.error("Get receipts error:", error);
+      res.status(500).json({ error: "Failed to fetch receipts" });
+    }
+  });
+
+  app.post("/api/accounts/receipts", requireAuth, async (req, res) => {
+    try {
+      const receipt = await storage.createAccountsReceipt({
+        ...req.body,
+        uploadedById: req.session.userId!,
+      });
+      res.status(201).json(receipt);
+    } catch (error) {
+      console.error("Create receipt error:", error);
+      res.status(500).json({ error: "Failed to create receipt" });
+    }
+  });
+
+  app.post("/api/accounts/receipts/:id/ocr", requireRoles('admin', 'accounts'), async (req, res) => {
+    try {
+      const receipt = await storage.getAccountsReceipt(req.params.id);
+      if (!receipt) {
+        return res.status(404).json({ error: "Receipt not found" });
+      }
+
+      const openai = getOpenAIClient();
+      if (!openai) {
+        return res.status(503).json({ error: "AI service not available" });
+      }
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are a receipt OCR specialist. Analyze the receipt image and extract:
+- vendor: The business/shop name
+- amount: The total amount paid (number only, no currency symbol)
+- date: The date in YYYY-MM-DD format if visible
+- category: One of: fuel, materials, parts, tools, equipment, meals, travel, other
+
+Return ONLY valid JSON in this exact format:
+{"vendor": "Shop Name", "amount": 45.99, "date": "2025-01-10", "category": "materials"}`
+          },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Please analyze this receipt image and extract the details." },
+              { type: "image_url", image_url: { url: receipt.imageUrl } }
+            ]
+          }
+        ],
+        max_tokens: 500,
+      });
+
+      const content = response.choices[0]?.message?.content || '{}';
+      let ocrData;
+      try {
+        ocrData = JSON.parse(content.replace(/```json\n?|\n?```/g, '').trim());
+      } catch {
+        ocrData = { error: "Could not parse OCR result" };
+      }
+
+      const updated = await storage.updateAccountsReceipt(req.params.id, {
+        ocrVendor: ocrData.vendor || null,
+        ocrAmount: ocrData.amount || null,
+        ocrDate: ocrData.date ? new Date(ocrData.date) : null,
+        ocrCategory: ocrData.category || null,
+        ocrRawData: ocrData,
+        isProcessed: true,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("OCR receipt error:", error);
+      res.status(500).json({ error: "Failed to process receipt OCR" });
+    }
+  });
+
+  app.patch("/api/accounts/receipts/:id", requireRoles('admin', 'accounts'), async (req, res) => {
+    try {
+      const receipt = await storage.updateAccountsReceipt(req.params.id, req.body);
+      if (!receipt) {
+        return res.status(404).json({ error: "Receipt not found" });
+      }
+      res.json(receipt);
+    } catch (error) {
+      console.error("Update receipt error:", error);
+      res.status(500).json({ error: "Failed to update receipt" });
+    }
+  });
+
+  app.delete("/api/accounts/receipts/:id", requireRoles('admin', 'accounts'), async (req, res) => {
+    try {
+      await storage.deleteAccountsReceipt(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Delete receipt error:", error);
+      res.status(500).json({ error: "Failed to delete receipt" });
+    }
+  });
+
+  app.get("/api/accounts/invoices", requireRoles('admin', 'accounts'), async (req, res) => {
+    try {
+      const invoices = await storage.getInvoicesWithChaseInfo();
+      res.json(invoices);
+    } catch (error) {
+      console.error("Get invoices with chase info error:", error);
+      res.status(500).json({ error: "Failed to fetch invoices" });
+    }
+  });
+
+  app.get("/api/accounts/invoices/overdue", requireRoles('admin', 'accounts'), async (req, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 14;
+      const overdueInvoices = await storage.getOverdueInvoices(days);
+      res.json(overdueInvoices);
+    } catch (error) {
+      console.error("Get overdue invoices error:", error);
+      res.status(500).json({ error: "Failed to fetch overdue invoices" });
+    }
+  });
+
+  app.get("/api/accounts/invoices/:id/chase-logs", requireRoles('admin', 'accounts'), async (req, res) => {
+    try {
+      const logs = await storage.getInvoiceChaseLogs(req.params.id);
+      res.json(logs);
+    } catch (error) {
+      console.error("Get chase logs error:", error);
+      res.status(500).json({ error: "Failed to fetch chase logs" });
+    }
+  });
+
+  app.post("/api/accounts/invoices/:id/generate-chase", requireRoles('admin', 'accounts'), async (req, res) => {
+    try {
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      const chaseLogs = await storage.getInvoiceChaseLogs(req.params.id);
+      const chaseNumber = chaseLogs.length + 1;
+      const daysOverdue = invoice.dueDate 
+        ? Math.floor((Date.now() - new Date(invoice.dueDate).getTime()) / (1000 * 60 * 60 * 24))
+        : 0;
+
+      const openai = getOpenAIClient();
+      if (!openai) {
+        const defaultMessage = `Dear ${invoice.customerName},
+
+I hope this message finds you well. I wanted to follow up on Invoice ${invoice.invoiceNo} dated ${invoice.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString('en-GB') : 'N/A'} for £${invoice.total?.toFixed(2)}.
+
+According to our records, this invoice is now ${daysOverdue} days overdue. I would be grateful if you could arrange payment at your earliest convenience, or let me know if there are any issues I can help resolve.
+
+Please feel free to contact me if you have any questions.
+
+Kind regards`;
+        return res.json({ message: defaultMessage, chaseNumber });
+      }
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are a professional UK accounts assistant. Generate a polite but firm payment reminder for an overdue invoice. 
+The tone should be:
+- Chase 1: Very polite and understanding
+- Chase 2: Firmer but still professional
+- Chase 3+: More urgent, mentioning potential consequences
+
+Keep the message concise, professional, and appropriate for UK business correspondence.
+Include the invoice details and make it easy for the customer to pay.
+Do not include subject lines or greetings like "Dear Sir/Madam" - start with "Dear [Customer Name]".`
+          },
+          {
+            role: "user",
+            content: `Generate chase message #${chaseNumber} for:
+Customer: ${invoice.customerName}
+Invoice No: ${invoice.invoiceNo}
+Invoice Date: ${invoice.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString('en-GB') : 'N/A'}
+Amount Due: £${invoice.total?.toFixed(2)}
+Days Overdue: ${daysOverdue}
+${invoice.customerEmail ? `Email: ${invoice.customerEmail}` : ''}`
+          }
+        ],
+        max_tokens: 500,
+      });
+
+      const message = response.choices[0]?.message?.content || '';
+      res.json({ message, chaseNumber });
+    } catch (error) {
+      console.error("Generate chase message error:", error);
+      res.status(500).json({ error: "Failed to generate chase message" });
+    }
+  });
+
+  app.post("/api/accounts/invoices/:id/chase", requireRoles('admin', 'accounts'), async (req, res) => {
+    try {
+      const { message, method = 'email' } = req.body;
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      const chaseLogs = await storage.getInvoiceChaseLogs(req.params.id);
+      
+      const log = await storage.createInvoiceChaseLog({
+        invoiceId: req.params.id,
+        chaseNumber: chaseLogs.length + 1,
+        method,
+        message,
+        sentAt: new Date(),
+        sentById: req.session.userId,
+      });
+
+      res.status(201).json(log);
+    } catch (error) {
+      console.error("Create chase log error:", error);
+      res.status(500).json({ error: "Failed to create chase log" });
+    }
+  });
+
+  app.get("/api/accounts/fixed-costs", requireRoles('admin', 'accounts'), async (req, res) => {
+    try {
+      const costs = await storage.getFixedCosts();
+      res.json(costs);
+    } catch (error) {
+      console.error("Get fixed costs error:", error);
+      res.status(500).json({ error: "Failed to fetch fixed costs" });
+    }
+  });
+
+  app.post("/api/accounts/fixed-costs", requireRoles('admin', 'accounts'), async (req, res) => {
+    try {
+      const cost = await storage.createFixedCost({
+        ...req.body,
+        createdById: req.session.userId,
+      });
+      res.status(201).json(cost);
+    } catch (error) {
+      console.error("Create fixed cost error:", error);
+      res.status(500).json({ error: "Failed to create fixed cost" });
+    }
+  });
+
+  app.patch("/api/accounts/fixed-costs/:id", requireRoles('admin', 'accounts'), async (req, res) => {
+    try {
+      const cost = await storage.updateFixedCost(req.params.id, req.body);
+      if (!cost) {
+        return res.status(404).json({ error: "Fixed cost not found" });
+      }
+      res.json(cost);
+    } catch (error) {
+      console.error("Update fixed cost error:", error);
+      res.status(500).json({ error: "Failed to update fixed cost" });
+    }
+  });
+
+  app.delete("/api/accounts/fixed-costs/:id", requireRoles('admin', 'accounts'), async (req, res) => {
+    try {
+      await storage.deleteFixedCost(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Delete fixed cost error:", error);
+      res.status(500).json({ error: "Failed to delete fixed cost" });
+    }
+  });
+
+  app.get("/api/accounts/financial-summary", requireRoles('admin', 'accounts'), async (req, res) => {
+    try {
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+      const summary = await storage.getFinancialSummary(startDate, endDate);
+      res.json(summary);
+    } catch (error) {
+      console.error("Get financial summary error:", error);
+      res.status(500).json({ error: "Failed to fetch financial summary" });
+    }
+  });
+
   return httpServer;
 }

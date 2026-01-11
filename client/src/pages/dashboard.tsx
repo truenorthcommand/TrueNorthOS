@@ -48,6 +48,14 @@ const PORTAL_CONFIGS: PortalConfig[] = [
     icon: ClipboardCheck,
     gradient: 'from-purple-600 to-purple-800',
   },
+  {
+    role: 'accounts',
+    title: 'Accounts Portal',
+    description: 'Invoices, receipts, costs, and financial overview',
+    path: '/accounts',
+    icon: Wallet,
+    gradient: 'from-green-600 to-green-800',
+  },
 ];
 
 function RolePortals({ user, setLocation }: { user: any; setLocation: (path: string) => void }) {

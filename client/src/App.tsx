@@ -55,6 +55,7 @@ import Inspections from "@/pages/inspections";
 import InspectionDetail from "@/pages/inspection-detail";
 import SnaggingSheets from "@/pages/snagging-sheets";
 import SnaggingDetail from "@/pages/snagging-detail";
+import AccountsDashboard from "@/pages/accounts-dashboard";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -205,6 +206,9 @@ function Router() {
       </Route>
       <Route path="/snagging/:id">
         <PrivateRoute component={SnaggingDetail} />
+      </Route>
+      <Route path="/accounts">
+        <PrivateRoute component={AccountsDashboard} />
       </Route>
       <Route path="/">
         <PrivateRoute component={Dashboard} />
