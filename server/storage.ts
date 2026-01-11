@@ -131,6 +131,9 @@ export interface IStorage {
   createVehicle(vehicle: InsertVehicle): Promise<Vehicle>;
   updateVehicle(id: string, updates: Partial<Vehicle>): Promise<Vehicle | undefined>;
   deleteVehicle(id: string): Promise<void>;
+  getVehiclesByUserId(userId: string): Promise<Vehicle[]>;
+  getAvailableVehicles(): Promise<Vehicle[]>;
+  assignVehicleToUser(vehicleId: string, userId: string | null): Promise<Vehicle | undefined>;
   
   getWalkaroundCheck(id: string): Promise<WalkaroundCheck | undefined>;
   getWalkaroundCheckWithDetails(id: string): Promise<WalkaroundCheckWithDetails | undefined>;
@@ -921,6 +924,22 @@ export class DatabaseStorage implements IStorage {
 
   async deleteVehicle(id: string): Promise<void> {
     await db.delete(vehicles).where(eq(vehicles.id, id));
+  }
+
+  async getVehiclesByUserId(userId: string): Promise<Vehicle[]> {
+    return db.select().from(vehicles).where(eq(vehicles.assignedUserId, userId));
+  }
+
+  async getAvailableVehicles(): Promise<Vehicle[]> {
+    return db.select().from(vehicles).where(isNull(vehicles.assignedUserId));
+  }
+
+  async assignVehicleToUser(vehicleId: string, userId: string | null): Promise<Vehicle | undefined> {
+    const [updated] = await db.update(vehicles)
+      .set({ assignedUserId: userId, updatedAt: new Date() })
+      .where(eq(vehicles.id, vehicleId))
+      .returning();
+    return updated;
   }
 
   async getWalkaroundCheck(id: string): Promise<WalkaroundCheck | undefined> {
