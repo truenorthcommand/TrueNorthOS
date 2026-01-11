@@ -42,9 +42,10 @@ TrueNorth Field View is a "business in a box" platform that enables field servic
 ### 4. Workforce
 - Team messaging (WhatsApp-style)
 - Live GPS tracking with map view
-- **Multi-role system**: Users can have multiple roles (admin, engineer, surveyor, fleet_manager)
+- **Multi-role system**: Users can have multiple roles (admin, engineer, surveyor, fleet_manager, works_manager)
 - **Staff skills management**: Assign trade skills to staff (plumbing, electrical, HVAC, etc.)
 - **AI-powered job assignment**: Smart engineer suggestions based on skills, workload, and location
+- **Works Manager Portal**: Team oversight with dashboard, job management, team map, and approvals
 - Role-based access with flexible permissions
 - Weekly planner
 - Engineer assignment and workload management
