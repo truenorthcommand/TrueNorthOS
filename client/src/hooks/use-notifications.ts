@@ -32,7 +32,7 @@ export function useNotifications(onNotification?: (notification: Notification) =
     if ('Notification' in window && Notification.permission === 'granted') {
       const n = new Notification(notification.title, {
         body: notification.message,
-        icon: '/logo.png',
+        icon: '/logo-pms.png',
         tag: notification.jobId || 'notification',
       });
 

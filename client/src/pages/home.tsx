@@ -182,10 +182,10 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <img src="/logo.png" alt="TrueNorth Logo" className="w-10 h-10 rounded-lg" />
+              <img src="/logo-pms.png" alt="Pro Main Solutions Logo" className="h-10 object-contain" />
               <div>
-                <h1 className="text-xl font-bold tracking-tight">Field View</h1>
-                <p className="text-xs text-muted-foreground">TrueNorth</p>
+                <h1 className="text-xl font-bold tracking-tight">Pro Main Solutions</h1>
+                <p className="text-xs text-muted-foreground">Powered By TrueNorth Operations Group</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -438,8 +438,8 @@ export default function Home() {
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-2">
-              <img src="/logo.png" alt="TrueNorth Logo" className="w-8 h-8 rounded" />
-              <span className="font-semibold">TrueNorth Field View</span>
+              <img src="/logo-pms.png" alt="Pro Main Solutions Logo" className="h-8 object-contain" />
+              <span className="font-semibold">Pro Main Solutions</span>
             </div>
             <p className="text-sm text-muted-foreground">
               The Complete Field Service ERP Suite

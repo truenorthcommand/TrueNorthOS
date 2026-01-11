@@ -162,7 +162,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         "flex items-center gap-2 mb-6",
         collapsed ? "justify-center" : "px-2"
       )}>
-        <img src="/logo.png" alt="Pro Main Solutions Logo" className="h-8 object-contain" />
+        <img src="/logo-pms.png" alt="Pro Main Solutions Logo" className="h-8 object-contain" />
         {!collapsed && (
           <div className="flex flex-col">
             <span className="text-lg font-bold tracking-tight leading-tight">Pro Main Solutions</span>
@@ -418,7 +418,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </Sheet>
             
             <div className="flex items-center gap-2">
-              <img src="/logo.png" alt="Pro Main Solutions Logo" className="h-8 object-contain" />
+              <img src="/logo-pms.png" alt="Pro Main Solutions Logo" className="h-8 object-contain" />
               <span className="text-sm font-bold leading-tight">Pro Main Solutions</span>
             </div>
 
