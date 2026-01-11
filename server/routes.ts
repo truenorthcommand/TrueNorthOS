@@ -653,10 +653,17 @@ export async function registerRoutes(
         email: e.email,
         phone: e.phone,
         role: e.role,
+        roles: e.roles,
         username: e.username,
         currentLat: e.currentLat,
         currentLng: e.currentLng,
         lastLocationUpdate: e.lastLocationUpdate,
+        addressLine1: e.addressLine1,
+        addressLine2: e.addressLine2,
+        city: e.city,
+        county: e.county,
+        homePostcode: e.homePostcode,
+        managerId: e.managerId,
       })));
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch users" });
