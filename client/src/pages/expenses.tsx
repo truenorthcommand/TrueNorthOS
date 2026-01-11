@@ -15,7 +15,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, CalendarIcon, Car, Package, Wrench, Fuel, Utensils, MoreHorizontal, Check, X, Loader2, Wallet } from "lucide-react";
+import { Plus, CalendarIcon, Car, Package, Wrench, Fuel, Utensils, MoreHorizontal, Check, X, Loader2, Wallet, Camera } from "lucide-react";
+import { ReceiptPhotoCapture } from "@/components/receipt-photo-capture";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { toast } from "sonner";
 import type { ExpenseWithDetails, User, Job } from "@shared/schema";
@@ -440,16 +441,11 @@ export default function Expenses() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="receiptUrl">Receipt URL</Label>
-                <Input
-                  id="receiptUrl"
-                  value={receiptUrl}
-                  onChange={(e) => setReceiptUrl(e.target.value)}
-                  placeholder="https://... (optional)"
-                  data-testid="input-receipt-url"
-                />
-              </div>
+              <ReceiptPhotoCapture
+                value={receiptUrl}
+                onChange={setReceiptUrl}
+                label="Receipt Photo (optional)"
+              />
 
               <div className="space-y-2">
                 <Label>Link to Job</Label>
