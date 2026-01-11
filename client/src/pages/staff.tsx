@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -62,6 +63,7 @@ const getRoleLabel = (role: Role): string => {
 export default function Staff() {
   const { user, refreshUser } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
   const [availableVehicles, setAvailableVehicles] = useState<Vehicle[]>([]);
@@ -481,6 +483,9 @@ export default function Staff() {
         title: "Staff Added",
         description: `${data.name} has been added${assignedSkills.length > 0 ? ` with ${assignedSkills.length} skill(s)` : ''}.`,
       });
+
+      // Invalidate the engineers query so calendar/planner updates
+      queryClient.invalidateQueries({ queryKey: ["/api/users/engineers"] });
     } catch (error: any) {
       toast({
         title: "Error",
@@ -647,6 +652,9 @@ export default function Staff() {
         title: "Staff Updated",
         description: `${data.name} has been updated.`,
       });
+
+      // Invalidate the engineers query so calendar/planner updates
+      queryClient.invalidateQueries({ queryKey: ["/api/users/engineers"] });
     } catch (error: any) {
       toast({
         title: "Error",
@@ -681,6 +689,9 @@ export default function Staff() {
         title: "Staff Removed",
         description: `${name} has been removed.`,
       });
+
+      // Invalidate the engineers query so calendar/planner updates
+      queryClient.invalidateQueries({ queryKey: ["/api/users/engineers"] });
     } catch (error: any) {
       toast({
         title: "Error",

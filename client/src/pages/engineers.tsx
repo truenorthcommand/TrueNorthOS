@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { User, CheckCircle2, AlertCircle, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 
 interface Engineer {
   id: string;
@@ -21,25 +22,19 @@ interface Engineer {
 export default function Engineers() {
   const { user } = useAuth();
   const { jobs, refreshJobs } = useStore();
-  const [engineers, setEngineers] = useState<Engineer[]>([]);
   const [expandedEngineerId, setExpandedEngineerId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (user?.role === 'admin') {
+  const { data: engineers = [], isLoading } = useQuery<Engineer[]>({
+    queryKey: ["/api/users/engineers"],
+    queryFn: async () => {
       refreshJobs();
-      fetch('/api/users', { credentials: 'include' })
-        .then(res => res.json())
-        .then(data => {
-          const engineerList = data.filter((u: any) => u.role === 'engineer');
-          setEngineers(engineerList);
-          setIsLoading(false);
-        })
-        .catch(() => {
-          setIsLoading(false);
-        });
-    }
-  }, [user]);
+      const res = await fetch('/api/users', { credentials: 'include' });
+      if (!res.ok) throw new Error("Failed to fetch users");
+      const data = await res.json();
+      return data.filter((u: any) => u.role === 'engineer');
+    },
+    enabled: user?.role === 'admin',
+  });
 
   const jobsByEngineer = useMemo(() => {
     const map = new Map<string, { total: number; completed: number; inProgress: number; allJobs: typeof jobs }>();

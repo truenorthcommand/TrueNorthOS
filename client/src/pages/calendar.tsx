@@ -79,7 +79,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
 function safeParseISO(dateStr: string | null | undefined): Date | null {
@@ -324,37 +324,42 @@ export default function CalendarPage() {
   }, [jobs]);
 
 
+  const { data: engineersData } = useQuery({
+    queryKey: ["/api/users/engineers"],
+    queryFn: async () => {
+      const res = await fetch("/api/users", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch users");
+      const data = await res.json();
+      const engineerList = data.filter((u: any) => u.role === "engineer");
+      return engineerList.map((e: any) => ({
+        id: e.id,
+        name: e.name,
+      }));
+    },
+    enabled: user?.role === "admin",
+  });
+
   useEffect(() => {
-    if (user?.role === "admin") {
-      fetch("/api/users", { credentials: "include" })
-        .then((res) => res.json())
-        .then((data) => {
-          const engineerList = data.filter((u: any) => u.role === "engineer");
-          const mapped = engineerList.map((e: any) => ({
-            id: e.id,
-            name: e.name,
-          }));
-          setEngineers(mapped);
-          const savedIds = localStorage.getItem("plannerVisibleEngineers");
-          if (savedIds) {
-            try {
-              const parsed = JSON.parse(savedIds);
-              const validIds = parsed.filter((id: string) =>
-                mapped.some((e: Engineer) => e.id === id)
-              );
-              setVisibleEngineerIds(
-                validIds.length > 0 ? validIds : mapped.map((e: Engineer) => e.id)
-              );
-            } catch {
-              setVisibleEngineerIds(mapped.map((e: Engineer) => e.id));
-            }
-          } else {
-            setVisibleEngineerIds(mapped.map((e: Engineer) => e.id));
-          }
-        })
-        .catch(() => {});
+    if (engineersData) {
+      setEngineers(engineersData);
+      const savedIds = localStorage.getItem("plannerVisibleEngineers");
+      if (savedIds) {
+        try {
+          const parsed = JSON.parse(savedIds);
+          const validIds = parsed.filter((id: string) =>
+            engineersData.some((e: Engineer) => e.id === id)
+          );
+          setVisibleEngineerIds(
+            validIds.length > 0 ? validIds : engineersData.map((e: Engineer) => e.id)
+          );
+        } catch {
+          setVisibleEngineerIds(engineersData.map((e: Engineer) => e.id));
+        }
+      } else {
+        setVisibleEngineerIds(engineersData.map((e: Engineer) => e.id));
+      }
     }
-  }, [user]);
+  }, [engineersData]);
 
   useEffect(() => {
     if (visibleEngineerIds.length > 0) {
