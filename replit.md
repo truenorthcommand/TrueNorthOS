@@ -78,6 +78,29 @@ TrueNorth Field View is a "business in a box" platform that enables field servic
 - Photo analysis capabilities
 - **Voice Notes** - Speech-to-text transcription with AI summarization for job updates
 - **Quote Pricing Advisor** - AI-powered pricing suggestions based on historical data
+- **Receipt OCR** - Automatic data extraction from expense receipts
+
+## Future AI Enhancements (Planned)
+
+### Operational Efficiency
+- **Smart Job Scheduling** - AI that optimizes engineer routes and schedules based on location, traffic, skills, and job duration estimates
+- **Automated Report Generation** - Generate professional job completion reports from photos, notes, and job data
+- **Document Scanner** - Extract data from supplier invoices, contracts, and certificates automatically
+
+### Financial
+- **Automated Invoice Chasing** - AI-generated follow-up messages for overdue payments
+- **Cash Flow Forecasting** - Predict income based on scheduled jobs, quotes, and payment patterns
+
+### Quality & Compliance
+- **Safety Risk Assessment** - Analyze site photos to identify potential hazards before work begins
+- **Compliance Checker** - Verify completed work meets Gas Safe, BS 7671, and other UK regulations
+
+### Customer Experience
+- **Smart Customer Communications** - Auto-generate appointment reminders, job updates, and thank-you messages
+- **Sentiment Analysis** - Analyze customer feedback to flag potential issues
+
+### Workforce
+- **Training Recommendations** - Suggest certifications based on job types and skill gaps
 
 ## Key Features Summary
 
