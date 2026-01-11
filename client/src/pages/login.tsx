@@ -132,14 +132,6 @@ export default function Login() {
                 Back to login
               </Button>
             )}
-            
-            {!requires2FA && (
-              <div className="text-xs text-center text-muted-foreground mt-4 bg-slate-50 p-3 rounded border">
-                <p className="font-semibold mb-1">Demo Credentials:</p>
-                <p>Admin: admin / admin123</p>
-                <p>Engineer: john / john123</p>
-              </div>
-            )}
           </form>
         </CardContent>
       </Card>
