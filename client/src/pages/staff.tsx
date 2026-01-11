@@ -131,6 +131,7 @@ export default function Staff() {
         setVerifyPassword("");
         fetchStaff();
         fetchSkills();
+        fetchWorksManagers();
       } else {
         const data = await res.json();
         toast({
