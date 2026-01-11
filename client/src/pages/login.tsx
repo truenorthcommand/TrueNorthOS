@@ -47,9 +47,6 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4">
-            <img src="/logo-pms.png" alt="Pro Main Solutions Logo" className="h-10 object-contain" />
-          </div>
           <CardTitle className="text-2xl font-bold">Pro Main Solutions</CardTitle>
           <CardDescription>
             {requires2FA ? "Enter your authentication code" : "Powered By TrueNorth Operations Group"}
