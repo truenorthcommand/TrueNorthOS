@@ -29,6 +29,8 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function JobDetail() {
   const { user } = useAuth();
@@ -354,13 +356,19 @@ export default function JobDetail() {
   const handleSelectSuggestedEngineer = async (engineerId: string) => {
     if (!job) return;
     
-    await updateJob(job.id, { assignedToId: engineerId });
+    const currentIds = job.assignedToIds || (job.assignedToId ? [job.assignedToId] : []);
+    const newIds = currentIds.includes(engineerId) ? currentIds : [...currentIds, engineerId];
+    
+    await updateJob(job.id, { 
+      assignedToIds: newIds,
+      assignedToId: newIds[0] || null
+    });
     setSuggestDialogOpen(false);
     
     const engineerName = suggestions.find(s => s.engineerId === engineerId)?.engineerName || 'engineer';
     toast({
-      title: "Engineer Assigned",
-      description: `Job assigned to ${engineerName}.`
+      title: "Engineer Added",
+      description: `${engineerName} has been added to this job.`
     });
   };
 
@@ -822,25 +830,58 @@ export default function JobDetail() {
               <div className="space-y-2 border-t pt-6 mt-6">
                 <Label className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
-                  Assign to Engineer
+                  Assign to Engineer(s)
                 </Label>
                 <div className="flex gap-2">
-                  <Select 
-                    value={job.assignedToId || ""} 
-                    onValueChange={(value) => updateJob(job.id, { assignedToId: value })}
-                    disabled={isReadOnly}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Select an engineer..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {engineers.map((engineer) => (
-                        <SelectItem key={engineer.id} value={engineer.id}>
-                          {engineer.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover>
+                    <PopoverTrigger asChild disabled={isReadOnly}>
+                      <Button 
+                        variant="outline" 
+                        className="flex-1 justify-between font-normal"
+                        data-testid="button-assign-engineers"
+                      >
+                        {(job.assignedToIds && job.assignedToIds.length > 0) 
+                          ? `${job.assignedToIds.length} engineer${job.assignedToIds.length > 1 ? 's' : ''} selected`
+                          : job.assignedToId 
+                            ? "1 engineer selected"
+                            : "Select engineers..."
+                        }
+                        <ChevronDown className="h-4 w-4 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-2" align="start">
+                      <div className="space-y-1 max-h-60 overflow-y-auto">
+                        {engineers.map((engineer) => {
+                          const currentIds = job.assignedToIds || (job.assignedToId ? [job.assignedToId] : []);
+                          const isChecked = currentIds.includes(engineer.id);
+                          return (
+                            <div 
+                              key={engineer.id}
+                              className="flex items-center space-x-2 p-2 rounded hover:bg-muted cursor-pointer"
+                              onClick={() => {
+                                let newIds: string[];
+                                if (isChecked) {
+                                  newIds = currentIds.filter(id => id !== engineer.id);
+                                } else {
+                                  newIds = [...currentIds, engineer.id];
+                                }
+                                updateJob(job.id, { 
+                                  assignedToIds: newIds,
+                                  assignedToId: newIds[0] || null
+                                });
+                              }}
+                            >
+                              <Checkbox 
+                                checked={isChecked}
+                                data-testid={`checkbox-engineer-${engineer.id}`}
+                              />
+                              <span className="text-sm">{engineer.name}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                   <Button
                     type="button"
                     variant="outline"
@@ -854,9 +895,13 @@ export default function JobDetail() {
                     <Sparkles className="h-4 w-4 text-amber-500" />
                   </Button>
                 </div>
-                {job.assignedToId && (
+                {((job.assignedToIds && job.assignedToIds.length > 0) || job.assignedToId) && (
                   <p className="text-xs text-muted-foreground">
-                    Currently assigned to {engineers.find(e => e.id === job.assignedToId)?.name || "Unknown"}
+                    Currently assigned to {
+                      (job.assignedToIds && job.assignedToIds.length > 0)
+                        ? job.assignedToIds.map(id => engineers.find(e => e.id === id)?.name || "Unknown").join(", ")
+                        : engineers.find(e => e.id === job.assignedToId)?.name || "Unknown"
+                    }
                   </p>
                 )}
 

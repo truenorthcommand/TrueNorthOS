@@ -964,8 +964,12 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Job not found" });
       }
       
-      if (req.session.userRole === 'engineer' && job.assignedToId !== req.session.userId) {
-        return res.status(403).json({ error: "Access denied" });
+      if (req.session.userRole === 'engineer') {
+        const assignedIds = (job.assignedToIds as string[]) || [];
+        const isAssigned = job.assignedToId === req.session.userId || assignedIds.includes(req.session.userId!);
+        if (!isAssigned) {
+          return res.status(403).json({ error: "Access denied" });
+        }
       }
       
       res.json(job);
@@ -979,22 +983,25 @@ export async function registerRoutes(
       const data = insertJobSchema.parse(req.body);
       const job = await storage.createJob(data);
       
-      // Check if job is scheduled for today and notify assigned engineer
-      if (job && job.date && job.assignedToId) {
+      // Check if job is scheduled for today and notify all assigned engineers
+      if (job && job.date) {
         const jobDate = new Date(job.date);
         const today = new Date();
         const isToday = jobDate.toDateString() === today.toDateString();
         
         if (isToday) {
-          notifyUser(job.assignedToId, {
-            type: 'urgent_job_assigned',
-            title: 'URGENT: New Job Today',
-            message: `You have been assigned a new job for TODAY: ${job.customerName || 'Customer'} at ${job.address || 'Site address'}`,
-            urgent: true,
-            jobId: job.id,
-            jobNo: job.jobNo || undefined,
-            timestamp: new Date().toISOString(),
-          });
+          const assignedIds = (job.assignedToIds as string[]) || (job.assignedToId ? [job.assignedToId] : []);
+          for (const engineerId of assignedIds) {
+            notifyUser(engineerId, {
+              type: 'urgent_job_assigned',
+              title: 'URGENT: New Job Today',
+              message: `You have been assigned a new job for TODAY: ${job.customerName || 'Customer'} at ${job.address || 'Site address'}`,
+              urgent: true,
+              jobId: job.id,
+              jobNo: job.jobNo || undefined,
+              timestamp: new Date().toISOString(),
+            });
+          }
         }
       }
       
@@ -1037,8 +1044,12 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Job not found" });
       }
 
-      if (req.session.userRole === 'engineer' && existingJob.assignedToId !== req.session.userId) {
-        return res.status(403).json({ error: "Access denied" });
+      if (req.session.userRole === 'engineer') {
+        const assignedIds = (existingJob.assignedToIds as string[]) || [];
+        const isAssigned = existingJob.assignedToId === req.session.userId || assignedIds.includes(req.session.userId!);
+        if (!isAssigned) {
+          return res.status(403).json({ error: "Access denied" });
+        }
       }
 
       if (existingJob.status === 'Signed Off') {
@@ -1072,22 +1083,25 @@ export async function registerRoutes(
 
       const job = await storage.updateJob(req.params.id, updates);
       
-      // Check if job was rescheduled to today and notify assigned engineer
-      if (job && isDateChanging && job.assignedToId) {
+      // Check if job was rescheduled to today and notify all assigned engineers
+      if (job && isDateChanging) {
         const jobDate = new Date(newDate);
         const today = new Date();
         const isRescheduledToToday = jobDate.toDateString() === today.toDateString();
         const wasNotToday = !oldDate || new Date(oldDate).toDateString() !== today.toDateString();
         
         if (isRescheduledToToday && wasNotToday) {
-          notifyUser(job.assignedToId, {
-            type: 'job_rescheduled_today',
-            title: 'Job Rescheduled to Today',
-            message: `Job ${job.jobNo || ''} for ${job.customerName || 'Customer'} has been rescheduled to TODAY.`,
-            jobId: job.id,
-            jobNo: job.jobNo || undefined,
-            timestamp: new Date().toISOString(),
-          });
+          const assignedIds = (job.assignedToIds as string[]) || (job.assignedToId ? [job.assignedToId] : []);
+          for (const engineerId of assignedIds) {
+            notifyUser(engineerId, {
+              type: 'job_rescheduled_today',
+              title: 'Job Rescheduled to Today',
+              message: `Job ${job.jobNo || ''} for ${job.customerName || 'Customer'} has been rescheduled to TODAY.`,
+              jobId: job.id,
+              jobNo: job.jobNo || undefined,
+              timestamp: new Date().toISOString(),
+            });
+          }
         }
       }
       
@@ -1115,8 +1129,12 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Job not found" });
       }
 
-      if (req.session.userRole === 'engineer' && existingJob.assignedToId !== req.session.userId) {
-        return res.status(403).json({ error: "Access denied" });
+      if (req.session.userRole === 'engineer') {
+        const assignedIds = (existingJob.assignedToIds as string[]) || [];
+        const isAssigned = existingJob.assignedToId === req.session.userId || assignedIds.includes(req.session.userId!);
+        if (!isAssigned) {
+          return res.status(403).json({ error: "Access denied" });
+        }
       }
 
       if (existingJob.status === 'Signed Off') {
