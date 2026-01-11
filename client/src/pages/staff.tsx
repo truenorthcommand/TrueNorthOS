@@ -29,6 +29,13 @@ interface StaffMember {
   county?: string | null;
   homePostcode?: string | null;
   skills?: Skill[];
+  managerId?: string | null;
+}
+
+interface WorksManager {
+  id: string;
+  name: string;
+  email: string | null;
 }
 
 const ALL_ROLES: { value: Role; label: string; color: string }[] = [
@@ -53,6 +60,7 @@ export default function Staff() {
   const { toast } = useToast();
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
+  const [worksManagers, setWorksManagers] = useState<WorksManager[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -86,6 +94,7 @@ export default function Staff() {
     city: "",
     county: "",
     homePostcode: "",
+    managerId: "" as string | null,
   });
   const [editSkills, setEditSkills] = useState<Skill[]>([]);
   const [showEditPassword, setShowEditPassword] = useState(false);
@@ -148,6 +157,18 @@ export default function Staff() {
     }
   };
 
+  const fetchWorksManagers = async () => {
+    try {
+      const res = await fetch('/api/works-managers', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setWorksManagers(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch works managers:', error);
+    }
+  };
+
   const fetchUserSkills = async (userId: string): Promise<Skill[]> => {
     try {
       const res = await fetch(`/api/users/${userId}/skills`, { credentials: 'include' });
@@ -189,6 +210,7 @@ export default function Staff() {
       setIsVerified(true);
       fetchStaff();
       fetchSkills();
+      fetchWorksManagers();
     } else {
       setIsLoading(false);
     }
@@ -415,10 +437,28 @@ export default function Staff() {
       city: member.city || "",
       county: member.county || "",
       homePostcode: member.homePostcode || "",
+      managerId: member.managerId || null,
     });
     const skills = await fetchUserSkills(member.id);
     setEditSkills(skills);
     setShowEditPassword(false);
+  };
+
+  const handleUpdateManager = async (userId: string, managerId: string | null) => {
+    try {
+      const res = await fetch(`/api/users/${userId}/manager`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ managerId }),
+      });
+      if (!res.ok) throw new Error('Failed to update manager');
+      const updated = await res.json();
+      setStaff(staff.map(s => s.id === userId ? { ...s, managerId: updated.managerId } : s));
+      toast({ title: "Manager Updated", description: "The user's manager has been updated." });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update manager", variant: "destructive" });
+    }
   };
 
   const handleUpdateStaff = async (e: React.FormEvent) => {
@@ -962,6 +1002,37 @@ export default function Staff() {
                     />
                   </div>
                 </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <Label className="text-base font-medium mb-3 block">Works Manager</Label>
+                <Select
+                  value={editForm.managerId || "none"}
+                  onValueChange={(value) => {
+                    const newManagerId = value === "none" ? null : value;
+                    setEditForm({ ...editForm, managerId: newManagerId });
+                    if (editingStaff) {
+                      handleUpdateManager(editingStaff.id, newManagerId);
+                    }
+                  }}
+                >
+                  <SelectTrigger data-testid="select-manager">
+                    <SelectValue placeholder="Select a manager..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Manager</SelectItem>
+                    {worksManagers
+                      .filter(m => m.id !== editingStaff?.id)
+                      .map(manager => (
+                        <SelectItem key={manager.id} value={manager.id}>
+                          {manager.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Assign a Works Manager who can oversee this user's jobs and approvals
+                </p>
               </div>
 
               <div className="border-t pt-4">

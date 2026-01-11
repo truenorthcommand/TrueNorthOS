@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'engineer' | 'surveyor' | 'fleet_manager';
+export type Role = 'admin' | 'engineer' | 'surveyor' | 'fleet_manager' | 'works_manager';
 
 export type Skill = {
   id: string;
@@ -29,6 +29,7 @@ export type User = {
   licencePhotoUrl?: string;
   licenceUploadedAt?: string;
   skills?: Skill[];
+  managerId?: string;
 };
 
 export const hasRole = (user: User | null, ...requiredRoles: Role[]): boolean => {

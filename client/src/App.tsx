@@ -47,6 +47,10 @@ import Payments from "@/pages/payments";
 import Analytics from "@/pages/analytics";
 import VoiceNotes from "@/pages/voice-notes";
 import UserGuide from "@/pages/user-guide";
+import WorksManagerDashboard from "@/pages/works-manager-dashboard";
+import WorksManagerJobs from "@/pages/works-manager-jobs";
+import WorksManagerMap from "@/pages/works-manager-map";
+import WorksManagerApprovals from "@/pages/works-manager-approvals";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -173,6 +177,18 @@ function Router() {
       </Route>
       <Route path="/admin/advisors">
         <PrivateRoute component={AdminAdvisors} />
+      </Route>
+      <Route path="/works-manager">
+        <PrivateRoute component={WorksManagerDashboard} />
+      </Route>
+      <Route path="/works-manager/jobs">
+        <PrivateRoute component={WorksManagerJobs} />
+      </Route>
+      <Route path="/works-manager/map">
+        <PrivateRoute component={WorksManagerMap} />
+      </Route>
+      <Route path="/works-manager/approvals">
+        <PrivateRoute component={WorksManagerApprovals} />
       </Route>
       <Route path="/">
         <PrivateRoute component={Dashboard} />

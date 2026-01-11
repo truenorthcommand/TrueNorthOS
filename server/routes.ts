@@ -4297,6 +4297,156 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
+  // ==================== WORKS MANAGER ROUTES ====================
+
+  app.get("/api/works-manager/team", requireRoles('works_manager', 'admin'), async (req, res) => {
+    try {
+      const teamMembers = await storage.getTeamMembers(req.session.userId!);
+      res.json(teamMembers.map(m => ({
+        id: m.id,
+        name: m.name,
+        email: m.email,
+        phone: m.phone,
+        role: m.role,
+        roles: m.roles,
+        currentLat: m.currentLat,
+        currentLng: m.currentLng,
+        lastLocationUpdate: m.lastLocationUpdate,
+        status: m.status,
+      })));
+    } catch (error) {
+      console.error("Get team members error:", error);
+      res.status(500).json({ error: "Failed to fetch team members" });
+    }
+  });
+
+  app.get("/api/works-manager/jobs", requireRoles('works_manager', 'admin'), async (req, res) => {
+    try {
+      const teamJobs = await storage.getTeamJobs(req.session.userId!);
+      res.json(teamJobs);
+    } catch (error) {
+      console.error("Get team jobs error:", error);
+      res.status(500).json({ error: "Failed to fetch team jobs" });
+    }
+  });
+
+  app.get("/api/works-manager/stats", requireRoles('works_manager', 'admin'), async (req, res) => {
+    try {
+      const managerId = req.session.userId!;
+      const teamMembers = await storage.getTeamMembers(managerId);
+      const teamJobs = await storage.getTeamJobs(managerId);
+      const teamTimesheets = await storage.getTeamTimesheets(managerId);
+      const teamExpenses = await storage.getTeamExpenses(managerId);
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      
+      const jobsToday = teamJobs.filter(job => {
+        if (!job.date) return false;
+        const jobDate = new Date(job.date);
+        return jobDate >= today && jobDate < tomorrow;
+      });
+      
+      const completedThisWeek = teamJobs.filter(job => {
+        if (job.status !== 'Signed Off' || !job.signOffTimestamp) return false;
+        const signOffDate = new Date(job.signOffTimestamp);
+        return signOffDate >= weekAgo && signOffDate < tomorrow;
+      });
+      
+      const pendingSignatures = teamJobs.filter(job => job.status === 'Awaiting Signatures');
+      const inProgress = teamJobs.filter(job => job.status === 'In Progress');
+      
+      const overdueJobs = teamJobs.filter(job => {
+        if (job.status === 'Signed Off') return false;
+        if (!job.date) return false;
+        const jobDate = new Date(job.date);
+        return jobDate < today;
+      });
+      
+      const pendingTimesheets = teamTimesheets.filter(ts => ts.status === 'pending');
+      const pendingExpenses = teamExpenses.filter(exp => exp.status === 'pending');
+      
+      const onlineEngineers = teamMembers.filter(m => {
+        if (!m.lastLocationUpdate) return false;
+        const lastUpdate = new Date(m.lastLocationUpdate);
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        return lastUpdate > fiveMinutesAgo;
+      });
+      
+      res.json({
+        teamSize: teamMembers.length,
+        onlineCount: onlineEngineers.length,
+        jobsToday: jobsToday.length,
+        inProgressCount: inProgress.length,
+        pendingSignatures: pendingSignatures.length,
+        completedThisWeek: completedThisWeek.length,
+        overdueJobs: overdueJobs.length,
+        pendingTimesheets: pendingTimesheets.length,
+        pendingExpenses: pendingExpenses.length,
+        totalPendingApprovals: pendingTimesheets.length + pendingExpenses.length,
+      });
+    } catch (error) {
+      console.error("Get works manager stats error:", error);
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
+  app.get("/api/works-manager/timesheets", requireRoles('works_manager', 'admin'), async (req, res) => {
+    try {
+      const timesheets = await storage.getTeamTimesheets(req.session.userId!);
+      res.json(timesheets);
+    } catch (error) {
+      console.error("Get team timesheets error:", error);
+      res.status(500).json({ error: "Failed to fetch team timesheets" });
+    }
+  });
+
+  app.get("/api/works-manager/expenses", requireRoles('works_manager', 'admin'), async (req, res) => {
+    try {
+      const expenses = await storage.getTeamExpenses(req.session.userId!);
+      res.json(expenses);
+    } catch (error) {
+      console.error("Get team expenses error:", error);
+      res.status(500).json({ error: "Failed to fetch team expenses" });
+    }
+  });
+
+  app.patch("/api/users/:id/manager", requireAdmin, async (req, res) => {
+    try {
+      const { managerId } = req.body;
+      const updated = await storage.updateUserManager(req.params.id, managerId || null);
+      if (!updated) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Update user manager error:", error);
+      res.status(500).json({ error: "Failed to update user manager" });
+    }
+  });
+
+  app.get("/api/works-managers", requireAdmin, async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      const worksManagers = allUsers.filter(u => {
+        const roles = (u.roles as string[]) || [u.role];
+        return roles.includes('works_manager');
+      });
+      res.json(worksManagers.map(m => ({
+        id: m.id,
+        name: m.name,
+        email: m.email,
+      })));
+    } catch (error) {
+      console.error("Get works managers error:", error);
+      res.status(500).json({ error: "Failed to fetch works managers" });
+    }
+  });
+
   // ==================== ANALYTICS ====================
 
   app.get("/api/analytics", requireAdmin, async (req, res) => {

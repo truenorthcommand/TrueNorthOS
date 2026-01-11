@@ -176,6 +176,13 @@ export interface IStorage {
   getUserSkills(userId: string): Promise<Skill[]>;
   addUserSkill(userId: string, skillId: string): Promise<void>;
   removeUserSkill(userId: string, skillId: string): Promise<void>;
+  
+  // Works Manager
+  getTeamMembers(managerId: string): Promise<User[]>;
+  getTeamJobs(managerId: string): Promise<Job[]>;
+  updateUserManager(userId: string, managerId: string | null): Promise<User | undefined>;
+  getTeamTimesheets(managerId: string): Promise<TimesheetWithUser[]>;
+  getTeamExpenses(managerId: string): Promise<ExpenseWithDetails[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1292,6 +1299,87 @@ export class DatabaseStorage implements IStorage {
   async removeUserSkill(userId: string, skillId: string): Promise<void> {
     await db.delete(userSkills)
       .where(and(eq(userSkills.userId, userId), eq(userSkills.skillId, skillId)));
+  }
+
+  // ==================== WORKS MANAGER ====================
+
+  async getTeamMembers(managerId: string): Promise<User[]> {
+    return db.select().from(users).where(eq(users.managerId, managerId));
+  }
+
+  async getTeamJobs(managerId: string): Promise<Job[]> {
+    const teamMembers = await this.getTeamMembers(managerId);
+    if (teamMembers.length === 0) {
+      return [];
+    }
+    const teamMemberIds = teamMembers.map(m => m.id);
+    
+    return db.select().from(jobs).where(
+      or(
+        inArray(jobs.assignedToId, teamMemberIds),
+        sql`EXISTS (
+          SELECT 1 FROM jsonb_array_elements_text(${jobs.assignedToIds}::jsonb) AS elem
+          WHERE elem::text = ANY(${teamMemberIds})
+        )`
+      )
+    ).orderBy(desc(jobs.date));
+  }
+
+  async updateUserManager(userId: string, managerId: string | null): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ managerId })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
+  async getTeamTimesheets(managerId: string): Promise<TimesheetWithUser[]> {
+    const teamMembers = await this.getTeamMembers(managerId);
+    if (teamMembers.length === 0) {
+      return [];
+    }
+    const teamMemberIds = teamMembers.map(m => m.id);
+    
+    const results = await db.select().from(timesheets)
+      .where(inArray(timesheets.userId, teamMemberIds))
+      .orderBy(desc(timesheets.date));
+    
+    return Promise.all(results.map(async (timesheet) => {
+      const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, timesheet.userId));
+      let approvedBy = null;
+      if (timesheet.approvedById) {
+        const [approver] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, timesheet.approvedById));
+        approvedBy = approver || null;
+      }
+      return { ...timesheet, user, approvedBy };
+    }));
+  }
+
+  async getTeamExpenses(managerId: string): Promise<ExpenseWithDetails[]> {
+    const teamMembers = await this.getTeamMembers(managerId);
+    if (teamMembers.length === 0) {
+      return [];
+    }
+    const teamMemberIds = teamMembers.map(m => m.id);
+    
+    const results = await db.select().from(expenses)
+      .where(inArray(expenses.userId, teamMemberIds))
+      .orderBy(desc(expenses.date));
+    
+    return Promise.all(results.map(async (expense) => {
+      const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, expense.userId));
+      let approvedBy = null;
+      if (expense.approvedById) {
+        const [approver] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, expense.approvedById));
+        approvedBy = approver || null;
+      }
+      let job = null;
+      if (expense.jobId) {
+        const [jobRecord] = await db.select({ id: jobs.id, jobNo: jobs.jobNo, customerName: jobs.customerName }).from(jobs).where(eq(jobs.id, expense.jobId));
+        job = jobRecord || null;
+      }
+      return { ...expense, user, approvedBy, job };
+    }));
   }
 }
 
