@@ -12,8 +12,16 @@ import { Separator } from "@/components/ui/separator";
 import { 
   ArrowLeft, Save, Printer, Trash2, Plus, 
   MapPin, Phone, Mail, Calendar, Upload, X, FileCheck,
-  AlertCircle, AlertTriangle, AlertOctagon, Users, ChevronDown, ClipboardList
+  AlertCircle, AlertTriangle, AlertOctagon, Users, ChevronDown, ClipboardList,
+  Sparkles, Loader2, Briefcase, User
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ActionPriority, JobUpdate, Photo } from "@/lib/types";
 import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -43,6 +51,21 @@ export default function JobDetail() {
   const [updatePhotos, setUpdatePhotos] = useState<Photo[]>([]);
   const [isSubmittingUpdate, setIsSubmittingUpdate] = useState(false);
   const updateFileInputRef = useRef<HTMLInputElement>(null);
+  
+  // AI Engineer Suggestion state
+  const [suggestDialogOpen, setSuggestDialogOpen] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<Array<{
+    engineerId: string;
+    engineerName: string;
+    score: number;
+    reason: string;
+    currentWorkload: number;
+    skills: string[];
+    factors: { skills: number; workload: number; proximity: number; };
+  }>>([]);
+  const [suggestionsAiPowered, setSuggestionsAiPowered] = useState(false);
   
   const [formData, setFormData] = useState<{
     client: string;
@@ -292,6 +315,49 @@ export default function JobDetail() {
     }
   };
 
+  // Fetch AI engineer suggestions
+  const fetchEngineerSuggestions = async () => {
+    if (!job) return;
+    
+    setSuggestDialogOpen(true);
+    setSuggestionsLoading(true);
+    setSuggestionsError(null);
+    setSuggestions([]);
+    
+    try {
+      const response = await fetch(`/api/ai/suggest-engineers/${job.id}`, {
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to fetch suggestions');
+      }
+      
+      const data = await response.json();
+      setSuggestions(data.suggestions || []);
+      setSuggestionsAiPowered(data.aiPowered || false);
+    } catch (error) {
+      setSuggestionsError(error instanceof Error ? error.message : 'Failed to fetch suggestions');
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  };
+
+  // Handle selecting an engineer from suggestions
+  const handleSelectSuggestedEngineer = async (engineerId: string) => {
+    if (!job) return;
+    
+    await updateJob(job.id, { assignedToId: engineerId });
+    setSuggestDialogOpen(false);
+    
+    const engineerName = suggestions.find(s => s.engineerId === engineerId)?.engineerName || 'engineer';
+    toast({
+      title: "Engineer Assigned",
+      description: `Job assigned to ${engineerName}.`
+    });
+  };
+
   // Group updates by date for display
   const groupedUpdates = allUpdates.reduce((groups, update) => {
     const date = format(new Date(update.workDate), 'yyyy-MM-dd');
@@ -475,7 +541,7 @@ export default function JobDetail() {
               <div className="space-y-2">
                 <Label>Site Contact</Label>
                 <div className="relative">
-                  <UserIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground print:hidden" />
+                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground print:hidden" />
                   <Input 
                     value={formData.contactName} 
                     onChange={(e) => handleFieldChange('contactName', e.target.value)}
@@ -578,27 +644,141 @@ export default function JobDetail() {
                   <Users className="h-4 w-4" />
                   Assign to Engineer
                 </Label>
-                <Select 
-                  value={job.assignedToId || ""} 
-                  onValueChange={(value) => updateJob(job.id, { assignedToId: value })}
-                  disabled={isReadOnly}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an engineer..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {engineers.map((engineer) => (
-                      <SelectItem key={engineer.id} value={engineer.id}>
-                        {engineer.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <Select 
+                    value={job.assignedToId || ""} 
+                    onValueChange={(value) => updateJob(job.id, { assignedToId: value })}
+                    disabled={isReadOnly}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select an engineer..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {engineers.map((engineer) => (
+                        <SelectItem key={engineer.id} value={engineer.id}>
+                          {engineer.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={fetchEngineerSuggestions}
+                    disabled={isReadOnly}
+                    className="shrink-0"
+                    title="AI Suggest Engineer"
+                    data-testid="button-suggest-engineer"
+                  >
+                    <Sparkles className="h-4 w-4 text-amber-500" />
+                  </Button>
+                </div>
                 {job.assignedToId && (
                   <p className="text-xs text-muted-foreground">
                     Currently assigned to {engineers.find(e => e.id === job.assignedToId)?.name || "Unknown"}
                   </p>
                 )}
+
+                {/* AI Engineer Suggestions Dialog */}
+                <Dialog open={suggestDialogOpen} onOpenChange={setSuggestDialogOpen}>
+                  <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-amber-500" />
+                        AI Engineer Suggestions
+                      </DialogTitle>
+                      <DialogDescription>
+                        {suggestionsAiPowered 
+                          ? "Recommendations based on skills, workload, and job requirements"
+                          : "Best matches based on availability and skills"
+                        }
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    {suggestionsLoading && (
+                      <div className="flex flex-col items-center justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
+                        <p className="text-sm text-muted-foreground">Analyzing job requirements...</p>
+                      </div>
+                    )}
+
+                    {suggestionsError && (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <AlertCircle className="h-8 w-8 text-destructive mb-3" />
+                        <p className="text-sm text-destructive font-medium">Failed to get suggestions</p>
+                        <p className="text-xs text-muted-foreground mt-1">{suggestionsError}</p>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="mt-4"
+                          onClick={fetchEngineerSuggestions}
+                        >
+                          Try Again
+                        </Button>
+                      </div>
+                    )}
+
+                    {!suggestionsLoading && !suggestionsError && suggestions.length === 0 && (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <Users className="h-8 w-8 text-muted-foreground mb-3" />
+                        <p className="text-sm text-muted-foreground">No engineers available for this job</p>
+                      </div>
+                    )}
+
+                    {!suggestionsLoading && !suggestionsError && suggestions.length > 0 && (
+                      <div className="space-y-3">
+                        {suggestions.map((suggestion, index) => (
+                          <button
+                            key={suggestion.engineerId}
+                            onClick={() => handleSelectSuggestedEngineer(suggestion.engineerId)}
+                            className="w-full text-left p-4 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors"
+                            data-testid={`suggestion-engineer-${suggestion.engineerId}`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm">
+                                  {index + 1}
+                                </div>
+                                <div>
+                                  <div className="font-medium flex items-center gap-2">
+                                    {suggestion.engineerName}
+                                    <Badge variant="outline" className="text-xs">
+                                      Score: {suggestion.score}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                                    <Briefcase className="h-3 w-3" />
+                                    {suggestion.currentWorkload} active job{suggestion.currentWorkload !== 1 ? 's' : ''}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <p className="text-sm text-muted-foreground mt-2 ml-11">
+                              {suggestion.reason}
+                            </p>
+
+                            {suggestion.skills.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2 ml-11">
+                                {suggestion.skills.slice(0, 5).map((skill) => (
+                                  <Badge key={skill} variant="secondary" className="text-xs">
+                                    {skill}
+                                  </Badge>
+                                ))}
+                                {suggestion.skills.length > 5 && (
+                                  <Badge variant="outline" className="text-xs">
+                                    +{suggestion.skills.length - 5} more
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
               </div>
             )}
 
@@ -1201,31 +1381,6 @@ export default function JobDetail() {
          </div>
        )}
 
-      {/* User Icon for imports */}
-      <div className="hidden">
-        <UserIcon />
-      </div>
     </div>
-  );
-}
-
-// Helper to fix missing import
-function UserIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
   );
 }

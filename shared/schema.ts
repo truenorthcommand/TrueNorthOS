@@ -11,16 +11,43 @@ export const users = pgTable("users", {
   email: text("email"),
   phone: text("phone"),
   role: text("role").notNull().default("engineer"),
+  roles: jsonb("roles").default(["engineer"]),
   superAdmin: boolean("super_admin").notNull().default(false),
   status: text("status").notNull().default("active"),
+  addressLine1: text("address_line_1"),
+  addressLine2: text("address_line_2"),
+  city: text("city"),
+  county: text("county"),
+  homePostcode: text("home_postcode"),
+  homeLat: doublePrecision("home_lat"),
+  homeLng: doublePrecision("home_lng"),
   currentLat: doublePrecision("current_lat"),
   currentLng: doublePrecision("current_lng"),
   lastLocationUpdate: timestamp("last_location_update"),
+  licencePhotoUrl: text("licence_photo_url"),
+  licenceUploadedAt: timestamp("licence_uploaded_at"),
   twoFactorSecret: text("two_factor_secret"),
   twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
   gdprConsentDate: timestamp("gdpr_consent_date"),
   gdprConsentVersion: text("gdpr_consent_version"),
   deletionRequestedAt: timestamp("deletion_requested_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const skills = pgTable("skills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  category: text("category").notNull().default("trade"),
+  icon: text("icon"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const userSkills = pgTable("user_skills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  skillId: varchar("skill_id").notNull(),
+  proficiencyLevel: text("proficiency_level").default("standard"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -53,6 +80,8 @@ export const jobs = pgTable("jobs", {
   signOffTimestamp: timestamp("sign_off_timestamp"),
   orderIndex: integer("order_index").default(0),
   isLongRunning: boolean("is_long_running").default(false),
+  requiredSkills: jsonb("required_skills").default([]),
+  urgency: text("urgency").default("normal"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -137,6 +166,24 @@ export const insertJobUpdateSchema = createInsertSchema(jobUpdates, {
 
 export type InsertJobUpdate = z.infer<typeof insertJobUpdateSchema>;
 export type JobUpdate = typeof jobUpdates.$inferSelect;
+
+export const insertSkillSchema = createInsertSchema(skills).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertUserSkillSchema = createInsertSchema(userSkills).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSkill = z.infer<typeof insertSkillSchema>;
+export type Skill = typeof skills.$inferSelect;
+
+export type InsertUserSkill = z.infer<typeof insertUserSkillSchema>;
+export type UserSkill = typeof userSkills.$inferSelect;
+
+export type UserRole = 'admin' | 'engineer' | 'surveyor' | 'fleet_manager';
 
 export type Material = {
   id: string;

@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
+import { hasRole } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, Bell, Shield, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw, Mic, BookOpen } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
@@ -199,25 +200,27 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Link>
         )}
 
-        {/* Sales Section - Admin Only (Clients → Quotes → Invoices follows natural workflow) */}
-        {user.role === "admin" && (
+        {/* Sales Section - Admin & Surveyor */}
+        {hasRole(user, 'admin', 'surveyor') && (
           <MenuGroup title="Sales" icon={BarChart3} section="sales">
             <NavLink href="/clients" icon={Building2Icon}>Clients</NavLink>
             <NavLink href="/quotes" icon={FileText}>Quotes</NavLink>
-            <NavLink href="/invoices" icon={Receipt}>Invoices</NavLink>
+            {hasRole(user, 'admin') && (
+              <NavLink href="/invoices" icon={Receipt}>Invoices</NavLink>
+            )}
           </MenuGroup>
         )}
 
         {/* Jobs Section (Quotes convert to Jobs) */}
         <MenuGroup title="Jobs" icon={Briefcase} section="jobs">
           <NavLink href="/jobs" icon={Briefcase}>Jobs List</NavLink>
-          {user.role === "admin" && (
+          {hasRole(user, 'admin') && (
             <NavLink href="/completed-jobs" icon={CheckCircle2}>Completed Jobs</NavLink>
           )}
         </MenuGroup>
 
         {/* Schedule Section - Admin Only */}
-        {user.role === "admin" && (
+        {hasRole(user, 'admin') && (
           <MenuGroup title="Schedule" icon={Calendar} section="schedule">
             <NavLink href="/calendar" icon={Calendar}>Calendar</NavLink>
             <NavLink href="/time-logs" icon={Clock}>Time Logs</NavLink>
@@ -225,7 +228,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         )}
 
         {/* Team Section - Admin Only */}
-        {user.role === "admin" && (
+        {hasRole(user, 'admin') && (
           <MenuGroup title="Team" icon={Users} section="team">
             <NavLink href="/engineers" icon={UserIcon}>Engineers</NavLink>
             {user.superAdmin && (
@@ -283,7 +286,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <MenuGroup title="Finance" icon={Wallet} section="finance">
           <NavLink href="/timesheets" icon={Timer}>Timesheets</NavLink>
           <NavLink href="/expenses" icon={Receipt}>Expenses</NavLink>
-          {user.role === "admin" && (
+          {hasRole(user, 'admin') && (
             <>
               <NavLink href="/payments" icon={CreditCard}>Payments</NavLink>
               <NavLink href="/analytics" icon={PieChart}>Analytics</NavLink>
@@ -291,7 +294,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           )}
         </MenuGroup>
 
-        {/* Fleet Section */}
+        {/* Fleet Section - All users see it, fleet managers & admins see all */}
         <MenuGroup title="Fleet" icon={Truck} section="fleet">
           <NavLink href="/fleet" icon={ClipboardCheck}>Dashboard</NavLink>
           <NavLink href="/fleet/vehicles" icon={Truck}>Vehicles</NavLink>
@@ -305,7 +308,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <NavLink href="/voice-notes" icon={Mic}>Voice Notes</NavLink>
           <NavLink href="/ai-advisors" icon={Bot}>Technical Advisor</NavLink>
           <NavLink href="/security" icon={Shield}>Security</NavLink>
-          {user.role === "admin" && (
+          {hasRole(user, 'admin') && (
             <>
               <NavLink href="/settings" icon={Settings}>Settings</NavLink>
               <NavLink href="/admin/advisors" icon={Bot}>Advisor Settings</NavLink>
@@ -318,7 +321,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {!collapsed && (
           <div className="px-4 py-2 mb-2">
             <p className="text-sm font-medium">{user.name}</p>
-            <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
+            <p className="text-xs text-muted-foreground capitalize">
+              {(user.roles && user.roles.length > 0 ? user.roles : [user.role]).join(' • ')}
+            </p>
           </div>
         )}
         {collapsed ? (

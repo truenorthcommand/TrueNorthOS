@@ -1,16 +1,41 @@
-export type Role = 'admin' | 'engineer';
+export type Role = 'admin' | 'engineer' | 'surveyor' | 'fleet_manager';
+
+export type Skill = {
+  id: string;
+  name: string;
+  category: string;
+  icon?: string;
+};
 
 export type User = {
   id: string;
   name: string;
   email: string;
   role: Role;
+  roles?: Role[];
   username?: string;
   superAdmin?: boolean;
   twoFactorEnabled?: boolean;
   currentLat?: number;
   currentLng?: number;
   lastLocationUpdate?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  county?: string;
+  homePostcode?: string;
+  homeLat?: number;
+  homeLng?: number;
+  licencePhotoUrl?: string;
+  licenceUploadedAt?: string;
+  skills?: Skill[];
+};
+
+export const hasRole = (user: User | null, ...requiredRoles: Role[]): boolean => {
+  if (!user) return false;
+  if (user.superAdmin) return true;
+  const userRoles = user.roles || [user.role];
+  return requiredRoles.some(role => userRoles.includes(role));
 };
 
 export type JobStatus = 'Draft' | 'In Progress' | 'Awaiting Signatures' | 'Signed Off';

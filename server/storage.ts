@@ -22,10 +22,12 @@ import {
   type Timesheet, type InsertTimesheet, type TimesheetWithUser,
   type Expense, type InsertExpense, type ExpenseWithDetails,
   type Payment, type InsertPayment, type PaymentWithInvoice,
+  type Skill,
   users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, jobUpdates,
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
-  timesheets, expenses, payments
+  timesheets, expenses, payments,
+  skills, userSkills
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and, ne, inArray, gt, asc } from "drizzle-orm";
@@ -168,6 +170,12 @@ export interface IStorage {
   getAllPayments(): Promise<PaymentWithInvoice[]>;
   createPayment(payment: InsertPayment): Promise<Payment>;
   updatePayment(id: string, updates: Partial<Payment>): Promise<Payment | undefined>;
+  
+  // Skills
+  getAllSkills(): Promise<Skill[]>;
+  getUserSkills(userId: string): Promise<Skill[]>;
+  addUserSkill(userId: string, skillId: string): Promise<void>;
+  removeUserSkill(userId: string, skillId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1258,6 +1266,32 @@ export class DatabaseStorage implements IStorage {
       .where(eq(payments.id, id))
       .returning();
     return updated;
+  }
+
+  async getAllSkills(): Promise<Skill[]> {
+    return db.select().from(skills).where(eq(skills.isActive, true));
+  }
+
+  async getUserSkills(userId: string): Promise<Skill[]> {
+    const userSkillRows = await db.select()
+      .from(userSkills)
+      .where(eq(userSkills.userId, userId));
+    
+    if (userSkillRows.length === 0) {
+      return [];
+    }
+    
+    const skillIds = userSkillRows.map(us => us.skillId);
+    return db.select().from(skills).where(inArray(skills.id, skillIds));
+  }
+
+  async addUserSkill(userId: string, skillId: string): Promise<void> {
+    await db.insert(userSkills).values({ userId, skillId }).onConflictDoNothing();
+  }
+
+  async removeUserSkill(userId: string, skillId: string): Promise<void> {
+    await db.delete(userSkills)
+      .where(and(eq(userSkills.userId, userId), eq(userSkills.skillId, skillId)));
   }
 }
 

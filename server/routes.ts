@@ -47,6 +47,31 @@ const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   next();
 };
 
+const hasRole = (userRoles: string[] | null | undefined, requiredRoles: string[]): boolean => {
+  if (!userRoles || !Array.isArray(userRoles)) return false;
+  return requiredRoles.some(role => userRoles.includes(role));
+};
+
+const requireRoles = (...allowedRoles: string[]) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
+    }
+    if (user.superAdmin) {
+      return next();
+    }
+    const userRoles = (user.roles as string[]) || [user.role];
+    if (hasRole(userRoles, allowedRoles)) {
+      return next();
+    }
+    return res.status(403).json({ error: `Access denied. Requires one of: ${allowedRoles.join(', ')}` });
+  };
+};
+
 const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
   if (!req.session.userId) {
     return res.status(401).json({ error: "Authentication required" });
@@ -135,11 +160,14 @@ export async function registerRoutes(
       req.session.userId = user.id;
       req.session.userRole = user.role;
 
+      const userRoles = (user.roles as string[]) || [user.role];
+      
       res.json({
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
+        roles: userRoles,
         username: user.username,
         superAdmin: user.superAdmin,
         twoFactorEnabled: user.twoFactorEnabled,
@@ -169,11 +197,15 @@ export async function registerRoutes(
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
+      const userRoles = (user.roles as string[]) || [user.role];
+      const userSkills = await storage.getUserSkills(user.id);
       res.json({
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
+        roles: userRoles,
+        skills: userSkills,
         username: user.username,
         superAdmin: user.superAdmin,
         twoFactorEnabled: user.twoFactorEnabled,
@@ -834,6 +866,48 @@ export async function registerRoutes(
       res.json(history);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch location history" });
+    }
+  });
+
+  // ==================== SKILLS ROUTES (PROTECTED) ====================
+
+  app.get("/api/skills", requireAuth, async (req, res) => {
+    try {
+      const skillsList = await storage.getAllSkills();
+      res.json(skillsList);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch skills" });
+    }
+  });
+
+  app.get("/api/users/:id/skills", requireAuth, async (req, res) => {
+    try {
+      const userSkills = await storage.getUserSkills(req.params.id);
+      res.json(userSkills);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user skills" });
+    }
+  });
+
+  app.post("/api/users/:id/skills", requireAdmin, async (req, res) => {
+    try {
+      const { skillId } = req.body;
+      if (!skillId) {
+        return res.status(400).json({ error: "skillId is required" });
+      }
+      await storage.addUserSkill(req.params.id, skillId);
+      res.status(201).json({ message: "Skill added to user" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to add skill to user" });
+    }
+  });
+
+  app.delete("/api/users/:id/skills/:skillId", requireAdmin, async (req, res) => {
+    try {
+      await storage.removeUserSkill(req.params.id, req.params.skillId);
+      res.json({ message: "Skill removed from user" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove skill from user" });
     }
   });
 
@@ -2582,6 +2656,174 @@ TrueNorth Field View is a "business in a box" platform that enables field servic
     } catch (error: any) {
       console.error("User guide AI error:", error);
       res.status(500).json({ error: error.message || "Failed to get guidance" });
+    }
+  });
+
+  // ==================== AI-POWERED ENGINEER ASSIGNMENT ====================
+
+  // Get AI-powered engineer suggestions for a job based on skills, location, and workload
+  app.get("/api/ai/suggest-engineers/:jobId", requireRoles('admin'), async (req, res) => {
+    try {
+      const job = await storage.getJob(req.params.jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      // Get all engineers (users with 'engineer' role)
+      const allUsers = await storage.getAllUsers();
+      const engineers = allUsers.filter(u => {
+        const userRoles = (u.roles as string[]) || [u.role];
+        return userRoles.includes('engineer');
+      });
+
+      if (engineers.length === 0) {
+        return res.json({ suggestions: [], message: "No engineers available" });
+      }
+
+      // Get all jobs to calculate workload
+      const allJobs = await storage.getAllJobs();
+      const activeJobs = allJobs.filter(j => j.status !== 'Signed Off');
+
+      // Calculate workload per engineer
+      const workloadMap: Record<string, number> = {};
+      for (const j of activeJobs) {
+        const assignedIds = (j.assignedToIds as string[]) || (j.assignedToId ? [j.assignedToId] : []);
+        for (const id of assignedIds) {
+          workloadMap[id] = (workloadMap[id] || 0) + 1;
+        }
+      }
+
+      // Get skills for each engineer
+      const engineerData = await Promise.all(engineers.map(async (eng) => {
+        const skills = await storage.getUserSkills(eng.id);
+        return {
+          id: eng.id,
+          name: eng.name,
+          skills: skills.map(s => s.name),
+          currentWorkload: workloadMap[eng.id] || 0,
+          homePostcode: eng.homePostcode || null,
+          homeLat: eng.homeLat as number | null,
+          homeLng: eng.homeLng as number | null,
+          currentLat: eng.currentLat as number | null,
+          currentLng: eng.currentLng as number | null,
+        };
+      }));
+
+      // Get required skills for the job (if any)
+      const requiredSkills = (job.requiredSkills as string[]) || [];
+
+      // Build context for AI
+      const jobContext = {
+        description: job.description || 'No description',
+        address: job.address || 'No address specified',
+        postcode: job.postcode || null,
+        requiredSkills: requiredSkills,
+        urgency: job.urgency || 'normal',
+      };
+
+      // Try AI-powered suggestions if available
+      const openai = getOpenAIClient();
+      if (openai) {
+        try {
+          const systemPrompt = `You are an AI assistant helping assign field engineers to jobs. Analyze the job requirements and engineer profiles to suggest the best matches.
+
+Consider these factors in order of importance:
+1. **Skills Match**: Engineers with relevant skills for the job type
+2. **Current Workload**: Prefer engineers with fewer active jobs
+3. **Location Proximity**: Engineers closer to the job site (use postcodes/coordinates if available)
+4. **Availability**: Balance workload across the team
+
+Return your response as a JSON array of engineer suggestions, ordered by suitability (best first). Each suggestion should include:
+- engineerId: the engineer's ID
+- score: a suitability score from 0-100
+- reason: a brief explanation of why this engineer is suitable
+- factors: { skills: number, workload: number, proximity: number } - individual factor scores 0-100`;
+
+          const userPrompt = `Job Details:
+${JSON.stringify(jobContext, null, 2)}
+
+Available Engineers:
+${JSON.stringify(engineerData, null, 2)}
+
+Please analyze and rank the engineers for this job. Return only valid JSON array.`;
+
+          const response = await openai.chat.completions.create({
+            model: "gpt-5",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt }
+            ],
+            max_completion_tokens: 1024,
+            response_format: { type: "json_object" },
+          });
+
+          const content = response.choices[0]?.message?.content;
+          if (content) {
+            const parsed = JSON.parse(content);
+            const suggestions = parsed.suggestions || parsed;
+            
+            // Enrich with engineer names
+            const enrichedSuggestions = (Array.isArray(suggestions) ? suggestions : []).map((s: any) => {
+              const eng = engineerData.find(e => e.id === s.engineerId);
+              return {
+                ...s,
+                engineerName: eng?.name || 'Unknown',
+                currentWorkload: eng?.currentWorkload || 0,
+                skills: eng?.skills || [],
+              };
+            });
+
+            return res.json({ 
+              suggestions: enrichedSuggestions.slice(0, 5),
+              aiPowered: true 
+            });
+          }
+        } catch (aiError) {
+          console.error("AI suggestion error, falling back to heuristic:", aiError);
+        }
+      }
+
+      // Fallback: Simple heuristic-based suggestions
+      const scoredEngineers = engineerData.map(eng => {
+        let score = 50; // Base score
+
+        // Skills match bonus
+        if (requiredSkills.length > 0) {
+          const matchCount = requiredSkills.filter(rs => 
+            eng.skills.some(s => s.toLowerCase().includes(rs.toLowerCase()))
+          ).length;
+          score += (matchCount / requiredSkills.length) * 30;
+        }
+
+        // Workload penalty (fewer jobs = better)
+        const maxWorkload = Math.max(...engineerData.map(e => e.currentWorkload), 1);
+        score += ((maxWorkload - eng.currentWorkload) / maxWorkload) * 20;
+
+        return {
+          engineerId: eng.id,
+          engineerName: eng.name,
+          score: Math.round(score),
+          reason: `${eng.currentWorkload} active jobs, ${eng.skills.length} skills`,
+          currentWorkload: eng.currentWorkload,
+          skills: eng.skills,
+          factors: {
+            skills: requiredSkills.length > 0 ? Math.round((eng.skills.length / 5) * 100) : 50,
+            workload: Math.round(((maxWorkload - eng.currentWorkload) / maxWorkload) * 100),
+            proximity: 50, // Unknown without geocoding
+          }
+        };
+      });
+
+      // Sort by score descending
+      scoredEngineers.sort((a, b) => b.score - a.score);
+
+      res.json({ 
+        suggestions: scoredEngineers.slice(0, 5),
+        aiPowered: false 
+      });
+    } catch (error: any) {
+      console.error("Engineer suggestion error:", error);
+      res.status(500).json({ error: error.message || "Failed to get suggestions" });
     }
   });
 

@@ -42,7 +42,10 @@ TrueNorth Field View is a "business in a box" platform that enables field servic
 ### 4. Workforce
 - Team messaging (WhatsApp-style)
 - Live GPS tracking with map view
-- Role-based access (Admin, Engineer, Super Admin)
+- **Multi-role system**: Users can have multiple roles (admin, engineer, surveyor, fleet_manager)
+- **Staff skills management**: Assign trade skills to staff (plumbing, electrical, HVAC, etc.)
+- **AI-powered job assignment**: Smart engineer suggestions based on skills, workload, and location
+- Role-based access with flexible permissions
 - Weekly planner
 - Engineer assignment and workload management
 
@@ -109,6 +112,8 @@ TrueNorth Field View is a "business in a box" platform that enables field servic
 - `check_items` - Individual check items (tyres, lights, brakes, etc.)
 - `defects` - Vehicle defects with severity and workflow status
 - `defect_updates` - Comment/update history for defects
+- `skills` - Trade skills (plumbing, electrical, HVAC, etc.)
+- `user_skills` - Junction table linking users to their skills
 
 ## Sign-off Validation Rules
 
