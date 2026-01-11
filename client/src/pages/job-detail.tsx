@@ -13,7 +13,7 @@ import {
   ArrowLeft, Save, Printer, Trash2, Plus, 
   MapPin, Phone, Mail, Calendar, Upload, X, FileCheck,
   AlertCircle, AlertTriangle, AlertOctagon, Users, ChevronDown, ClipboardList,
-  Sparkles, Loader2, Briefcase, User
+  Sparkles, Loader2, Briefcase, User, Navigation
 } from "lucide-react";
 import {
   Dialog,
@@ -535,6 +535,22 @@ export default function JobDetail() {
                   className="print:border-none print:p-0"
                 />
               </div>
+              {(formData.address || formData.postcode) && (
+                <Button
+                  variant="outline"
+                  className="w-full print:hidden"
+                  onClick={() => {
+                    const destination = encodeURIComponent(
+                      `${formData.address}${formData.postcode ? ', ' + formData.postcode : ''}, UK`
+                    );
+                    window.open(`https://maps.google.com/maps?daddr=${destination}`, '_blank');
+                  }}
+                  data-testid="button-navigate-to-job"
+                >
+                  <Navigation className="mr-2 h-4 w-4" />
+                  Navigate to Job
+                </Button>
+              )}
             </div>
             
             <div className="space-y-4">
