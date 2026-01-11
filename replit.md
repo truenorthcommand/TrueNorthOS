@@ -50,14 +50,26 @@ TrueNorth Field View is a "business in a box" platform that enables field servic
 - Weekly planner
 - Engineer assignment and workload management
 
-### 5. Compliance
+### 5. Quality Control
+- **Site Inspections** - Pre-start, progress, final, and handover inspections
+- Inspection checklists with pass/fail/N/A for each item
+- Categories: Structure, Electrical, Plumbing, Safety, Finishes, External
+- Inspector and client signature capture
+- Photo evidence for each inspection item
+- **Snagging Sheets** - Punch lists for tracking defects
+- Snag items with priority (low, medium, high, critical)
+- Status workflow: open → in progress → resolved → verified
+- Progress tracking (X/Y snags resolved)
+- Completion photos and client sign-off
+
+### 6. Compliance
 - Two-Factor Authentication (TOTP-based 2FA)
 - GDPR compliance (consent tracking, data export, deletion requests)
 - Geo-verified sign-offs with reverse geocoding
 - Full audit trails
 - Cookie consent and privacy controls
 
-### 6. Intelligence (AI-Powered)
+### 7. Intelligence (AI-Powered)
 - Snagging Pro - Quality assessment specialist
 - Trade Parts Finder - UK parts sourcing
 - Gas & Heating Expert - Boiler diagnostics & Gas Safe
