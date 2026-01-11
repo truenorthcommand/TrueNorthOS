@@ -1319,7 +1319,7 @@ export class DatabaseStorage implements IStorage {
         inArray(jobs.assignedToId, teamMemberIds),
         sql`EXISTS (
           SELECT 1 FROM jsonb_array_elements_text(${jobs.assignedToIds}::jsonb) AS elem
-          WHERE elem::text = ANY(${teamMemberIds})
+          WHERE elem::text = ANY(ARRAY[${sql.join(teamMemberIds.map(id => sql`${id}`), sql`, `)}]::text[])
         )`
       )
     ).orderBy(desc(jobs.date));
