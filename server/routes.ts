@@ -4217,7 +4217,7 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
   // ==================== OUTLOOK / EMAIL ROUTES ====================
 
-  app.get("/api/outlook/test", requireAdmin, async (req, res) => {
+  app.get("/api/outlook/test", requireRoles('admin'), async (req, res) => {
     try {
       const result = await outlook.testConnection();
       res.json(result);
@@ -4226,7 +4226,7 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
-  app.post("/api/outlook/send", requireAdmin, async (req, res) => {
+  app.post("/api/outlook/send", requireRoles('admin'), async (req, res) => {
     try {
       const { fromEmail, subject, body, toRecipients, ccRecipients, isHtml } = req.body;
       
@@ -4249,7 +4249,7 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
-  app.get("/api/outlook/emails/:userEmail", requireAdmin, async (req, res) => {
+  app.get("/api/outlook/emails/:userEmail", requireRoles('admin'), async (req, res) => {
     try {
       const { userEmail } = req.params;
       const top = parseInt(req.query.top as string) || 10;
@@ -4262,7 +4262,7 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
-  app.get("/api/outlook/calendar/:userEmail", requireAdmin, async (req, res) => {
+  app.get("/api/outlook/calendar/:userEmail", requireRoles('admin'), async (req, res) => {
     try {
       const { userEmail } = req.params;
       const top = parseInt(req.query.top as string) || 10;
@@ -4275,7 +4275,7 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
-  app.post("/api/outlook/calendar/:userEmail", requireAdmin, async (req, res) => {
+  app.post("/api/outlook/calendar/:userEmail", requireRoles('admin'), async (req, res) => {
     try {
       const { userEmail } = req.params;
       const { subject, body, start, end, location, attendees } = req.body;
