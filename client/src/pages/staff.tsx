@@ -448,6 +448,13 @@ export default function Staff() {
       managerId: member.managerId || null,
       dayRate: member.dayRate?.toString() || "",
     });
+    
+    // Refresh skills and works managers when opening edit dialog
+    await Promise.all([
+      fetchSkills(),
+      fetchWorksManagers()
+    ]);
+    
     const skills = await fetchUserSkills(member.id);
     setEditSkills(skills);
     setShowEditPassword(false);
@@ -1105,7 +1112,7 @@ export default function Staff() {
                     <span className="text-sm text-muted-foreground">No skills assigned</span>
                   )}
                 </div>
-                {availableSkills.length > 0 && (
+                {availableSkills.length > 0 ? (
                   <div className="space-y-2">
                     <Label>Add Skill</Label>
                     <Select
@@ -1124,6 +1131,21 @@ export default function Staff() {
                           ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => fetchSkills()}
+                      data-testid="button-reload-skills"
+                    >
+                      Load Skills
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Click to load available skills
+                    </p>
                   </div>
                 )}
               </div>
