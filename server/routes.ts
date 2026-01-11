@@ -73,14 +73,22 @@ const requireRoles = (...allowedRoles: string[]) => {
   };
 };
 
-const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
+const requireAdmin = async (req: Request, res: Response, next: NextFunction) => {
   if (!req.session.userId) {
     return res.status(401).json({ error: "Authentication required" });
   }
-  if (req.session.userRole !== "admin") {
-    return res.status(403).json({ error: "Admin access required" });
+  const user = await storage.getUser(req.session.userId);
+  if (!user) {
+    return res.status(401).json({ error: "User not found" });
   }
-  next();
+  if (user.superAdmin) {
+    return next();
+  }
+  const userRoles = (user.roles as string[]) || [user.role];
+  if (userRoles.includes('admin')) {
+    return next();
+  }
+  return res.status(403).json({ error: "Admin access required" });
 };
 
 const requireSuperAdmin = async (req: Request, res: Response, next: NextFunction) => {
@@ -669,6 +677,32 @@ export async function registerRoutes(
       })));
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Get all engineers (users with engineer role) for calendar/planner
+  app.get("/api/users/engineers", requireAdmin, async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      // Filter users who have 'engineer' in their roles array or as their primary role
+      const engineers = allUsers.filter(u => {
+        const userRoles = (u.roles as string[]) || [u.role];
+        return userRoles.includes('engineer');
+      });
+      res.json(engineers.map(e => ({
+        id: e.id,
+        name: e.name,
+        email: e.email,
+        phone: e.phone,
+        role: e.role,
+        roles: e.roles,
+        username: e.username,
+        currentLat: e.currentLat,
+        currentLng: e.currentLng,
+        lastLocationUpdate: e.lastLocationUpdate,
+      })));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch engineers" });
     }
   });
 
