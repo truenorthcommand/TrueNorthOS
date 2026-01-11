@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { setupNotifications } from "./notifications";
+import { storage } from "./storage";
 
 const app = express();
 const httpServer = createServer(app);
@@ -65,6 +66,40 @@ app.use((req, res, next) => {
 
 (async () => {
   await registerRoutes(httpServer, app);
+
+  const seedDefaultSkills = async () => {
+    try {
+      const count = await storage.getSkillsCount();
+      if (count === 0) {
+        log("No skills found, seeding default skills...");
+        const defaultSkills = [
+          { name: "Plumbing", category: "trade", icon: "Droplets" },
+          { name: "Electrical", category: "trade", icon: "Zap" },
+          { name: "Gas & Heating", category: "trade", icon: "Flame" },
+          { name: "Carpentry", category: "trade", icon: "Hammer" },
+          { name: "HVAC", category: "trade", icon: "Wind" },
+          { name: "Roofing", category: "trade", icon: "Home" },
+          { name: "Painting & Decorating", category: "trade", icon: "Paintbrush" },
+          { name: "General Maintenance", category: "trade", icon: "Wrench" },
+          { name: "Tiling", category: "trade", icon: "LayoutGrid" },
+          { name: "Plastering", category: "trade", icon: "Brush" },
+          { name: "Glazing", category: "trade", icon: "Square" },
+          { name: "Locksmith", category: "trade", icon: "Key" },
+          { name: "Drainage", category: "trade", icon: "Waves" },
+          { name: "Fire Safety", category: "trade", icon: "Flame" },
+          { name: "Security Systems", category: "trade", icon: "Shield" },
+        ];
+        for (const skill of defaultSkills) {
+          await storage.createSkill(skill.name, skill.category, skill.icon);
+        }
+        log(`Seeded ${defaultSkills.length} default skills`);
+      }
+    } catch (error) {
+      console.error("Failed to seed default skills:", error);
+    }
+  };
+  
+  await seedDefaultSkills();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

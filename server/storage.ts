@@ -183,6 +183,8 @@ export interface IStorage {
   
   // Skills
   getAllSkills(): Promise<Skill[]>;
+  getSkillsCount(): Promise<number>;
+  createSkill(name: string, category: string, icon: string): Promise<Skill>;
   getUserSkills(userId: string): Promise<Skill[]>;
   addUserSkill(userId: string, skillId: string): Promise<void>;
   removeUserSkill(userId: string, skillId: string): Promise<void>;
@@ -1331,6 +1333,16 @@ export class DatabaseStorage implements IStorage {
 
   async getAllSkills(): Promise<Skill[]> {
     return db.select().from(skills).where(eq(skills.isActive, true));
+  }
+
+  async getSkillsCount(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(skills);
+    return result[0]?.count || 0;
+  }
+
+  async createSkill(name: string, category: string, icon: string): Promise<Skill> {
+    const [skill] = await db.insert(skills).values({ name, category, icon, isActive: true }).returning();
+    return skill;
   }
 
   async getUserSkills(userId: string): Promise<Skill[]> {
