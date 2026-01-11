@@ -990,7 +990,9 @@ export async function registerRoutes(
         const isToday = jobDate.toDateString() === today.toDateString();
         
         if (isToday) {
-          const assignedIds = (job.assignedToIds as string[]) || (job.assignedToId ? [job.assignedToId] : []);
+          const assignedIds = Array.isArray(job.assignedToIds) && job.assignedToIds.length > 0 
+            ? job.assignedToIds as string[]
+            : job.assignedToId ? [job.assignedToId] : [];
           for (const engineerId of assignedIds) {
             notifyUser(engineerId, {
               type: 'urgent_job_assigned',
@@ -1091,7 +1093,9 @@ export async function registerRoutes(
         const wasNotToday = !oldDate || new Date(oldDate).toDateString() !== today.toDateString();
         
         if (isRescheduledToToday && wasNotToday) {
-          const assignedIds = (job.assignedToIds as string[]) || (job.assignedToId ? [job.assignedToId] : []);
+          const assignedIds = Array.isArray(job.assignedToIds) && job.assignedToIds.length > 0 
+            ? job.assignedToIds as string[]
+            : job.assignedToId ? [job.assignedToId] : [];
           for (const engineerId of assignedIds) {
             notifyUser(engineerId, {
               type: 'job_rescheduled_today',
