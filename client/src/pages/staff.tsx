@@ -28,6 +28,7 @@ interface StaffMember {
   city?: string | null;
   county?: string | null;
   homePostcode?: string | null;
+  dayRate?: number | null;
   skills?: Skill[];
   managerId?: string | null;
 }
@@ -82,6 +83,7 @@ export default function Staff() {
     city: "",
     county: "",
     homePostcode: "",
+    dayRate: "" as string,
   });
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
   const [editForm, setEditForm] = useState({
@@ -97,6 +99,7 @@ export default function Staff() {
     county: "",
     homePostcode: "",
     managerId: "" as string | null,
+    dayRate: "" as string,
   });
   const [editSkills, setEditSkills] = useState<Skill[]>([]);
   const [showEditPassword, setShowEditPassword] = useState(false);
@@ -386,6 +389,7 @@ export default function Staff() {
         city: newStaff.city || null,
         county: newStaff.county || null,
         homePostcode: newStaff.homePostcode || null,
+        dayRate: newStaff.dayRate ? parseFloat(newStaff.dayRate) : null,
       };
 
       const res = await fetch('/api/users', {
@@ -405,7 +409,8 @@ export default function Staff() {
       setNewStaff({ 
         name: "", email: "", phone: "", username: "", password: "", 
         roles: ["engineer"], contactMethod: "email",
-        addressLine1: "", addressLine2: "", city: "", county: "", homePostcode: ""
+        addressLine1: "", addressLine2: "", city: "", county: "", homePostcode: "",
+        dayRate: ""
       });
       setShowPassword(false);
 
@@ -440,6 +445,7 @@ export default function Staff() {
       county: member.county || "",
       homePostcode: member.homePostcode || "",
       managerId: member.managerId || null,
+      dayRate: member.dayRate?.toString() || "",
     });
     const skills = await fetchUserSkills(member.id);
     setEditSkills(skills);
@@ -490,6 +496,7 @@ export default function Staff() {
         city: editForm.city || null,
         county: editForm.county || null,
         homePostcode: editForm.homePostcode || null,
+        dayRate: editForm.dayRate ? parseFloat(editForm.dayRate) : null,
       };
       
       if (editForm.password) {
@@ -830,6 +837,20 @@ export default function Staff() {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <Label>Day Rate (£)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="250.00"
+                value={newStaff.dayRate}
+                onChange={(e) => setNewStaff({ ...newStaff, dayRate: e.target.value })}
+                data-testid="input-staff-day-rate"
+              />
+              <p className="text-xs text-muted-foreground">Used for calculating staff costs in financial reports</p>
+            </div>
+
             <Button 
               type="submit" 
               className="bg-emerald-600 hover:bg-emerald-700"
@@ -1008,6 +1029,23 @@ export default function Staff() {
                       data-testid="input-edit-postcode"
                     />
                   </div>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <Label className="text-base font-medium mb-3 block">Day Rate</Label>
+                <div className="space-y-2">
+                  <Input
+                    id="edit-day-rate"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editForm.dayRate}
+                    onChange={(e) => setEditForm({ ...editForm, dayRate: e.target.value })}
+                    placeholder="250.00"
+                    data-testid="input-edit-day-rate"
+                  />
+                  <p className="text-xs text-muted-foreground">Daily rate in £ for calculating staff costs</p>
                 </div>
               </div>
 

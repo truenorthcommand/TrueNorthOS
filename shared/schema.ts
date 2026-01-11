@@ -20,6 +20,7 @@ export const users = pgTable("users", {
   city: text("city"),
   county: text("county"),
   homePostcode: text("home_postcode"),
+  dayRate: doublePrecision("day_rate"),
   homeLat: doublePrecision("home_lat"),
   homeLng: doublePrecision("home_lng"),
   currentLat: doublePrecision("current_lat"),

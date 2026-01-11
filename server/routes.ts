@@ -665,6 +665,7 @@ export async function registerRoutes(
         county: e.county,
         homePostcode: e.homePostcode,
         managerId: e.managerId,
+        dayRate: e.dayRate,
       })));
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch users" });
@@ -700,7 +701,7 @@ export async function registerRoutes(
 
   app.post("/api/users", requireSuperAdmin, async (req, res) => {
     try {
-      const { username, password, name, email, phone, role } = req.body;
+      const { username, password, name, email, phone, role, roles, addressLine1, addressLine2, city, county, homePostcode, dayRate } = req.body;
       
       if (!username || !password || !name || !role) {
         return res.status(400).json({ error: "Username, password, name, and role are required" });
@@ -712,10 +713,6 @@ export async function registerRoutes(
 
       if (password.length < 6) {
         return res.status(400).json({ error: "Password must be at least 6 characters" });
-      }
-
-      if (!['admin', 'engineer'].includes(role)) {
-        return res.status(400).json({ error: "Role must be 'admin' or 'engineer'" });
       }
 
       const existingUser = await storage.getUserByUsername(username);
@@ -733,7 +730,14 @@ export async function registerRoutes(
         email: email || null,
         phone: phone || null,
         role,
+        roles: roles || [role],
         status: 'active',
+        addressLine1: addressLine1 || null,
+        addressLine2: addressLine2 || null,
+        city: city || null,
+        county: county || null,
+        homePostcode: homePostcode || null,
+        dayRate: dayRate || null,
       });
 
       res.status(201).json({
@@ -742,7 +746,9 @@ export async function registerRoutes(
         email: user.email,
         phone: user.phone,
         role: user.role,
+        roles: user.roles,
         username: user.username,
+        dayRate: user.dayRate,
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to create user" });
@@ -784,7 +790,7 @@ export async function registerRoutes(
         return res.status(403).json({ error: "Cannot demote a super admin" });
       }
 
-      const { name, email, phone, username, password, role, roles, addressLine1, addressLine2, city, county, homePostcode } = req.body;
+      const { name, email, phone, username, password, role, roles, addressLine1, addressLine2, city, county, homePostcode, dayRate } = req.body;
       const updates: Record<string, any> = {};
 
       if (name) updates.name = name;
@@ -814,6 +820,7 @@ export async function registerRoutes(
       if (city !== undefined) updates.city = city || null;
       if (county !== undefined) updates.county = county || null;
       if (homePostcode !== undefined) updates.homePostcode = homePostcode || null;
+      if (dayRate !== undefined) updates.dayRate = dayRate || null;
 
       const updatedUser = await storage.updateUser(req.params.id, updates);
       res.json({
@@ -824,6 +831,7 @@ export async function registerRoutes(
         role: updatedUser!.role,
         roles: updatedUser!.roles,
         username: updatedUser!.username,
+        dayRate: updatedUser!.dayRate,
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to update user" });
