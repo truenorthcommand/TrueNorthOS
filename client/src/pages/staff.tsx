@@ -57,7 +57,7 @@ const getRoleLabel = (role: Role): string => {
 };
 
 export default function Staff() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { toast } = useToast();
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
@@ -519,6 +519,11 @@ export default function Staff() {
 
       setStaff(staff.map(s => s.id === editingStaff.id ? { ...data, skills: editSkills } : s));
       setEditingStaff(null);
+
+      // If the updated user is the current logged-in user, refresh their session data
+      if (user && editingStaff.id === user.id) {
+        await refreshUser();
+      }
 
       toast({
         title: "Staff Updated",
