@@ -12,6 +12,7 @@ import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalk
 import { z } from "zod";
 import { notifyAdmins, notifyUser } from "./notifications";
 import { sessionMiddleware } from "./session";
+import * as outlook from "./outlook";
 
 function getStripeClient(): Stripe | null {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -4212,6 +4213,91 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
       return res.status(500).json({ error: "Stripe is not configured" });
     }
     res.json({ publishableKey });
+  });
+
+  // ==================== OUTLOOK / EMAIL ROUTES ====================
+
+  app.get("/api/outlook/test", requireAdmin, async (req, res) => {
+    try {
+      const result = await outlook.testConnection();
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.post("/api/outlook/send", requireAdmin, async (req, res) => {
+    try {
+      const { fromEmail, subject, body, toRecipients, ccRecipients, isHtml } = req.body;
+      
+      if (!fromEmail || !subject || !body || !toRecipients || !Array.isArray(toRecipients)) {
+        return res.status(400).json({ error: "Missing required fields: fromEmail, subject, body, toRecipients" });
+      }
+
+      await outlook.sendEmail(fromEmail, {
+        subject,
+        body,
+        toRecipients,
+        ccRecipients,
+        isHtml,
+      });
+
+      res.json({ success: true, message: "Email sent successfully" });
+    } catch (error: any) {
+      console.error("Send email error:", error);
+      res.status(500).json({ error: error.message || "Failed to send email" });
+    }
+  });
+
+  app.get("/api/outlook/emails/:userEmail", requireAdmin, async (req, res) => {
+    try {
+      const { userEmail } = req.params;
+      const top = parseInt(req.query.top as string) || 10;
+      
+      const emails = await outlook.getEmails(userEmail, top);
+      res.json(emails);
+    } catch (error: any) {
+      console.error("Get emails error:", error);
+      res.status(500).json({ error: error.message || "Failed to get emails" });
+    }
+  });
+
+  app.get("/api/outlook/calendar/:userEmail", requireAdmin, async (req, res) => {
+    try {
+      const { userEmail } = req.params;
+      const top = parseInt(req.query.top as string) || 10;
+      
+      const events = await outlook.getCalendarEvents(userEmail, top);
+      res.json(events);
+    } catch (error: any) {
+      console.error("Get calendar events error:", error);
+      res.status(500).json({ error: error.message || "Failed to get calendar events" });
+    }
+  });
+
+  app.post("/api/outlook/calendar/:userEmail", requireAdmin, async (req, res) => {
+    try {
+      const { userEmail } = req.params;
+      const { subject, body, start, end, location, attendees } = req.body;
+      
+      if (!subject || !start || !end) {
+        return res.status(400).json({ error: "Missing required fields: subject, start, end" });
+      }
+
+      const event = await outlook.createCalendarEvent(userEmail, {
+        subject,
+        body,
+        start: new Date(start),
+        end: new Date(end),
+        location,
+        attendees,
+      });
+
+      res.json(event);
+    } catch (error: any) {
+      console.error("Create calendar event error:", error);
+      res.status(500).json({ error: error.message || "Failed to create calendar event" });
+    }
   });
 
   // ==================== MESSAGING ROUTES ====================
