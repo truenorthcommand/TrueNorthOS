@@ -48,11 +48,11 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4">
-            <img src="/logo.png" alt="TrueNorth Logo" className="w-12 h-12 rounded-lg" />
+            <img src="/logo.png" alt="Pro Main Solutions Logo" className="h-16 object-contain" />
           </div>
-          <CardTitle className="text-2xl">TrueNorth</CardTitle>
+          <CardTitle className="text-2xl font-bold">Pro Main Solutions</CardTitle>
           <CardDescription>
-            {requires2FA ? "Enter your authentication code" : "Field View - Sign in to manage your jobs"}
+            {requires2FA ? "Enter your authentication code" : "Powered By TrueNorth Operations Group"}
           </CardDescription>
         </CardHeader>
         <CardContent>

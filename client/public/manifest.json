@@ -1,7 +1,7 @@
 {
-  "name": "TrueNorth Field View",
-  "short_name": "Field View",
-  "description": "Digital job sheet management for field engineers",
+  "name": "Pro Main Solutions",
+  "short_name": "Pro Main",
+  "description": "Professional field service management. Powered By TrueNorth Operations Group.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

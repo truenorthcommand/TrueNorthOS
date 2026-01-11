@@ -162,8 +162,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         "flex items-center gap-2 mb-6",
         collapsed ? "justify-center" : "px-2"
       )}>
-        <img src="/logo.png" alt="TrueNorth Logo" className="w-8 h-8 rounded-md" />
-        {!collapsed && <span className="text-xl font-bold tracking-tight">Field View</span>}
+        <img src="/logo.png" alt="Pro Main Solutions Logo" className="h-8 object-contain" />
+        {!collapsed && (
+          <div className="flex flex-col">
+            <span className="text-lg font-bold tracking-tight leading-tight">Pro Main Solutions</span>
+            <span className="text-[10px] text-muted-foreground leading-tight">Powered By TrueNorth Operations Group</span>
+          </div>
+        )}
       </div>
 
       <nav className={cn(
@@ -413,8 +418,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </Sheet>
             
             <div className="flex items-center gap-2">
-              <img src="/logo.png" alt="TrueNorth Logo" className="w-8 h-8 rounded-md" />
-              <span className="text-lg font-bold">Field View</span>
+              <img src="/logo.png" alt="Pro Main Solutions Logo" className="h-8 object-contain" />
+              <span className="text-sm font-bold leading-tight">Pro Main Solutions</span>
             </div>
 
             <div className="ml-auto">
