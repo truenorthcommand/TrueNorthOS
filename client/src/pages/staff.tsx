@@ -102,6 +102,7 @@ export default function Staff() {
     dayRate: "" as string,
   });
   const [editSkills, setEditSkills] = useState<Skill[]>([]);
+  const [newStaffSkills, setNewStaffSkills] = useState<Skill[]>([]);
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -406,18 +407,37 @@ export default function Staff() {
         throw new Error(data.error || 'Failed to create staff member');
       }
 
-      setStaff([...staff, { ...data, skills: [] }]);
+      // Assign selected skills to the new user
+      const assignedSkills: Skill[] = [];
+      for (const skill of newStaffSkills) {
+        try {
+          const skillRes = await fetch(`/api/users/${data.id}/skills`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ skillId: skill.id }),
+          });
+          if (skillRes.ok) {
+            assignedSkills.push(skill);
+          }
+        } catch (e) {
+          console.error('Failed to assign skill:', skill.name, e);
+        }
+      }
+
+      setStaff([...staff, { ...data, skills: assignedSkills }]);
       setNewStaff({ 
         name: "", email: "", phone: "", username: "", password: "", 
         roles: ["engineer"], contactMethod: "email",
         addressLine1: "", addressLine2: "", city: "", county: "", homePostcode: "",
         dayRate: ""
       });
+      setNewStaffSkills([]);
       setShowPassword(false);
 
       toast({
         title: "Staff Added",
-        description: `${data.name} has been added.`,
+        description: `${data.name} has been added${assignedSkills.length > 0 ? ` with ${assignedSkills.length} skill(s)` : ''}.`,
       });
     } catch (error: any) {
       toast({
@@ -857,6 +877,73 @@ export default function Staff() {
                 data-testid="input-staff-day-rate"
               />
               <p className="text-xs text-muted-foreground">Used for calculating staff costs in financial reports</p>
+            </div>
+
+            <div className="border-t pt-4 mt-4">
+              <Label className="text-base font-medium mb-3 block">Trade Skills (Optional)</Label>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {newStaffSkills.map(skill => (
+                  <Badge 
+                    key={skill.id} 
+                    variant="secondary"
+                    className="flex items-center gap-1 pr-1"
+                  >
+                    {skill.name}
+                    <button
+                      type="button"
+                      onClick={() => setNewStaffSkills(newStaffSkills.filter(s => s.id !== skill.id))}
+                      className="ml-1 hover:bg-destructive/20 rounded p-0.5"
+                      data-testid={`button-remove-new-skill-${skill.id}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+                {newStaffSkills.length === 0 && (
+                  <span className="text-sm text-muted-foreground">No skills selected</span>
+                )}
+              </div>
+              {availableSkills.length > 0 ? (
+                <div className="space-y-2">
+                  <Label>Add Skill</Label>
+                  <Select
+                    onValueChange={(value) => {
+                      const skill = availableSkills.find(s => s.id === value);
+                      if (skill && !newStaffSkills.some(s => s.id === skill.id)) {
+                        setNewStaffSkills([...newStaffSkills, skill]);
+                      }
+                    }}
+                  >
+                    <SelectTrigger data-testid="select-new-staff-skill">
+                      <SelectValue placeholder="Select a skill to add..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableSkills
+                        .filter(skill => !newStaffSkills.some(s => s.id === skill.id))
+                        .map(skill => (
+                          <SelectItem key={skill.id} value={skill.id}>
+                            {skill.name} ({skill.category})
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => fetchSkills()}
+                    data-testid="button-load-skills-new"
+                  >
+                    Load Skills
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Click to load available skills
+                  </p>
+                </div>
+              )}
             </div>
 
             <Button 
