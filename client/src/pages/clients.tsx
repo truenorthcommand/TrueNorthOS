@@ -8,10 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AITextarea } from "@/components/ui/ai-assist";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search, Check } from "lucide-react";
+import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
@@ -25,60 +24,16 @@ interface JobPhoto {
   timestamp: string;
 }
 
-interface Property {
-  id: string;
-  address: string;
-  postcode: string;
-}
-
 interface Client {
   id: string;
   name: string;
-  contact: string;
-  email: string;
-  phone: string;
-  mainAddress: string;
-  properties: Property[];
+  contactName: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  postcode: string | null;
+  notes: string | null;
 }
-
-const MOCK_CLIENTS: Client[] = [
-  {
-    id: "c-1",
-    name: "BuildTech Solutions",
-    contact: "John Brown",
-    email: "john@buildtech.com",
-    phone: "01234 567890",
-    mainAddress: "42 Industrial Estate, Manchester, M1 2AB",
-    properties: [
-      { id: "p-1", address: "123 Factory Lane", postcode: "M1 1AA" },
-      { id: "p-2", address: "456 Warehouse Park", postcode: "M2 2BB" },
-    ],
-  },
-  {
-    id: "c-2",
-    name: "HomeAssure Ltd",
-    contact: "Sarah White",
-    email: "sarah@homeassure.com",
-    phone: "01234 567891",
-    mainAddress: "10 Service Road, Birmingham, B1 1CD",
-    properties: [
-      { id: "p-3", address: "789 Residential Drive", postcode: "B1 5EF" },
-    ],
-  },
-  {
-    id: "c-3",
-    name: "NetCable Installations",
-    contact: "Mike Johnson",
-    email: "mike@netcable.com",
-    phone: "01234 567892",
-    mainAddress: "100 Tech Hub, London, EC1 1XY",
-    properties: [
-      { id: "p-4", address: "201 Tech Park", postcode: "EC1 2AB" },
-      { id: "p-5", address: "202 Innovation Centre", postcode: "EC2 3CD" },
-      { id: "p-6", address: "203 Digital Square", postcode: "EC3 4EF" },
-    ],
-  },
-];
 
 export default function Clients() {
   const { user } = useAuth();
@@ -86,22 +41,20 @@ export default function Clients() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   
-  const [clients, setClients] = useState<Client[]>(MOCK_CLIENTS);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [isLoadingClients, setIsLoadingClients] = useState(true);
   const [clientSearchTerm, setClientSearchTerm] = useState("");
   const [newClient, setNewClient] = useState({
     name: "",
-    contact: "",
+    contactName: "",
     email: "",
     phone: "",
-    mainAddress: "",
+    address: "",
+    postcode: "",
   });
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
-  const [newPropertyByClient, setNewPropertyByClient] = useState<
-    Record<string, { address: string; postcode: string }>
-  >({});
 
   const [selectedClientId, setSelectedClientId] = useState("");
-  const [selectedPropertyId, setSelectedPropertyId] = useState("");
   const [selectedEngineerIds, setSelectedEngineerIds] = useState<string[]>([]);
   const [engineers, setEngineers] = useState<{id: string; name: string}[]>([]);
   const [jobForm, setJobForm] = useState({
@@ -145,8 +98,24 @@ export default function Clients() {
     setJobPhotos((prev) => prev.filter((p) => p.id !== photoId));
   };
 
+  const fetchClients = async () => {
+    try {
+      setIsLoadingClients(true);
+      const res = await fetch('/api/clients', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setClients(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch clients:', error);
+    } finally {
+      setIsLoadingClients(false);
+    }
+  };
+
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (user) {
+      fetchClients();
       fetch('/api/users', { credentials: 'include' })
         .then(res => res.json())
         .then(data => {
@@ -159,87 +128,71 @@ export default function Clients() {
     }
   }, [user]);
 
-  const handleAddClient = (e: React.FormEvent) => {
+  const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newClient.name && newClient.contact) {
-      setClients([
-        ...clients,
-        {
-          id: `c-${Date.now()}`,
-          ...newClient,
-          properties: [],
-        },
-      ]);
-      setNewClient({
-        name: "",
-        contact: "",
-        email: "",
-        phone: "",
-        mainAddress: "",
+    if (!newClient.name) {
+      toast({ title: "Error", description: "Client name is required.", variant: "destructive" });
+      return;
+    }
+    try {
+      const res = await fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(newClient),
       });
+      if (res.ok) {
+        const createdClient = await res.json();
+        setClients([...clients, createdClient]);
+        setNewClient({
+          name: "",
+          contactName: "",
+          email: "",
+          phone: "",
+          address: "",
+          postcode: "",
+        });
+        toast({ title: "Success", description: "Client added successfully." });
+      } else {
+        toast({ title: "Error", description: "Failed to add client.", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to add client.", variant: "destructive" });
     }
   };
 
-  const handleAddProperty = (clientId: string) => {
-    const propData = newPropertyByClient[clientId];
-    if (propData?.address && propData?.postcode) {
-      setClients(
-        clients.map((c) =>
-          c.id === clientId
-            ? {
-                ...c,
-                properties: [
-                  ...c.properties,
-                  {
-                    id: `p-${Date.now()}`,
-                    ...propData,
-                  },
-                ],
-              }
-            : c
-        )
-      );
-      setNewPropertyByClient({
-        ...newPropertyByClient,
-        [clientId]: { address: "", postcode: "" },
+  const handleDeleteClient = async (id: string) => {
+    try {
+      const res = await fetch(`/api/clients/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
       });
+      if (res.ok) {
+        setClients(clients.filter((c) => c.id !== id));
+        setExpandedClientId(null);
+        toast({ title: "Success", description: "Client deleted." });
+      } else {
+        toast({ title: "Error", description: "Failed to delete client.", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete client.", variant: "destructive" });
     }
-  };
-
-  const handleDeleteProperty = (clientId: string, propertyId: string) => {
-    setClients(
-      clients.map((c) =>
-        c.id === clientId
-          ? {
-              ...c,
-              properties: c.properties.filter((p) => p.id !== propertyId),
-            }
-          : c
-      )
-    );
-  };
-
-  const handleDeleteClient = (id: string) => {
-    setClients(clients.filter((c) => c.id !== id));
-    setExpandedClientId(null);
   };
 
   const handleCreateJobFromClient = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedClientId || !selectedPropertyId || !jobForm.description) {
+    if (!selectedClientId || !jobForm.description) {
       toast({ 
         title: "Missing Information", 
-        description: "Please select a client, property, and enter a description.",
+        description: "Please select a client and enter a description.",
         variant: "destructive"
       });
       return;
     }
 
     const client = clients.find(c => c.id === selectedClientId);
-    const property = client?.properties.find(p => p.id === selectedPropertyId);
-    
-    if (!client || !property) return;
+    if (!client) return;
 
     const assignToIds = user?.role === 'admin' && selectedEngineerIds.length > 0 
       ? selectedEngineerIds 
@@ -251,11 +204,11 @@ export default function Clients() {
       nickname: jobForm.nickname || null,
       client: client.name,
       customerName: client.name,
-      address: property.address,
-      postcode: property.postcode,
-      contactName: client.contact,
-      contactPhone: client.phone,
-      contactEmail: client.email,
+      address: client.address || "",
+      postcode: client.postcode || "",
+      contactName: client.contactName || "",
+      contactPhone: client.phone || "",
+      contactEmail: client.email || "",
       date: new Date(jobForm.date).toISOString(),
       session: jobForm.session,
       orderNumber: jobForm.orderNumber ? Number(jobForm.orderNumber) : null,
@@ -278,7 +231,6 @@ export default function Clients() {
       });
 
       setSelectedClientId("");
-      setSelectedPropertyId("");
       setSelectedEngineerIds([]);
       setJobForm({ nickname: "", description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "", isLongRunning: false });
       setJobPhotos([]);
@@ -288,7 +240,19 @@ export default function Clients() {
   if (!user) return null;
 
   const selectedClient = clients.find(c => c.id === selectedClientId);
-  const selectedProperty = selectedClient?.properties.find(p => p.id === selectedPropertyId);
+
+  const filteredClients = clients.filter((client) => {
+    if (!clientSearchTerm) return true;
+    const term = clientSearchTerm.toLowerCase();
+    return (
+      client.name.toLowerCase().includes(term) ||
+      (client.contactName || '').toLowerCase().includes(term) ||
+      (client.email || '').toLowerCase().includes(term) ||
+      (client.phone || '').toLowerCase().includes(term) ||
+      (client.address || '').toLowerCase().includes(term) ||
+      (client.postcode || '').toLowerCase().includes(term)
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -317,10 +281,7 @@ export default function Clients() {
               <form onSubmit={handleCreateJobFromClient} className="space-y-6">
                 <div className="space-y-2">
                   <Label>Select Client</Label>
-                  <Select value={selectedClientId} onValueChange={(value) => {
-                    setSelectedClientId(value);
-                    setSelectedPropertyId("");
-                  }}>
+                  <Select value={selectedClientId} onValueChange={setSelectedClientId}>
                     <SelectTrigger data-testid="select-client">
                       <SelectValue placeholder="Choose a client..." />
                     </SelectTrigger>
@@ -335,24 +296,6 @@ export default function Clients() {
                 </div>
 
                 {selectedClient && (
-                  <div className="space-y-2">
-                    <Label>Select Property / Site</Label>
-                    <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
-                      <SelectTrigger data-testid="select-property">
-                        <SelectValue placeholder="Choose a property..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {selectedClient.properties.map((prop) => (
-                          <SelectItem key={prop.id} value={prop.id}>
-                            {prop.address} - {prop.postcode}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {selectedClient && (
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border space-y-3">
                     <p className="text-xs font-medium text-muted-foreground uppercase">Client Information (Auto-filled)</p>
                     <div className="grid md:grid-cols-2 gap-4 text-sm">
@@ -362,26 +305,20 @@ export default function Clients() {
                       </div>
                       <div>
                         <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Contact Person</p>
-                        <p className="font-medium" data-testid="text-contact-name">{selectedClient.contact}</p>
+                        <p className="font-medium" data-testid="text-contact-name">{selectedClient.contactName || '-'}</p>
                       </div>
                       <div>
                         <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Phone</p>
-                        <p className="font-medium" data-testid="text-contact-phone">{selectedClient.phone}</p>
+                        <p className="font-medium" data-testid="text-contact-phone">{selectedClient.phone || '-'}</p>
                       </div>
                       <div>
                         <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Email</p>
-                        <p className="font-medium" data-testid="text-contact-email">{selectedClient.email}</p>
+                        <p className="font-medium" data-testid="text-contact-email">{selectedClient.email || '-'}</p>
                       </div>
-                    </div>
-                  </div>
-                )}
-
-                {selectedProperty && (
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800 space-y-2">
-                    <p className="text-xs font-medium text-blue-900 dark:text-blue-300 uppercase">Selected Property</p>
-                    <div className="space-y-1">
-                      <p className="font-semibold" data-testid="text-property-address">{selectedProperty.address}</p>
-                      <p className="text-sm text-muted-foreground" data-testid="text-property-postcode">{selectedProperty.postcode}</p>
+                      <div className="md:col-span-2">
+                        <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Address</p>
+                        <p className="font-medium" data-testid="text-client-address">{selectedClient.address || '-'}{selectedClient.postcode ? `, ${selectedClient.postcode}` : ''}</p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -553,7 +490,7 @@ export default function Clients() {
                   <Button 
                     type="submit" 
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700" 
-                    disabled={!selectedPropertyId || !jobForm.description}
+                    disabled={!selectedClientId || !jobForm.description}
                     data-testid="button-create-job"
                   >
                     <Send className="mr-2 h-4 w-4" />
@@ -564,7 +501,6 @@ export default function Clients() {
                     variant="outline" 
                     onClick={() => {
                       setSelectedClientId("");
-                      setSelectedPropertyId("");
                       setSelectedEngineerIds([]);
                       setJobForm({ nickname: "", description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "", isLongRunning: false });
                       setJobPhotos([]);
@@ -600,9 +536,9 @@ export default function Clients() {
                     <Label>Contact Person</Label>
                     <Input
                       placeholder="Full name"
-                      value={newClient.contact}
+                      value={newClient.contactName}
                       onChange={(e) =>
-                        setNewClient({ ...newClient, contact: e.target.value })
+                        setNewClient({ ...newClient, contactName: e.target.value })
                       }
                       data-testid="input-contact-person"
                     />
@@ -627,17 +563,28 @@ export default function Clients() {
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Main Office Address</Label>
-                  <Textarea
-                    placeholder="Full address of main office"
-                    value={newClient.mainAddress}
-                    onChange={(e) =>
-                      setNewClient({ ...newClient, mainAddress: e.target.value })
-                    }
-                    className="min-h-[80px]"
-                    data-testid="input-main-address"
-                  />
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Address</Label>
+                    <Textarea
+                      placeholder="Full address"
+                      value={newClient.address}
+                      onChange={(e) =>
+                        setNewClient({ ...newClient, address: e.target.value })
+                      }
+                      className="min-h-[80px]"
+                      data-testid="input-address"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Postcode</Label>
+                    <Input
+                      placeholder="e.g., SW1A 1AA"
+                      value={newClient.postcode}
+                      onChange={(e) => setNewClient({ ...newClient, postcode: e.target.value })}
+                      data-testid="input-postcode"
+                    />
+                  </div>
                 </div>
                 <Button type="submit" className="w-full sm:w-auto" data-testid="button-add-client">
                   <Plus className="mr-2 h-4 w-4" />
@@ -659,23 +606,7 @@ export default function Clients() {
           </div>
 
           <div className="space-y-4">
-            {clients
-              .filter((client) => {
-                if (!clientSearchTerm) return true;
-                const term = clientSearchTerm.toLowerCase();
-                return (
-                  client.name.toLowerCase().includes(term) ||
-                  client.contact.toLowerCase().includes(term) ||
-                  client.email.toLowerCase().includes(term) ||
-                  client.phone.toLowerCase().includes(term) ||
-                  client.mainAddress.toLowerCase().includes(term) ||
-                  client.properties.some(p => 
-                    p.address.toLowerCase().includes(term) || 
-                    p.postcode.toLowerCase().includes(term)
-                  )
-                );
-              })
-              .map((client) => (
+            {filteredClients.map((client) => (
               <Card
                 key={client.id}
                 className="hover:shadow-md transition-shadow overflow-hidden"
@@ -697,13 +628,8 @@ export default function Clients() {
                       <div className="flex-1">
                         <CardTitle className="text-base">{client.name}</CardTitle>
                         <p className="text-sm text-muted-foreground">
-                          {client.contact}
+                          {client.contactName || '-'}
                         </p>
-                        <div className="flex gap-2 mt-2">
-                          <Badge variant="outline" className="text-xs">
-                            {client.properties.length} properties
-                          </Badge>
-                        </div>
                       </div>
                     </div>
                     <Button
@@ -752,93 +678,17 @@ export default function Clients() {
                       )}
                     </div>
 
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <MapPin className="h-4 w-4 text-primary" />
-                        <p className="text-sm font-semibold">Main Office</p>
-                      </div>
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                        {client.mainAddress}
-                      </p>
-                    </div>
-
-                    <div className="border-t pt-6">
-                      <div className="mb-4">
-                        <h4 className="font-semibold text-sm mb-4">Properties</h4>
-                        {client.properties.length === 0 ? (
-                          <p className="text-sm text-muted-foreground mb-4">
-                            No properties added yet.
-                          </p>
-                        ) : (
-                          <div className="space-y-3 mb-6">
-                            {client.properties.map((prop) => (
-                              <div
-                                key={prop.id}
-                                className="flex items-start justify-between gap-4 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-md border"
-                              >
-                                <div className="flex-1">
-                                  <p className="text-sm font-medium">{prop.address}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {prop.postcode}
-                                  </p>
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleDeleteProperty(client.id, prop.id)
-                                  }
-                                  className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0 shrink-0"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="border-t pt-4 space-y-3">
-                        <p className="text-sm font-medium">Add Property</p>
-                        <div className="space-y-3">
-                          <Input
-                            placeholder="Property address"
-                            value={newPropertyByClient[client.id]?.address || ""}
-                            onChange={(e) =>
-                              setNewPropertyByClient({
-                                ...newPropertyByClient,
-                                [client.id]: {
-                                  address: e.target.value,
-                                  postcode: newPropertyByClient[client.id]?.postcode || "",
-                                },
-                              })
-                            }
-                          />
-                          <Input
-                            placeholder="Postcode"
-                            value={newPropertyByClient[client.id]?.postcode || ""}
-                            onChange={(e) =>
-                              setNewPropertyByClient({
-                                ...newPropertyByClient,
-                                [client.id]: {
-                                  address: newPropertyByClient[client.id]?.address || "",
-                                  postcode: e.target.value,
-                                },
-                              })
-                            }
-                          />
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            className="w-full"
-                            onClick={() => handleAddProperty(client.id)}
-                          >
-                            <Plus className="mr-2 h-3 w-3" />
-                            Add Property
-                          </Button>
+                    {client.address && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <MapPin className="h-4 w-4 text-primary" />
+                          <p className="text-sm font-semibold">Address</p>
                         </div>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                          {client.address}{client.postcode ? `, ${client.postcode}` : ''}
+                        </p>
                       </div>
-                    </div>
+                    )}
                   </CardContent>
                 )}
               </Card>
@@ -850,20 +700,7 @@ export default function Clients() {
               <p>No clients added yet.</p>
             </div>
           )}
-          {clients.length > 0 && clientSearchTerm && clients.filter((client) => {
-            const term = clientSearchTerm.toLowerCase();
-            return (
-              client.name.toLowerCase().includes(term) ||
-              client.contact.toLowerCase().includes(term) ||
-              client.email.toLowerCase().includes(term) ||
-              client.phone.toLowerCase().includes(term) ||
-              client.mainAddress.toLowerCase().includes(term) ||
-              client.properties.some(p => 
-                p.address.toLowerCase().includes(term) || 
-                p.postcode.toLowerCase().includes(term)
-              )
-            );
-          }).length === 0 && (
+          {clients.length > 0 && clientSearchTerm && filteredClients.length === 0 && (
             <div className="text-center py-12 text-muted-foreground">
               <p>No clients match your search.</p>
             </div>
