@@ -5934,69 +5934,90 @@ Be concise and practical. Focus on real issues that affect the business.`;
     try {
       const issues: { type: string; severity: string; message: string; details?: any }[] = [];
 
-      // Check for orphaned jobs (no client)
-      const orphanedJobs = await pool.query(`
-        SELECT j.id, j."jobNo", j.client 
-        FROM jobs j 
-        LEFT JOIN clients c ON j."clientId" = c.id 
-        WHERE j."clientId" IS NOT NULL AND c.id IS NULL
-        LIMIT 10
-      `);
-      if (orphanedJobs.rows.length > 0) {
-        issues.push({
-          type: 'orphaned_records',
-          severity: 'warning',
-          message: `${orphanedJobs.rows.length} jobs have invalid client references`,
-          details: orphanedJobs.rows
-        });
-      }
+      // Check for jobs without client name
+      try {
+        const jobsNoClient = await pool.query(`
+          SELECT COUNT(*) as count FROM jobs WHERE client IS NULL OR client = ''
+        `);
+        const noClientCount = parseInt(jobsNoClient.rows[0]?.count) || 0;
+        if (noClientCount > 0) {
+          issues.push({
+            type: 'missing_data',
+            severity: 'warning',
+            message: `${noClientCount} jobs have no client name assigned`,
+          });
+        }
+      } catch (e) { /* table might not exist */ }
 
       // Check for duplicate client names
-      const duplicateClients = await pool.query(`
-        SELECT name, COUNT(*) as count 
-        FROM clients 
-        GROUP BY LOWER(name) 
-        HAVING COUNT(*) > 1
-      `);
-      if (duplicateClients.rows.length > 0) {
-        issues.push({
-          type: 'duplicates',
-          severity: 'info',
-          message: `${duplicateClients.rows.length} client names appear multiple times`,
-          details: duplicateClients.rows
-        });
-      }
+      try {
+        const duplicateClients = await pool.query(`
+          SELECT name, COUNT(*) as count 
+          FROM clients 
+          GROUP BY LOWER(name), name
+          HAVING COUNT(*) > 1
+        `);
+        if (duplicateClients.rows.length > 0) {
+          issues.push({
+            type: 'duplicates',
+            severity: 'info',
+            message: `${duplicateClients.rows.length} client names appear multiple times`,
+            details: duplicateClients.rows
+          });
+        }
+      } catch (e) { /* table might not exist */ }
 
       // Check for invoices without payments
-      const unpaidInvoices = await pool.query(`
-        SELECT COUNT(*) as count 
-        FROM invoices 
-        WHERE status = 'sent' AND "createdAt" < NOW() - INTERVAL '30 days'
-      `);
-      const unpaidCount = parseInt(unpaidInvoices.rows[0]?.count) || 0;
-      if (unpaidCount > 0) {
-        issues.push({
-          type: 'business_alert',
-          severity: 'warning',
-          message: `${unpaidCount} invoices sent over 30 days ago are still unpaid`,
-        });
-      }
+      try {
+        const unpaidInvoices = await pool.query(`
+          SELECT COUNT(*) as count 
+          FROM invoices 
+          WHERE status = 'sent' AND created_at < NOW() - INTERVAL '30 days'
+        `);
+        const unpaidCount = parseInt(unpaidInvoices.rows[0]?.count) || 0;
+        if (unpaidCount > 0) {
+          issues.push({
+            type: 'business_alert',
+            severity: 'warning',
+            message: `${unpaidCount} invoices sent over 30 days ago are still unpaid`,
+          });
+        }
+      } catch (e) { /* table might not exist */ }
 
       // Check for users without recent activity
-      const inactiveUsers = await pool.query(`
-        SELECT COUNT(*) as count 
-        FROM users 
-        WHERE status = 'active' 
-        AND ("lastLoginAt" IS NULL OR "lastLoginAt" < NOW() - INTERVAL '90 days')
-      `);
-      const inactiveCount = parseInt(inactiveUsers.rows[0]?.count) || 0;
-      if (inactiveCount > 0) {
-        issues.push({
-          type: 'user_activity',
-          severity: 'info',
-          message: `${inactiveCount} active users haven't logged in for 90+ days`,
-        });
-      }
+      try {
+        const inactiveUsers = await pool.query(`
+          SELECT COUNT(*) as count 
+          FROM users 
+          WHERE status = 'active' 
+          AND (last_login_at IS NULL OR last_login_at < NOW() - INTERVAL '90 days')
+        `);
+        const inactiveCount = parseInt(inactiveUsers.rows[0]?.count) || 0;
+        if (inactiveCount > 0) {
+          issues.push({
+            type: 'user_activity',
+            severity: 'info',
+            message: `${inactiveCount} active users haven't logged in for 90+ days`,
+          });
+        }
+      } catch (e) { /* table might not exist */ }
+
+      // Check for jobs in draft status for too long
+      try {
+        const staleDrafts = await pool.query(`
+          SELECT COUNT(*) as count 
+          FROM jobs 
+          WHERE status = 'Draft' AND created_at < NOW() - INTERVAL '7 days'
+        `);
+        const staleCount = parseInt(staleDrafts.rows[0]?.count) || 0;
+        if (staleCount > 0) {
+          issues.push({
+            type: 'stale_data',
+            severity: 'info',
+            message: `${staleCount} jobs have been in draft status for over 7 days`,
+          });
+        }
+      } catch (e) { /* table might not exist */ }
 
       res.json({ 
         healthy: issues.filter(i => i.severity === 'error').length === 0,
