@@ -3683,8 +3683,11 @@ Return ONLY valid JSON.`;
 
   // ==================== SEED ROUTE (DEV ONLY) ====================
 
-  // Simple GET endpoint to reset passwords - requires secret key
+  // Simple GET endpoint to reset passwords - requires secret key (dev only)
   app.get("/api/reset-demo", async (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).send("Not available in production");
+    }
     const key = req.query.key;
     if (key !== "TrueNorth2024Reset") {
       return res.status(403).send("Access denied");
@@ -3704,6 +3707,9 @@ Return ONLY valid JSON.`;
   });
 
   app.post("/api/seed", async (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ error: "Seed not available in production" });
+    }
     try {
       // Upsert demo admin - create or reset password
       const existingAdmin = await storage.getUserByUsername("admin");
@@ -3973,6 +3979,9 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
   // Seed fleet data
   app.post("/api/seed-fleet", async (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ error: "Seed not available in production" });
+    }
     try {
       const existingVehicles = await storage.getAllVehicles();
       if (existingVehicles.length > 0) {

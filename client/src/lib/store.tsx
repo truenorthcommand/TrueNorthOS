@@ -46,8 +46,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           furtherActions: job.furtherActions || [],
         }));
         setJobs(normalizedJobs);
+      } else if (response.status === 401) {
+        setJobs([]);
+        console.log("Session expired - clearing job data");
+      } else {
+        setJobs([]);
+        console.error("Failed to fetch jobs:", response.status);
       }
     } catch (error) {
+      setJobs([]);
       console.error("Failed to fetch jobs:", error);
     } finally {
       setIsLoading(false);
