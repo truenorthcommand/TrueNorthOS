@@ -1,16 +1,16 @@
-# TrueNorth Field View
+# TrueNorth Trade OS
 
-A comprehensive Field Service ERP Suite for UK field engineers and tradespeople. Run your entire business from one platform — jobs, quotes, invoices, timesheets, expenses, fleet, team messaging, and AI-powered tools.
+The complete operating system for UK trade and field service businesses. Run your entire operation from one platform — jobs, quotes, invoices, timesheets, expenses, fleet, team messaging, quality control, and AI-powered tools.
 
 ## Overview
 
-TrueNorth Field View is a "business in a box" platform that enables field service companies to manage all aspects of their operation digitally. From job management and quoting to financial tracking and fleet maintenance, everything is integrated and built specifically for UK tradespeople.
+TrueNorth Trade OS is a comprehensive business management platform that enables trade and field service companies to digitise and streamline every aspect of their operation. From initial enquiry to final payment, everything is integrated and built specifically for UK tradespeople.
 
 ## Platform Classification
 
-**Field Service ERP / All-in-One Operations Suite** — comparable to ServiceTitan, Simpro, and Jobber Pro.
+**Trade Business Operating System** — an all-in-one ERP suite comparable to ServiceTitan, Simpro, and BigChange, but purpose-built for UK compliance and trade workflows.
 
-## Six Integrated Modules
+## Seven Integrated Modules
 
 ### 1. Operations
 - Job management with full lifecycle tracking
@@ -115,6 +115,79 @@ TrueNorth Field View is a "business in a box" platform that enables field servic
 - Engineer: `john` / `john123`
 - Engineer: `sarah` / `sarah123`
 
+## Pricing & Implementation
+
+### Pricing Structure
+
+All plans include professional implementation with setup, testing, data migration, and training.
+
+| Tier | Implementation Fee | Monthly per User | Minimum Term |
+|------|-------------------|------------------|--------------|
+| **Starter** | £500 | £39 | 12 months |
+| **Professional** | £1,500 | £69 | 12 months |
+| **Business** | £3,500 | £99 | 12 months |
+| **Enterprise** | £7,500+ | £149 | 24 months |
+
+### What's Included
+
+**Starter - £500 setup + £39/user/month**
+- Core operations (jobs, quotes, invoices)
+- Basic finance (timesheets, expenses)
+- Client CRM
+- Mobile app access
+- Remote setup and configuration
+- 2-hour video training session
+- Email support
+
+**Professional - £1,500 setup + £69/user/month**
+- Everything in Starter
+- Full finance module with approvals
+- Team messaging
+- Live GPS tracking
+- AI advisors (Trade Parts, Gas Expert, Electrical Expert)
+- Quality control (inspections, snagging)
+- Weekly planner/calendar
+- Full-day on-site or remote training
+- Priority email support
+
+**Business - £3,500 setup + £99/user/month**
+- Everything in Professional
+- Fleet management (vehicles, walkaround checks, defects)
+- Works Manager portal
+- Advanced reporting and analytics
+- Multi-engineer job assignment with AI suggestions
+- Staff skills management
+- Voice notes with AI transcription
+- 2-day implementation and training
+- Phone and email support
+
+**Enterprise - £7,500+ setup + £149/user/month**
+- Everything in Business
+- Unlimited users
+- White-label branding (your logo, colours, domain)
+- Custom integrations (Xero, Sage, QuickBooks)
+- Dedicated implementation manager
+- Full week of on-site implementation
+- SLA guarantees
+- Dedicated account manager
+- Priority phone support
+
+### Target Customers by Tier
+
+- **Starter**: Solo traders and micro-businesses (1-2 users)
+- **Professional**: Growing trade companies (3-10 users)
+- **Business**: Established firms with fleet and compliance needs (10-25 users)
+- **Enterprise**: Large operations wanting white-label solution (25+ users)
+
+### Example Annual Values
+
+| Company Size | Tier | Year 1 Total | Year 2+ Annual |
+|--------------|------|--------------|----------------|
+| 2 engineers | Starter | £1,436 | £936 |
+| 5 engineers | Professional | £5,640 | £4,140 |
+| 15 engineers | Business | £21,320 | £17,820 |
+| 30 engineers | Enterprise | £61,060+ | £53,640 |
+
 ## Architecture
 
 ### Frontend (React + TypeScript)
@@ -181,10 +254,3 @@ The client invoice portal supports card payments via Stripe. When configured:
 - Webhook handlers automatically record payments and update invoice status
 - Payment intent creation requires valid invoice access token or session auth
 - Duplicate webhook deliveries are handled idempotently
-
-## Pricing Tiers
-
-- **Starter**: £29/user/month - Core operations and basic finance
-- **Professional**: £49/user/month - Full finance, team messaging, GPS, AI advisors
-- **Business**: £79/user/month - Everything plus fleet management and advanced features
-- **Enterprise**: Custom pricing - Unlimited users, white-label, custom integrations
