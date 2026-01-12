@@ -1772,6 +1772,8 @@ export async function registerRoutes(
   app.get("/api/clients", requireAdmin, async (req, res) => {
     try {
       const allClients = await storage.getAllClients();
+      // Prevent caching to ensure fresh data
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
       res.json(allClients);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch clients" });
