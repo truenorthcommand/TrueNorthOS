@@ -5799,5 +5799,215 @@ ${invoice.customerEmail ? `Email: ${invoice.customerEmail}` : ''}`
     }
   });
 
+  // ==================== AI DATABASE ANALYST ====================
+
+  app.get("/api/admin/database-stats", requireAdmin, async (req, res) => {
+    try {
+      const stats = await pool.query(`
+        SELECT 
+          schemaname,
+          relname as table_name,
+          n_live_tup as row_count
+        FROM pg_stat_user_tables
+        ORDER BY n_live_tup DESC
+      `);
+
+      const tableInfo = await pool.query(`
+        SELECT 
+          table_name,
+          column_name,
+          data_type,
+          is_nullable
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+        ORDER BY table_name, ordinal_position
+      `);
+
+      const schemaByTable: Record<string, any[]> = {};
+      for (const col of tableInfo.rows) {
+        if (!schemaByTable[col.table_name]) {
+          schemaByTable[col.table_name] = [];
+        }
+        schemaByTable[col.table_name].push({
+          column: col.column_name,
+          type: col.data_type,
+          nullable: col.is_nullable === 'YES'
+        });
+      }
+
+      res.json({
+        tables: stats.rows.map((t: any) => ({
+          name: t.table_name,
+          rowCount: parseInt(t.row_count) || 0,
+          schema: schemaByTable[t.table_name] || []
+        })),
+        totalTables: stats.rows.length
+      });
+    } catch (error) {
+      console.error("Database stats error:", error);
+      res.status(500).json({ error: "Failed to fetch database stats" });
+    }
+  });
+
+  app.post("/api/admin/database-analyze", requireAdmin, async (req, res) => {
+    try {
+      const { question } = req.body;
+      if (!question) {
+        return res.status(400).json({ error: "Question is required" });
+      }
+
+      const openai = getOpenAIClient();
+      if (!openai) {
+        return res.status(503).json({ error: "AI service not available" });
+      }
+
+      const statsResult = await pool.query(`
+        SELECT relname as table_name, n_live_tup as row_count
+        FROM pg_stat_user_tables ORDER BY n_live_tup DESC
+      `);
+
+      const tableStats = statsResult.rows.map((t: any) => 
+        `${t.table_name}: ${t.row_count} rows`
+      ).join('\n');
+
+      const sampleData: Record<string, any> = {};
+      const keyTables = ['users', 'jobs', 'clients', 'quotes', 'invoices', 'timesheets', 'expenses', 'vehicles', 'defects'];
+      
+      for (const table of keyTables) {
+        try {
+          const result = await pool.query(`SELECT * FROM "${table}" LIMIT 3`);
+          if (result.rows.length > 0) {
+            sampleData[table] = result.rows;
+          }
+        } catch (e) {
+          // Table might not exist, skip
+        }
+      }
+
+      const systemPrompt = `You are a database analyst for TrueNorth Trade OS, a field service management application for UK trade businesses.
+
+The application includes these core modules:
+- Jobs: Work orders assigned to engineers
+- Clients: Customer records
+- Quotes: Price quotes for potential work
+- Invoices: Bills sent to clients
+- Timesheets: Employee time tracking
+- Expenses: Employee expense claims
+- Vehicles: Fleet management
+- Defects: Vehicle defect reports
+- Users: Staff accounts with roles (admin, engineer, surveyor, fleet_manager, works_manager)
+
+Current Database Statistics:
+${tableStats}
+
+Sample Data (up to 3 records per table):
+${JSON.stringify(sampleData, null, 2)}
+
+When analyzing:
+1. Look for data integrity issues (orphaned records, missing relationships)
+2. Identify potential duplicates or inconsistencies
+3. Suggest optimizations or data quality improvements
+4. Explain findings in simple, non-technical language
+5. If asked about specific issues, query patterns, or anomalies, provide actionable insights
+
+Be concise and practical. Focus on real issues that affect the business.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: question }
+        ],
+        max_tokens: 2000,
+        temperature: 0.3
+      });
+
+      const answer = response.choices[0]?.message?.content || "No response generated";
+      res.json({ answer, tableStats: statsResult.rows });
+    } catch (error) {
+      console.error("Database analyze error:", error);
+      res.status(500).json({ error: "Failed to analyze database" });
+    }
+  });
+
+  app.get("/api/admin/database-health", requireAdmin, async (req, res) => {
+    try {
+      const issues: { type: string; severity: string; message: string; details?: any }[] = [];
+
+      // Check for orphaned jobs (no client)
+      const orphanedJobs = await pool.query(`
+        SELECT j.id, j."jobNo", j.client 
+        FROM jobs j 
+        LEFT JOIN clients c ON j."clientId" = c.id 
+        WHERE j."clientId" IS NOT NULL AND c.id IS NULL
+        LIMIT 10
+      `);
+      if (orphanedJobs.rows.length > 0) {
+        issues.push({
+          type: 'orphaned_records',
+          severity: 'warning',
+          message: `${orphanedJobs.rows.length} jobs have invalid client references`,
+          details: orphanedJobs.rows
+        });
+      }
+
+      // Check for duplicate client names
+      const duplicateClients = await pool.query(`
+        SELECT name, COUNT(*) as count 
+        FROM clients 
+        GROUP BY LOWER(name) 
+        HAVING COUNT(*) > 1
+      `);
+      if (duplicateClients.rows.length > 0) {
+        issues.push({
+          type: 'duplicates',
+          severity: 'info',
+          message: `${duplicateClients.rows.length} client names appear multiple times`,
+          details: duplicateClients.rows
+        });
+      }
+
+      // Check for invoices without payments
+      const unpaidInvoices = await pool.query(`
+        SELECT COUNT(*) as count 
+        FROM invoices 
+        WHERE status = 'sent' AND "createdAt" < NOW() - INTERVAL '30 days'
+      `);
+      const unpaidCount = parseInt(unpaidInvoices.rows[0]?.count) || 0;
+      if (unpaidCount > 0) {
+        issues.push({
+          type: 'business_alert',
+          severity: 'warning',
+          message: `${unpaidCount} invoices sent over 30 days ago are still unpaid`,
+        });
+      }
+
+      // Check for users without recent activity
+      const inactiveUsers = await pool.query(`
+        SELECT COUNT(*) as count 
+        FROM users 
+        WHERE status = 'active' 
+        AND ("lastLoginAt" IS NULL OR "lastLoginAt" < NOW() - INTERVAL '90 days')
+      `);
+      const inactiveCount = parseInt(inactiveUsers.rows[0]?.count) || 0;
+      if (inactiveCount > 0) {
+        issues.push({
+          type: 'user_activity',
+          severity: 'info',
+          message: `${inactiveCount} active users haven't logged in for 90+ days`,
+        });
+      }
+
+      res.json({ 
+        healthy: issues.filter(i => i.severity === 'error').length === 0,
+        issues,
+        checkedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Database health check error:", error);
+      res.status(500).json({ error: "Failed to check database health" });
+    }
+  });
+
   return httpServer;
 }
