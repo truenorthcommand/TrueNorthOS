@@ -124,6 +124,47 @@ export async function registerRoutes(
     });
   });
 
+  // ==================== DIAGNOSTIC ENDPOINT (PUBLIC) ====================
+  // Used to verify database connectivity and basic data in production
+  app.get("/api/diagnostics", async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      const allJobs = await storage.getAllJobs();
+      
+      res.json({
+        status: "connected",
+        environment: process.env.NODE_ENV || 'development',
+        timestamp: new Date().toISOString(),
+        databaseConnected: true,
+        counts: {
+          users: allUsers.length,
+          jobs: allJobs.length,
+          engineers: allUsers.filter(u => {
+            const roles = (u.roles as string[]) || [u.role];
+            return roles.includes('engineer');
+          }).length,
+          admins: allUsers.filter(u => {
+            const roles = (u.roles as string[]) || [u.role];
+            return roles.includes('admin');
+          }).length,
+        },
+        userNames: allUsers.map(u => u.name),
+        sessionInfo: {
+          hasUserId: !!req.session?.userId,
+          userId: req.session?.userId || null,
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        status: "error",
+        environment: process.env.NODE_ENV || 'development',
+        timestamp: new Date().toISOString(),
+        databaseConnected: false,
+        error: error.message,
+      });
+    }
+  });
+
   // ==================== AUTH ROUTES (PUBLIC) ====================
 
   app.post("/api/auth/login", async (req, res) => {
