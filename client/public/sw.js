@@ -84,7 +84,21 @@ self.addEventListener('message', (event) => {
       event.ports[0].postMessage({ count });
     });
   }
+  
+  if (event.data.type === 'CLEAR_ALL_CACHES') {
+    clearAllCaches().then(() => {
+      event.ports[0].postMessage({ success: true });
+    }).catch((error) => {
+      event.ports[0].postMessage({ success: false, error: error.message });
+    });
+  }
 });
+
+async function clearAllCaches() {
+  const cacheNames = await caches.keys();
+  await Promise.all(cacheNames.map(name => caches.delete(name)));
+  return true;
+}
 
 function isCacheableApiRoute(pathname) {
   return CACHEABLE_API_ROUTES.some(route => pathname.startsWith(route));

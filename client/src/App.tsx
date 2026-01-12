@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { StoreProvider } from "@/lib/store";
+import { useVersionCheck } from "@/hooks/use-version-check";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
@@ -234,6 +235,8 @@ function Router() {
 }
 
 function App() {
+  useVersionCheck();
+  
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>

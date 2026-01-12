@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Save, Building, CreditCard, FileText, Loader2 } from "lucide-react";
+import { Save, Building, CreditCard, FileText, Loader2, RefreshCw, Smartphone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type CompanySettings = {
@@ -28,6 +28,7 @@ export default function Settings() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isClearingCache, setIsClearingCache] = useState(false);
 
   const [settings, setSettings] = useState<CompanySettings>({
     companyName: "",
@@ -97,6 +98,52 @@ export default function Settings() {
       toast({ title: "Error", description: "Failed to save settings", variant: "destructive" });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const clearCacheAndRefresh = async () => {
+    setIsClearingCache(true);
+    try {
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        const messageChannel = new MessageChannel();
+        const promise = new Promise<void>((resolve, reject) => {
+          messageChannel.port1.onmessage = (event) => {
+            if (event.data.success) {
+              resolve();
+            } else {
+              reject(new Error(event.data.error || 'Failed to clear cache'));
+            }
+          };
+        });
+        navigator.serviceWorker.controller.postMessage(
+          { type: 'CLEAR_ALL_CACHES' },
+          [messageChannel.port2]
+        );
+        await promise;
+      }
+      
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map(name => caches.delete(name)));
+      
+      localStorage.setItem('appVersion', '');
+      
+      toast({ 
+        title: "Cache Cleared", 
+        description: "Refreshing app with fresh data..." 
+      });
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    } catch (error) {
+      console.error('Cache clear error:', error);
+      toast({ 
+        title: "Cache Cleared", 
+        description: "Refreshing app..." 
+      });
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
     }
   };
 
@@ -270,6 +317,39 @@ export default function Settings() {
               placeholder="Enter default terms for invoices..."
               rows={4}
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Smartphone className="w-5 h-5" />
+            App Settings
+          </CardTitle>
+          <CardDescription>Manage app data and cache for mobile and web</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+            <div>
+              <p className="font-medium">Clear Cache & Refresh</p>
+              <p className="text-sm text-muted-foreground">
+                Clears all cached data and reloads the app with fresh data. Use this if you're seeing outdated information.
+              </p>
+            </div>
+            <Button 
+              variant="outline" 
+              onClick={clearCacheAndRefresh}
+              disabled={isClearingCache}
+              data-testid="button-clear-cache"
+            >
+              {isClearingCache ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4 mr-2" />
+              )}
+              {isClearingCache ? "Clearing..." : "Clear Cache"}
+            </Button>
           </div>
         </CardContent>
       </Card>
