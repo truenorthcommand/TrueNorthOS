@@ -713,6 +713,7 @@ export async function registerRoutes(
         name: e.name,
         email: e.email,
         phone: e.phone,
+        tabletNumber: e.tabletNumber,
         role: e.role,
         roles: e.roles,
         username: e.username,
@@ -831,14 +832,10 @@ export async function registerRoutes(
 
   app.post("/api/users", requireSuperAdmin, async (req, res) => {
     try {
-      const { username, password, name, email, phone, role, roles, addressLine1, addressLine2, city, county, homePostcode, dayRate } = req.body;
+      const { username, password, name, email, phone, tabletNumber, role, roles, addressLine1, addressLine2, city, county, homePostcode, dayRate } = req.body;
       
       if (!username || !password || !name || !role) {
         return res.status(400).json({ error: "Username, password, name, and role are required" });
-      }
-
-      if (!email && !phone) {
-        return res.status(400).json({ error: "Either email or phone number is required" });
       }
 
       if (password.length < 6) {
@@ -859,6 +856,7 @@ export async function registerRoutes(
         name,
         email: email || null,
         phone: phone || null,
+        tabletNumber: tabletNumber || null,
         role,
         roles: roles || [role],
         status: 'active',
@@ -875,6 +873,7 @@ export async function registerRoutes(
         name: user.name,
         email: user.email,
         phone: user.phone,
+        tabletNumber: user.tabletNumber,
         role: user.role,
         roles: user.roles,
         username: user.username,
@@ -920,12 +919,13 @@ export async function registerRoutes(
         return res.status(403).json({ error: "Cannot demote a super admin" });
       }
 
-      const { name, email, phone, username, password, role, roles, addressLine1, addressLine2, city, county, homePostcode, dayRate } = req.body;
+      const { name, email, phone, tabletNumber, username, password, role, roles, addressLine1, addressLine2, city, county, homePostcode, dayRate } = req.body;
       const updates: Record<string, any> = {};
 
       if (name) updates.name = name;
       if (email !== undefined) updates.email = email || null;
       if (phone !== undefined) updates.phone = phone || null;
+      if (tabletNumber !== undefined) updates.tabletNumber = tabletNumber || null;
       if (username) {
         const existingUser = await storage.getUserByUsername(username);
         if (existingUser && existingUser.id !== req.params.id) {
@@ -958,6 +958,7 @@ export async function registerRoutes(
         name: updatedUser!.name,
         email: updatedUser!.email,
         phone: updatedUser!.phone,
+        tabletNumber: updatedUser!.tabletNumber,
         role: updatedUser!.role,
         roles: updatedUser!.roles,
         username: updatedUser!.username,

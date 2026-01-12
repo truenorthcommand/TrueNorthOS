@@ -22,6 +22,7 @@ interface StaffMember {
   name: string;
   email: string | null;
   phone: string | null;
+  tabletNumber: string | null;
   username: string;
   role: Role;
   roles?: Role[];
@@ -79,10 +80,10 @@ export default function Staff() {
     name: "",
     email: "",
     phone: "",
+    tabletNumber: "",
     username: "",
     password: "",
     roles: ["engineer"] as Role[],
-    contactMethod: "email" as 'email' | 'phone',
     addressLine1: "",
     addressLine2: "",
     city: "",
@@ -95,6 +96,7 @@ export default function Staff() {
     name: "",
     email: "",
     phone: "",
+    tabletNumber: "",
     username: "",
     password: "",
     roles: ["engineer"] as Role[],
@@ -375,12 +377,10 @@ export default function Staff() {
   const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const contactValue = newStaff.contactMethod === 'email' ? newStaff.email : newStaff.phone;
-    
-    if (!newStaff.name || !contactValue || !newStaff.username || !newStaff.password) {
+    if (!newStaff.name || !newStaff.username || !newStaff.password) {
       toast({
         title: "Missing Information",
-        description: `Please fill in name, ${newStaff.contactMethod === 'email' ? 'email' : 'phone number'}, username, and password.`,
+        description: "Please fill in name, username, and password.",
         variant: "destructive",
       });
       return;
@@ -408,8 +408,9 @@ export default function Staff() {
     try {
       const payload = {
         name: newStaff.name,
-        email: newStaff.contactMethod === 'email' ? newStaff.email : null,
-        phone: newStaff.contactMethod === 'phone' ? newStaff.phone : null,
+        email: newStaff.email || null,
+        phone: newStaff.phone || null,
+        tabletNumber: newStaff.tabletNumber || null,
         username: newStaff.username,
         password: newStaff.password,
         role: newStaff.roles[0],
@@ -469,8 +470,8 @@ export default function Staff() {
 
       setStaff([...staff, { ...data, skills: assignedSkills }]);
       setNewStaff({ 
-        name: "", email: "", phone: "", username: "", password: "", 
-        roles: ["engineer"], contactMethod: "email",
+        name: "", email: "", phone: "", tabletNumber: "", username: "", password: "", 
+        roles: ["engineer"],
         addressLine1: "", addressLine2: "", city: "", county: "", homePostcode: "",
         dayRate: ""
       });
@@ -504,6 +505,7 @@ export default function Staff() {
       name: member.name,
       email: member.email || "",
       phone: member.phone || "",
+      tabletNumber: member.tabletNumber || "",
       username: member.username,
       password: "",
       roles: userRoles as Role[],
@@ -577,6 +579,7 @@ export default function Staff() {
         name: editForm.name,
         email: editForm.email || null,
         phone: editForm.phone || null,
+        tabletNumber: editForm.tabletNumber || null,
         username: editForm.username,
         role: editForm.roles[0],
         roles: editForm.roles,
@@ -820,44 +823,34 @@ export default function Staff() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Contact Method</Label>
-                <Select
-                  value={newStaff.contactMethod}
-                  onValueChange={(value: 'email' | 'phone') => setNewStaff({ ...newStaff, contactMethod: value })}
-                >
-                  <SelectTrigger data-testid="select-contact-method">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="email">Email Address</SelectItem>
-                    <SelectItem value="phone">Phone Number</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Email Address</Label>
+                <Input
+                  type="email"
+                  placeholder="john@company.com"
+                  value={newStaff.email}
+                  onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
+                  data-testid="input-staff-email"
+                />
               </div>
               <div className="space-y-2">
-                {newStaff.contactMethod === 'email' ? (
-                  <>
-                    <Label>Email Address</Label>
-                    <Input
-                      type="email"
-                      placeholder="john@company.com"
-                      value={newStaff.email}
-                      onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
-                      data-testid="input-staff-email"
-                    />
-                  </>
-                ) : (
-                  <>
-                    <Label>Phone Number</Label>
-                    <Input
-                      type="tel"
-                      placeholder="07123 456789"
-                      value={newStaff.phone}
-                      onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })}
-                      data-testid="input-staff-phone"
-                    />
-                  </>
-                )}
+                <Label>Phone Number</Label>
+                <Input
+                  type="tel"
+                  placeholder="07123 456789"
+                  value={newStaff.phone}
+                  onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })}
+                  data-testid="input-staff-phone"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Tablet Number</Label>
+                <Input
+                  type="tel"
+                  placeholder="07123 456789"
+                  value={newStaff.tabletNumber}
+                  onChange={(e) => setNewStaff({ ...newStaff, tabletNumber: e.target.value })}
+                  data-testid="input-staff-tablet"
+                />
               </div>
               <div className="space-y-2">
                 <Label>Username (for login)</Label>
@@ -1123,7 +1116,7 @@ export default function Staff() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-phone">Phone (optional)</Label>
+                <Label htmlFor="edit-phone">Phone Number</Label>
                 <Input
                   id="edit-phone"
                   type="tel"
@@ -1131,6 +1124,17 @@ export default function Staff() {
                   onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                   placeholder="07123 456789"
                   data-testid="input-edit-phone"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-tablet">Tablet Number</Label>
+                <Input
+                  id="edit-tablet"
+                  type="tel"
+                  value={editForm.tabletNumber}
+                  onChange={(e) => setEditForm({ ...editForm, tabletNumber: e.target.value })}
+                  placeholder="07123 456789"
+                  data-testid="input-edit-tablet"
                 />
               </div>
               <div className="space-y-2">

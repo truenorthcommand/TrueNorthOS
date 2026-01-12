@@ -10,6 +10,7 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
+  tabletNumber: text("tablet_number"),
   role: text("role").notNull().default("engineer"),
   roles: jsonb("roles").default(["engineer"]),
   superAdmin: boolean("super_admin").notNull().default(false),
