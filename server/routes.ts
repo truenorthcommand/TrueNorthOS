@@ -691,6 +691,50 @@ export async function registerRoutes(
     }
   });
 
+  // Fix user roles - adds missing role to user's roles array
+  app.post("/api/admin/fix-user-role", requireSuperAdmin, async (req, res) => {
+    try {
+      const { userName, roleToAdd } = req.body;
+      
+      if (!userName || !roleToAdd) {
+        return res.status(400).json({ error: "userName and roleToAdd are required" });
+      }
+
+      const validRoles = ['admin', 'engineer', 'surveyor', 'works_manager', 'fleet_manager', 'accounts'];
+      if (!validRoles.includes(roleToAdd)) {
+        return res.status(400).json({ error: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
+      }
+
+      const allUsers = await storage.getAllUsers();
+      const user = allUsers.find(u => u.name.toLowerCase().includes(userName.toLowerCase()));
+      
+      if (!user) {
+        return res.status(404).json({ error: `No user found matching: ${userName}` });
+      }
+
+      const currentRoles = (user.roles as string[]) || [user.role];
+      
+      if (currentRoles.includes(roleToAdd)) {
+        return res.json({ 
+          message: `User ${user.name} already has role: ${roleToAdd}`,
+          user: { id: user.id, name: user.name, roles: currentRoles }
+        });
+      }
+
+      const newRoles = [...currentRoles, roleToAdd];
+      await storage.updateUser(user.id, { roles: newRoles });
+
+      res.json({ 
+        success: true,
+        message: `Added '${roleToAdd}' role to ${user.name}`,
+        user: { id: user.id, name: user.name, roles: newRoles }
+      });
+    } catch (error) {
+      console.error("Fix user role error:", error);
+      res.status(500).json({ error: "Failed to fix user role" });
+    }
+  });
+
   // Get all engineers (users with engineer role) for calendar/planner
   app.get("/api/users/engineers", requireAdmin, async (req, res) => {
     try {
