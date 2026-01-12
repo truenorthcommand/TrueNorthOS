@@ -439,22 +439,38 @@ export default function CalendarPage() {
       date,
       engineerId,
       orderIndex,
+      preserveEngineers,
+      currentAssignedToIds,
     }: {
       jobId: string;
       date: string | null;
       engineerId?: string;
       orderIndex?: number;
+      preserveEngineers?: boolean;
+      currentAssignedToIds?: string[];
     }) => {
+      const body: Record<string, unknown> = {
+        date: date,
+        ...(orderIndex !== undefined && { orderIndex }),
+      };
+
+      if (preserveEngineers && currentAssignedToIds && currentAssignedToIds.length > 1) {
+        // Multi-engineer job: preserve all engineers, don't change assignments
+        // Only update date and orderIndex
+      } else if (engineerId) {
+        // Single engineer or explicitly changing assignment
+        body.assignedToId = engineerId;
+        body.assignedToIds = [engineerId];
+      } else if (!preserveEngineers) {
+        // Clearing assignment (e.g., removing from schedule)
+        body.assignedToIds = [];
+      }
+
       const response = await fetch(`/api/jobs/${jobId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          date: date,
-          assignedToId: engineerId,
-          assignedToIds: engineerId ? [engineerId] : [],
-          ...(orderIndex !== undefined && { orderIndex }),
-        }),
+        body: JSON.stringify(body),
       });
       if (!response.ok) {
         const error = await response.json();
@@ -639,18 +655,23 @@ export default function CalendarPage() {
     const targetCellJobs = getJobsForCell(engineerId, targetDate);
     const newOrderIndex = targetCellJobs.length;
 
+    // Check if this is a multi-engineer job - if so, preserve engineers
+    const isMultiEngineerJob = currentAssignedIds.length > 1;
+
     updateJobMutation.mutate({
       jobId: activeId,
       date: fullIsoDate,
-      engineerId,
+      engineerId: isMultiEngineerJob ? undefined : engineerId,
       orderIndex: newOrderIndex,
+      preserveEngineers: isMultiEngineerJob,
+      currentAssignedToIds: currentAssignedIds,
     });
 
     toast({
       title: "Job moved",
-      description: `Moved to ${
-        engineers.find((e) => e.id === engineerId)?.name
-      } on ${format(targetDate, "EEE dd MMM")}`,
+      description: isMultiEngineerJob 
+        ? `Moved to ${format(targetDate, "EEE dd MMM")} (engineers preserved)`
+        : `Moved to ${engineers.find((e) => e.id === engineerId)?.name} on ${format(targetDate, "EEE dd MMM")}`,
     });
   };
 
