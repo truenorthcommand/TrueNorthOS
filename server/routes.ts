@@ -5924,9 +5924,14 @@ Be concise and practical. Focus on real issues that affect the business.`;
 
       const answer = response.choices[0]?.message?.content || "No response generated";
       res.json({ answer, tableStats: statsResult.rows });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Database analyze error:", error);
-      res.status(500).json({ error: "Failed to analyze database" });
+      const errorMessage = error?.message?.includes('timeout') 
+        ? "AI service timed out. Please try a simpler question."
+        : error?.message?.includes('rate') 
+        ? "AI service rate limited. Please wait a moment and try again."
+        : "Failed to analyze database. The AI service may be temporarily unavailable.";
+      res.status(500).json({ error: errorMessage });
     }
   });
 
