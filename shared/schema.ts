@@ -57,6 +57,7 @@ export const userSkills = pgTable("user_skills", {
 export const jobs = pgTable("jobs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   jobNo: text("job_no").notNull(),
+  nickname: text("nickname"),
   client: text("client"),
   customerName: text("customer_name").notNull(),
   address: text("address"),

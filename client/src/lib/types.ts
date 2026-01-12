@@ -74,6 +74,7 @@ export type FurtherAction = {
 export type Job = {
   id: string;
   jobNo: string;
+  nickname: string | null;
   client: string | null;
   customerName: string;
   address: string | null;

@@ -105,6 +105,7 @@ export default function Clients() {
   const [selectedEngineerIds, setSelectedEngineerIds] = useState<string[]>([]);
   const [engineers, setEngineers] = useState<{id: string; name: string}[]>([]);
   const [jobForm, setJobForm] = useState({
+    nickname: "",
     description: "",
     notes: "",
     session: "AM",
@@ -247,6 +248,7 @@ export default function Clients() {
     
     const newJob = await addJob({
       jobNo: `J-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`,
+      nickname: jobForm.nickname || null,
       client: client.name,
       customerName: client.name,
       address: property.address,
@@ -278,7 +280,7 @@ export default function Clients() {
       setSelectedClientId("");
       setSelectedPropertyId("");
       setSelectedEngineerIds([]);
-      setJobForm({ description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "", isLongRunning: false });
+      setJobForm({ nickname: "", description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "", isLongRunning: false });
       setJobPhotos([]);
     }
   };
@@ -457,6 +459,17 @@ export default function Clients() {
                 </div>
 
                 <div className="space-y-2">
+                  <Label>Job Nickname (shows on planner)</Label>
+                  <Input
+                    placeholder="e.g. Boiler Install, Kitchen Rewire..."
+                    value={jobForm.nickname}
+                    onChange={(e) => setJobForm({ ...jobForm, nickname: e.target.value })}
+                    data-testid="input-nickname"
+                  />
+                  <p className="text-xs text-muted-foreground">Optional - if blank, the client name will be shown on the planner</p>
+                </div>
+
+                <div className="space-y-2">
                   <Label>Description of Works *</Label>
                   <AITextarea
                     placeholder="Describe the work to be carried out..."
@@ -553,7 +566,7 @@ export default function Clients() {
                       setSelectedClientId("");
                       setSelectedPropertyId("");
                       setSelectedEngineerIds([]);
-                      setJobForm({ description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "", isLongRunning: false });
+                      setJobForm({ nickname: "", description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "", isLongRunning: false });
                       setJobPhotos([]);
                     }}
                     data-testid="button-clear-form"

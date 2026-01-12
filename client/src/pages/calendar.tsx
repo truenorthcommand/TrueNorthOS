@@ -177,7 +177,7 @@ function SortableJobCard({
       className="bg-white dark:bg-slate-800 border rounded-md p-2 mb-1 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing select-none"
       data-testid={`planner-job-${job.id}`}
     >
-      <p className="text-xs font-medium truncate">{job.customerName}</p>
+      <p className="text-xs font-medium truncate">{job.nickname || job.customerName}</p>
       {job.postcode && (
         <p className="text-xs text-muted-foreground truncate flex items-center">
           <MapPin className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
@@ -254,7 +254,7 @@ function JobCardOverlay({ job }: { job: Job }) {
           <span className="text-xs text-muted-foreground">{job.session}</span>
         )}
       </div>
-      <p className="text-xs font-medium truncate">{job.customerName}</p>
+      <p className="text-xs font-medium truncate">{job.nickname || job.customerName}</p>
     </div>
   );
 }
