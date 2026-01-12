@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Save, Building, CreditCard, FileText, Loader2, RefreshCw, Smartphone, Database, Send, AlertTriangle, CheckCircle, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 
 type CompanySettings = {
   companyName: string;
@@ -39,6 +40,7 @@ interface HealthIssue {
 
 export default function Settings() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isClearingCache, setIsClearingCache] = useState(false);
@@ -437,102 +439,104 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Database className="w-5 h-5" />
-            AI Database Analyst
-          </CardTitle>
-          <CardDescription>Ask questions about your database and get AI-powered insights</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={loadDbStats}
-              disabled={isLoadingStats}
-              data-testid="button-load-db-stats"
-            >
-              {isLoadingStats ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Database className="w-4 h-4 mr-2" />}
-              View Database Stats
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={checkDbHealth}
-              disabled={isCheckingHealth}
-              data-testid="button-check-db-health"
-            >
-              {isCheckingHealth ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
-              Run Health Check
-            </Button>
-          </div>
+      {user?.superAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Database className="w-5 h-5" />
+              AI Database Analyst
+            </CardTitle>
+            <CardDescription>Ask questions about your database and get AI-powered insights</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={loadDbStats}
+                disabled={isLoadingStats}
+                data-testid="button-load-db-stats"
+              >
+                {isLoadingStats ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Database className="w-4 h-4 mr-2" />}
+                View Database Stats
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={checkDbHealth}
+                disabled={isCheckingHealth}
+                data-testid="button-check-db-health"
+              >
+                {isCheckingHealth ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                Run Health Check
+              </Button>
+            </div>
 
-          {dbStats.length > 0 && (
-            <div className="bg-muted p-4 rounded-lg max-h-48 overflow-y-auto">
-              <p className="font-medium mb-2">Database Tables ({dbStats.length})</p>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                {dbStats.map((table) => (
-                  <div key={table.name} className="flex justify-between">
-                    <span className="text-muted-foreground">{table.name}</span>
-                    <span className="font-mono">{table.rowCount}</span>
+            {dbStats.length > 0 && (
+              <div className="bg-muted p-4 rounded-lg max-h-48 overflow-y-auto">
+                <p className="font-medium mb-2">Database Tables ({dbStats.length})</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {dbStats.map((table) => (
+                    <div key={table.name} className="flex justify-between">
+                      <span className="text-muted-foreground">{table.name}</span>
+                      <span className="font-mono">{table.rowCount}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {healthIssues.length > 0 && (
+              <div className="space-y-2">
+                <p className="font-medium">Health Check Results</p>
+                {healthIssues.map((issue, idx) => (
+                  <div 
+                    key={idx} 
+                    className={`flex items-start gap-2 p-3 rounded-lg ${
+                      issue.severity === 'error' ? 'bg-red-50 text-red-800' :
+                      issue.severity === 'warning' ? 'bg-yellow-50 text-yellow-800' :
+                      'bg-blue-50 text-blue-800'
+                    }`}
+                  >
+                    {issue.severity === 'error' ? <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" /> :
+                     issue.severity === 'warning' ? <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" /> :
+                     <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />}
+                    <span className="text-sm">{issue.message}</span>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
 
-          {healthIssues.length > 0 && (
+            <Separator />
+
             <div className="space-y-2">
-              <p className="font-medium">Health Check Results</p>
-              {healthIssues.map((issue, idx) => (
-                <div 
-                  key={idx} 
-                  className={`flex items-start gap-2 p-3 rounded-lg ${
-                    issue.severity === 'error' ? 'bg-red-50 text-red-800' :
-                    issue.severity === 'warning' ? 'bg-yellow-50 text-yellow-800' :
-                    'bg-blue-50 text-blue-800'
-                  }`}
+              <Label>Ask a Question</Label>
+              <div className="flex gap-2">
+                <Textarea
+                  value={dbQuestion}
+                  onChange={(e) => setDbQuestion(e.target.value)}
+                  placeholder="E.g., Show me clients with no jobs, find duplicate records, what data issues exist?"
+                  rows={2}
+                  className="flex-1"
+                  data-testid="input-db-question"
+                />
+                <Button 
+                  onClick={analyzeDatabase}
+                  disabled={isAnalyzing || !dbQuestion.trim()}
+                  data-testid="button-analyze-db"
                 >
-                  {issue.severity === 'error' ? <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" /> :
-                   issue.severity === 'warning' ? <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" /> :
-                   <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />}
-                  <span className="text-sm">{issue.message}</span>
-                </div>
-              ))}
+                  {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </Button>
+              </div>
             </div>
-          )}
 
-          <Separator />
-
-          <div className="space-y-2">
-            <Label>Ask a Question</Label>
-            <div className="flex gap-2">
-              <Textarea
-                value={dbQuestion}
-                onChange={(e) => setDbQuestion(e.target.value)}
-                placeholder="E.g., Show me clients with no jobs, find duplicate records, what data issues exist?"
-                rows={2}
-                className="flex-1"
-                data-testid="input-db-question"
-              />
-              <Button 
-                onClick={analyzeDatabase}
-                disabled={isAnalyzing || !dbQuestion.trim()}
-                data-testid="button-analyze-db"
-              >
-                {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              </Button>
-            </div>
-          </div>
-
-          {dbAnswer && (
-            <div className="bg-muted p-4 rounded-lg">
-              <p className="font-medium mb-2">AI Analysis</p>
-              <div className="text-sm whitespace-pre-wrap">{dbAnswer}</div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            {dbAnswer && (
+              <div className="bg-muted p-4 rounded-lg">
+                <p className="font-medium mb-2">AI Analysis</p>
+                <div className="text-sm whitespace-pre-wrap">{dbAnswer}</div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

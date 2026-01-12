@@ -5801,7 +5801,7 @@ ${invoice.customerEmail ? `Email: ${invoice.customerEmail}` : ''}`
 
   // ==================== AI DATABASE ANALYST ====================
 
-  app.get("/api/admin/database-stats", requireAdmin, async (req, res) => {
+  app.get("/api/admin/database-stats", requireSuperAdmin, async (req, res) => {
     try {
       const stats = await pool.query(`
         SELECT 
@@ -5849,7 +5849,7 @@ ${invoice.customerEmail ? `Email: ${invoice.customerEmail}` : ''}`
     }
   });
 
-  app.post("/api/admin/database-analyze", requireAdmin, async (req, res) => {
+  app.post("/api/admin/database-analyze", requireSuperAdmin, async (req, res) => {
     try {
       const { question } = req.body;
       if (!question) {
@@ -5930,7 +5930,7 @@ Be concise and practical. Focus on real issues that affect the business.`;
     }
   });
 
-  app.get("/api/admin/database-health", requireAdmin, async (req, res) => {
+  app.get("/api/admin/database-health", requireSuperAdmin, async (req, res) => {
     try {
       const issues: { type: string; severity: string; message: string; details?: any }[] = [];
 
