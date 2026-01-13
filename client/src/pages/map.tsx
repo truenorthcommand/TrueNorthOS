@@ -39,23 +39,29 @@ export default function MapPage() {
       }
     } catch {
       // Fail silently
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 
   const handleRefresh = useCallback(async () => {
     setIsLoading(true);
-    await Promise.all([fetchEngineerLocations(), refreshJobs()]);
+    try {
+      await Promise.all([fetchEngineerLocations(), refreshJobs()]);
+    } finally {
+      setIsLoading(false);
+    }
   }, [fetchEngineerLocations, refreshJobs]);
 
   useEffect(() => {
     if (hasRole(user, 'admin')) {
-      fetchEngineerLocations();
+      const loadInitialData = async () => {
+        await fetchEngineerLocations();
+        setIsLoading(false);
+      };
+      loadInitialData();
       const interval = setInterval(fetchEngineerLocations, 30000);
       return () => clearInterval(interval);
     }
-  }, [user]);
+  }, [user, fetchEngineerLocations]);
 
   if (!user || !hasRole(user, 'admin')) {
     return (
@@ -134,10 +140,11 @@ export default function MapPage() {
           size="sm" 
           onClick={handleRefresh}
           disabled={isLoading}
+          className="cursor-pointer active:scale-95 transition-transform"
           data-testid="button-refresh-map"
         >
           <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh
+          {isLoading ? 'Refreshing...' : 'Refresh'}
         </Button>
       </div>
 
