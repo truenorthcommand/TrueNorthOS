@@ -605,7 +605,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateClientContact(id: string, updates: Partial<ClientContact>): Promise<ClientContact | undefined> {
-    const [updated] = await db.update(clientContacts).set({ ...updates, updatedAt: new Date() }).where(eq(clientContacts.id, id)).returning();
+    // Only allow updating these specific fields
+    const { name, email, phone, role, isPrimary } = updates;
+    const safeUpdates: Record<string, any> = { updatedAt: new Date() };
+    if (name !== undefined) safeUpdates.name = name;
+    if (email !== undefined) safeUpdates.email = email;
+    if (phone !== undefined) safeUpdates.phone = phone;
+    if (role !== undefined) safeUpdates.role = role;
+    if (isPrimary !== undefined) safeUpdates.isPrimary = isPrimary;
+    
+    const [updated] = await db.update(clientContacts).set(safeUpdates).where(eq(clientContacts.id, id)).returning();
     return updated;
   }
 

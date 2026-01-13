@@ -10,11 +10,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { AITextarea } from "@/components/ui/ai-assist";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search } from "lucide-react";
+import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search, User, Phone, Mail, Star, Edit2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { Badge } from "@/components/ui/badge";
 
 interface JobPhoto {
   id: string;
@@ -22,6 +23,16 @@ interface JobPhoto {
   caption: string;
   source: 'admin' | 'engineer';
   timestamp: string;
+}
+
+interface ClientContact {
+  id: string;
+  clientId: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  role: string | null;
+  isPrimary: boolean;
 }
 
 interface Client {
@@ -68,6 +79,97 @@ export default function Clients() {
   });
   const [jobPhotos, setJobPhotos] = useState<JobPhoto[]>([]);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
+  // Client contacts state
+  const [clientContacts, setClientContacts] = useState<Record<string, ClientContact[]>>({});
+  const [isLoadingContacts, setIsLoadingContacts] = useState(false);
+  const [showAddContact, setShowAddContact] = useState<string | null>(null);
+  const [editingContact, setEditingContact] = useState<ClientContact | null>(null);
+  const [newContact, setNewContact] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    role: "",
+    isPrimary: false,
+  });
+
+  const fetchClientContacts = async (clientId: string) => {
+    try {
+      setIsLoadingContacts(true);
+      const res = await fetch(`/api/clients/${clientId}/contacts`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setClientContacts(prev => ({ ...prev, [clientId]: data }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch contacts:', error);
+    } finally {
+      setIsLoadingContacts(false);
+    }
+  };
+
+  const handleAddContact = async (clientId: string) => {
+    if (!newContact.name.trim()) {
+      toast({ title: "Error", description: "Contact name is required.", variant: "destructive" });
+      return;
+    }
+    try {
+      const res = await fetch(`/api/clients/${clientId}/contacts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newContact),
+        credentials: 'include',
+      });
+      if (res.ok) {
+        toast({ title: "Success", description: "Contact added successfully." });
+        setNewContact({ name: "", email: "", phone: "", role: "", isPrimary: false });
+        setShowAddContact(null);
+        fetchClientContacts(clientId);
+      } else {
+        toast({ title: "Error", description: "Failed to add contact.", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to add contact.", variant: "destructive" });
+    }
+  };
+
+  const handleUpdateContact = async (clientId: string, contactId: string, updates: Partial<ClientContact>) => {
+    try {
+      const res = await fetch(`/api/clients/${clientId}/contacts/${contactId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+        credentials: 'include',
+      });
+      if (res.ok) {
+        toast({ title: "Success", description: "Contact updated." });
+        setEditingContact(null);
+        fetchClientContacts(clientId);
+      } else {
+        toast({ title: "Error", description: "Failed to update contact.", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update contact.", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteContact = async (clientId: string, contactId: string) => {
+    if (!confirm("Are you sure you want to delete this contact?")) return;
+    try {
+      const res = await fetch(`/api/clients/${clientId}/contacts/${contactId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        toast({ title: "Success", description: "Contact deleted." });
+        fetchClientContacts(clientId);
+      } else {
+        toast({ title: "Error", description: "Failed to delete contact.", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete contact.", variant: "destructive" });
+    }
+  };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -127,6 +229,13 @@ export default function Clients() {
         .catch(() => {});
     }
   }, [user]);
+
+  // Fetch contacts when a client is expanded
+  useEffect(() => {
+    if (expandedClientId && !clientContacts[expandedClientId]) {
+      fetchClientContacts(expandedClientId);
+    }
+  }, [expandedClientId]);
 
   const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -689,6 +798,224 @@ export default function Clients() {
                         </p>
                       </div>
                     )}
+
+                    {/* Contact Persons Section */}
+                    <div className="border-t pt-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-primary" />
+                          <p className="text-sm font-semibold">Contact Persons</p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowAddContact(showAddContact === client.id ? null : client.id)}
+                          data-testid={`button-add-contact-${client.id}`}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Contact
+                        </Button>
+                      </div>
+
+                      {/* Add Contact Form */}
+                      {showAddContact === client.id && (
+                        <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg mb-4 space-y-3">
+                          <p className="text-sm font-medium">New Contact</p>
+                          <div className="grid md:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Name *</Label>
+                              <Input
+                                placeholder="Contact name"
+                                value={newContact.name}
+                                onChange={(e) => setNewContact({ ...newContact, name: e.target.value })}
+                                data-testid={`input-new-contact-name-${client.id}`}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Role</Label>
+                              <Input
+                                placeholder="e.g., Site Manager"
+                                value={newContact.role}
+                                onChange={(e) => setNewContact({ ...newContact, role: e.target.value })}
+                                data-testid={`input-new-contact-role-${client.id}`}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Email</Label>
+                              <Input
+                                type="email"
+                                placeholder="email@company.com"
+                                value={newContact.email}
+                                onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
+                                data-testid={`input-new-contact-email-${client.id}`}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Phone</Label>
+                              <Input
+                                placeholder="01234 567890"
+                                value={newContact.phone}
+                                onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
+                                data-testid={`input-new-contact-phone-${client.id}`}
+                              />
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`primary-${client.id}`}
+                              checked={newContact.isPrimary}
+                              onCheckedChange={(checked) => setNewContact({ ...newContact, isPrimary: !!checked })}
+                              data-testid={`checkbox-primary-contact-${client.id}`}
+                            />
+                            <label htmlFor={`primary-${client.id}`} className="text-sm">Primary contact</label>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => handleAddContact(client.id)} data-testid={`button-save-contact-${client.id}`}>
+                              Save Contact
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => {
+                              setShowAddContact(null);
+                              setNewContact({ name: "", email: "", phone: "", role: "", isPrimary: false });
+                            }}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Contacts List */}
+                      {isLoadingContacts && expandedClientId === client.id ? (
+                        <p className="text-sm text-muted-foreground">Loading contacts...</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {(clientContacts[client.id] || []).length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No contacts added yet.</p>
+                          ) : (
+                            (clientContacts[client.id] || []).map((contact) => (
+                              <div
+                                key={contact.id}
+                                className="flex items-start justify-between p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg"
+                                data-testid={`contact-card-${contact.id}`}
+                              >
+                                {editingContact?.id === contact.id ? (
+                                  <div className="flex-1 space-y-3">
+                                    <div className="grid md:grid-cols-2 gap-3">
+                                      <div className="space-y-1">
+                                        <Label className="text-xs">Name *</Label>
+                                        <Input
+                                          value={editingContact.name}
+                                          onChange={(e) => setEditingContact({ ...editingContact, name: e.target.value })}
+                                          data-testid={`input-edit-contact-name-${contact.id}`}
+                                        />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-xs">Role</Label>
+                                        <Input
+                                          value={editingContact.role || ""}
+                                          onChange={(e) => setEditingContact({ ...editingContact, role: e.target.value })}
+                                          data-testid={`input-edit-contact-role-${contact.id}`}
+                                        />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-xs">Email</Label>
+                                        <Input
+                                          type="email"
+                                          value={editingContact.email || ""}
+                                          onChange={(e) => setEditingContact({ ...editingContact, email: e.target.value })}
+                                          data-testid={`input-edit-contact-email-${contact.id}`}
+                                        />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-xs">Phone</Label>
+                                        <Input
+                                          value={editingContact.phone || ""}
+                                          onChange={(e) => setEditingContact({ ...editingContact, phone: e.target.value })}
+                                          data-testid={`input-edit-contact-phone-${contact.id}`}
+                                        />
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <Checkbox
+                                        id={`edit-primary-${contact.id}`}
+                                        checked={editingContact.isPrimary}
+                                        onCheckedChange={(checked) => setEditingContact({ ...editingContact, isPrimary: !!checked })}
+                                      />
+                                      <label htmlFor={`edit-primary-${contact.id}`} className="text-sm">Primary contact</label>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => {
+                                          const { id, clientId, ...updateFields } = editingContact;
+                                          handleUpdateContact(client.id, contact.id, updateFields);
+                                        }}
+                                        data-testid={`button-update-contact-${contact.id}`}
+                                      >
+                                        Update
+                                      </Button>
+                                      <Button size="sm" variant="outline" onClick={() => setEditingContact(null)}>
+                                        Cancel
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <p className="font-medium text-sm">{contact.name}</p>
+                                        {contact.isPrimary && (
+                                          <Badge variant="secondary" className="text-xs">
+                                            <Star className="h-3 w-3 mr-1" />
+                                            Primary
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      {contact.role && (
+                                        <p className="text-xs text-muted-foreground mb-1">{contact.role}</p>
+                                      )}
+                                      <div className="flex flex-wrap gap-4 text-sm">
+                                        {contact.email && (
+                                          <a href={`mailto:${contact.email}`} className="flex items-center gap-1 text-primary hover:underline">
+                                            <Mail className="h-3 w-3" />
+                                            {contact.email}
+                                          </a>
+                                        )}
+                                        {contact.phone && (
+                                          <a href={`tel:${contact.phone}`} className="flex items-center gap-1 text-primary hover:underline">
+                                            <Phone className="h-3 w-3" />
+                                            {contact.phone}
+                                          </a>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setEditingContact(contact)}
+                                        className="h-8 w-8 p-0"
+                                        data-testid={`button-edit-contact-${contact.id}`}
+                                      >
+                                        <Edit2 className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDeleteContact(client.id, contact.id)}
+                                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                        data-testid={`button-delete-contact-${contact.id}`}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 )}
               </Card>
