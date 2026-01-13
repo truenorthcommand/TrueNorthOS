@@ -4933,6 +4933,218 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
+  app.get("/api/outlook/emails/:userEmail/:messageId", requireRoles('admin'), async (req, res) => {
+    try {
+      const { userEmail, messageId } = req.params;
+      const email = await outlook.getEmailById(userEmail, messageId);
+      res.json(email);
+    } catch (error: any) {
+      console.error("Get email by id error:", error);
+      res.status(500).json({ error: error.message || "Failed to get email" });
+    }
+  });
+
+  app.get("/api/outlook/emails/:userEmail/:messageId/attachments", requireRoles('admin'), async (req, res) => {
+    try {
+      const { userEmail, messageId } = req.params;
+      const attachments = await outlook.getEmailAttachments(userEmail, messageId);
+      res.json(attachments);
+    } catch (error: any) {
+      console.error("Get attachments error:", error);
+      res.status(500).json({ error: error.message || "Failed to get attachments" });
+    }
+  });
+
+  app.get("/api/outlook/emails/:userEmail/:messageId/attachments/:attachmentId", requireRoles('admin'), async (req, res) => {
+    try {
+      const { userEmail, messageId, attachmentId } = req.params;
+      const attachment = await outlook.getAttachmentContent(userEmail, messageId, attachmentId);
+      res.json(attachment);
+    } catch (error: any) {
+      console.error("Get attachment content error:", error);
+      res.status(500).json({ error: error.message || "Failed to get attachment" });
+    }
+  });
+
+  app.post("/api/outlook/emails/:userEmail/:messageId/reply", requireRoles('admin'), async (req, res) => {
+    try {
+      const { userEmail, messageId } = req.params;
+      const { body, replyAll } = req.body;
+      
+      if (!body) {
+        return res.status(400).json({ error: "Missing required field: body" });
+      }
+
+      await outlook.replyToEmail(userEmail, messageId, body, replyAll || false);
+      res.json({ success: true, message: "Reply sent successfully" });
+    } catch (error: any) {
+      console.error("Reply to email error:", error);
+      res.status(500).json({ error: error.message || "Failed to send reply" });
+    }
+  });
+
+  app.get("/api/outlook/search/:userEmail", requireRoles('admin'), async (req, res) => {
+    try {
+      const { userEmail } = req.params;
+      const query = req.query.q as string;
+      const top = parseInt(req.query.top as string) || 20;
+      
+      if (!query) {
+        return res.status(400).json({ error: "Missing required query parameter: q" });
+      }
+
+      const emails = await outlook.searchEmails(userEmail, query, top);
+      res.json(emails);
+    } catch (error: any) {
+      console.error("Search emails error:", error);
+      res.status(500).json({ error: error.message || "Failed to search emails" });
+    }
+  });
+
+  app.patch("/api/outlook/emails/:userEmail/:messageId/read", requireRoles('admin'), async (req, res) => {
+    try {
+      const { userEmail, messageId } = req.params;
+      const { isRead } = req.body;
+      
+      await outlook.markEmailAsRead(userEmail, messageId, isRead !== false);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Mark email as read error:", error);
+      res.status(500).json({ error: error.message || "Failed to update email" });
+    }
+  });
+
+  app.get("/api/outlook/users", requireRoles('admin'), async (req, res) => {
+    try {
+      const users = await outlook.getUsers();
+      res.json(users);
+    } catch (error: any) {
+      console.error("Get outlook users error:", error);
+      res.status(500).json({ error: error.message || "Failed to get users" });
+    }
+  });
+
+  // ==================== AI EXTRACTION ROUTE ====================
+  app.post("/api/ai/extract", requireRoles('admin'), async (req, res) => {
+    try {
+      const openai = getOpenAIClient();
+      if (!openai) {
+        return res.status(500).json({ error: "OpenAI not configured" });
+      }
+
+      const { prompt } = req.body;
+      if (!prompt) {
+        return res.status(400).json({ error: "Prompt is required" });
+      }
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: "You are an assistant that extracts structured information from text. Always respond with valid JSON only, no markdown formatting." },
+          { role: "user", content: prompt }
+        ],
+        max_tokens: 1000,
+      });
+
+      const content = response.choices[0]?.message?.content || "{}";
+      try {
+        const parsed = JSON.parse(content);
+        res.json({ result: parsed });
+      } catch {
+        res.json({ result: content });
+      }
+    } catch (error: any) {
+      console.error("AI extraction error:", error);
+      res.status(500).json({ error: error.message || "AI extraction failed" });
+    }
+  });
+
+  // ==================== SNIPPET ROUTES ====================
+
+  app.get("/api/snippets", requireAuth, async (req, res) => {
+    try {
+      const snippets = await storage.getSnippets(req.session.userId!);
+      res.json(snippets);
+    } catch (error: any) {
+      console.error("Get snippets error:", error);
+      res.status(500).json({ error: error.message || "Failed to get snippets" });
+    }
+  });
+
+  app.post("/api/snippets", requireAuth, async (req, res) => {
+    try {
+      const { title, content, category, shortcut } = req.body;
+      if (!title || !content) {
+        return res.status(400).json({ error: "Title and content are required" });
+      }
+      const user = await storage.getUser(req.session.userId!);
+      const isAdmin = user?.role === 'admin' || (user?.roles as string[] || []).includes('admin');
+      const snippet = await storage.createSnippet({
+        title,
+        content,
+        category: category || 'general',
+        shortcut,
+        isGlobal: isAdmin && req.body.isGlobal === true,
+        createdById: req.session.userId,
+      });
+      res.json(snippet);
+    } catch (error: any) {
+      console.error("Create snippet error:", error);
+      res.status(500).json({ error: error.message || "Failed to create snippet" });
+    }
+  });
+
+  app.patch("/api/snippets/:id", requireAuth, async (req, res) => {
+    try {
+      const snippets = await storage.getSnippets(req.session.userId!);
+      const existing = snippets.find(s => s.id === req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Snippet not found" });
+      }
+      const user = await storage.getUser(req.session.userId!);
+      const isAdmin = user?.role === 'admin' || (user?.roles as string[] || []).includes('admin');
+      if (existing.isGlobal && !isAdmin) {
+        return res.status(403).json({ error: "Only admins can update global snippets" });
+      }
+      if (!existing.isGlobal && existing.createdById !== req.session.userId) {
+        return res.status(403).json({ error: "Not authorized to update this snippet" });
+      }
+      const { title, content, category, shortcut } = req.body;
+      const snippet = await storage.updateSnippet(req.params.id, {
+        title,
+        content,
+        category,
+        shortcut,
+      });
+      res.json(snippet);
+    } catch (error: any) {
+      console.error("Update snippet error:", error);
+      res.status(500).json({ error: error.message || "Failed to update snippet" });
+    }
+  });
+
+  app.delete("/api/snippets/:id", requireAuth, async (req, res) => {
+    try {
+      const snippets = await storage.getSnippets(req.session.userId!);
+      const existing = snippets.find(s => s.id === req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Snippet not found" });
+      }
+      if (existing.createdById !== req.session.userId) {
+        const user = await storage.getUser(req.session.userId!);
+        const isAdmin = user?.role === 'admin' || (user?.roles as string[] || []).includes('admin');
+        if (!isAdmin) {
+          return res.status(403).json({ error: "Not authorized to delete this snippet" });
+        }
+      }
+      await storage.deleteSnippet(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete snippet error:", error);
+      res.status(500).json({ error: error.message || "Failed to delete snippet" });
+    }
+  });
+
   // ==================== MESSAGING ROUTES ====================
 
   // Get all conversations for current user

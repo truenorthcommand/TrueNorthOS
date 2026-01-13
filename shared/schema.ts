@@ -987,3 +987,42 @@ export type FinancialSummary = {
   netProfit: number;
   period: string;
 };
+
+export const snippets = pgTable("snippets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  category: text("category").notNull().default("general"),
+  shortcut: text("shortcut"),
+  isGlobal: boolean("is_global").notNull().default(false),
+  createdById: varchar("created_by_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSnippetSchema = createInsertSchema(snippets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSnippet = z.infer<typeof insertSnippetSchema>;
+export type Snippet = typeof snippets.$inferSelect;
+
+export const outlookSettings = pgTable("outlook_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  defaultUserEmail: text("default_user_email"),
+  syncEnabled: boolean("sync_enabled").notNull().default(false),
+  autoExtract: boolean("auto_extract").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertOutlookSettingsSchema = createInsertSchema(outlookSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertOutlookSettings = z.infer<typeof insertOutlookSettingsSchema>;
+export type OutlookSettings = typeof outlookSettings.$inferSelect;

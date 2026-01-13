@@ -150,3 +150,93 @@ export async function testConnection(): Promise<{ success: boolean; message: str
     return { success: false, message: error.message || "Connection failed" };
   }
 }
+
+export async function getEmailById(userEmail: string, messageId: string): Promise<any> {
+  const accessToken = await getAccessToken();
+  const client = getGraphClient(accessToken);
+
+  const message = await client
+    .api(`/users/${userEmail}/messages/${messageId}`)
+    .select("id,subject,from,toRecipients,ccRecipients,receivedDateTime,body,bodyPreview,isRead,hasAttachments,importance,conversationId")
+    .get();
+
+  return message;
+}
+
+export async function getEmailAttachments(userEmail: string, messageId: string): Promise<any[]> {
+  const accessToken = await getAccessToken();
+  const client = getGraphClient(accessToken);
+
+  const attachments = await client
+    .api(`/users/${userEmail}/messages/${messageId}/attachments`)
+    .get();
+
+  return attachments.value;
+}
+
+export async function getAttachmentContent(userEmail: string, messageId: string, attachmentId: string): Promise<any> {
+  const accessToken = await getAccessToken();
+  const client = getGraphClient(accessToken);
+
+  const attachment = await client
+    .api(`/users/${userEmail}/messages/${messageId}/attachments/${attachmentId}`)
+    .get();
+
+  return attachment;
+}
+
+export async function replyToEmail(userEmail: string, messageId: string, replyBody: string, replyAll: boolean = false): Promise<void> {
+  const accessToken = await getAccessToken();
+  const client = getGraphClient(accessToken);
+
+  const reply = {
+    message: {
+      body: {
+        contentType: "HTML",
+        content: replyBody,
+      },
+    },
+  };
+
+  const endpoint = replyAll ? "replyAll" : "reply";
+  await client.api(`/users/${userEmail}/messages/${messageId}/${endpoint}`).post(reply);
+}
+
+export async function searchEmails(userEmail: string, query: string, top: number = 20): Promise<any[]> {
+  const accessToken = await getAccessToken();
+  const client = getGraphClient(accessToken);
+
+  const sanitizedQuery = query.replace(/'/g, "''").replace(/[\\"%&]/g, "");
+
+  const messages = await client
+    .api(`/users/${userEmail}/messages`)
+    .filter(`contains(subject,'${sanitizedQuery}') or contains(from/emailAddress/address,'${sanitizedQuery}')`)
+    .top(top)
+    .select("id,subject,from,receivedDateTime,bodyPreview,isRead,hasAttachments")
+    .orderby("receivedDateTime DESC")
+    .get();
+
+  return messages.value;
+}
+
+export async function markEmailAsRead(userEmail: string, messageId: string, isRead: boolean = true): Promise<void> {
+  const accessToken = await getAccessToken();
+  const client = getGraphClient(accessToken);
+
+  await client
+    .api(`/users/${userEmail}/messages/${messageId}`)
+    .patch({ isRead });
+}
+
+export async function getUsers(): Promise<any[]> {
+  const accessToken = await getAccessToken();
+  const client = getGraphClient(accessToken);
+
+  const users = await client
+    .api('/users')
+    .select('id,displayName,mail,userPrincipalName')
+    .top(50)
+    .get();
+
+  return users.value;
+}

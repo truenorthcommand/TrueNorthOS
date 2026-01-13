@@ -33,13 +33,14 @@ import {
   type InvoiceChaseLog, type InsertInvoiceChaseLog,
   type FixedCost, type InsertFixedCost,
   type InvoiceWithChaseInfo, type FinancialSummary,
+  type Snippet, type InsertSnippet,
   users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, clientContacts, clientProperties, jobUpdates,
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
   timesheets, expenses, payments,
   skills, userSkills,
   inspections, inspectionItems, snaggingSheets, snagItems,
-  accountsReceipts, invoiceChaseLogs, fixedCosts
+  accountsReceipts, invoiceChaseLogs, fixedCosts, snippets
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and, ne, inArray, gt, asc } from "drizzle-orm";
@@ -251,6 +252,12 @@ export interface IStorage {
   getInvoicesWithChaseInfo(): Promise<InvoiceWithChaseInfo[]>;
   getOverdueInvoices(daysOverdue?: number): Promise<InvoiceWithChaseInfo[]>;
   getFinancialSummary(startDate?: Date, endDate?: Date): Promise<FinancialSummary>;
+  
+  // Snippets
+  getSnippets(userId: string): Promise<Snippet[]>;
+  createSnippet(data: InsertSnippet): Promise<Snippet>;
+  updateSnippet(id: string, data: Partial<Snippet>): Promise<Snippet | undefined>;
+  deleteSnippet(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1904,6 +1911,29 @@ export class DatabaseStorage implements IStorage {
       netProfit: totalRevenue - totalCosts,
       period,
     };
+  }
+
+  async getSnippets(userId: string): Promise<Snippet[]> {
+    return db.select().from(snippets)
+      .where(or(eq(snippets.createdById, userId), eq(snippets.isGlobal, true)))
+      .orderBy(snippets.category, snippets.title);
+  }
+
+  async createSnippet(data: InsertSnippet): Promise<Snippet> {
+    const [snippet] = await db.insert(snippets).values(data).returning();
+    return snippet;
+  }
+
+  async updateSnippet(id: string, data: Partial<Snippet>): Promise<Snippet | undefined> {
+    const [snippet] = await db.update(snippets)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(snippets.id, id))
+      .returning();
+    return snippet;
+  }
+
+  async deleteSnippet(id: string): Promise<void> {
+    await db.delete(snippets).where(eq(snippets.id, id));
   }
 }
 
