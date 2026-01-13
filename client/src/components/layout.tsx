@@ -216,10 +216,42 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Link>
         )}
 
+        {/* Clients - Admin & Surveyor */}
+        {hasRole(user, 'admin', 'surveyor') && (
+          collapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link href="/clients">
+                  <Button
+                    variant={location === "/clients" ? "secondary" : "ghost"}
+                    size="icon"
+                    className="w-10 h-10"
+                    data-testid="nav-clients"
+                  >
+                    <Building2Icon className="h-5 w-5" />
+                  </Button>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right">Clients</TooltipContent>
+            </Tooltip>
+          ) : (
+            <Link href="/clients">
+              <Button
+                variant={location === "/clients" ? "secondary" : "ghost"}
+                className="w-full justify-start h-12 text-lg font-medium"
+                onClick={() => setIsOpen(false)}
+                data-testid="nav-clients"
+              >
+                <Building2Icon className="mr-3 h-5 w-5" />
+                Clients
+              </Button>
+            </Link>
+          )
+        )}
+
         {/* Sales Section - Admin & Surveyor */}
         {hasRole(user, 'admin', 'surveyor') && (
           <MenuGroup title="Sales" icon={BarChart3} section="sales">
-            <NavLink href="/clients" icon={Building2Icon}>Clients</NavLink>
             <NavLink href="/quotes" icon={FileText}>Quotes</NavLink>
             {hasRole(user, 'admin') && (
               <NavLink href="/invoices" icon={Receipt}>Invoices</NavLink>
@@ -319,6 +351,39 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </MenuGroup>
 
 
+        {/* Email - Admin Only */}
+        {hasRole(user, 'admin') && (
+          collapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link href="/outlook-inbox">
+                  <Button
+                    variant={location === "/outlook-inbox" ? "secondary" : "ghost"}
+                    size="icon"
+                    className="w-10 h-10"
+                    data-testid="nav-email"
+                  >
+                    <Mail className="h-5 w-5" />
+                  </Button>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right">Email</TooltipContent>
+            </Tooltip>
+          ) : (
+            <Link href="/outlook-inbox">
+              <Button
+                variant={location === "/outlook-inbox" ? "secondary" : "ghost"}
+                className="w-full justify-start h-12 text-lg font-medium"
+                onClick={() => setIsOpen(false)}
+                data-testid="nav-email"
+              >
+                <Mail className="mr-3 h-5 w-5" />
+                Email
+              </Button>
+            </Link>
+          )
+        )}
+
         {/* Tools Section */}
         <MenuGroup title="Tools" icon={Wrench} section="tools">
           <NavLink href="/user-guide" icon={BookOpen}>Help Guide</NavLink>
@@ -328,7 +393,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <NavLink href="/security" icon={Shield}>Security</NavLink>
           {hasRole(user, 'admin') && (
             <>
-              <NavLink href="/outlook-inbox" icon={Mail}>Outlook Inbox</NavLink>
               <NavLink href="/settings" icon={Settings}>Settings</NavLink>
               <NavLink href="/admin/advisors" icon={Bot}>Advisor Settings</NavLink>
             </>
