@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AITextarea } from "@/components/ui/ai-assist";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search, User, Phone, Mail, Star, Edit2 } from "lucide-react";
+import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search, User, Phone, Mail, Star, Edit2, ChevronRight, ChevronLeft, Check, Home, Save } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
@@ -35,6 +35,19 @@ interface ClientContact {
   isPrimary: boolean;
 }
 
+interface ClientProperty {
+  id: string;
+  clientId: string;
+  name: string;
+  address: string;
+  postcode: string | null;
+  contactName: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
+  notes: string | null;
+  isDefault: boolean;
+}
+
 interface Client {
   id: string;
   name: string;
@@ -45,6 +58,13 @@ interface Client {
   postcode: string | null;
   notes: string | null;
 }
+
+const STEP_TITLES = [
+  "Select Client",
+  "Select Property",
+  "Job Details",
+  "Assign & Send"
+];
 
 export default function Clients() {
   const { user } = useAuth();
@@ -88,6 +108,22 @@ export default function Clients() {
   const [jobPhotos, setJobPhotos] = useState<JobPhoto[]>([]);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
+  // Step-based form state
+  const [currentStep, setCurrentStep] = useState(1);
+  const [clientProperties, setClientProperties] = useState<Record<string, ClientProperty[]>>({});
+  const [selectedPropertyId, setSelectedPropertyId] = useState("");
+  const [showAddProperty, setShowAddProperty] = useState(false);
+  const [newProperty, setNewProperty] = useState({
+    name: "",
+    address: "",
+    postcode: "",
+    contactName: "",
+    contactPhone: "",
+    contactEmail: "",
+  });
+  const [isLoadingProperties, setIsLoadingProperties] = useState(false);
+  const [assignOption, setAssignOption] = useState<'ready' | 'assign'>('ready');
+
   // Client contacts state
   const [clientContacts, setClientContacts] = useState<Record<string, ClientContact[]>>({});
   const [isLoadingContacts, setIsLoadingContacts] = useState(false);
@@ -113,6 +149,51 @@ export default function Clients() {
       console.error('Failed to fetch contacts:', error);
     } finally {
       setIsLoadingContacts(false);
+    }
+  };
+
+  const fetchClientProperties = async (clientId: string) => {
+    try {
+      setIsLoadingProperties(true);
+      const res = await fetch(`/api/clients/${clientId}/properties`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setClientProperties(prev => ({ ...prev, [clientId]: data }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch properties:', error);
+    } finally {
+      setIsLoadingProperties(false);
+    }
+  };
+
+  const handleAddProperty = async () => {
+    if (!newProperty.name.trim() || !newProperty.address.trim()) {
+      toast({ title: "Error", description: "Property name and address are required.", variant: "destructive" });
+      return;
+    }
+    try {
+      const res = await fetch(`/api/clients/${selectedClientId}/properties`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: selectedClientId,
+          ...newProperty,
+        }),
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const createdProperty = await res.json();
+        toast({ title: "Success", description: "Property added successfully." });
+        setNewProperty({ name: "", address: "", postcode: "", contactName: "", contactPhone: "", contactEmail: "" });
+        setShowAddProperty(false);
+        await fetchClientProperties(selectedClientId);
+        setSelectedPropertyId(createdProperty.id);
+      } else {
+        toast({ title: "Error", description: "Failed to add property.", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to add property.", variant: "destructive" });
     }
   };
 
@@ -245,13 +326,19 @@ export default function Clients() {
     }
   }, [expandedClientId]);
 
-  // Fetch contacts when a client is selected in job form
+  // Fetch contacts and properties when a client is selected in job form
   useEffect(() => {
-    if (selectedClientId && !clientContacts[selectedClientId]) {
-      fetchClientContacts(selectedClientId);
+    if (selectedClientId) {
+      if (!clientContacts[selectedClientId]) {
+        fetchClientContacts(selectedClientId);
+      }
+      if (!clientProperties[selectedClientId]) {
+        fetchClientProperties(selectedClientId);
+      }
     }
-    // Reset selected contact when client changes
+    // Reset selected contact and property when client changes
     setSelectedContactId("");
+    setSelectedPropertyId("");
   }, [selectedClientId]);
 
   const handleAddClient = async (e: React.FormEvent) => {
@@ -319,13 +406,11 @@ export default function Clients() {
     }
   };
 
-  const handleCreateJobFromClient = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleCreateJobFromClient = async (status: 'Ready' | 'Draft') => {
     if (!selectedClientId || !jobForm.description) {
       toast({ 
         title: "Missing Information", 
-        description: "Please select a client and enter a description.",
+        description: "Please complete all required fields.",
         variant: "destructive"
       });
       return;
@@ -334,27 +419,36 @@ export default function Clients() {
     const client = clients.find(c => c.id === selectedClientId);
     if (!client) return;
 
-    // Use selected contact if available, otherwise fall back to client defaults
+    // Get selected property for address info
+    const selectedProperty = selectedPropertyId && clientProperties[selectedClientId]
+      ? clientProperties[selectedClientId].find(p => p.id === selectedPropertyId)
+      : null;
+
+    // Use selected contact if available, then property contact, then client defaults
     const selectedContact = selectedContactId && clientContacts[selectedClientId]
       ? clientContacts[selectedClientId].find(c => c.id === selectedContactId)
       : null;
 
-    const contactName = selectedContact?.name || client.contactName || "";
-    const contactPhone = selectedContact?.phone || client.phone || "";
-    const contactEmail = selectedContact?.email || client.email || "";
+    const contactName = selectedContact?.name || selectedProperty?.contactName || client.contactName || "";
+    const contactPhone = selectedContact?.phone || selectedProperty?.contactPhone || client.phone || "";
+    const contactEmail = selectedContact?.email || selectedProperty?.contactEmail || client.email || "";
 
-    const assignToIds = user?.role === 'admin' && selectedEngineerIds.length > 0 
+    // Use property address if selected, otherwise client address
+    const jobAddress = selectedProperty?.address || client.address || "";
+    const jobPostcode = selectedProperty?.postcode || client.postcode || "";
+
+    const assignToIds = status === 'Draft' && selectedEngineerIds.length > 0 
       ? selectedEngineerIds 
-      : user?.id ? [user.id] : [];
-    const primaryAssignee = assignToIds[0] || user?.id || "";
+      : [];
+    const primaryAssignee = assignToIds[0] || "";
     
     const newJob = await addJob({
       jobNo: `J-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`,
       nickname: jobForm.nickname || null,
       client: client.name,
       customerName: client.name,
-      address: client.address || "",
-      postcode: client.postcode || "",
+      address: jobAddress,
+      postcode: jobPostcode,
       contactName: contactName,
       contactPhone: contactPhone,
       contactEmail: contactEmail,
@@ -364,8 +458,8 @@ export default function Clients() {
       description: jobForm.description,
       notes: jobForm.notes,
       isLongRunning: jobForm.isLongRunning,
-      status: "Draft",
-      assignedToId: primaryAssignee,
+      status: status,
+      assignedToId: primaryAssignee || null,
       assignedToIds: assignToIds,
       materials: [],
       photos: jobPhotos,
@@ -374,22 +468,60 @@ export default function Clients() {
     });
 
     if (newJob) {
+      const message = status === 'Ready' 
+        ? `Job sheet #${newJob.jobNo} saved as Ready for ${client.name}`
+        : `Job sheet #${newJob.jobNo} has been created and sent for ${client.name}`;
+      
       toast({
-        title: "Job Sheet Sent",
-        description: `Job sheet #${newJob.jobNo} has been created and sent for ${client.name}`,
+        title: status === 'Ready' ? "Job Saved as Ready" : "Job Sheet Sent",
+        description: message,
       });
 
+      // Reset form
       setSelectedClientId("");
       setSelectedContactId("");
+      setSelectedPropertyId("");
       setSelectedEngineerIds([]);
       setJobForm({ nickname: "", description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "", isLongRunning: false });
       setJobPhotos([]);
+      setCurrentStep(1);
+      setShowAddProperty(false);
+      setAssignOption('ready');
+    }
+  };
+
+  // Step validation
+  const canProceedToNextStep = () => {
+    switch (currentStep) {
+      case 1:
+        return !!selectedClientId;
+      case 2:
+        return !!selectedPropertyId || showAddProperty;
+      case 3:
+        return !!jobForm.description.trim();
+      default:
+        return true;
+    }
+  };
+
+  const goToNextStep = () => {
+    if (currentStep < 4 && canProceedToNextStep()) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const goToPreviousStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
     }
   };
 
   if (!user) return null;
 
   const selectedClient = clients.find(c => c.id === selectedClientId);
+  const selectedProperty = selectedPropertyId && clientProperties[selectedClientId]
+    ? clientProperties[selectedClientId].find(p => p.id === selectedPropertyId)
+    : null;
 
   const filteredClients = clients.filter((client) => {
     if (!clientSearchTerm) return true;
@@ -403,6 +535,535 @@ export default function Clients() {
       (client.postcode || '').toLowerCase().includes(term)
     );
   });
+
+  // Step indicator component
+  const StepIndicator = () => (
+    <div className="flex items-center justify-between mb-6">
+      {STEP_TITLES.map((title, index) => {
+        const stepNumber = index + 1;
+        const isActive = currentStep === stepNumber;
+        const isCompleted = currentStep > stepNumber;
+        
+        return (
+          <div key={stepNumber} className="flex items-center flex-1">
+            <div className="flex flex-col items-center flex-1">
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                  isCompleted
+                    ? 'bg-emerald-600 text-white'
+                    : isActive
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {isCompleted ? <Check className="h-5 w-5" /> : stepNumber}
+              </div>
+              <span className={`text-xs mt-1 text-center ${isActive ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+                {title}
+              </span>
+            </div>
+            {stepNumber < 4 && (
+              <div className={`h-0.5 flex-1 mx-2 ${isCompleted ? 'bg-emerald-600' : 'bg-muted'}`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  // Render step content
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select Client *</Label>
+              <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                <SelectTrigger data-testid="select-client">
+                  <SelectValue placeholder="Choose a client..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedClient && (
+              <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border space-y-3">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-primary" />
+                  <p className="text-sm font-medium">Client Information</p>
+                </div>
+                <div className="grid md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Company</p>
+                    <p className="font-medium" data-testid="text-client-name">{selectedClient.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Contact Person</p>
+                    <p className="font-medium" data-testid="text-contact-name">{selectedClient.contactName || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Phone</p>
+                    <p className="font-medium" data-testid="text-contact-phone">{selectedClient.phone || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Email</p>
+                    <p className="font-medium" data-testid="text-contact-email">{selectedClient.email || '-'}</p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Address</p>
+                    <p className="font-medium" data-testid="text-client-address">{selectedClient.address || '-'}{selectedClient.postcode ? `, ${selectedClient.postcode}` : ''}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
+      case 2:
+        return (
+          <div className="space-y-4">
+            {isLoadingProperties ? (
+              <p className="text-sm text-muted-foreground">Loading properties...</p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Select Property *</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAddProperty(!showAddProperty)}
+                      data-testid="button-add-property"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add New Property
+                    </Button>
+                  </div>
+                  
+                  {(clientProperties[selectedClientId] || []).length > 0 ? (
+                    <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
+                      <SelectTrigger data-testid="select-property">
+                        <SelectValue placeholder="Choose a property..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(clientProperties[selectedClientId] || []).map((property) => (
+                          <SelectItem key={property.id} value={property.id}>
+                            <div className="flex flex-col">
+                              <span>{property.name}{property.isDefault ? ' (Default)' : ''}</span>
+                              <span className="text-xs text-muted-foreground">{property.address}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-sm text-muted-foreground p-4 border rounded-lg bg-slate-50 dark:bg-slate-900/50">
+                      No properties found for this client. Add a new property to continue.
+                    </p>
+                  )}
+                </div>
+
+                {showAddProperty && (
+                  <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Home className="h-4 w-4 text-primary" />
+                      <p className="text-sm font-medium">New Property</p>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm">Property Name *</Label>
+                        <Input
+                          placeholder="e.g., Head Office, Site A"
+                          value={newProperty.name}
+                          onChange={(e) => setNewProperty({ ...newProperty, name: e.target.value })}
+                          data-testid="input-property-name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm">Postcode</Label>
+                        <Input
+                          placeholder="e.g., SW1A 1AA"
+                          value={newProperty.postcode}
+                          onChange={(e) => setNewProperty({ ...newProperty, postcode: e.target.value })}
+                          data-testid="input-property-postcode"
+                        />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label className="text-sm">Address *</Label>
+                        <Textarea
+                          placeholder="Full property address"
+                          value={newProperty.address}
+                          onChange={(e) => setNewProperty({ ...newProperty, address: e.target.value })}
+                          className="min-h-[80px]"
+                          data-testid="input-property-address"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm">Contact Name</Label>
+                        <Input
+                          placeholder="Site contact name"
+                          value={newProperty.contactName}
+                          onChange={(e) => setNewProperty({ ...newProperty, contactName: e.target.value })}
+                          data-testid="input-property-contact-name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm">Contact Phone</Label>
+                        <Input
+                          placeholder="01onal 567890"
+                          value={newProperty.contactPhone}
+                          onChange={(e) => setNewProperty({ ...newProperty, contactPhone: e.target.value })}
+                          data-testid="input-property-contact-phone"
+                        />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label className="text-sm">Contact Email</Label>
+                        <Input
+                          type="email"
+                          placeholder="site@company.com"
+                          value={newProperty.contactEmail}
+                          onChange={(e) => setNewProperty({ ...newProperty, contactEmail: e.target.value })}
+                          data-testid="input-property-contact-email"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button type="button" size="sm" onClick={handleAddProperty} data-testid="button-save-property">
+                        Save Property
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => {
+                        setShowAddProperty(false);
+                        setNewProperty({ name: "", address: "", postcode: "", contactName: "", contactPhone: "", contactEmail: "" });
+                      }}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {selectedProperty && (
+                  <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg border border-emerald-200 dark:border-emerald-800 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-emerald-600" />
+                      <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Selected Property</p>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Name</p>
+                        <p className="font-medium">{selectedProperty.name}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Postcode</p>
+                        <p className="font-medium">{selectedProperty.postcode || '-'}</p>
+                      </div>
+                      <div className="md:col-span-2">
+                        <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Address</p>
+                        <p className="font-medium">{selectedProperty.address}</p>
+                      </div>
+                      {(selectedProperty.contactName || selectedProperty.contactPhone || selectedProperty.contactEmail) && (
+                        <>
+                          <div>
+                            <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Site Contact</p>
+                            <p className="font-medium">{selectedProperty.contactName || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Contact Info</p>
+                            <p className="font-medium">
+                              {selectedProperty.contactPhone || selectedProperty.contactEmail || '-'}
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {selectedClientId && clientContacts[selectedClientId] && clientContacts[selectedClientId].length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Contact Person (Optional)</Label>
+                    <Select value={selectedContactId} onValueChange={setSelectedContactId}>
+                      <SelectTrigger data-testid="select-contact-person">
+                        <SelectValue placeholder="Select a contact person..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {clientContacts[selectedClientId].map((contact) => (
+                          <SelectItem key={contact.id} value={contact.id}>
+                            <div className="flex flex-col">
+                              <span>{contact.name}{contact.isPrimary ? ' (Primary)' : ''}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {contact.role && `${contact.role} • `}{contact.phone || contact.email || 'No contact info'}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        );
+
+      case 3:
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Appointment Date</Label>
+                <Input
+                  type="date"
+                  value={jobForm.date}
+                  onChange={(e) => setJobForm({ ...jobForm, date: e.target.value })}
+                  data-testid="input-date"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Session</Label>
+                <Select value={jobForm.session} onValueChange={(value) => setJobForm({ ...jobForm, session: value })}>
+                  <SelectTrigger data-testid="select-session">
+                    <SelectValue placeholder="Select session..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AM">AM (Morning)</SelectItem>
+                    <SelectItem value="PM">PM (Afternoon)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Job Order</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="999"
+                  placeholder="Auto"
+                  value={jobForm.orderNumber}
+                  onChange={(e) => setJobForm({ ...jobForm, orderNumber: e.target.value })}
+                  data-testid="input-order-number"
+                />
+                <p className="text-xs text-muted-foreground">Lower numbers appear first</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Job Nickname (shows on planner)</Label>
+              <Input
+                placeholder="e.g. Boiler Install, Kitchen Rewire..."
+                value={jobForm.nickname}
+                onChange={(e) => setJobForm({ ...jobForm, nickname: e.target.value })}
+                data-testid="input-nickname"
+              />
+              <p className="text-xs text-muted-foreground">Optional - if blank, the client name will be shown on the planner</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Description of Works *</Label>
+              <AITextarea
+                placeholder="Describe the work to be carried out..."
+                value={jobForm.description}
+                onChange={(e) => setJobForm({ ...jobForm, description: e.target.value })}
+                className="min-h-[120px]"
+                required
+                data-testid="input-description"
+                aiContext="job description for field service work"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Notes (Optional)</Label>
+              <AITextarea
+                placeholder="Access codes, parking info, special instructions..."
+                value={jobForm.notes}
+                onChange={(e) => setJobForm({ ...jobForm, notes: e.target.value })}
+                className="min-h-[80px]"
+                data-testid="input-notes"
+                aiContext="job notes and instructions"
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="space-y-0.5">
+                <Label htmlFor="long-running-switch">Long-running Job</Label>
+                <p className="text-sm text-muted-foreground">Enable daily progress updates for multi-day projects</p>
+              </div>
+              <Switch
+                id="long-running-switch"
+                checked={jobForm.isLongRunning}
+                onCheckedChange={(checked) => setJobForm({ ...jobForm, isLongRunning: checked })}
+                data-testid="switch-long-running"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <Label>Photos (Optional)</Label>
+              <div className="flex flex-wrap gap-3">
+                {jobPhotos.map((photo) => (
+                  <div key={photo.id} className="relative group">
+                    <img
+                      src={photo.url}
+                      alt={photo.caption}
+                      className="h-24 w-24 object-cover rounded-lg border"
+                      data-testid={`photo-preview-${photo.id}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemovePhoto(photo.id)}
+                      className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      data-testid={`button-remove-photo-${photo.id}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+                <label className="h-24 w-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+                  <Camera className="h-6 w-6 text-muted-foreground mb-1" />
+                  <span className="text-xs text-muted-foreground">
+                    {isUploadingPhoto ? "..." : "Add"}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handlePhotoUpload}
+                    disabled={isUploadingPhoto}
+                    data-testid="input-photo-upload"
+                  />
+                </label>
+              </div>
+              {jobPhotos.length > 0 && (
+                <p className="text-xs text-muted-foreground">{jobPhotos.length} photo(s) attached</p>
+              )}
+            </div>
+          </div>
+        );
+
+      case 4:
+        return (
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <Label className="text-base font-medium">How would you like to save this job?</Label>
+              
+              <div 
+                className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                  assignOption === 'ready' 
+                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' 
+                    : 'border-muted hover:border-muted-foreground/50'
+                }`}
+                onClick={() => setAssignOption('ready')}
+                data-testid="option-save-ready"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    assignOption === 'ready' ? 'border-emerald-500 bg-emerald-500' : 'border-muted-foreground'
+                  }`}>
+                    {assignOption === 'ready' && <Check className="h-3 w-3 text-white" />}
+                  </div>
+                  <div>
+                    <p className="font-medium">Save as Ready</p>
+                    <p className="text-sm text-muted-foreground">Save the job without assigning an engineer. You can assign engineers later.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div 
+                className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                  assignOption === 'assign' 
+                    ? 'border-primary bg-primary/5' 
+                    : 'border-muted hover:border-muted-foreground/50'
+                }`}
+                onClick={() => setAssignOption('assign')}
+                data-testid="option-assign-send"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    assignOption === 'assign' ? 'border-primary bg-primary' : 'border-muted-foreground'
+                  }`}>
+                    {assignOption === 'assign' && <Check className="h-3 w-3 text-white" />}
+                  </div>
+                  <div>
+                    <p className="font-medium">Assign Engineer & Send</p>
+                    <p className="text-sm text-muted-foreground">Select engineers and send the job sheet to them immediately.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {assignOption === 'assign' && user?.role === 'admin' && engineers.length > 0 && (
+              <div className="space-y-2">
+                <Label>Select Engineers *</Label>
+                <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto" data-testid="engineer-checkbox-list">
+                  {engineers.map((eng) => (
+                    <div key={eng.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`eng-${eng.id}`}
+                        checked={selectedEngineerIds.includes(eng.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedEngineerIds([...selectedEngineerIds, eng.id]);
+                          } else {
+                            setSelectedEngineerIds(selectedEngineerIds.filter(id => id !== eng.id));
+                          }
+                        }}
+                        data-testid={`checkbox-engineer-${eng.id}`}
+                      />
+                      <label 
+                        htmlFor={`eng-${eng.id}`} 
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      >
+                        {eng.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                {selectedEngineerIds.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {selectedEngineerIds.length} engineer(s) selected
+                  </p>
+                )}
+                {assignOption === 'assign' && selectedEngineerIds.length === 0 && (
+                  <p className="text-xs text-amber-600">Please select at least one engineer to send the job.</p>
+                )}
+              </div>
+            )}
+
+            {/* Summary Card */}
+            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border space-y-3">
+              <p className="text-sm font-medium">Job Summary</p>
+              <div className="grid gap-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Client:</span>
+                  <span className="font-medium">{selectedClient?.name || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Property:</span>
+                  <span className="font-medium">{selectedProperty?.name || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Date:</span>
+                  <span className="font-medium">{format(new Date(jobForm.date), "dd MMM yyyy")} ({jobForm.session})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Description:</span>
+                  <span className="font-medium truncate max-w-[200px]">{jobForm.description || '-'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -424,267 +1085,68 @@ export default function Clients() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Create New Job Sheet
+                Step {currentStep} of 4: {STEP_TITLES[currentStep - 1]}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleCreateJobFromClient} className="space-y-6">
-                <div className="space-y-2">
-                  <Label>Select Client</Label>
-                  <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                    <SelectTrigger data-testid="select-client">
-                      <SelectValue placeholder="Choose a client..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.map((client) => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <StepIndicator />
+              
+              <div className="min-h-[400px]">
+                {renderStepContent()}
+              </div>
 
-                {selectedClientId && clientContacts[selectedClientId] && clientContacts[selectedClientId].length > 0 && (
-                  <div className="space-y-2">
-                    <Label>Contact Person</Label>
-                    <Select value={selectedContactId} onValueChange={setSelectedContactId}>
-                      <SelectTrigger data-testid="select-contact-person">
-                        <SelectValue placeholder="Select a contact person..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clientContacts[selectedClientId].map((contact) => (
-                          <SelectItem key={contact.id} value={contact.id}>
-                            <div className="flex flex-col">
-                              <span>{contact.name}{contact.isPrimary ? ' (Primary)' : ''}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {contact.role && `${contact.role} • `}{contact.phone || contact.email || 'No contact info'}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {selectedClient && (
-                  <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border space-y-3">
-                    <p className="text-xs font-medium text-muted-foreground uppercase">Client Information (Auto-filled)</p>
-                    <div className="grid md:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Company</p>
-                        <p className="font-medium" data-testid="text-client-name">{selectedClient.name}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Contact Person</p>
-                        <p className="font-medium" data-testid="text-contact-name">{selectedClient.contactName || '-'}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Phone</p>
-                        <p className="font-medium" data-testid="text-contact-phone">{selectedClient.phone || '-'}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Email</p>
-                        <p className="font-medium" data-testid="text-contact-email">{selectedClient.email || '-'}</p>
-                      </div>
-                      <div className="md:col-span-2">
-                        <p className="text-muted-foreground text-xs uppercase font-medium mb-1">Address</p>
-                        <p className="font-medium" data-testid="text-client-address">{selectedClient.address || '-'}{selectedClient.postcode ? `, ${selectedClient.postcode}` : ''}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {user?.role === 'admin' && engineers.length > 0 && (
-                  <div className="space-y-2">
-                    <Label>Assign Engineers</Label>
-                    <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto" data-testid="engineer-checkbox-list">
-                      {engineers.map((eng) => (
-                        <div key={eng.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`eng-${eng.id}`}
-                            checked={selectedEngineerIds.includes(eng.id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedEngineerIds([...selectedEngineerIds, eng.id]);
-                              } else {
-                                setSelectedEngineerIds(selectedEngineerIds.filter(id => id !== eng.id));
-                              }
-                            }}
-                            data-testid={`checkbox-engineer-${eng.id}`}
-                          />
-                          <label 
-                            htmlFor={`eng-${eng.id}`} 
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                          >
-                            {eng.name}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                    {selectedEngineerIds.length > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {selectedEngineerIds.length} engineer(s) selected
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label>Appointment Date</Label>
-                    <Input
-                      type="date"
-                      value={jobForm.date}
-                      onChange={(e) => setJobForm({ ...jobForm, date: e.target.value })}
-                      data-testid="input-date"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Session</Label>
-                    <Select value={jobForm.session} onValueChange={(value) => setJobForm({ ...jobForm, session: value })}>
-                      <SelectTrigger data-testid="select-session">
-                        <SelectValue placeholder="Select session..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="AM">AM (Morning)</SelectItem>
-                        <SelectItem value="PM">PM (Afternoon)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Job Order</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="999"
-                      placeholder="Auto"
-                      value={jobForm.orderNumber}
-                      onChange={(e) => setJobForm({ ...jobForm, orderNumber: e.target.value })}
-                      data-testid="input-order-number"
-                    />
-                    <p className="text-xs text-muted-foreground">Lower numbers appear first</p>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Job Nickname (shows on planner)</Label>
-                  <Input
-                    placeholder="e.g. Boiler Install, Kitchen Rewire..."
-                    value={jobForm.nickname}
-                    onChange={(e) => setJobForm({ ...jobForm, nickname: e.target.value })}
-                    data-testid="input-nickname"
-                  />
-                  <p className="text-xs text-muted-foreground">Optional - if blank, the client name will be shown on the planner</p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Description of Works *</Label>
-                  <AITextarea
-                    placeholder="Describe the work to be carried out..."
-                    value={jobForm.description}
-                    onChange={(e) => setJobForm({ ...jobForm, description: e.target.value })}
-                    className="min-h-[120px]"
-                    required
-                    data-testid="input-description"
-                    aiContext="job description for field service work"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Notes (Optional)</Label>
-                  <AITextarea
-                    placeholder="Access codes, parking info, special instructions..."
-                    value={jobForm.notes}
-                    onChange={(e) => setJobForm({ ...jobForm, notes: e.target.value })}
-                    className="min-h-[80px]"
-                    data-testid="input-notes"
-                    aiContext="job notes and instructions"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="long-running-switch">Long-running Job</Label>
-                    <p className="text-sm text-muted-foreground">Enable daily progress updates for multi-day projects</p>
-                  </div>
-                  <Switch
-                    id="long-running-switch"
-                    checked={jobForm.isLongRunning}
-                    onCheckedChange={(checked) => setJobForm({ ...jobForm, isLongRunning: checked })}
-                    data-testid="switch-long-running"
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <Label>Photos (Optional)</Label>
-                  <div className="flex flex-wrap gap-3">
-                    {jobPhotos.map((photo) => (
-                      <div key={photo.id} className="relative group">
-                        <img
-                          src={photo.url}
-                          alt={photo.caption}
-                          className="h-24 w-24 object-cover rounded-lg border"
-                          data-testid={`photo-preview-${photo.id}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemovePhoto(photo.id)}
-                          className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                          data-testid={`button-remove-photo-${photo.id}`}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
-                    <label className="h-24 w-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
-                      <Camera className="h-6 w-6 text-muted-foreground mb-1" />
-                      <span className="text-xs text-muted-foreground">
-                        {isUploadingPhoto ? "..." : "Add"}
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={handlePhotoUpload}
-                        disabled={isUploadingPhoto}
-                        data-testid="input-photo-upload"
-                      />
-                    </label>
-                  </div>
-                  {jobPhotos.length > 0 && (
-                    <p className="text-xs text-muted-foreground">{jobPhotos.length} photo(s) attached</p>
-                  )}
-                </div>
+              <div className="flex justify-between mt-6 pt-6 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={goToPreviousStep}
+                  disabled={currentStep === 1}
+                  data-testid="button-previous-step"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Back
+                </Button>
 
                 <div className="flex gap-2">
-                  <Button 
-                    type="submit" 
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700" 
-                    disabled={!selectedClientId || !jobForm.description}
-                    data-testid="button-create-job"
-                  >
-                    <Send className="mr-2 h-4 w-4" />
-                    Send
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => {
-                      setSelectedClientId("");
-                      setSelectedContactId("");
-                      setSelectedEngineerIds([]);
-                      setJobForm({ nickname: "", description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "", isLongRunning: false });
-                      setJobPhotos([]);
-                    }}
-                    data-testid="button-clear-form"
-                  >
-                    Clear
-                  </Button>
+                  {currentStep < 4 ? (
+                    <Button
+                      type="button"
+                      onClick={goToNextStep}
+                      disabled={!canProceedToNextStep()}
+                      data-testid="button-next-step"
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  ) : (
+                    <>
+                      {assignOption === 'ready' ? (
+                        <Button
+                          type="button"
+                          className="bg-emerald-600 hover:bg-emerald-700"
+                          onClick={() => handleCreateJobFromClient('Ready')}
+                          disabled={!jobForm.description.trim()}
+                          data-testid="button-save-ready"
+                        >
+                          <Save className="mr-2 h-4 w-4" />
+                          Save as Ready
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          className="bg-primary hover:bg-primary/90"
+                          onClick={() => handleCreateJobFromClient('Draft')}
+                          disabled={!jobForm.description.trim() || (assignOption === 'assign' && selectedEngineerIds.length === 0)}
+                          data-testid="button-assign-send"
+                        >
+                          <Send className="mr-2 h-4 w-4" />
+                          Assign & Send
+                        </Button>
+                      )}
+                    </>
+                  )}
                 </div>
-              </form>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
