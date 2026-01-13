@@ -29,7 +29,6 @@ export default function Jobs() {
 
   const { data: users = [] } = useQuery<UserType[]>({
     queryKey: ["/api/users"],
-    enabled: user?.role === "admin",
   });
 
   const engineers = users.filter((u) => u.role === "engineer" || u.role === "admin");
@@ -154,6 +153,7 @@ export default function Jobs() {
                  isAdmin={user.role === 'admin'}
                  isSelected={selectedJobIds.has(job.id)}
                  onToggleSelection={toggleJobSelection}
+                 users={users}
                />
             ))}
           </div>
@@ -173,6 +173,7 @@ export default function Jobs() {
                 isAdmin={user.role === 'admin'}
                 isSelected={selectedJobIds.has(job.id)}
                 onToggleSelection={toggleJobSelection}
+                users={users}
               />
             ))}
           </div>
@@ -193,6 +194,7 @@ export default function Jobs() {
                  isAdmin={user.role === 'admin'}
                  isSelected={selectedJobIds.has(job.id)}
                  onToggleSelection={toggleJobSelection}
+                 users={users}
                />
             ))}
           </div>
@@ -212,6 +214,7 @@ export default function Jobs() {
                  isAdmin={user.role === 'admin'}
                  isSelected={selectedJobIds.has(job.id)}
                  onToggleSelection={toggleJobSelection}
+                 users={users}
                />
             ))}
           </div>
@@ -268,14 +271,28 @@ function JobCard({
   isAdmin,
   isSelected,
   onToggleSelection,
+  users = [],
 }: { 
   job: Job; 
   statusColor: string; 
   isAdmin: boolean;
   isSelected?: boolean;
   onToggleSelection?: (id: string) => void;
+  users?: UserType[];
 }) {
   const [, setLocation] = useLocation();
+  
+  // Get assigned engineer name(s)
+  const getEngineerNames = () => {
+    const assignedIds = job.assignedToIds?.length ? job.assignedToIds : (job.assignedToId ? [job.assignedToId] : []);
+    if (assignedIds.length === 0) return "Unassigned";
+    const names = assignedIds
+      .map(id => users.find(u => u.id === id)?.name)
+      .filter(Boolean);
+    if (names.length === 0) return "Unassigned";
+    if (names.length === 1) return names[0];
+    return `${names[0]} +${names.length - 1}`;
+  };
   const photos = job.photos || [];
   const signatures = job.signatures || [];
   
@@ -337,7 +354,7 @@ function JobCard({
               </div>
               <div className="flex items-center gap-2">
                 <User className="w-4 h-4 shrink-0" />
-                <span>{job.contactName || "No contact"}</span>
+                <span>{getEngineerNames()}</span>
               </div>
             </div>
 
