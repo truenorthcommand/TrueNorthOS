@@ -346,7 +346,11 @@ function JobCard({
             <div className="space-y-2 text-sm text-muted-foreground">
               <div className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
-                <span className="line-clamp-2">{job.address || "No address set"}</span>
+                <div className="line-clamp-2">
+                  {job.propertyName && <span className="font-medium">{job.propertyName}</span>}
+                  {job.propertyName && job.address && <span className="text-muted-foreground"> - </span>}
+                  <span>{job.address || (job.propertyName ? "" : "No address set")}</span>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 shrink-0" />
