@@ -75,9 +75,13 @@ export default function JobDetail() {
   const [reportError, setReportError] = useState<string | null>(null);
   const [report, setReport] = useState<any>(null);
   
+  // View mode state - admins default to admin view, engineers to engineer view
+  const [viewMode, setViewMode] = useState<'admin' | 'engineer'>('admin');
+  
   const [formData, setFormData] = useState<{
     client: string;
     customerName: string;
+    propertyName: string;
     address: string;
     postcode: string;
     contactName: string;
@@ -91,6 +95,7 @@ export default function JobDetail() {
   }>({
     client: "",
     customerName: "",
+    propertyName: "",
     address: "",
     postcode: "",
     contactName: "",
@@ -157,6 +162,7 @@ export default function JobDetail() {
       setFormData({
         client: job.client || "",
         customerName: job.customerName || "",
+        propertyName: job.propertyName || "",
         address: job.address || "",
         postcode: job.postcode || "",
         contactName: job.contactName || "",
@@ -221,6 +227,7 @@ export default function JobDetail() {
     await updateJob(job.id, {
       client: formData.client,
       customerName: formData.customerName,
+      propertyName: formData.propertyName,
       address: formData.address,
       postcode: formData.postcode,
       contactName: formData.contactName,
@@ -534,6 +541,10 @@ export default function JobDetail() {
   const isReadOnly = job.status === "Signed Off";
   const isAdmin = user?.role === "admin";
   const isAdminFieldReadOnly = isReadOnly || !isAdmin;
+  
+  // Set initial view mode based on user role
+  const effectiveViewMode = isAdmin ? viewMode : 'engineer';
+  const showAdminView = effectiveViewMode === 'admin' && isAdmin;
   const shouldMaskContactDetails = user?.role === "engineer" && job.status !== "Ready";
 
   const handleAddAction = () => {
@@ -622,7 +633,7 @@ export default function JobDetail() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 no-print">
         <div className="flex items-center gap-4">
-          <Link href="/">
+          <Link href="/jobs">
             <Button variant="outline" size="icon">
               <ArrowLeft className="h-4 w-4" />
             </Button>
@@ -633,12 +644,28 @@ export default function JobDetail() {
               <Badge variant={job.status === "Signed Off" ? "default" : "secondary"}>
                 {job.status}
               </Badge>
+              {isAdmin && (
+                <Badge variant={showAdminView ? "default" : "outline"} className={showAdminView ? "bg-blue-600" : ""}>
+                  {showAdminView ? "Admin View" : "Engineer View"}
+                </Badge>
+              )}
             </div>
-            <p className="text-muted-foreground">{job.customerName}</p>
+            <p className="text-muted-foreground">{job.customerName}{job.propertyName ? ` - ${job.propertyName}` : ''}</p>
           </div>
         </div>
         
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex gap-2 w-full sm:w-auto flex-wrap">
+          {isAdmin && (
+            <Button 
+              variant={showAdminView ? "default" : "outline"} 
+              onClick={() => setViewMode(viewMode === 'admin' ? 'engineer' : 'admin')}
+              className="flex-1 sm:flex-none"
+              data-testid="button-toggle-view"
+            >
+              <Users className="mr-2 h-4 w-4" />
+              {showAdminView ? "Switch to Engineer View" : "Switch to Admin View"}
+            </Button>
+          )}
           {!isReadOnly && (
             <Button variant="outline" onClick={handleUpdateJob} className="flex-1 sm:flex-none" data-testid="button-update-job">
               <Save className="mr-2 h-4 w-4" />
@@ -674,8 +701,21 @@ export default function JobDetail() {
         </div>
       </div>
 
-      {/* Sign-off Validation Status */}
-      {job.status !== "Signed Off" && !isReadyForSignOff && (
+      {/* Admin View Banner */}
+      {showAdminView && (
+        <Card className="mb-6 border-2 border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/30 no-print">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+              <Briefcase className="h-5 w-5" />
+              <span className="font-medium">Admin Job Management</span>
+              <span className="text-sm text-muted-foreground ml-2">— Edit job details, assign engineers, and manage customer information.</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Sign-off Validation Status - Only show in engineer view */}
+      {!showAdminView && job.status !== "Signed Off" && !isReadyForSignOff && (
         <Card className="mb-6 border-2 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 no-print" data-testid="card-validation-status">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2 text-amber-700 dark:text-amber-300">
@@ -699,8 +739,8 @@ export default function JobDetail() {
         </Card>
       )}
 
-      {/* Sign-off Ready Indicator */}
-      {job.status !== "Signed Off" && isReadyForSignOff && (
+      {/* Sign-off Ready Indicator - Only show in engineer view */}
+      {!showAdminView && job.status !== "Signed Off" && isReadyForSignOff && (
         <Card className="mb-6 border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 no-print" data-testid="card-ready-signoff">
           <CardContent className="py-4">
             <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
@@ -745,7 +785,18 @@ export default function JobDetail() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Address</Label>
+                <Label>Property / Work Site</Label>
+                <Input 
+                  value={formData.propertyName} 
+                  onChange={(e) => handleFieldChange('propertyName', e.target.value)}
+                  onBlur={() => handleFieldBlur('propertyName')}
+                  disabled={isAdminFieldReadOnly}
+                  className="print:border-none print:p-0 print:font-semibold"
+                  placeholder="Property or site name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Site Address</Label>
                 <Textarea 
                   value={formData.address} 
                   onChange={(e) => handleFieldChange('address', e.target.value)}
