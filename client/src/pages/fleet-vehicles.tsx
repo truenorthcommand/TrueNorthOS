@@ -28,6 +28,7 @@ export default function FleetVehicles() {
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
   const [type, setType] = useState("Van");
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
   const { data: vehicles = [], isLoading } = useQuery<VehicleWithStats[]>({
     queryKey: ["/api/fleet/vehicles"],
@@ -64,12 +65,14 @@ export default function FleetVehicles() {
     setModel("");
     setYear("");
     setType("Van");
+    setAttemptedSubmit(false);
   };
 
   const isVehicleFormValid = registration.trim() && make.trim() && model.trim();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setAttemptedSubmit(true);
     if (!registration.trim()) {
       toast({ title: "Error", description: "Registration is required", variant: "destructive" });
       return;
@@ -130,9 +133,12 @@ export default function FleetVehicles() {
                     placeholder="e.g. AB12 CDE"
                     value={registration}
                     onChange={(e) => setRegistration(e.target.value)}
-                    className="uppercase"
+                    className={`uppercase ${attemptedSubmit && !registration.trim() ? 'border-red-500' : ''}`}
                     data-testid="input-registration"
                   />
+                  {attemptedSubmit && !registration.trim() && (
+                    <p className="text-xs text-red-500">Registration is required</p>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -142,8 +148,12 @@ export default function FleetVehicles() {
                       placeholder="e.g. Ford"
                       value={make}
                       onChange={(e) => setMake(e.target.value)}
+                      className={attemptedSubmit && !make.trim() ? 'border-red-500' : ''}
                       data-testid="input-make"
                     />
+                    {attemptedSubmit && !make.trim() && (
+                      <p className="text-xs text-red-500">Make is required</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="model">Model <span className="text-red-500">*</span></Label>
@@ -152,8 +162,12 @@ export default function FleetVehicles() {
                       placeholder="e.g. Transit"
                       value={model}
                       onChange={(e) => setModel(e.target.value)}
+                      className={attemptedSubmit && !model.trim() ? 'border-red-500' : ''}
                       data-testid="input-model"
                     />
+                    {attemptedSubmit && !model.trim() && (
+                      <p className="text-xs text-red-500">Model is required</p>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">

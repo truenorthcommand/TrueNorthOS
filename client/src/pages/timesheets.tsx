@@ -31,6 +31,7 @@ export default function Timesheets() {
   const [manualClockOut, setManualClockOut] = useState("17:00");
   const [manualBreak, setManualBreak] = useState("30");
   const [manualNotes, setManualNotes] = useState("");
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
@@ -92,6 +93,7 @@ export default function Timesheets() {
       setManualClockOut("17:00");
       setManualBreak("30");
       setManualNotes("");
+      setAttemptedSubmit(false);
       toast.success("Manual entry created successfully");
     },
     onError: (error: Error) => {
@@ -173,6 +175,7 @@ export default function Timesheets() {
   const clockOutError = getClockOutError();
 
   const handleManualSubmit = () => {
+    setAttemptedSubmit(true);
     if (!manualDate) {
       toast.error("Please select a date");
       return;
@@ -276,7 +279,7 @@ export default function Timesheets() {
                 <Label>Date <span className="text-red-500">*</span></Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className={`w-full justify-start text-left font-normal ${!manualDate ? 'border-red-300' : ''}`} data-testid="button-select-date">
+                    <Button variant="outline" className={`w-full justify-start text-left font-normal ${attemptedSubmit && !manualDate ? 'border-red-500' : ''}`} data-testid="button-select-date">
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {manualDate ? format(manualDate, "PPP") : "Select date"}
                     </Button>
@@ -294,7 +297,7 @@ export default function Timesheets() {
                     type="time"
                     value={manualClockIn}
                     onChange={(e) => setManualClockIn(e.target.value)}
-                    className={!manualClockIn ? 'border-red-300' : ''}
+                    className={attemptedSubmit && !manualClockIn ? 'border-red-500' : ''}
                     data-testid="input-clock-in-time"
                   />
                 </div>
@@ -305,10 +308,10 @@ export default function Timesheets() {
                     type="time"
                     value={manualClockOut}
                     onChange={(e) => setManualClockOut(e.target.value)}
-                    className={!manualClockOut || clockOutError ? 'border-red-300' : ''}
+                    className={attemptedSubmit && (!manualClockOut || clockOutError) ? 'border-red-500' : ''}
                     data-testid="input-clock-out-time"
                   />
-                  {clockOutError && (
+                  {attemptedSubmit && clockOutError && (
                     <p className="text-sm text-red-500" data-testid="text-clock-out-error">{clockOutError}</p>
                   )}
                 </div>

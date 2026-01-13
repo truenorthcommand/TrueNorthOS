@@ -42,6 +42,7 @@ export default function ReportDefect() {
   const [severity, setSeverity] = useState<"critical" | "major" | "minor">("minor");
   const [description, setDescription] = useState("");
   const [vehicleOffRoad, setVehicleOffRoad] = useState(false);
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
   const { data: vehicles = [] } = useQuery<Vehicle[]>({
     queryKey: ["/api/fleet/vehicles"],
@@ -73,6 +74,7 @@ export default function ReportDefect() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setAttemptedSubmit(true);
     if (!vehicleId || !category || !description) {
       toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" });
       return;
@@ -109,7 +111,7 @@ export default function ReportDefect() {
             <div className="space-y-2">
               <Label htmlFor="vehicle">Vehicle <span className="text-red-500">*</span></Label>
               <Select value={vehicleId} onValueChange={setVehicleId}>
-                <SelectTrigger className={!vehicleId ? "border-orange-300" : ""} data-testid="select-vehicle">
+                <SelectTrigger className={attemptedSubmit && !vehicleId ? "border-red-500" : ""} data-testid="select-vehicle">
                   <SelectValue placeholder="Select a vehicle" />
                 </SelectTrigger>
                 <SelectContent>
@@ -126,7 +128,7 @@ export default function ReportDefect() {
             <div className="space-y-2">
               <Label htmlFor="category">Category <span className="text-red-500">*</span></Label>
               <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger className={!category ? "border-orange-300" : ""} data-testid="select-category">
+                <SelectTrigger className={attemptedSubmit && !category ? "border-red-500" : ""} data-testid="select-category">
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -174,11 +176,11 @@ export default function ReportDefect() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={4}
-                className={!description.trim() ? "border-orange-300" : ""}
+                className={attemptedSubmit && !description.trim() ? "border-red-500" : ""}
                 data-testid="input-description"
               />
-              {!description.trim() && (
-                <p className="text-xs text-muted-foreground">Please provide a detailed description of the defect</p>
+              {attemptedSubmit && !description.trim() && (
+                <p className="text-xs text-red-500">Please provide a detailed description of the defect</p>
               )}
             </div>
 

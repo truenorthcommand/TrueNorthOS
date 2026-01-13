@@ -95,6 +95,7 @@ export default function Expenses() {
   const [noReceipt, setNoReceipt] = useState(false);
   const [fromLocation, setFromLocation] = useState("");
   const [toLocation, setToLocation] = useState("");
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
   const isFormValid = (): boolean => {
     if (!expenseDate) return false;
@@ -235,9 +236,11 @@ export default function Expenses() {
     setNoReceipt(false);
     setFromLocation("");
     setToLocation("");
+    setAttemptedSubmit(false);
   };
 
   const handleSubmit = () => {
+    setAttemptedSubmit(true);
     if (!expenseDate) {
       toast.error("Please select a date");
       return;

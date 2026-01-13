@@ -102,6 +102,7 @@ export default function Clients() {
     isPrimary: boolean;
   }>>([]);
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
+  const [attemptedClientSubmit, setAttemptedClientSubmit] = useState(false);
 
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedContactId, setSelectedContactId] = useState("");
@@ -140,6 +141,8 @@ export default function Clients() {
   const [isLoadingContacts, setIsLoadingContacts] = useState(false);
   const [showAddContact, setShowAddContact] = useState<string | null>(null);
   const [editingContact, setEditingContact] = useState<ClientContact | null>(null);
+  const [attemptedContactSubmit, setAttemptedContactSubmit] = useState(false);
+  const [attemptedPropertySubmit, setAttemptedPropertySubmit] = useState(false);
   const [newContact, setNewContact] = useState({
     name: "",
     email: "",
@@ -179,8 +182,9 @@ export default function Clients() {
   };
 
   const handleAddProperty = async () => {
-    if (!newProperty.name.trim() || !newProperty.address.trim()) {
-      toast({ title: "Error", description: "Property name and address are required.", variant: "destructive" });
+    setAttemptedPropertySubmit(true);
+    if (!newProperty.name.trim() || !newProperty.address.trim() || !newProperty.postcode.trim()) {
+      toast({ title: "Error", description: "Property name, address and postcode are required.", variant: "destructive" });
       return;
     }
     try {
@@ -198,6 +202,7 @@ export default function Clients() {
         toast({ title: "Success", description: "Property added successfully." });
         setNewProperty({ name: "", address: "", postcode: "", contactName: "", contactPhone: "", contactEmail: "" });
         setShowAddProperty(false);
+        setAttemptedPropertySubmit(false);
         await fetchClientProperties(selectedClientId);
         setSelectedPropertyId(createdProperty.id);
       } else {
@@ -209,6 +214,7 @@ export default function Clients() {
   };
 
   const handleAddContact = async (clientId: string) => {
+    setAttemptedContactSubmit(true);
     if (!isNewContactValid()) {
       toast({ title: "Error", description: "Please fill in all required fields (Name, Email, Phone) with valid values.", variant: "destructive" });
       return;
@@ -224,6 +230,7 @@ export default function Clients() {
         toast({ title: "Success", description: "Contact added successfully." });
         setNewContact({ name: "", email: "", phone: "", role: "", isPrimary: false });
         setShowAddContact(null);
+        setAttemptedContactSubmit(false);
         fetchClientContacts(clientId);
       } else {
         toast({ title: "Error", description: "Failed to add contact.", variant: "destructive" });
@@ -357,6 +364,7 @@ export default function Clients() {
     if (!newClient.contactName.trim()) return false;
     if (!isValidEmail(newClient.email)) return false;
     if (!newClient.phone.trim()) return false;
+    if (!newClient.postcode.trim()) return false;
     return true;
   };
 
@@ -388,6 +396,7 @@ export default function Clients() {
 
   const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAttemptedClientSubmit(true);
     if (!isNewClientValid()) {
       toast({ title: "Error", description: "Please fill in all required fields with valid values.", variant: "destructive" });
       return;
@@ -428,6 +437,7 @@ export default function Clients() {
           postcode: "",
         });
         setNewClientContacts([]);
+        setAttemptedClientSubmit(false);
         toast({ title: "Success", description: "Client added successfully." });
       } else {
         toast({ title: "Error", description: "Failed to add client.", variant: "destructive" });
@@ -762,37 +772,41 @@ export default function Clients() {
                     </div>
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label className="text-sm">Property Name *</Label>
+                        <Label className="text-sm">Property Name <span className="text-red-500">*</span></Label>
                         <Input
                           placeholder="e.g., Head Office, Site A"
                           value={newProperty.name}
                           onChange={(e) => setNewProperty({ ...newProperty, name: e.target.value })}
                           data-testid="input-property-name"
-                          className={showAddProperty && !newProperty.name.trim() ? "border-red-300 focus:ring-red-500" : ""}
+                          className={attemptedPropertySubmit && !newProperty.name.trim() ? "border-red-500 focus:ring-red-500" : ""}
                         />
-                        {showAddProperty && !newProperty.name.trim() && (
+                        {attemptedPropertySubmit && !newProperty.name.trim() && (
                           <p className="text-xs text-red-500">Property name is required</p>
                         )}
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-sm">Postcode</Label>
+                        <Label className="text-sm">Postcode <span className="text-red-500">*</span></Label>
                         <Input
                           placeholder="e.g., SW1A 1AA"
                           value={newProperty.postcode}
                           onChange={(e) => setNewProperty({ ...newProperty, postcode: e.target.value })}
                           data-testid="input-property-postcode"
+                          className={attemptedPropertySubmit && !newProperty.postcode.trim() ? "border-red-500 focus:ring-red-500" : ""}
                         />
+                        {attemptedPropertySubmit && !newProperty.postcode.trim() && (
+                          <p className="text-xs text-red-500">Postcode is required</p>
+                        )}
                       </div>
                       <div className="space-y-2 md:col-span-2">
-                        <Label className="text-sm">Address *</Label>
+                        <Label className="text-sm">Address <span className="text-red-500">*</span></Label>
                         <Textarea
                           placeholder="Full property address"
                           value={newProperty.address}
                           onChange={(e) => setNewProperty({ ...newProperty, address: e.target.value })}
-                          className={`min-h-[80px] ${showAddProperty && !newProperty.address.trim() ? "border-red-300 focus:ring-red-500" : ""}`}
+                          className={`min-h-[80px] ${attemptedPropertySubmit && !newProperty.address.trim() ? "border-red-500 focus:ring-red-500" : ""}`}
                           data-testid="input-property-address"
                         />
-                        {showAddProperty && !newProperty.address.trim() && (
+                        {attemptedPropertySubmit && !newProperty.address.trim() && (
                           <p className="text-xs text-red-500">Property address is required</p>
                         )}
                       </div>
@@ -1261,10 +1275,10 @@ export default function Clients() {
                       placeholder="e.g., BuildTech Solutions"
                       value={newClient.name}
                       onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
-                      className={!newClient.name.trim() ? "border-red-300 focus:ring-red-500" : ""}
+                      className={attemptedClientSubmit && !newClient.name.trim() ? "border-red-500 focus:ring-red-500" : ""}
                       data-testid="input-company-name"
                     />
-                    {!newClient.name.trim() && (
+                    {attemptedClientSubmit && !newClient.name.trim() && (
                       <p className="text-xs text-red-500">Company name is required</p>
                     )}
                   </div>
@@ -1276,10 +1290,10 @@ export default function Clients() {
                       onChange={(e) =>
                         setNewClient({ ...newClient, contactName: e.target.value })
                       }
-                      className={!newClient.contactName.trim() ? "border-red-300 focus:ring-red-500" : ""}
+                      className={attemptedClientSubmit && !newClient.contactName.trim() ? "border-red-500 focus:ring-red-500" : ""}
                       data-testid="input-contact-person"
                     />
-                    {!newClient.contactName.trim() && (
+                    {attemptedClientSubmit && !newClient.contactName.trim() && (
                       <p className="text-xs text-red-500">Contact person is required</p>
                     )}
                   </div>
@@ -1290,12 +1304,12 @@ export default function Clients() {
                       placeholder="contact@company.com"
                       value={newClient.email}
                       onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
-                      className={!isValidEmail(newClient.email) ? "border-red-300 focus:ring-red-500" : ""}
+                      className={attemptedClientSubmit && !isValidEmail(newClient.email) ? "border-red-500 focus:ring-red-500" : ""}
                       data-testid="input-client-email"
                     />
-                    {!newClient.email.trim() ? (
+                    {attemptedClientSubmit && !newClient.email.trim() ? (
                       <p className="text-xs text-red-500">Email is required</p>
-                    ) : !isValidEmail(newClient.email) ? (
+                    ) : attemptedClientSubmit && !isValidEmail(newClient.email) ? (
                       <p className="text-xs text-red-500">Please enter a valid email address</p>
                     ) : null}
                   </div>
@@ -1305,19 +1319,19 @@ export default function Clients() {
                       placeholder="01234 567890"
                       value={newClient.phone}
                       onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
-                      className={!newClient.phone.trim() ? "border-red-300 focus:ring-red-500" : ""}
+                      className={attemptedClientSubmit && !newClient.phone.trim() ? "border-red-500 focus:ring-red-500" : ""}
                       data-testid="input-client-phone"
                     />
-                    {!newClient.phone.trim() && (
+                    {attemptedClientSubmit && !newClient.phone.trim() && (
                       <p className="text-xs text-red-500">Phone is required</p>
                     )}
                   </div>
                 </div>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Address <span className="text-muted-foreground text-xs">(optional or N/A)</span></Label>
+                    <Label>Address <span className="text-muted-foreground text-xs">(optional)</span></Label>
                     <Textarea
-                      placeholder="Full address (or N/A)"
+                      placeholder="Full address"
                       value={newClient.address}
                       onChange={(e) =>
                         setNewClient({ ...newClient, address: e.target.value })
@@ -1327,13 +1341,17 @@ export default function Clients() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Postcode <span className="text-muted-foreground text-xs">(optional or N/A)</span></Label>
+                    <Label>Postcode <span className="text-red-500">*</span></Label>
                     <Input
-                      placeholder="e.g., SW1A 1AA (or N/A)"
+                      placeholder="e.g., SW1A 1AA"
                       value={newClient.postcode}
                       onChange={(e) => setNewClient({ ...newClient, postcode: e.target.value })}
+                      className={attemptedClientSubmit && !newClient.postcode.trim() ? "border-red-500 focus:ring-red-500" : ""}
                       data-testid="input-postcode"
                     />
+                    {attemptedClientSubmit && !newClient.postcode.trim() && (
+                      <p className="text-xs text-red-500">Postcode is required</p>
+                    )}
                   </div>
                 </div>
 

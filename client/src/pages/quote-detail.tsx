@@ -97,6 +97,7 @@ export default function QuoteDetail() {
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
   const [quoteAnalysis, setQuoteAnalysis] = useState<QuoteAnalysis | null>(null);
   const [aiNotes, setAiNotes] = useState("");
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
   const [quote, setQuote] = useState<Quote>({
     id: "",
@@ -208,8 +209,13 @@ export default function QuoteDetail() {
   };
 
   const saveQuote = async (sendAfterSave = false) => {
+    setAttemptedSubmit(true);
     if (!quote.customerName.trim()) {
       toast({ title: "Error", description: "Customer name is required", variant: "destructive" });
+      return;
+    }
+    if (!validateQuote.isValid) {
+      toast({ title: "Error", description: "Please complete all required fields", variant: "destructive" });
       return;
     }
 
@@ -524,7 +530,7 @@ export default function QuoteDetail() {
                     onChange={(e) => setQuote({ ...quote, customerName: e.target.value })}
                     placeholder="Enter customer name"
                     data-testid="input-customer-name"
-                    className={validateQuote.errors.customerName ? "border-red-500 focus-visible:ring-red-500" : ""}
+                    className={attemptedSubmit && validateQuote.errors.customerName ? "border-red-500 focus-visible:ring-red-500" : ""}
                   />
                 </div>
                 <div className="space-y-2">
@@ -656,7 +662,7 @@ export default function QuoteDetail() {
                               setExpandedDescriptionIndex(index);
                               setExpandedDescriptionValue(item.description);
                             }}
-                            className={`min-h-[32px] px-3 py-1.5 border rounded-md cursor-pointer hover:bg-muted/50 flex items-center text-sm truncate ${validateQuote.errors.itemErrors?.[index]?.description ? "border-red-500" : ""}`}
+                            className={`min-h-[32px] px-3 py-1.5 border rounded-md cursor-pointer hover:bg-muted/50 flex items-center text-sm truncate ${attemptedSubmit && validateQuote.errors.itemErrors?.[index]?.description ? "border-red-500" : ""}`}
                             data-testid={`button-expand-description-${index}`}
                           >
                             {item.description || <span className="text-muted-foreground">Click to add description...</span>}
@@ -667,7 +673,7 @@ export default function QuoteDetail() {
                             type="number"
                             value={item.quantity}
                             onChange={(e) => updateLineItem(index, "quantity", parseFloat(e.target.value) || 0)}
-                            className={`h-8 text-right ${validateQuote.errors.itemErrors?.[index]?.quantity ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                            className={`h-8 text-right ${attemptedSubmit && validateQuote.errors.itemErrors?.[index]?.quantity ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                             min="0"
                           />
                         </td>
@@ -676,7 +682,7 @@ export default function QuoteDetail() {
                             type="number"
                             value={item.unitCost}
                             onChange={(e) => updateLineItem(index, "unitCost", parseFloat(e.target.value) || 0)}
-                            className={`h-8 text-right ${validateQuote.errors.itemErrors?.[index]?.unitCost ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                            className={`h-8 text-right ${attemptedSubmit && validateQuote.errors.itemErrors?.[index]?.unitCost ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                             min="0"
                             step="0.01"
                           />
@@ -703,7 +709,7 @@ export default function QuoteDetail() {
                     ))}
                     {quote.lineItems.length === 0 && (
                       <tr>
-                        <td colSpan={7} className={`py-8 text-center ${validateQuote.errors.lineItems ? "text-red-500" : "text-muted-foreground"}`}>
+                        <td colSpan={7} className={`py-8 text-center ${attemptedSubmit && validateQuote.errors.lineItems ? "text-red-500" : "text-muted-foreground"}`}>
                           No items added. Click "Add Item" to get started.
                         </td>
                       </tr>
