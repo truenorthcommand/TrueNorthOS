@@ -431,7 +431,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <span className="text-sm font-bold leading-tight">Pro Main Solutions</span>
             </div>
 
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => window.location.reload()}
+                data-testid="button-refresh-app-mobile"
+              >
+                <RefreshCw className="h-5 w-5" />
+                <span className="sr-only">Refresh app</span>
+              </Button>
               <Button variant="outline" size="sm" onClick={logout}>
                 Sign Out
               </Button>
@@ -468,6 +477,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full">
             {children}
           </main>
+          
+          {/* Floating Refresh Button - Desktop */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="fixed bottom-6 right-6 h-12 w-12 rounded-full shadow-lg bg-background hover:bg-accent hidden md:flex print:hidden z-40"
+                onClick={() => window.location.reload()}
+                data-testid="button-refresh-app-desktop"
+              >
+                <RefreshCw className="h-5 w-5" />
+                <span className="sr-only">Refresh app</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>Refresh app</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
     </TooltipProvider>
