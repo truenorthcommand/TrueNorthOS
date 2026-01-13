@@ -1822,6 +1822,49 @@ export async function registerRoutes(
     }
   });
 
+  // Client Contacts
+  app.get("/api/clients/:id/contacts", requireAdmin, async (req, res) => {
+    try {
+      const contacts = await storage.getClientContacts(req.params.id);
+      res.json(contacts);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch client contacts" });
+    }
+  });
+
+  app.post("/api/clients/:id/contacts", requireAdmin, async (req, res) => {
+    try {
+      const contact = await storage.createClientContact({
+        ...req.body,
+        clientId: req.params.id,
+      });
+      res.json(contact);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create client contact" });
+    }
+  });
+
+  app.patch("/api/clients/:id/contacts/:contactId", requireAdmin, async (req, res) => {
+    try {
+      const contact = await storage.updateClientContact(req.params.contactId, req.body);
+      if (!contact) {
+        return res.status(404).json({ error: "Contact not found" });
+      }
+      res.json(contact);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update client contact" });
+    }
+  });
+
+  app.delete("/api/clients/:id/contacts/:contactId", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteClientContact(req.params.contactId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete client contact" });
+    }
+  });
+
   // ==================== INVOICES ROUTES ====================
 
   // PUBLIC routes first (specific paths before :id parameter)
