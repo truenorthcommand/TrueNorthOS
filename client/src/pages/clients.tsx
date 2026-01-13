@@ -63,6 +63,13 @@ export default function Clients() {
     address: "",
     postcode: "",
   });
+  const [newClientContacts, setNewClientContacts] = useState<Array<{
+    name: string;
+    email: string;
+    phone: string;
+    role: string;
+    isPrimary: boolean;
+  }>>([]);
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
 
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -252,6 +259,19 @@ export default function Clients() {
       });
       if (res.ok) {
         const createdClient = await res.json();
+        
+        // Create any additional contacts
+        if (newClientContacts.length > 0) {
+          for (const contact of newClientContacts) {
+            await fetch(`/api/clients/${createdClient.id}/contacts`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify(contact),
+            });
+          }
+        }
+        
         setClients([...clients, createdClient]);
         setNewClient({
           name: "",
@@ -261,6 +281,7 @@ export default function Clients() {
           address: "",
           postcode: "",
         });
+        setNewClientContacts([]);
         toast({ title: "Success", description: "Client added successfully." });
       } else {
         toast({ title: "Error", description: "Failed to add client.", variant: "destructive" });
@@ -695,6 +716,114 @@ export default function Clients() {
                     />
                   </div>
                 </div>
+
+                {/* Additional Contact Persons Section */}
+                <div className="border rounded-lg p-4 space-y-4 bg-slate-50 dark:bg-slate-900/50">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-medium">Additional Contact Persons</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setNewClientContacts([...newClientContacts, { name: "", email: "", phone: "", role: "", isPrimary: false }])}
+                      data-testid="button-add-new-contact"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Contact
+                    </Button>
+                  </div>
+                  
+                  {newClientContacts.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No additional contacts added yet. Click "Add Contact" to add contact persons.</p>
+                  )}
+                  
+                  {newClientContacts.map((contact, index) => (
+                    <div key={index} className="border rounded-md p-3 bg-white dark:bg-slate-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Contact {index + 1}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setNewClientContacts(newClientContacts.filter((_, i) => i !== index))}
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          data-testid={`button-remove-contact-${index}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <Input
+                          placeholder="Name *"
+                          value={contact.name}
+                          onChange={(e) => {
+                            const updated = [...newClientContacts];
+                            updated[index].name = e.target.value;
+                            setNewClientContacts(updated);
+                          }}
+                          data-testid={`input-contact-name-${index}`}
+                        />
+                        <Input
+                          placeholder="Email"
+                          type="email"
+                          value={contact.email}
+                          onChange={(e) => {
+                            const updated = [...newClientContacts];
+                            updated[index].email = e.target.value;
+                            setNewClientContacts(updated);
+                          }}
+                          data-testid={`input-contact-email-${index}`}
+                        />
+                        <Input
+                          placeholder="Phone"
+                          value={contact.phone}
+                          onChange={(e) => {
+                            const updated = [...newClientContacts];
+                            updated[index].phone = e.target.value;
+                            setNewClientContacts(updated);
+                          }}
+                          data-testid={`input-contact-phone-${index}`}
+                        />
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Select
+                          value={contact.role || ""}
+                          onValueChange={(value) => {
+                            const updated = [...newClientContacts];
+                            updated[index].role = value;
+                            setNewClientContacts(updated);
+                          }}
+                        >
+                          <SelectTrigger className="w-[180px]" data-testid={`select-contact-role-${index}`}>
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="General">General</SelectItem>
+                            <SelectItem value="Accounts">Accounts</SelectItem>
+                            <SelectItem value="Manager">Manager</SelectItem>
+                            <SelectItem value="Site">Site Contact</SelectItem>
+                            <SelectItem value="Technical">Technical</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <label className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={contact.isPrimary}
+                            onChange={(e) => {
+                              const updated = [...newClientContacts];
+                              updated[index].isPrimary = e.target.checked;
+                              setNewClientContacts(updated);
+                            }}
+                            className="rounded"
+                            data-testid={`checkbox-contact-primary-${index}`}
+                          />
+                          Primary Contact
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
                 <Button type="submit" className="w-full sm:w-auto" data-testid="button-add-client">
                   <Plus className="mr-2 h-4 w-4" />
                   Add Client
