@@ -506,6 +506,8 @@ export default function Clients() {
       nickname: jobForm.nickname || null,
       client: client.name,
       customerName: client.name,
+      propertyId: selectedProperty?.id || null,
+      propertyName: selectedProperty?.name || null,
       address: jobAddress,
       postcode: jobPostcode,
       contactName: contactName,

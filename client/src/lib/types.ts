@@ -77,6 +77,8 @@ export type Job = {
   nickname: string | null;
   client: string | null;
   customerName: string;
+  propertyId: string | null;
+  propertyName: string | null;
   address: string | null;
   postcode: string | null;
   contactName: string | null;

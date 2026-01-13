@@ -60,6 +60,8 @@ export const jobs = pgTable("jobs", {
   nickname: text("nickname"),
   client: text("client"),
   customerName: text("customer_name").notNull(),
+  propertyId: varchar("property_id"),
+  propertyName: text("property_name"),
   address: text("address"),
   postcode: text("postcode"),
   contactName: text("contact_name"),
