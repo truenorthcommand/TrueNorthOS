@@ -8,6 +8,7 @@ import {
   type Invoice, type InsertInvoice,
   type CompanySettings, type InsertCompanySettings,
   type Client, type InsertClient,
+  type ClientContact, type InsertClientContact,
   type JobUpdate, type InsertJobUpdate,
   type Conversation, type InsertConversation,
   type ConversationMember, type InsertConversationMember,
@@ -31,7 +32,7 @@ import {
   type InvoiceChaseLog, type InsertInvoiceChaseLog,
   type FixedCost, type InsertFixedCost,
   type InvoiceWithChaseInfo, type FinancialSummary,
-  users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, jobUpdates,
+  users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, clientContacts, jobUpdates,
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
   timesheets, expenses, payments,
@@ -104,6 +105,12 @@ export interface IStorage {
   updateClient(id: string, updates: Partial<Client>): Promise<Client | undefined>;
   deleteClient(id: string): Promise<void>;
   findOrCreateClient(data: { name: string; email?: string | null; phone?: string | null; address?: string | null; postcode?: string | null; contactName?: string | null }): Promise<Client>;
+  
+  // Client Contacts
+  getClientContacts(clientId: string): Promise<ClientContact[]>;
+  createClientContact(contact: InsertClientContact): Promise<ClientContact>;
+  updateClientContact(id: string, updates: Partial<ClientContact>): Promise<ClientContact | undefined>;
+  deleteClientContact(id: string): Promise<void>;
   
   createJobUpdate(update: InsertJobUpdate): Promise<JobUpdate>;
   getJobUpdates(jobId: string): Promise<JobUpdate[]>;
@@ -585,6 +592,25 @@ export class DatabaseStorage implements IStorage {
       postcode: data.postcode,
       contactName: data.contactName,
     });
+  }
+
+  // Client Contacts
+  async getClientContacts(clientId: string): Promise<ClientContact[]> {
+    return db.select().from(clientContacts).where(eq(clientContacts.clientId, clientId)).orderBy(desc(clientContacts.isPrimary), asc(clientContacts.name));
+  }
+
+  async createClientContact(contact: InsertClientContact): Promise<ClientContact> {
+    const [created] = await db.insert(clientContacts).values(contact).returning();
+    return created;
+  }
+
+  async updateClientContact(id: string, updates: Partial<ClientContact>): Promise<ClientContact | undefined> {
+    const [updated] = await db.update(clientContacts).set({ ...updates, updatedAt: new Date() }).where(eq(clientContacts.id, id)).returning();
+    return updated;
+  }
+
+  async deleteClientContact(id: string): Promise<void> {
+    await db.delete(clientContacts).where(eq(clientContacts.id, id));
   }
 
   async createJobUpdate(update: InsertJobUpdate): Promise<JobUpdate> {

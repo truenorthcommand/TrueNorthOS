@@ -115,6 +115,19 @@ export const clients = pgTable("clients", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Client contacts - multiple contact persons per client
+export const clientContacts = pgTable("client_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull(),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  role: text("role"), // e.g., "Site Manager", "Accounts", "Director"
+  isPrimary: boolean("is_primary").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const engineerLocations = pgTable("engineer_locations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   engineerId: varchar("engineer_id").notNull(),
@@ -132,6 +145,15 @@ export const insertClientSchema = createInsertSchema(clients).omit({
 
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
+
+export const insertClientContactSchema = createInsertSchema(clientContacts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertClientContact = z.infer<typeof insertClientContactSchema>;
+export type ClientContact = typeof clientContacts.$inferSelect;
 
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
