@@ -384,7 +384,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950">
         {/* Desktop Sidebar */}
         <aside className={cn(
-          "hidden md:flex flex-col border-r bg-background h-screen sticky top-0 transition-all duration-300",
+          "hidden md:flex flex-col border-r bg-background h-screen sticky top-0 transition-all duration-300 print:hidden",
           sidebarCollapsed ? "w-16" : "w-64 lg:w-72"
         )}>
           {/* Collapse Toggle Button */}
@@ -413,7 +413,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-h-screen">
           {/* Mobile Header */}
-          <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6 shadow-sm md:hidden">
+          <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6 shadow-sm md:hidden print:hidden">
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon">
@@ -440,7 +440,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
           {(!isOnline || pendingActions > 0) && (
             <div className={cn(
-              "px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-2",
+              "px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-2 print:hidden",
               !isOnline ? "bg-red-500 text-white" : "bg-amber-500 text-white"
             )}>
               {!isOnline ? (
@@ -465,7 +465,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </div>
           )}
 
-          <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full no-print">
+          <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full">
             {children}
           </main>
         </div>
