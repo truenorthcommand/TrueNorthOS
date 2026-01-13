@@ -1865,6 +1865,46 @@ export async function registerRoutes(
     }
   });
 
+  // Client Properties
+  app.get("/api/clients/:id/properties", requireAuth, async (req, res) => {
+    try {
+      const properties = await storage.getClientProperties(req.params.id);
+      res.json(properties);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch client properties" });
+    }
+  });
+
+  app.post("/api/clients/:id/properties", requireAdmin, async (req, res) => {
+    try {
+      const property = await storage.createClientProperty({ ...req.body, clientId: req.params.id });
+      res.json(property);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create client property" });
+    }
+  });
+
+  app.patch("/api/clients/:id/properties/:propertyId", requireAdmin, async (req, res) => {
+    try {
+      const property = await storage.updateClientProperty(req.params.propertyId, req.body);
+      if (!property) {
+        return res.status(404).json({ error: "Property not found" });
+      }
+      res.json(property);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update client property" });
+    }
+  });
+
+  app.delete("/api/clients/:id/properties/:propertyId", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteClientProperty(req.params.propertyId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete client property" });
+    }
+  });
+
   // ==================== INVOICES ROUTES ====================
 
   // PUBLIC routes first (specific paths before :id parameter)

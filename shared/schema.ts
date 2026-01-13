@@ -128,6 +128,22 @@ export const clientContacts = pgTable("client_contacts", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Client properties - multiple work sites/properties per client
+export const clientProperties = pgTable("client_properties", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull(),
+  name: text("name").notNull(), // e.g., "Head Office", "Warehouse", "Site A"
+  address: text("address").notNull(),
+  postcode: text("postcode"),
+  contactName: text("contact_name"), // Site-specific contact
+  contactPhone: text("contact_phone"),
+  contactEmail: text("contact_email"),
+  notes: text("notes"),
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const engineerLocations = pgTable("engineer_locations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   engineerId: varchar("engineer_id").notNull(),
@@ -154,6 +170,15 @@ export const insertClientContactSchema = createInsertSchema(clientContacts).omit
 
 export type InsertClientContact = z.infer<typeof insertClientContactSchema>;
 export type ClientContact = typeof clientContacts.$inferSelect;
+
+export const insertClientPropertySchema = createInsertSchema(clientProperties).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertClientProperty = z.infer<typeof insertClientPropertySchema>;
+export type ClientProperty = typeof clientProperties.$inferSelect;
 
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,

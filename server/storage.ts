@@ -9,6 +9,7 @@ import {
   type CompanySettings, type InsertCompanySettings,
   type Client, type InsertClient,
   type ClientContact, type InsertClientContact,
+  type ClientProperty, type InsertClientProperty,
   type JobUpdate, type InsertJobUpdate,
   type Conversation, type InsertConversation,
   type ConversationMember, type InsertConversationMember,
@@ -32,7 +33,7 @@ import {
   type InvoiceChaseLog, type InsertInvoiceChaseLog,
   type FixedCost, type InsertFixedCost,
   type InvoiceWithChaseInfo, type FinancialSummary,
-  users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, clientContacts, jobUpdates,
+  users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, clientContacts, clientProperties, jobUpdates,
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
   timesheets, expenses, payments,
@@ -620,6 +621,36 @@ export class DatabaseStorage implements IStorage {
 
   async deleteClientContact(id: string): Promise<void> {
     await db.delete(clientContacts).where(eq(clientContacts.id, id));
+  }
+
+  // Client Properties
+  async getClientProperties(clientId: string): Promise<ClientProperty[]> {
+    return db.select().from(clientProperties).where(eq(clientProperties.clientId, clientId)).orderBy(desc(clientProperties.isDefault), asc(clientProperties.name));
+  }
+
+  async createClientProperty(property: InsertClientProperty): Promise<ClientProperty> {
+    const [created] = await db.insert(clientProperties).values(property).returning();
+    return created;
+  }
+
+  async updateClientProperty(id: string, updates: Partial<ClientProperty>): Promise<ClientProperty | undefined> {
+    const { name, address, postcode, contactName, contactPhone, contactEmail, notes, isDefault } = updates;
+    const safeUpdates: Record<string, any> = { updatedAt: new Date() };
+    if (name !== undefined) safeUpdates.name = name;
+    if (address !== undefined) safeUpdates.address = address;
+    if (postcode !== undefined) safeUpdates.postcode = postcode;
+    if (contactName !== undefined) safeUpdates.contactName = contactName;
+    if (contactPhone !== undefined) safeUpdates.contactPhone = contactPhone;
+    if (contactEmail !== undefined) safeUpdates.contactEmail = contactEmail;
+    if (notes !== undefined) safeUpdates.notes = notes;
+    if (isDefault !== undefined) safeUpdates.isDefault = isDefault;
+    
+    const [updated] = await db.update(clientProperties).set(safeUpdates).where(eq(clientProperties.id, id)).returning();
+    return updated;
+  }
+
+  async deleteClientProperty(id: string): Promise<void> {
+    await db.delete(clientProperties).where(eq(clientProperties.id, id));
   }
 
   async createJobUpdate(update: InsertJobUpdate): Promise<JobUpdate> {
