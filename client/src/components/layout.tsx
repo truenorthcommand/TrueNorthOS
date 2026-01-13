@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/lib/store";
 import { SnippetWidget } from "@/components/snippet-widget";
 
-type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools' | 'fleet' | 'finance';
+type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools' | 'fleet' | 'finance' | 'clients';
 import { LayoutDashboard as DashboardIcon } from "lucide-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -216,37 +216,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Link>
         )}
 
-        {/* Clients - Admin & Surveyor */}
+        {/* Clients Section - Admin & Surveyor */}
         {hasRole(user, 'admin', 'surveyor') && (
-          collapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link href="/clients">
-                  <Button
-                    variant={location === "/clients" ? "secondary" : "ghost"}
-                    size="icon"
-                    className="w-10 h-10"
-                    data-testid="nav-clients"
-                  >
-                    <Building2Icon className="h-5 w-5" />
-                  </Button>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">Clients</TooltipContent>
-            </Tooltip>
-          ) : (
-            <Link href="/clients">
-              <Button
-                variant={location === "/clients" ? "secondary" : "ghost"}
-                className="w-full justify-start h-12 text-lg font-medium"
-                onClick={() => setIsOpen(false)}
-                data-testid="nav-clients"
-              >
-                <Building2Icon className="mr-3 h-5 w-5" />
-                Clients
-              </Button>
-            </Link>
-          )
+          <MenuGroup title="Clients" icon={Building2Icon} section="clients">
+            <NavLink href="/clients" icon={Building2Icon}>Client List</NavLink>
+            {hasRole(user, 'admin') && (
+              <NavLink href="/outlook-inbox" icon={Mail}>Email</NavLink>
+            )}
+          </MenuGroup>
         )}
 
         {/* Sales Section - Admin & Surveyor */}
@@ -350,39 +327,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <NavLink href="/fleet/report-defect" icon={AlertTriangle}>Report Defect</NavLink>
         </MenuGroup>
 
-
-        {/* Email - Admin Only */}
-        {hasRole(user, 'admin') && (
-          collapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link href="/outlook-inbox">
-                  <Button
-                    variant={location === "/outlook-inbox" ? "secondary" : "ghost"}
-                    size="icon"
-                    className="w-10 h-10"
-                    data-testid="nav-email"
-                  >
-                    <Mail className="h-5 w-5" />
-                  </Button>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">Email</TooltipContent>
-            </Tooltip>
-          ) : (
-            <Link href="/outlook-inbox">
-              <Button
-                variant={location === "/outlook-inbox" ? "secondary" : "ghost"}
-                className="w-full justify-start h-12 text-lg font-medium"
-                onClick={() => setIsOpen(false)}
-                data-testid="nav-email"
-              >
-                <Mail className="mr-3 h-5 w-5" />
-                Email
-              </Button>
-            </Link>
-          )
-        )}
 
         {/* Tools Section */}
         <MenuGroup title="Tools" icon={Wrench} section="tools">
