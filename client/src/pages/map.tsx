@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
@@ -22,7 +22,7 @@ interface EngineerLocation {
 
 export default function MapPage() {
   const { user } = useAuth();
-  const { jobs } = useStore();
+  const { jobs, refreshJobs } = useStore();
   const [, setLocation] = useLocation();
   const [engineerLocations, setEngineerLocations] = useState<EngineerLocation[]>([]);
   const [showEngineers, setShowEngineers] = useState(true);
@@ -30,7 +30,7 @@ export default function MapPage() {
   const [showTodayOnly, setShowTodayOnly] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchEngineerLocations = async () => {
+  const fetchEngineerLocations = useCallback(async () => {
     try {
       const response = await fetch('/api/engineers/locations', { credentials: 'include' });
       if (response.ok) {
@@ -42,7 +42,12 @@ export default function MapPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setIsLoading(true);
+    await Promise.all([fetchEngineerLocations(), refreshJobs()]);
+  }, [fetchEngineerLocations, refreshJobs]);
 
   useEffect(() => {
     if (hasRole(user, 'admin')) {
@@ -127,7 +132,7 @@ export default function MapPage() {
         <Button 
           variant="outline" 
           size="sm" 
-          onClick={fetchEngineerLocations}
+          onClick={handleRefresh}
           disabled={isLoading}
           data-testid="button-refresh-map"
         >
