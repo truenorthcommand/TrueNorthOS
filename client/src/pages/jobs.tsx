@@ -90,6 +90,7 @@ export default function Jobs() {
 
   const getStatusColor = (status: JobStatus) => {
     switch (status) {
+      case "Ready": return "bg-purple-500 hover:bg-purple-600";
       case "Draft": return "bg-slate-500 hover:bg-slate-600";
       case "In Progress": return "bg-blue-500 hover:bg-blue-600";
       case "Awaiting Signatures": return "bg-amber-500 hover:bg-amber-600";

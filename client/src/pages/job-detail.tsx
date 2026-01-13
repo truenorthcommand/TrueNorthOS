@@ -534,6 +534,7 @@ export default function JobDetail() {
   const isReadOnly = job.status === "Signed Off";
   const isAdmin = user?.role === "admin";
   const isAdminFieldReadOnly = isReadOnly || !isAdmin;
+  const shouldMaskContactDetails = user?.role === "engineer" && job.status !== "Ready";
 
   const handleAddAction = () => {
     if (!actionDescription.trim()) {
@@ -744,28 +745,42 @@ export default function JobDetail() {
                 <Label>Phone</Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground print:hidden" />
-                  <Input 
-                    value={formData.contactPhone} 
-                    onChange={(e) => handleFieldChange('contactPhone', e.target.value)}
-                    onBlur={() => handleFieldBlur('contactPhone')}
-                    disabled={isAdminFieldReadOnly}
-                    className="pl-9 print:pl-0 print:border-none"
-                    placeholder="Phone Number"
-                  />
+                  {shouldMaskContactDetails ? (
+                    <div className="pl-9 py-2 text-muted-foreground italic" data-testid="text-phone-masked">
+                      Contact via office
+                    </div>
+                  ) : (
+                    <Input 
+                      value={formData.contactPhone} 
+                      onChange={(e) => handleFieldChange('contactPhone', e.target.value)}
+                      onBlur={() => handleFieldBlur('contactPhone')}
+                      disabled={isAdminFieldReadOnly}
+                      className="pl-9 print:pl-0 print:border-none"
+                      placeholder="Phone Number"
+                      data-testid="input-contact-phone"
+                    />
+                  )}
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>Email</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground print:hidden" />
-                  <Input 
-                    value={formData.contactEmail} 
-                    onChange={(e) => handleFieldChange('contactEmail', e.target.value)}
-                    onBlur={() => handleFieldBlur('contactEmail')}
-                    disabled={isAdminFieldReadOnly}
-                    className="pl-9 print:pl-0 print:border-none"
-                    placeholder="Email Address"
-                  />
+                  {shouldMaskContactDetails ? (
+                    <div className="pl-9 py-2 text-muted-foreground italic" data-testid="text-email-masked">
+                      Contact via office
+                    </div>
+                  ) : (
+                    <Input 
+                      value={formData.contactEmail} 
+                      onChange={(e) => handleFieldChange('contactEmail', e.target.value)}
+                      onBlur={() => handleFieldBlur('contactEmail')}
+                      disabled={isAdminFieldReadOnly}
+                      className="pl-9 print:pl-0 print:border-none"
+                      placeholder="Email Address"
+                      data-testid="input-contact-email"
+                    />
+                  )}
                 </div>
               </div>
               <div className="flex gap-4">

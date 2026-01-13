@@ -39,7 +39,7 @@ export const hasRole = (user: User | null, ...requiredRoles: Role[]): boolean =>
   return requiredRoles.some(role => userRoles.includes(role));
 };
 
-export type JobStatus = 'Draft' | 'In Progress' | 'Awaiting Signatures' | 'Signed Off';
+export type JobStatus = 'Ready' | 'Draft' | 'In Progress' | 'Awaiting Signatures' | 'Signed Off';
 
 export type Material = {
   id: string;
