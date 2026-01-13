@@ -59,6 +59,17 @@ interface Client {
   notes: string | null;
 }
 
+const isValidEmail = (email: string): boolean => {
+  if (!email || email.trim() === "") return false;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email.trim());
+};
+
+const isValidOrNA = (value: string | null | undefined): boolean => {
+  if (!value || value.trim() === "" || value.trim().toLowerCase() === "n/a") return true;
+  return value.trim().length > 0;
+};
+
 const STEP_TITLES = [
   "Select Client",
   "Select Property",
@@ -198,8 +209,8 @@ export default function Clients() {
   };
 
   const handleAddContact = async (clientId: string) => {
-    if (!newContact.name.trim()) {
-      toast({ title: "Error", description: "Contact name is required.", variant: "destructive" });
+    if (!isNewContactValid()) {
+      toast({ title: "Error", description: "Please fill in all required fields (Name, Email, Phone) with valid values.", variant: "destructive" });
       return;
     }
     try {
@@ -341,10 +352,48 @@ export default function Clients() {
     setSelectedPropertyId("");
   }, [selectedClientId]);
 
+  const isNewClientValid = (): boolean => {
+    if (!newClient.name.trim()) return false;
+    if (!newClient.contactName.trim()) return false;
+    if (!isValidEmail(newClient.email)) return false;
+    if (!newClient.phone.trim()) return false;
+    return true;
+  };
+
+  const isNewContactValid = (): boolean => {
+    if (!newContact.name.trim()) return false;
+    if (!isValidEmail(newContact.email)) return false;
+    if (!newContact.phone.trim()) return false;
+    return true;
+  };
+
+  const isEditingContactValid = (): boolean => {
+    if (!editingContact) return false;
+    if (!editingContact.name.trim()) return false;
+    if (!isValidEmail(editingContact.email || "")) return false;
+    if (!editingContact.phone?.trim()) return false;
+    return true;
+  };
+
+  const isAdditionalContactValid = (contact: { name: string; email: string; phone: string; role: string; isPrimary: boolean }): boolean => {
+    if (!contact.name.trim()) return false;
+    if (!isValidEmail(contact.email)) return false;
+    if (!contact.phone.trim()) return false;
+    return true;
+  };
+
+  const areAllAdditionalContactsValid = (): boolean => {
+    return newClientContacts.every(isAdditionalContactValid);
+  };
+
   const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newClient.name) {
-      toast({ title: "Error", description: "Client name is required.", variant: "destructive" });
+    if (!isNewClientValid()) {
+      toast({ title: "Error", description: "Please fill in all required fields with valid values.", variant: "destructive" });
+      return;
+    }
+    if (newClientContacts.length > 0 && !areAllAdditionalContactsValid()) {
+      toast({ title: "Error", description: "Please complete all additional contact fields with valid values.", variant: "destructive" });
       return;
     }
     try {
@@ -490,15 +539,35 @@ export default function Clients() {
     }
   };
 
-  // Step validation
+  // Step validation functions
+  const isStep1Valid = () => !!selectedClientId;
+  
+  const isStep2Valid = () => {
+    if (showAddProperty) {
+      return newProperty.name.trim() !== "" && newProperty.address.trim() !== "";
+    }
+    return !!selectedPropertyId;
+  };
+  
+  const isStep3Valid = () => !!jobForm.description.trim();
+  
+  const isStep4Valid = () => {
+    if (assignOption === 'assign') {
+      return selectedEngineerIds.length > 0;
+    }
+    return true;
+  };
+
   const canProceedToNextStep = () => {
     switch (currentStep) {
       case 1:
-        return !!selectedClientId;
+        return isStep1Valid();
       case 2:
-        return !!selectedPropertyId || showAddProperty;
+        return isStep2Valid();
       case 3:
-        return !!jobForm.description.trim();
+        return isStep3Valid();
+      case 4:
+        return isStep4Valid();
       default:
         return true;
     }
@@ -580,7 +649,10 @@ export default function Clients() {
             <div className="space-y-2">
               <Label>Select Client *</Label>
               <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                <SelectTrigger data-testid="select-client">
+                <SelectTrigger 
+                  data-testid="select-client"
+                  className={!selectedClientId ? "border-red-300 focus:ring-red-500" : ""}
+                >
                   <SelectValue placeholder="Choose a client..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -591,6 +663,9 @@ export default function Clients() {
                   ))}
                 </SelectContent>
               </Select>
+              {!selectedClientId && (
+                <p className="text-xs text-red-500">Please select a client to continue</p>
+              )}
             </div>
 
             {selectedClient && (
@@ -650,7 +725,10 @@ export default function Clients() {
                   
                   {(clientProperties[selectedClientId] || []).length > 0 ? (
                     <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
-                      <SelectTrigger data-testid="select-property">
+                      <SelectTrigger 
+                        data-testid="select-property"
+                        className={!selectedPropertyId && !showAddProperty ? "border-red-300 focus:ring-red-500" : ""}
+                      >
                         <SelectValue placeholder="Choose a property..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -665,9 +743,14 @@ export default function Clients() {
                       </SelectContent>
                     </Select>
                   ) : (
-                    <p className="text-sm text-muted-foreground p-4 border rounded-lg bg-slate-50 dark:bg-slate-900/50">
-                      No properties found for this client. Add a new property to continue.
-                    </p>
+                    <div className="p-4 border rounded-lg bg-slate-50 dark:bg-slate-900/50 border-amber-300">
+                      <p className="text-sm text-muted-foreground">
+                        No properties found for this client. Add a new property to continue.
+                      </p>
+                    </div>
+                  )}
+                  {!selectedPropertyId && !showAddProperty && (clientProperties[selectedClientId] || []).length > 0 && (
+                    <p className="text-xs text-red-500">Please select a property to continue</p>
                   )}
                 </div>
 
@@ -685,7 +768,11 @@ export default function Clients() {
                           value={newProperty.name}
                           onChange={(e) => setNewProperty({ ...newProperty, name: e.target.value })}
                           data-testid="input-property-name"
+                          className={showAddProperty && !newProperty.name.trim() ? "border-red-300 focus:ring-red-500" : ""}
                         />
+                        {showAddProperty && !newProperty.name.trim() && (
+                          <p className="text-xs text-red-500">Property name is required</p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm">Postcode</Label>
@@ -702,9 +789,12 @@ export default function Clients() {
                           placeholder="Full property address"
                           value={newProperty.address}
                           onChange={(e) => setNewProperty({ ...newProperty, address: e.target.value })}
-                          className="min-h-[80px]"
+                          className={`min-h-[80px] ${showAddProperty && !newProperty.address.trim() ? "border-red-300 focus:ring-red-500" : ""}`}
                           data-testid="input-property-address"
                         />
+                        {showAddProperty && !newProperty.address.trim() && (
+                          <p className="text-xs text-red-500">Property address is required</p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm">Contact Name</Label>
@@ -870,11 +960,14 @@ export default function Clients() {
                 placeholder="Describe the work to be carried out..."
                 value={jobForm.description}
                 onChange={(e) => setJobForm({ ...jobForm, description: e.target.value })}
-                className="min-h-[120px]"
+                className={`min-h-[120px] ${!jobForm.description.trim() ? "border-red-300 focus:ring-red-500" : ""}`}
                 required
                 data-testid="input-description"
                 aiContext="job description for field service work"
               />
+              {!jobForm.description.trim() && (
+                <p className="text-xs text-red-500">Description is required to continue</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -1000,7 +1093,10 @@ export default function Clients() {
             {assignOption === 'assign' && user?.role === 'admin' && engineers.length > 0 && (
               <div className="space-y-2">
                 <Label>Select Engineers *</Label>
-                <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto" data-testid="engineer-checkbox-list">
+                <div 
+                  className={`border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto ${selectedEngineerIds.length === 0 ? "border-red-300" : ""}`}
+                  data-testid="engineer-checkbox-list"
+                >
                   {engineers.map((eng) => (
                     <div key={eng.id} className="flex items-center space-x-2">
                       <Checkbox
@@ -1030,7 +1126,7 @@ export default function Clients() {
                   </p>
                 )}
                 {assignOption === 'assign' && selectedEngineerIds.length === 0 && (
-                  <p className="text-xs text-amber-600">Please select at least one engineer to send the job.</p>
+                  <p className="text-xs text-red-500">Please select at least one engineer to send the job</p>
                 )}
               </div>
             )}
@@ -1160,50 +1256,68 @@ export default function Clients() {
               <form onSubmit={handleAddClient} className="space-y-4">
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Company Name</Label>
+                    <Label>Company Name <span className="text-red-500">*</span></Label>
                     <Input
                       placeholder="e.g., BuildTech Solutions"
                       value={newClient.name}
                       onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
+                      className={!newClient.name.trim() ? "border-red-300 focus:ring-red-500" : ""}
                       data-testid="input-company-name"
                     />
+                    {!newClient.name.trim() && (
+                      <p className="text-xs text-red-500">Company name is required</p>
+                    )}
                   </div>
                   <div className="space-y-2">
-                    <Label>Contact Person</Label>
+                    <Label>Contact Person <span className="text-red-500">*</span></Label>
                     <Input
                       placeholder="Full name"
                       value={newClient.contactName}
                       onChange={(e) =>
                         setNewClient({ ...newClient, contactName: e.target.value })
                       }
+                      className={!newClient.contactName.trim() ? "border-red-300 focus:ring-red-500" : ""}
                       data-testid="input-contact-person"
                     />
+                    {!newClient.contactName.trim() && (
+                      <p className="text-xs text-red-500">Contact person is required</p>
+                    )}
                   </div>
                   <div className="space-y-2">
-                    <Label>Email</Label>
+                    <Label>Email <span className="text-red-500">*</span></Label>
                     <Input
                       type="email"
                       placeholder="contact@company.com"
                       value={newClient.email}
                       onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
+                      className={!isValidEmail(newClient.email) ? "border-red-300 focus:ring-red-500" : ""}
                       data-testid="input-client-email"
                     />
+                    {!newClient.email.trim() ? (
+                      <p className="text-xs text-red-500">Email is required</p>
+                    ) : !isValidEmail(newClient.email) ? (
+                      <p className="text-xs text-red-500">Please enter a valid email address</p>
+                    ) : null}
                   </div>
                   <div className="space-y-2">
-                    <Label>Phone</Label>
+                    <Label>Phone <span className="text-red-500">*</span></Label>
                     <Input
                       placeholder="01234 567890"
                       value={newClient.phone}
                       onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
+                      className={!newClient.phone.trim() ? "border-red-300 focus:ring-red-500" : ""}
                       data-testid="input-client-phone"
                     />
+                    {!newClient.phone.trim() && (
+                      <p className="text-xs text-red-500">Phone is required</p>
+                    )}
                   </div>
                 </div>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Address</Label>
+                    <Label>Address <span className="text-muted-foreground text-xs">(optional or N/A)</span></Label>
                     <Textarea
-                      placeholder="Full address"
+                      placeholder="Full address (or N/A)"
                       value={newClient.address}
                       onChange={(e) =>
                         setNewClient({ ...newClient, address: e.target.value })
@@ -1213,9 +1327,9 @@ export default function Clients() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Postcode</Label>
+                    <Label>Postcode <span className="text-muted-foreground text-xs">(optional or N/A)</span></Label>
                     <Input
-                      placeholder="e.g., SW1A 1AA"
+                      placeholder="e.g., SW1A 1AA (or N/A)"
                       value={newClient.postcode}
                       onChange={(e) => setNewClient({ ...newClient, postcode: e.target.value })}
                       data-testid="input-postcode"
@@ -1244,7 +1358,7 @@ export default function Clients() {
                   )}
                   
                   {newClientContacts.map((contact, index) => (
-                    <div key={index} className="border rounded-md p-3 bg-white dark:bg-slate-800 space-y-3">
+                    <div key={index} className={`border rounded-md p-3 bg-white dark:bg-slate-800 space-y-3 ${!isAdditionalContactValid(contact) ? "border-red-300" : ""}`}>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Contact {index + 1}</span>
                         <Button
@@ -1259,58 +1373,81 @@ export default function Clients() {
                         </Button>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <Input
-                          placeholder="Name *"
-                          value={contact.name}
-                          onChange={(e) => {
-                            const updated = [...newClientContacts];
-                            updated[index].name = e.target.value;
-                            setNewClientContacts(updated);
-                          }}
-                          data-testid={`input-contact-name-${index}`}
-                        />
-                        <Input
-                          placeholder="Email"
-                          type="email"
-                          value={contact.email}
-                          onChange={(e) => {
-                            const updated = [...newClientContacts];
-                            updated[index].email = e.target.value;
-                            setNewClientContacts(updated);
-                          }}
-                          data-testid={`input-contact-email-${index}`}
-                        />
-                        <Input
-                          placeholder="Phone"
-                          value={contact.phone}
-                          onChange={(e) => {
-                            const updated = [...newClientContacts];
-                            updated[index].phone = e.target.value;
-                            setNewClientContacts(updated);
-                          }}
-                          data-testid={`input-contact-phone-${index}`}
-                        />
+                        <div className="space-y-1">
+                          <Input
+                            placeholder="Name *"
+                            value={contact.name}
+                            onChange={(e) => {
+                              const updated = [...newClientContacts];
+                              updated[index].name = e.target.value;
+                              setNewClientContacts(updated);
+                            }}
+                            className={!contact.name.trim() ? "border-red-300 focus:ring-red-500" : ""}
+                            data-testid={`input-contact-name-${index}`}
+                          />
+                          {!contact.name.trim() && (
+                            <p className="text-xs text-red-500">Required</p>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <Input
+                            placeholder="Email *"
+                            type="email"
+                            value={contact.email}
+                            onChange={(e) => {
+                              const updated = [...newClientContacts];
+                              updated[index].email = e.target.value;
+                              setNewClientContacts(updated);
+                            }}
+                            className={!isValidEmail(contact.email) ? "border-red-300 focus:ring-red-500" : ""}
+                            data-testid={`input-contact-email-${index}`}
+                          />
+                          {!contact.email.trim() ? (
+                            <p className="text-xs text-red-500">Required</p>
+                          ) : !isValidEmail(contact.email) ? (
+                            <p className="text-xs text-red-500">Invalid email</p>
+                          ) : null}
+                        </div>
+                        <div className="space-y-1">
+                          <Input
+                            placeholder="Phone *"
+                            value={contact.phone}
+                            onChange={(e) => {
+                              const updated = [...newClientContacts];
+                              updated[index].phone = e.target.value;
+                              setNewClientContacts(updated);
+                            }}
+                            className={!contact.phone.trim() ? "border-red-300 focus:ring-red-500" : ""}
+                            data-testid={`input-contact-phone-${index}`}
+                          />
+                          {!contact.phone.trim() && (
+                            <p className="text-xs text-red-500">Required</p>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-4">
-                        <Select
-                          value={contact.role || ""}
-                          onValueChange={(value) => {
-                            const updated = [...newClientContacts];
-                            updated[index].role = value;
-                            setNewClientContacts(updated);
-                          }}
-                        >
-                          <SelectTrigger className="w-[180px]" data-testid={`select-contact-role-${index}`}>
-                            <SelectValue placeholder="Select role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="General">General</SelectItem>
-                            <SelectItem value="Accounts">Accounts</SelectItem>
-                            <SelectItem value="Manager">Manager</SelectItem>
-                            <SelectItem value="Site">Site Contact</SelectItem>
-                            <SelectItem value="Technical">Technical</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <div className="space-y-1">
+                          <Select
+                            value={contact.role || ""}
+                            onValueChange={(value) => {
+                              const updated = [...newClientContacts];
+                              updated[index].role = value;
+                              setNewClientContacts(updated);
+                            }}
+                          >
+                            <SelectTrigger className="w-[180px]" data-testid={`select-contact-role-${index}`}>
+                              <SelectValue placeholder="Role (optional)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="N/A">N/A</SelectItem>
+                              <SelectItem value="General">General</SelectItem>
+                              <SelectItem value="Accounts">Accounts</SelectItem>
+                              <SelectItem value="Manager">Manager</SelectItem>
+                              <SelectItem value="Site">Site Contact</SelectItem>
+                              <SelectItem value="Technical">Technical</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <label className="flex items-center gap-2 text-sm">
                           <input
                             type="checkbox"
@@ -1330,7 +1467,12 @@ export default function Clients() {
                   ))}
                 </div>
 
-                <Button type="submit" className="w-full sm:w-auto" data-testid="button-add-client">
+                <Button 
+                  type="submit" 
+                  className="w-full sm:w-auto" 
+                  data-testid="button-add-client"
+                  disabled={!isNewClientValid() || (newClientContacts.length > 0 && !areAllAdditionalContactsValid())}
+                >
                   <Plus className="mr-2 h-4 w-4" />
                   Add Client
                 </Button>
@@ -1458,41 +1600,55 @@ export default function Clients() {
                           <p className="text-sm font-medium">New Contact</p>
                           <div className="grid md:grid-cols-2 gap-3">
                             <div className="space-y-1">
-                              <Label className="text-xs">Name *</Label>
+                              <Label className="text-xs">Name <span className="text-red-500">*</span></Label>
                               <Input
                                 placeholder="Contact name"
                                 value={newContact.name}
                                 onChange={(e) => setNewContact({ ...newContact, name: e.target.value })}
+                                className={!newContact.name.trim() ? "border-red-300 focus:ring-red-500" : ""}
                                 data-testid={`input-new-contact-name-${client.id}`}
                               />
+                              {!newContact.name.trim() && (
+                                <p className="text-xs text-red-500">Name is required</p>
+                              )}
                             </div>
                             <div className="space-y-1">
-                              <Label className="text-xs">Role</Label>
+                              <Label className="text-xs">Role <span className="text-muted-foreground">(optional or N/A)</span></Label>
                               <Input
-                                placeholder="e.g., Site Manager"
+                                placeholder="e.g., Site Manager (or N/A)"
                                 value={newContact.role}
                                 onChange={(e) => setNewContact({ ...newContact, role: e.target.value })}
                                 data-testid={`input-new-contact-role-${client.id}`}
                               />
                             </div>
                             <div className="space-y-1">
-                              <Label className="text-xs">Email</Label>
+                              <Label className="text-xs">Email <span className="text-red-500">*</span></Label>
                               <Input
                                 type="email"
                                 placeholder="email@company.com"
                                 value={newContact.email}
                                 onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
+                                className={!isValidEmail(newContact.email) ? "border-red-300 focus:ring-red-500" : ""}
                                 data-testid={`input-new-contact-email-${client.id}`}
                               />
+                              {!newContact.email.trim() ? (
+                                <p className="text-xs text-red-500">Email is required</p>
+                              ) : !isValidEmail(newContact.email) ? (
+                                <p className="text-xs text-red-500">Please enter a valid email</p>
+                              ) : null}
                             </div>
                             <div className="space-y-1">
-                              <Label className="text-xs">Phone</Label>
+                              <Label className="text-xs">Phone <span className="text-red-500">*</span></Label>
                               <Input
                                 placeholder="01234 567890"
                                 value={newContact.phone}
                                 onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
+                                className={!newContact.phone.trim() ? "border-red-300 focus:ring-red-500" : ""}
                                 data-testid={`input-new-contact-phone-${client.id}`}
                               />
+                              {!newContact.phone.trim() && (
+                                <p className="text-xs text-red-500">Phone is required</p>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
@@ -1505,7 +1661,12 @@ export default function Clients() {
                             <label htmlFor={`primary-${client.id}`} className="text-sm">Primary contact</label>
                           </div>
                           <div className="flex gap-2">
-                            <Button size="sm" onClick={() => handleAddContact(client.id)} data-testid={`button-save-contact-${client.id}`}>
+                            <Button 
+                              size="sm" 
+                              onClick={() => handleAddContact(client.id)} 
+                              disabled={!isNewContactValid()}
+                              data-testid={`button-save-contact-${client.id}`}
+                            >
                               Save Contact
                             </Button>
                             <Button size="sm" variant="outline" onClick={() => {
@@ -1536,37 +1697,52 @@ export default function Clients() {
                                   <div className="flex-1 space-y-3">
                                     <div className="grid md:grid-cols-2 gap-3">
                                       <div className="space-y-1">
-                                        <Label className="text-xs">Name *</Label>
+                                        <Label className="text-xs">Name <span className="text-red-500">*</span></Label>
                                         <Input
                                           value={editingContact.name}
                                           onChange={(e) => setEditingContact({ ...editingContact, name: e.target.value })}
+                                          className={!editingContact.name.trim() ? "border-red-300 focus:ring-red-500" : ""}
                                           data-testid={`input-edit-contact-name-${contact.id}`}
                                         />
+                                        {!editingContact.name.trim() && (
+                                          <p className="text-xs text-red-500">Name is required</p>
+                                        )}
                                       </div>
                                       <div className="space-y-1">
-                                        <Label className="text-xs">Role</Label>
+                                        <Label className="text-xs">Role <span className="text-muted-foreground">(optional or N/A)</span></Label>
                                         <Input
                                           value={editingContact.role || ""}
+                                          placeholder="e.g., Site Manager (or N/A)"
                                           onChange={(e) => setEditingContact({ ...editingContact, role: e.target.value })}
                                           data-testid={`input-edit-contact-role-${contact.id}`}
                                         />
                                       </div>
                                       <div className="space-y-1">
-                                        <Label className="text-xs">Email</Label>
+                                        <Label className="text-xs">Email <span className="text-red-500">*</span></Label>
                                         <Input
                                           type="email"
                                           value={editingContact.email || ""}
                                           onChange={(e) => setEditingContact({ ...editingContact, email: e.target.value })}
+                                          className={!isValidEmail(editingContact.email || "") ? "border-red-300 focus:ring-red-500" : ""}
                                           data-testid={`input-edit-contact-email-${contact.id}`}
                                         />
+                                        {!(editingContact.email || "").trim() ? (
+                                          <p className="text-xs text-red-500">Email is required</p>
+                                        ) : !isValidEmail(editingContact.email || "") ? (
+                                          <p className="text-xs text-red-500">Please enter a valid email</p>
+                                        ) : null}
                                       </div>
                                       <div className="space-y-1">
-                                        <Label className="text-xs">Phone</Label>
+                                        <Label className="text-xs">Phone <span className="text-red-500">*</span></Label>
                                         <Input
                                           value={editingContact.phone || ""}
                                           onChange={(e) => setEditingContact({ ...editingContact, phone: e.target.value })}
+                                          className={!editingContact.phone?.trim() ? "border-red-300 focus:ring-red-500" : ""}
                                           data-testid={`input-edit-contact-phone-${contact.id}`}
                                         />
+                                        {!editingContact.phone?.trim() && (
+                                          <p className="text-xs text-red-500">Phone is required</p>
+                                        )}
                                       </div>
                                     </div>
                                     <div className="flex items-center space-x-2">
@@ -1584,6 +1760,7 @@ export default function Clients() {
                                           const { id, clientId, ...updateFields } = editingContact;
                                           handleUpdateContact(client.id, contact.id, updateFields);
                                         }}
+                                        disabled={!isEditingContactValid()}
                                         data-testid={`button-update-contact-${contact.id}`}
                                       >
                                         Update

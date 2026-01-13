@@ -10,7 +10,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Loader2, AlertTriangle, Camera, Info } from "lucide-react";
 import type { Vehicle } from "@shared/schema";
 
 const CATEGORIES = [
@@ -107,9 +107,9 @@ export default function ReportDefect() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="vehicle">Vehicle *</Label>
+              <Label htmlFor="vehicle">Vehicle <span className="text-red-500">*</span></Label>
               <Select value={vehicleId} onValueChange={setVehicleId}>
-                <SelectTrigger data-testid="select-vehicle">
+                <SelectTrigger className={!vehicleId ? "border-orange-300" : ""} data-testid="select-vehicle">
                   <SelectValue placeholder="Select a vehicle" />
                 </SelectTrigger>
                 <SelectContent>
@@ -120,12 +120,13 @@ export default function ReportDefect() {
                   ))}
                 </SelectContent>
               </Select>
+              {!vehicleId && <p className="text-xs text-muted-foreground">Please select the affected vehicle</p>}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="category">Category *</Label>
+              <Label htmlFor="category">Category <span className="text-red-500">*</span></Label>
               <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger data-testid="select-category">
+                <SelectTrigger className={!category ? "border-orange-300" : ""} data-testid="select-category">
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -139,7 +140,7 @@ export default function ReportDefect() {
             </div>
 
             <div className="space-y-2">
-              <Label>Severity *</Label>
+              <Label>Severity <span className="text-red-500">*</span></Label>
               <RadioGroup
                 value={severity}
                 onValueChange={(v) => setSeverity(v as "critical" | "major" | "minor")}
@@ -166,15 +167,31 @@ export default function ReportDefect() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description *</Label>
+              <Label htmlFor="description">Description <span className="text-red-500">*</span></Label>
               <Textarea
                 id="description"
                 placeholder="Describe the defect in detail..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={4}
+                className={!description.trim() ? "border-orange-300" : ""}
                 data-testid="input-description"
               />
+              {!description.trim() && (
+                <p className="text-xs text-muted-foreground">Please provide a detailed description of the defect</p>
+              )}
+            </div>
+
+            <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-4 border border-blue-200 dark:border-blue-800">
+              <div className="flex gap-3">
+                <Camera className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Photo Evidence Recommended</p>
+                  <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                    Taking photos of the defect helps maintenance teams diagnose and fix issues faster.
+                  </p>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

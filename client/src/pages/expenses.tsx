@@ -92,6 +92,24 @@ export default function Expenses() {
   const [receiptUrl, setReceiptUrl] = useState("");
   const [jobId, setJobId] = useState<string>("");
   const [notes, setNotes] = useState("");
+  const [noReceipt, setNoReceipt] = useState(false);
+  const [fromLocation, setFromLocation] = useState("");
+  const [toLocation, setToLocation] = useState("");
+
+  const isFormValid = (): boolean => {
+    if (!expenseDate) return false;
+    if (!description.trim()) return false;
+    if (!amount || parseFloat(amount) <= 0) return false;
+    if (!noReceipt && !receiptUrl) return false;
+    
+    if (category === "mileage") {
+      if (!fromLocation.trim()) return false;
+      if (!toLocation.trim()) return false;
+      if (!mileage || parseFloat(mileage) <= 0) return false;
+    }
+    
+    return true;
+  };
 
   const { data: expenses = [], isLoading: expensesLoading } = useQuery<ExpenseWithDetails[]>({
     queryKey: ["/api/expenses"],
@@ -214,6 +232,9 @@ export default function Expenses() {
     setReceiptUrl("");
     setJobId("");
     setNotes("");
+    setNoReceipt(false);
+    setFromLocation("");
+    setToLocation("");
   };
 
   const handleSubmit = () => {
@@ -221,13 +242,31 @@ export default function Expenses() {
       toast.error("Please select a date");
       return;
     }
-    if (!description) {
+    if (!description.trim()) {
       toast.error("Please enter a description");
       return;
     }
     if (!amount || parseFloat(amount) <= 0) {
       toast.error("Please enter a valid amount");
       return;
+    }
+    if (!noReceipt && !receiptUrl) {
+      toast.error("Please add a receipt photo or mark as 'No receipt'");
+      return;
+    }
+    if (category === "mileage") {
+      if (!fromLocation.trim()) {
+        toast.error("Please enter a 'From' location");
+        return;
+      }
+      if (!toLocation.trim()) {
+        toast.error("Please enter a 'To' location");
+        return;
+      }
+      if (!mileage || parseFloat(mileage) <= 0) {
+        toast.error("Please enter miles travelled");
+        return;
+      }
     }
 
     const expenseData: any = {
@@ -239,6 +278,9 @@ export default function Expenses() {
       receiptUrl: receiptUrl || null,
       jobId: (jobId && jobId !== "none") ? jobId : null,
       notes: notes || null,
+      noReceipt,
+      fromLocation: fromLocation || null,
+      toLocation: toLocation || null,
     };
 
     if (category === "mileage" && mileage) {
@@ -332,7 +374,7 @@ export default function Expenses() {
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label>Category</Label>
+                <Label>Category <span className="text-red-500">*</span></Label>
                 <Select value={category} onValueChange={(v) => setCategory(v as ExpenseCategory)}>
                   <SelectTrigger data-testid="select-category">
                     <SelectValue placeholder="Select category" />
@@ -351,7 +393,7 @@ export default function Expenses() {
               </div>
 
               <div className="space-y-2">
-                <Label>Date</Label>
+                <Label>Date <span className="text-red-500">*</span></Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start text-left font-normal" data-testid="button-select-date">
@@ -366,7 +408,7 @@ export default function Expenses() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description">Description <span className="text-red-500">*</span></Label>
                 <Input
                   id="description"
                   value={description}
@@ -380,7 +422,29 @@ export default function Expenses() {
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="mileage">Miles Travelled</Label>
+                      <Label htmlFor="fromLocation">From Location <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="fromLocation"
+                        value={fromLocation}
+                        onChange={(e) => setFromLocation(e.target.value)}
+                        placeholder="Starting location"
+                        data-testid="input-from-location"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="toLocation">To Location <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="toLocation"
+                        value={toLocation}
+                        onChange={(e) => setToLocation(e.target.value)}
+                        placeholder="Destination"
+                        data-testid="input-to-location"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="mileage">Miles Travelled <span className="text-red-500">*</span></Label>
                       <Input
                         id="mileage"
                         type="number"
@@ -392,7 +456,7 @@ export default function Expenses() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Rate</Label>
+                      <Label>Rate <span className="text-red-500">*</span></Label>
                       <Select value={mileageRate} onValueChange={setMileageRate}>
                         <SelectTrigger data-testid="select-mileage-rate">
                           <SelectValue placeholder="Select rate" />
@@ -415,7 +479,7 @@ export default function Expenses() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Amount (£)</Label>
+                  <Label htmlFor="amount">Amount (£) <span className="text-red-500">*</span></Label>
                   <Input
                     id="amount"
                     type="number"
@@ -441,11 +505,26 @@ export default function Expenses() {
                 </div>
               </div>
 
-              <ReceiptPhotoCapture
-                value={receiptUrl}
-                onChange={setReceiptUrl}
-                label="Receipt Photo (optional)"
-              />
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="noReceipt"
+                    checked={noReceipt}
+                    onCheckedChange={(checked) => setNoReceipt(checked === true)}
+                    data-testid="checkbox-no-receipt"
+                  />
+                  <Label htmlFor="noReceipt" className="text-sm font-normal cursor-pointer">
+                    No receipt available
+                  </Label>
+                </div>
+                {!noReceipt && (
+                  <ReceiptPhotoCapture
+                    value={receiptUrl}
+                    onChange={setReceiptUrl}
+                    label="Receipt Photo *"
+                  />
+                )}
+              </div>
 
               <div className="space-y-2">
                 <Label>Link to Job</Label>
@@ -480,7 +559,7 @@ export default function Expenses() {
               <Button variant="outline" onClick={() => setAddExpenseOpen(false)} data-testid="button-cancel">
                 Cancel
               </Button>
-              <Button onClick={handleSubmit} disabled={createExpenseMutation.isPending} data-testid="button-submit-expense">
+              <Button onClick={handleSubmit} disabled={createExpenseMutation.isPending || !isFormValid()} data-testid="button-submit-expense">
                 {createExpenseMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Submit Expense
               </Button>

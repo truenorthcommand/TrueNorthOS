@@ -23,6 +23,8 @@ export default function SignOff() {
   const [engName, setEngName] = useState("");
   const [custName, setCustName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [engSigEmpty, setEngSigEmpty] = useState(true);
+  const [custSigEmpty, setCustSigEmpty] = useState(true);
   const [location, setGeoLocation] = useState<{lat: number; lng: number} | null>(null);
   const [locationAddress, setLocationAddress] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -88,7 +90,26 @@ export default function SignOff() {
 
   const hasPhotos = (job.photos || []).filter(p => !p.source || p.source === 'engineer').length > 0;
   const hasLocation = location !== null;
-  const canSubmit = hasPhotos && hasLocation && engName && custName && !isSubmitting;
+  const hasDescription = job.description && job.description.trim().length > 0;
+  const hasWorksCompleted = job.worksCompleted && job.worksCompleted.trim().length > 0;
+  
+  const validationErrors: string[] = [];
+  if (!hasDescription) validationErrors.push("Description of Works is required");
+  if (!hasWorksCompleted) validationErrors.push("Works Completed is required (enter N/A if no work done)");
+  if (!hasPhotos) validationErrors.push("At least one evidence photo is required");
+  if (!hasLocation) validationErrors.push("Location must be captured");
+  if (!engName.trim()) validationErrors.push("Engineer name is required");
+  if (engSigEmpty) validationErrors.push("Engineer signature is required");
+  if (!custName.trim()) validationErrors.push("Customer name is required");
+  if (custSigEmpty) validationErrors.push("Customer signature is required");
+  
+  const hasPreRequisites = hasDescription && hasWorksCompleted && hasPhotos;
+  const canSubmit = validationErrors.length === 0 && !isSubmitting;
+  
+  const checkSignatures = () => {
+    setEngSigEmpty(engSigRef.current?.isEmpty() ?? true);
+    setCustSigEmpty(custSigRef.current?.isEmpty() ?? true);
+  };
 
   const handleComplete = async () => {
     setIsSubmitting(true);
@@ -170,12 +191,20 @@ export default function SignOff() {
         </div>
       </div>
 
-      {!hasPhotos && (
-        <Alert variant="destructive" className="mb-6" data-testid="alert-missing-photos">
+      {!hasPreRequisites && (
+        <Alert variant="destructive" className="mb-6" data-testid="alert-missing-prerequisites">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Missing Evidence</AlertTitle>
+          <AlertTitle>Missing Required Information</AlertTitle>
           <AlertDescription>
-            You must upload at least one photo before signing off this job.
+            <p className="mb-2">Please complete the following on the job sheet before signing off:</p>
+            <ul className="list-disc list-inside space-y-1 text-sm">
+              {!hasDescription && <li>Description of Works is required</li>}
+              {!hasWorksCompleted && <li>Works Completed is required (enter N/A if no work done)</li>}
+              {!hasPhotos && <li>At least one evidence photo must be uploaded</li>}
+            </ul>
+            <Link href={`/jobs/${job.id}`} className="inline-block mt-3">
+              <Button variant="outline" size="sm">Return to Job Sheet</Button>
+            </Link>
           </AlertDescription>
         </Alert>
       )}
@@ -232,16 +261,19 @@ export default function SignOff() {
           </CardContent>
         </Card>
 
-        <Card className={!hasPhotos ? "opacity-50 pointer-events-none" : ""} data-testid="card-engineer-signature">
+        <Card className={!hasPreRequisites ? "opacity-50 pointer-events-none" : ""} data-testid="card-engineer-signature">
           <CardHeader>
-            <CardTitle>Engineer Sign-off</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Engineer Sign-off
+              {!engSigEmpty && engName.trim() && <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+            </CardTitle>
             <CardDescription>
               Confirm works are complete and site is safe.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Engineer Name</Label>
+              <Label>Engineer Name <span className="text-destructive">*</span></Label>
               <Input 
                 value={engName} 
                 onChange={(e) => setEngName(e.target.value)} 
@@ -250,37 +282,42 @@ export default function SignOff() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Signature</Label>
-              <div className="border-2 border-dashed border-slate-300 rounded-md bg-slate-50 h-40 relative">
+              <Label>Signature <span className="text-destructive">*</span></Label>
+              <div className={`border-2 border-dashed rounded-md bg-slate-50 h-40 relative ${engSigEmpty ? 'border-slate-300' : 'border-emerald-400'}`}>
                 <SignatureCanvas 
                   ref={engSigRef}
                   canvasProps={{ className: "sigCanvas w-full h-full" }}
                   backgroundColor="rgba(255,255,255,0)"
+                  onEnd={checkSignatures}
                 />
                 <Button 
                   size="sm" 
                   variant="ghost" 
                   className="absolute bottom-2 right-2 text-xs"
-                  onClick={() => engSigRef.current?.clear()}
+                  onClick={() => { engSigRef.current?.clear(); setEngSigEmpty(true); }}
                   data-testid="button-clear-engineer-sig"
                 >
                   <Eraser className="mr-1 h-3 w-3" /> Clear
                 </Button>
               </div>
+              {engSigEmpty && <p className="text-xs text-muted-foreground">Please sign above</p>}
             </div>
           </CardContent>
         </Card>
 
-        <Card className={!hasPhotos ? "opacity-50 pointer-events-none" : ""} data-testid="card-customer-signature">
+        <Card className={!hasPreRequisites ? "opacity-50 pointer-events-none" : ""} data-testid="card-customer-signature">
           <CardHeader>
-            <CardTitle>Customer Acceptance</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Customer Acceptance
+              {!custSigEmpty && custName.trim() && <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+            </CardTitle>
             <CardDescription>
               Confirm satisfaction with the work carried out.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Customer Name</Label>
+              <Label>Customer Name <span className="text-destructive">*</span></Label>
               <Input 
                 value={custName} 
                 onChange={(e) => setCustName(e.target.value)} 
@@ -289,26 +326,42 @@ export default function SignOff() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Signature</Label>
-              <div className="border-2 border-dashed border-slate-300 rounded-md bg-slate-50 h-40 relative">
+              <Label>Signature <span className="text-destructive">*</span></Label>
+              <div className={`border-2 border-dashed rounded-md bg-slate-50 h-40 relative ${custSigEmpty ? 'border-slate-300' : 'border-emerald-400'}`}>
                  <SignatureCanvas 
                   ref={custSigRef}
                   canvasProps={{ className: "sigCanvas w-full h-full" }}
                   backgroundColor="rgba(255,255,255,0)"
+                  onEnd={checkSignatures}
                 />
                 <Button 
                   size="sm" 
                   variant="ghost" 
                   className="absolute bottom-2 right-2 text-xs"
-                  onClick={() => custSigRef.current?.clear()}
+                  onClick={() => { custSigRef.current?.clear(); setCustSigEmpty(true); }}
                   data-testid="button-clear-customer-sig"
                 >
                   <Eraser className="mr-1 h-3 w-3" /> Clear
                 </Button>
               </div>
+              {custSigEmpty && <p className="text-xs text-muted-foreground">Please sign above</p>}
             </div>
           </CardContent>
         </Card>
+
+        {validationErrors.length > 0 && hasPreRequisites && (
+          <Alert variant="default" className="border-amber-300 bg-amber-50 dark:bg-amber-950/30" data-testid="alert-validation-summary">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-800 dark:text-amber-200">Complete All Required Fields</AlertTitle>
+            <AlertDescription>
+              <ul className="list-disc list-inside space-y-1 text-sm text-amber-700 dark:text-amber-300">
+                {validationErrors.map((error, idx) => (
+                  <li key={idx}>{error}</li>
+                ))}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Button 
           size="lg" 

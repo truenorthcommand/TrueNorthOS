@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,8 +10,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Check, X, Minus, Camera, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, X, Minus, Camera, Loader2, PenTool, Trash2 } from "lucide-react";
 import type { Vehicle } from "@shared/schema";
+import SignatureCanvas from "react-signature-canvas";
 
 const CHECKLIST_ITEMS = [
   { key: "tyres", label: "Tyres", description: "Condition, pressure, tread depth" },
@@ -49,12 +50,37 @@ export default function WalkaroundCheck() {
   const [items, setItems] = useState<Record<string, CheckItemState>>(
     Object.fromEntries(CHECKLIST_ITEMS.map((item) => [item.key, { status: "pass" as CheckStatus, note: "" }]))
   );
+  const [hasSignature, setHasSignature] = useState(false);
+  const signatureRef = useRef<SignatureCanvas>(null);
 
   const { data: vehicles = [], isLoading: vehiclesLoading } = useQuery<Vehicle[]>({
     queryKey: ["/api/fleet/vehicles"],
   });
 
   const hasFailures = Object.values(items).some((item) => item.status === "fail");
+  
+  const failedItemsWithoutNote = Object.entries(items)
+    .filter(([_, value]) => value.status === "fail" && !value.note.trim())
+    .map(([key]) => key);
+  
+  const failedItemsWithoutSeverity = Object.entries(items)
+    .filter(([_, value]) => value.status === "fail" && !value.severity)
+    .map(([key]) => key);
+  
+  const isFormValid = vehicleId && hasSignature && 
+    failedItemsWithoutNote.length === 0 && 
+    failedItemsWithoutSeverity.length === 0;
+
+  const clearSignature = () => {
+    signatureRef.current?.clear();
+    setHasSignature(false);
+  };
+
+  const handleSignatureEnd = () => {
+    if (signatureRef.current && !signatureRef.current.isEmpty()) {
+      setHasSignature(true);
+    }
+  };
 
   const createCheckMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -86,6 +112,23 @@ export default function WalkaroundCheck() {
       toast({ title: "Error", description: "Please select a vehicle", variant: "destructive" });
       return;
     }
+    
+    if (failedItemsWithoutSeverity.length > 0) {
+      toast({ title: "Error", description: "Please select severity for all failed items", variant: "destructive" });
+      return;
+    }
+    
+    if (failedItemsWithoutNote.length > 0) {
+      toast({ title: "Error", description: "Please add a note describing each failed item", variant: "destructive" });
+      return;
+    }
+    
+    if (!hasSignature) {
+      toast({ title: "Error", description: "Signature is required to complete the check", variant: "destructive" });
+      return;
+    }
+
+    const signatureData = signatureRef.current?.toDataURL() || null;
 
     const checkItems = Object.entries(items).map(([key, value]) => ({
       itemName: key,
@@ -102,6 +145,7 @@ export default function WalkaroundCheck() {
       notes: notes || null,
       vehicleSafeToOperate: vehicleSafe,
       items: checkItems,
+      signature: signatureData,
     });
   };
 
@@ -211,7 +255,7 @@ export default function WalkaroundCheck() {
                 {items[item.key].status === "fail" && (
                   <div className="space-y-3 pt-2 border-t">
                     <div className="space-y-2">
-                      <Label>Severity *</Label>
+                      <Label>Severity <span className="text-red-500">*</span></Label>
                       <RadioGroup
                         value={items[item.key].severity || ""}
                         onValueChange={(v) => updateItem(item.key, { severity: v as "critical" | "major" | "minor" })}
@@ -230,15 +274,22 @@ export default function WalkaroundCheck() {
                           <Label htmlFor={`${item.key}-minor`} className="text-yellow-600">Minor</Label>
                         </div>
                       </RadioGroup>
+                      {!items[item.key].severity && (
+                        <p className="text-xs text-red-500">Please select a severity level</p>
+                      )}
                     </div>
                     <div className="space-y-2">
-                      <Label>Note</Label>
+                      <Label>Note <span className="text-red-500">*</span></Label>
                       <Textarea
                         placeholder="Describe the issue..."
                         value={items[item.key].note}
                         onChange={(e) => updateItem(item.key, { note: e.target.value })}
+                        className={!items[item.key].note.trim() ? "border-red-300" : ""}
                         data-testid={`input-${item.key}-note`}
                       />
+                      {!items[item.key].note.trim() && (
+                        <p className="text-xs text-red-500">A note is required for failed items</p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -291,11 +342,55 @@ export default function WalkaroundCheck() {
           </CardContent>
         </Card>
 
+        <Card className={!hasSignature ? "border-orange-300" : "border-green-500"}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PenTool className="h-5 w-5" />
+              Signature <span className="text-red-500">*</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Sign below to confirm this walkaround check is accurate and complete
+            </p>
+            <div className="border rounded-lg bg-white">
+              <SignatureCanvas
+                ref={signatureRef}
+                canvasProps={{
+                  className: "w-full h-32 rounded-lg",
+                  style: { width: "100%", height: "128px" }
+                }}
+                onEnd={handleSignatureEnd}
+                data-testid="signature-canvas"
+              />
+            </div>
+            <div className="flex justify-between items-center">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={clearSignature}
+                data-testid="button-clear-signature"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Clear
+              </Button>
+              {hasSignature ? (
+                <span className="text-sm text-green-600 flex items-center gap-1">
+                  <Check className="h-4 w-4" /> Signed
+                </span>
+              ) : (
+                <span className="text-sm text-orange-500">Signature required</span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         <Button
           type="submit"
           className="w-full"
           size="lg"
-          disabled={!vehicleId || createCheckMutation.isPending}
+          disabled={!isFormValid || createCheckMutation.isPending}
           data-testid="button-submit-check"
         >
           {createCheckMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

@@ -66,10 +66,20 @@ export default function FleetVehicles() {
     setType("Van");
   };
 
+  const isVehicleFormValid = registration.trim() && make.trim() && model.trim();
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!registration) {
+    if (!registration.trim()) {
       toast({ title: "Error", description: "Registration is required", variant: "destructive" });
+      return;
+    }
+    if (!make.trim()) {
+      toast({ title: "Error", description: "Make is required", variant: "destructive" });
+      return;
+    }
+    if (!model.trim()) {
+      toast({ title: "Error", description: "Model is required", variant: "destructive" });
       return;
     }
     createVehicleMutation.mutate({
@@ -114,7 +124,7 @@ export default function FleetVehicles() {
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="registration">Registration *</Label>
+                  <Label htmlFor="registration">Registration <span className="text-red-500">*</span></Label>
                   <Input
                     id="registration"
                     placeholder="e.g. AB12 CDE"
@@ -126,7 +136,7 @@ export default function FleetVehicles() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="make">Make</Label>
+                    <Label htmlFor="make">Make <span className="text-red-500">*</span></Label>
                     <Input
                       id="make"
                       placeholder="e.g. Ford"
@@ -136,7 +146,7 @@ export default function FleetVehicles() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="model">Model</Label>
+                    <Label htmlFor="model">Model <span className="text-red-500">*</span></Label>
                     <Input
                       id="model"
                       placeholder="e.g. Transit"
@@ -148,7 +158,7 @@ export default function FleetVehicles() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="year">Year</Label>
+                    <Label htmlFor="year">Year <span className="text-muted-foreground text-xs">(optional)</span></Label>
                     <Input
                       id="year"
                       type="number"
@@ -159,7 +169,7 @@ export default function FleetVehicles() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Type</Label>
+                    <Label>Type <span className="text-red-500">*</span></Label>
                     <Select value={type} onValueChange={setType}>
                       <SelectTrigger data-testid="select-type">
                         <SelectValue />
@@ -174,7 +184,8 @@ export default function FleetVehicles() {
                     </Select>
                   </div>
                 </div>
-                <Button type="submit" className="w-full" disabled={createVehicleMutation.isPending} data-testid="button-submit-vehicle">
+                <p className="text-xs text-muted-foreground"><span className="text-red-500">*</span> Required fields</p>
+                <Button type="submit" className="w-full" disabled={!isVehicleFormValid || createVehicleMutation.isPending} data-testid="button-submit-vehicle">
                   {createVehicleMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Add Vehicle
                 </Button>

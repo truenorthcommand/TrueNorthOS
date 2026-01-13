@@ -141,9 +141,50 @@ export default function Timesheets() {
     },
   });
 
+  const isManualFormValid = () => {
+    if (!manualDate) return false;
+    if (!manualClockIn) return false;
+    if (!manualClockOut) return false;
+    
+    const [clockInHours, clockInMins] = manualClockIn.split(":").map(Number);
+    const [clockOutHours, clockOutMins] = manualClockOut.split(":").map(Number);
+    const clockInMinutes = clockInHours * 60 + clockInMins;
+    const clockOutMinutes = clockOutHours * 60 + clockOutMins;
+    
+    if (clockOutMinutes <= clockInMinutes) return false;
+    
+    return true;
+  };
+
+  const getClockOutError = () => {
+    if (!manualClockIn || !manualClockOut) return null;
+    
+    const [clockInHours, clockInMins] = manualClockIn.split(":").map(Number);
+    const [clockOutHours, clockOutMins] = manualClockOut.split(":").map(Number);
+    const clockInMinutes = clockInHours * 60 + clockInMins;
+    const clockOutMinutes = clockOutHours * 60 + clockOutMins;
+    
+    if (clockOutMinutes <= clockInMinutes) {
+      return "Clock out must be after clock in time";
+    }
+    return null;
+  };
+
+  const clockOutError = getClockOutError();
+
   const handleManualSubmit = () => {
     if (!manualDate) {
       toast.error("Please select a date");
+      return;
+    }
+
+    if (!manualClockIn) {
+      toast.error("Please enter clock in time");
+      return;
+    }
+
+    if (!manualClockOut) {
+      toast.error("Please enter clock out time");
       return;
     }
 
@@ -155,6 +196,11 @@ export default function Timesheets() {
 
     const clockOut = new Date(manualDate);
     clockOut.setHours(clockOutHours, clockOutMins, 0, 0);
+
+    if (clockOut <= clockIn) {
+      toast.error("Clock out time must be after clock in time");
+      return;
+    }
 
     createManualEntryMutation.mutate({
       date: manualDate,
@@ -227,10 +273,10 @@ export default function Timesheets() {
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label>Date</Label>
+                <Label>Date <span className="text-red-500">*</span></Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left font-normal" data-testid="button-select-date">
+                    <Button variant="outline" className={`w-full justify-start text-left font-normal ${!manualDate ? 'border-red-300' : ''}`} data-testid="button-select-date">
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {manualDate ? format(manualDate, "PPP") : "Select date"}
                     </Button>
@@ -242,24 +288,29 @@ export default function Timesheets() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="clockIn">Clock In Time</Label>
+                  <Label htmlFor="clockIn">Clock In Time <span className="text-red-500">*</span></Label>
                   <Input
                     id="clockIn"
                     type="time"
                     value={manualClockIn}
                     onChange={(e) => setManualClockIn(e.target.value)}
+                    className={!manualClockIn ? 'border-red-300' : ''}
                     data-testid="input-clock-in-time"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="clockOut">Clock Out Time</Label>
+                  <Label htmlFor="clockOut">Clock Out Time <span className="text-red-500">*</span></Label>
                   <Input
                     id="clockOut"
                     type="time"
                     value={manualClockOut}
                     onChange={(e) => setManualClockOut(e.target.value)}
+                    className={!manualClockOut || clockOutError ? 'border-red-300' : ''}
                     data-testid="input-clock-out-time"
                   />
+                  {clockOutError && (
+                    <p className="text-sm text-red-500" data-testid="text-clock-out-error">{clockOutError}</p>
+                  )}
                 </div>
               </div>
               <div className="space-y-2">
@@ -288,7 +339,7 @@ export default function Timesheets() {
               <Button variant="outline" onClick={() => setManualEntryOpen(false)} data-testid="button-cancel-manual">
                 Cancel
               </Button>
-              <Button onClick={handleManualSubmit} disabled={createManualEntryMutation.isPending} data-testid="button-submit-manual">
+              <Button onClick={handleManualSubmit} disabled={createManualEntryMutation.isPending || !isManualFormValid()} data-testid="button-submit-manual">
                 {createManualEntryMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit"}
               </Button>
             </DialogFooter>

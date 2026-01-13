@@ -411,6 +411,31 @@ export default function QuoteDetail() {
     }
   };
 
+  const validateQuote = useMemo(() => {
+    const errors: { customerName?: boolean; lineItems?: boolean; itemErrors?: { description?: boolean; quantity?: boolean; unitCost?: boolean }[] } = {};
+    
+    if (!quote.customerName.trim()) {
+      errors.customerName = true;
+    }
+    
+    if (quote.lineItems.length === 0) {
+      errors.lineItems = true;
+    } else {
+      const itemErrors = quote.lineItems.map(item => ({
+        description: !item.description.trim(),
+        quantity: !item.quantity || item.quantity <= 0,
+        unitCost: item.unitCost === undefined || item.unitCost === null || item.unitCost <= 0,
+      }));
+      const hasItemErrors = itemErrors.some(e => e.description || e.quantity || e.unitCost);
+      if (hasItemErrors) {
+        errors.itemErrors = itemErrors;
+      }
+    }
+    
+    const isValid = !errors.customerName && !errors.lineItems && !errors.itemErrors;
+    return { isValid, errors };
+  }, [quote.customerName, quote.lineItems]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -446,11 +471,11 @@ export default function QuoteDetail() {
           )}
           {(quote.status === "Draft" || isNew) && (
             <>
-              <Button variant="outline" onClick={() => saveQuote(false)} disabled={isSaving} data-testid="button-save-quote">
+              <Button variant="outline" onClick={() => saveQuote(false)} disabled={isSaving || !validateQuote.isValid} data-testid="button-save-quote">
                 {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                 Save
               </Button>
-              <Button onClick={() => saveQuote(true)} disabled={isSaving} data-testid="button-send-quote">
+              <Button onClick={() => saveQuote(true)} disabled={isSaving || !validateQuote.isValid} data-testid="button-send-quote">
                 <Send className="w-4 h-4 mr-2" />
                 Save & Send
               </Button>
@@ -493,12 +518,13 @@ export default function QuoteDetail() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Customer Name *</Label>
+                  <Label>Customer Name <span className="text-red-500">*</span></Label>
                   <Input
                     value={quote.customerName}
                     onChange={(e) => setQuote({ ...quote, customerName: e.target.value })}
                     placeholder="Enter customer name"
                     data-testid="input-customer-name"
+                    className={validateQuote.errors.customerName ? "border-red-500 focus-visible:ring-red-500" : ""}
                   />
                 </div>
                 <div className="space-y-2">
@@ -593,7 +619,7 @@ export default function QuoteDetail() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Line Items</CardTitle>
+              <CardTitle>Line Items <span className="text-red-500">*</span></CardTitle>
               <Button variant="outline" size="sm" onClick={addLineItem} data-testid="button-add-line-item">
                 <Plus className="w-4 h-4 mr-1" />
                 Add Item
@@ -605,9 +631,9 @@ export default function QuoteDetail() {
                   <thead>
                     <tr className="border-b">
                       <th className="text-left py-2 px-2">Code</th>
-                      <th className="text-left py-2 px-2">Description</th>
-                      <th className="text-right py-2 px-2 w-20">Qty</th>
-                      <th className="text-right py-2 px-2 w-24">Unit Cost</th>
+                      <th className="text-left py-2 px-2">Description <span className="text-red-500">*</span></th>
+                      <th className="text-right py-2 px-2 w-20">Qty <span className="text-red-500">*</span></th>
+                      <th className="text-right py-2 px-2 w-24">Unit Cost <span className="text-red-500">*</span></th>
                       <th className="text-right py-2 px-2 w-20">Disc %</th>
                       <th className="text-right py-2 px-2 w-24">Amount</th>
                       <th className="w-10"></th>
@@ -630,7 +656,7 @@ export default function QuoteDetail() {
                               setExpandedDescriptionIndex(index);
                               setExpandedDescriptionValue(item.description);
                             }}
-                            className="min-h-[32px] px-3 py-1.5 border rounded-md cursor-pointer hover:bg-muted/50 flex items-center text-sm truncate"
+                            className={`min-h-[32px] px-3 py-1.5 border rounded-md cursor-pointer hover:bg-muted/50 flex items-center text-sm truncate ${validateQuote.errors.itemErrors?.[index]?.description ? "border-red-500" : ""}`}
                             data-testid={`button-expand-description-${index}`}
                           >
                             {item.description || <span className="text-muted-foreground">Click to add description...</span>}
@@ -641,7 +667,7 @@ export default function QuoteDetail() {
                             type="number"
                             value={item.quantity}
                             onChange={(e) => updateLineItem(index, "quantity", parseFloat(e.target.value) || 0)}
-                            className="h-8 text-right"
+                            className={`h-8 text-right ${validateQuote.errors.itemErrors?.[index]?.quantity ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                             min="0"
                           />
                         </td>
@@ -650,7 +676,7 @@ export default function QuoteDetail() {
                             type="number"
                             value={item.unitCost}
                             onChange={(e) => updateLineItem(index, "unitCost", parseFloat(e.target.value) || 0)}
-                            className="h-8 text-right"
+                            className={`h-8 text-right ${validateQuote.errors.itemErrors?.[index]?.unitCost ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                             min="0"
                             step="0.01"
                           />
@@ -677,7 +703,7 @@ export default function QuoteDetail() {
                     ))}
                     {quote.lineItems.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                        <td colSpan={7} className={`py-8 text-center ${validateQuote.errors.lineItems ? "text-red-500" : "text-muted-foreground"}`}>
                           No items added. Click "Add Item" to get started.
                         </td>
                       </tr>
