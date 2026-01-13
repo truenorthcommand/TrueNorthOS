@@ -5024,6 +5024,151 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
+  // AI Email Analysis - categorization, priority, sentiment, auto-linking
+  app.post("/api/outlook/emails/:userEmail/:messageId/analyze", requireRoles('admin'), async (req, res) => {
+    try {
+      const { userEmail, messageId } = req.params;
+      
+      // Get the email content
+      const email = await outlook.getEmailById(userEmail, messageId);
+      if (!email) {
+        return res.status(404).json({ error: "Email not found" });
+      }
+
+      // Get existing clients and jobs for matching
+      const clients = await storage.getAllClients();
+      const jobs = await storage.getAllJobs();
+
+      const analysis = await outlook.analyzeEmailWithAI(
+        email.body?.content || email.bodyPreview || '',
+        email.from?.emailAddress?.address || '',
+        email.from?.emailAddress?.name || '',
+        email.subject || '',
+        clients.map((c: any) => ({ id: c.id, name: c.name, email: c.email || undefined, phone: c.phone || undefined })),
+        jobs.map((j: any) => ({ id: j.id, customerName: j.customerName, jobNo: j.jobNo, description: j.description || undefined }))
+      );
+
+      res.json(analysis);
+    } catch (error: any) {
+      console.error("Email analysis error:", error);
+      res.status(500).json({ error: error.message || "Failed to analyze email" });
+    }
+  });
+
+  // Generate smart reply for an email
+  app.post("/api/outlook/emails/:userEmail/:messageId/smart-reply", requireRoles('admin'), async (req, res) => {
+    try {
+      const { userEmail, messageId } = req.params;
+      const { replyType, customInstructions } = req.body;
+      
+      if (!replyType) {
+        return res.status(400).json({ error: "replyType is required" });
+      }
+
+      // Get the email content
+      const email = await outlook.getEmailById(userEmail, messageId);
+      if (!email) {
+        return res.status(404).json({ error: "Email not found" });
+      }
+
+      const reply = await outlook.generateSmartReply(
+        email.body?.content || email.bodyPreview || '',
+        email.from?.emailAddress?.name || email.from?.emailAddress?.address || 'Customer',
+        email.subject || '',
+        replyType,
+        customInstructions
+      );
+
+      res.json({ reply });
+    } catch (error: any) {
+      console.error("Smart reply error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate reply" });
+    }
+  });
+
+  // Save email attachment to a job
+  app.post("/api/outlook/emails/:userEmail/:messageId/attachments/:attachmentId/save-to-job", requireRoles('admin'), async (req, res) => {
+    try {
+      const { userEmail, messageId, attachmentId } = req.params;
+      const { jobId, photoType } = req.body;
+      
+      if (!jobId) {
+        return res.status(400).json({ error: "jobId is required" });
+      }
+
+      // Get the attachment content
+      const attachment = await outlook.getAttachmentContent(userEmail, messageId, attachmentId);
+      
+      if (!attachment.contentBytes) {
+        return res.status(400).json({ error: "Attachment has no content" });
+      }
+
+      // Check if it's an image
+      if (!attachment.contentType?.startsWith('image/')) {
+        return res.status(400).json({ error: "Only image attachments can be saved to jobs" });
+      }
+
+      // Convert base64 to data URL
+      const dataUrl = `data:${attachment.contentType};base64,${attachment.contentBytes}`;
+      
+      // Get the job and update its photos
+      const job = await storage.getJob(jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      const photos = (job.photos as any[]) || [];
+      photos.push({
+        id: `email-${Date.now()}`,
+        url: dataUrl,
+        type: photoType || 'evidence',
+        timestamp: new Date().toISOString(),
+        source: 'email',
+        filename: attachment.name,
+      });
+
+      await storage.updateJob(jobId, { photos });
+
+      res.json({ success: true, message: "Attachment saved to job" });
+    } catch (error: any) {
+      console.error("Save attachment to job error:", error);
+      res.status(500).json({ error: error.message || "Failed to save attachment" });
+    }
+  });
+
+  // Auto-create client from email
+  app.post("/api/outlook/emails/auto-create-client", requireRoles('admin'), async (req, res) => {
+    try {
+      const { name, email, phone, address, fromEmailId } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ error: "Client name is required" });
+      }
+
+      // Check if client already exists by email
+      if (email) {
+        const existingClients = await storage.getAllClients();
+        const existing = existingClients.find((c: any) => c.email?.toLowerCase() === email.toLowerCase());
+        if (existing) {
+          return res.json({ client: existing, created: false, message: "Client already exists" });
+        }
+      }
+
+      const client = await storage.createClient({
+        name,
+        email: email || null,
+        phone: phone || null,
+        address: address || null,
+        postcode: null,
+      });
+
+      res.json({ client, created: true, message: "Client created successfully" });
+    } catch (error: any) {
+      console.error("Auto-create client error:", error);
+      res.status(500).json({ error: error.message || "Failed to create client" });
+    }
+  });
+
   // ==================== AI EXTRACTION ROUTE ====================
   app.post("/api/ai/extract", requireRoles('admin'), async (req, res) => {
     try {

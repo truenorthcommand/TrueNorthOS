@@ -40,6 +40,19 @@ import {
   Loader2,
   MailOpen,
   ChevronLeft,
+  AlertTriangle,
+  MessageSquare,
+  Zap,
+  CheckCircle,
+  XCircle,
+  Link,
+  Download,
+  FileText,
+  ThumbsUp,
+  ThumbsDown,
+  Meh,
+  Clock,
+  Image,
 } from "lucide-react";
 
 interface OutlookEmail {
@@ -87,6 +100,42 @@ interface ExtractedData {
   notes?: string;
 }
 
+interface EmailAnalysis {
+  category: 'quote_request' | 'complaint' | 'job_update' | 'invoice_query' | 'general_enquiry' | 'booking_request' | 'cancellation' | 'feedback' | 'spam';
+  priority: 'high' | 'medium' | 'low';
+  sentiment: 'positive' | 'neutral' | 'negative' | 'urgent';
+  summary: string;
+  suggestedReply?: string;
+  extractedData?: ExtractedData & { amount?: string };
+  matchedClientId?: number;
+  matchedJobId?: number;
+}
+
+const categoryLabels: Record<string, { label: string; color: string }> = {
+  quote_request: { label: 'Quote Request', color: 'bg-blue-100 text-blue-800' },
+  complaint: { label: 'Complaint', color: 'bg-red-100 text-red-800' },
+  job_update: { label: 'Job Update', color: 'bg-green-100 text-green-800' },
+  invoice_query: { label: 'Invoice Query', color: 'bg-yellow-100 text-yellow-800' },
+  general_enquiry: { label: 'Enquiry', color: 'bg-gray-100 text-gray-800' },
+  booking_request: { label: 'Booking', color: 'bg-purple-100 text-purple-800' },
+  cancellation: { label: 'Cancellation', color: 'bg-orange-100 text-orange-800' },
+  feedback: { label: 'Feedback', color: 'bg-teal-100 text-teal-800' },
+  spam: { label: 'Spam', color: 'bg-gray-300 text-gray-600' },
+};
+
+const priorityConfig: Record<string, { icon: any; color: string; label: string }> = {
+  high: { icon: AlertTriangle, color: 'text-red-500', label: 'High Priority' },
+  medium: { icon: Clock, color: 'text-yellow-500', label: 'Medium Priority' },
+  low: { icon: CheckCircle, color: 'text-green-500', label: 'Low Priority' },
+};
+
+const sentimentConfig: Record<string, { icon: any; color: string; label: string }> = {
+  positive: { icon: ThumbsUp, color: 'text-green-500', label: 'Positive' },
+  neutral: { icon: Meh, color: 'text-gray-500', label: 'Neutral' },
+  negative: { icon: ThumbsDown, color: 'text-orange-500', label: 'Negative' },
+  urgent: { icon: AlertTriangle, color: 'text-red-500', label: 'Urgent' },
+};
+
 export default function OutlookInbox() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -98,6 +147,11 @@ export default function OutlookInbox() {
   const [replyText, setReplyText] = useState("");
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [emailAnalysis, setEmailAnalysis] = useState<EmailAnalysis | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isGeneratingReply, setIsGeneratingReply] = useState(false);
+  const [selectedJobForAttachment, setSelectedJobForAttachment] = useState<string>("");
+  const [savingAttachment, setSavingAttachment] = useState<string | null>(null);
 
   const { data: outlookUsers = [], isLoading: loadingUsers } = useQuery<OutlookUser[]>({
     queryKey: ["/api/outlook/users"],
@@ -158,6 +212,11 @@ export default function OutlookInbox() {
       return res.json();
     },
     enabled: !!userEmail && !!selectedEmail && detailDialogOpen && selectedEmail.hasAttachments,
+  });
+
+  const { data: jobs = [] } = useQuery<Array<{ id: number; jobNo: string; customerName: string }>>({
+    queryKey: ["/api/jobs"],
+    enabled: detailDialogOpen,
   });
 
   const replyMutation = useMutation({
@@ -221,9 +280,90 @@ export default function OutlookInbox() {
     setSelectedEmail(email);
     setDetailDialogOpen(true);
     setExtractedData(null);
+    setEmailAnalysis(null);
     setReplyText("");
     if (!email.isRead) {
       markAsReadMutation.mutate(email.id);
+    }
+  };
+
+  // AI-powered full email analysis
+  const handleAnalyzeEmail = async () => {
+    if (!selectedEmail || !userEmail) return;
+    
+    setIsAnalyzing(true);
+    try {
+      const res = await fetch(`/api/outlook/emails/${encodeURIComponent(userEmail)}/${selectedEmail.id}/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      if (res.ok) {
+        const analysis = await res.json();
+        setEmailAnalysis(analysis);
+        // Also populate extracted data if available
+        if (analysis.extractedData) {
+          setExtractedData(analysis.extractedData);
+        }
+        toast.success("Email analyzed successfully");
+      } else {
+        toast.error("Failed to analyze email");
+      }
+    } catch (error) {
+      toast.error("Analysis failed");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  // Generate smart reply
+  const handleSmartReply = async (replyType: 'acknowledge' | 'quote' | 'schedule' | 'followup' | 'resolve') => {
+    if (!selectedEmail || !userEmail) return;
+    
+    setIsGeneratingReply(true);
+    try {
+      const res = await fetch(`/api/outlook/emails/${encodeURIComponent(userEmail)}/${selectedEmail.id}/smart-reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ replyType }),
+      });
+      
+      if (res.ok) {
+        const { reply } = await res.json();
+        setReplyText(reply);
+        toast.success("Reply generated");
+      } else {
+        toast.error("Failed to generate reply");
+      }
+    } catch (error) {
+      toast.error("Reply generation failed");
+    } finally {
+      setIsGeneratingReply(false);
+    }
+  };
+
+  // Save attachment to job
+  const handleSaveAttachmentToJob = async (attachmentId: string, jobId: number) => {
+    if (!selectedEmail || !userEmail) return;
+    
+    setSavingAttachment(attachmentId);
+    try {
+      const res = await fetch(`/api/outlook/emails/${encodeURIComponent(userEmail)}/${selectedEmail.id}/attachments/${attachmentId}/save-to-job`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId, photoType: 'evidence' }),
+      });
+      
+      if (res.ok) {
+        toast.success("Attachment saved to job");
+      } else {
+        const error = await res.json();
+        toast.error(error.error || "Failed to save attachment");
+      }
+    } catch (error) {
+      toast.error("Save failed");
+    } finally {
+      setSavingAttachment(null);
     }
   };
 
@@ -482,15 +622,49 @@ Respond with only valid JSON, no markdown.`;
                   {attachments.length > 0 && (
                     <div className="space-y-2">
                       <Label>Attachments ({attachments.length})</Label>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="space-y-2">
                         {attachments.map((att) => (
-                          <Badge key={att.id} variant="outline" className="flex items-center gap-1">
-                            <Paperclip className="h-3 w-3" />
-                            {att.name}
-                            <span className="text-xs text-muted-foreground">
-                              ({Math.round(att.size / 1024)}KB)
-                            </span>
-                          </Badge>
+                          <div key={att.id} className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                            <div className="flex items-center gap-2">
+                              {att.contentType?.startsWith('image/') ? (
+                                <Image className="h-4 w-4 text-blue-500" />
+                              ) : (
+                                <FileText className="h-4 w-4" />
+                              )}
+                              <span className="text-sm">{att.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                ({Math.round(att.size / 1024)}KB)
+                              </span>
+                            </div>
+                            {att.contentType?.startsWith('image/') && jobs.length > 0 && (
+                              <div className="flex items-center gap-2">
+                                <Select value={selectedJobForAttachment} onValueChange={setSelectedJobForAttachment}>
+                                  <SelectTrigger className="w-[180px] h-8 text-xs">
+                                    <SelectValue placeholder="Select job..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {jobs.slice(0, 20).map((job) => (
+                                      <SelectItem key={job.id} value={job.id.toString()}>
+                                        {job.jobNo} - {job.customerName}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleSaveAttachmentToJob(att.id, parseInt(selectedJobForAttachment))}
+                                  disabled={!selectedJobForAttachment || savingAttachment === att.id}
+                                >
+                                  {savingAttachment === att.id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Download className="h-3 w-3" />
+                                  )}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -499,6 +673,19 @@ Respond with only valid JSON, no markdown.`;
                   <Separator />
 
                   <div className="flex gap-2 flex-wrap">
+                    <Button
+                      variant="default"
+                      onClick={handleAnalyzeEmail}
+                      disabled={isAnalyzing || !emailDetail}
+                      data-testid="button-analyze-ai"
+                    >
+                      {isAnalyzing ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Zap className="h-4 w-4 mr-2" />
+                      )}
+                      AI Analyze
+                    </Button>
                     <Button
                       variant="outline"
                       onClick={handleExtractWithAI}
@@ -510,9 +697,84 @@ Respond with only valid JSON, no markdown.`;
                       ) : (
                         <Sparkles className="h-4 w-4 mr-2" />
                       )}
-                      Extract with AI
+                      Extract Data
                     </Button>
                   </div>
+
+                  {emailAnalysis && (
+                    <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 border-blue-200 dark:border-blue-800">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-blue-500" />
+                          AI Analysis Results
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex flex-wrap gap-2">
+                          <Badge className={categoryLabels[emailAnalysis.category]?.color || 'bg-gray-100'}>
+                            {categoryLabels[emailAnalysis.category]?.label || emailAnalysis.category}
+                          </Badge>
+                          {priorityConfig[emailAnalysis.priority] && (
+                            <Badge variant="outline" className="flex items-center gap-1">
+                              {(() => {
+                                const PriorityIcon = priorityConfig[emailAnalysis.priority].icon;
+                                return <PriorityIcon className={`h-3 w-3 ${priorityConfig[emailAnalysis.priority].color}`} />;
+                              })()}
+                              {priorityConfig[emailAnalysis.priority].label}
+                            </Badge>
+                          )}
+                          {sentimentConfig[emailAnalysis.sentiment] && (
+                            <Badge variant="outline" className="flex items-center gap-1">
+                              {(() => {
+                                const SentimentIcon = sentimentConfig[emailAnalysis.sentiment].icon;
+                                return <SentimentIcon className={`h-3 w-3 ${sentimentConfig[emailAnalysis.sentiment].color}`} />;
+                              })()}
+                              {sentimentConfig[emailAnalysis.sentiment].label}
+                            </Badge>
+                          )}
+                        </div>
+
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Summary</Label>
+                          <p className="text-sm">{emailAnalysis.summary}</p>
+                        </div>
+
+                        {(emailAnalysis.matchedClientId || emailAnalysis.matchedJobId) && (
+                          <div className="flex gap-2">
+                            {emailAnalysis.matchedClientId && (
+                              <Badge variant="secondary" className="flex items-center gap-1">
+                                <Link className="h-3 w-3" />
+                                Linked to Client #{emailAnalysis.matchedClientId}
+                              </Badge>
+                            )}
+                            {emailAnalysis.matchedJobId && (
+                              <Badge variant="secondary" className="flex items-center gap-1">
+                                <Link className="h-3 w-3" />
+                                Linked to Job #{emailAnalysis.matchedJobId}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+
+                        {emailAnalysis.suggestedReply && (
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Suggested Reply</Label>
+                            <p className="text-sm italic bg-white dark:bg-slate-900 p-2 rounded border mt-1">
+                              {emailAnalysis.suggestedReply}
+                            </p>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="mt-2"
+                              onClick={() => setReplyText(emailAnalysis.suggestedReply || '')}
+                            >
+                              Use This Reply
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {extractedData && (
                     <Card className="bg-muted/50">
@@ -588,10 +850,50 @@ Respond with only valid JSON, no markdown.`;
 
                   <Separator />
 
-                  <div className="space-y-2">
-                    <Label>Reply</Label>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Reply</Label>
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleSmartReply('acknowledge')}
+                          disabled={isGeneratingReply}
+                          title="Generate acknowledgment"
+                        >
+                          {isGeneratingReply ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageSquare className="h-3 w-3" />}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleSmartReply('quote')}
+                          disabled={isGeneratingReply}
+                          title="Generate quote offer"
+                        >
+                          <FileText className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleSmartReply('schedule')}
+                          disabled={isGeneratingReply}
+                          title="Generate scheduling reply"
+                        >
+                          <Clock className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleSmartReply('resolve')}
+                          disabled={isGeneratingReply}
+                          title="Generate resolution reply"
+                        >
+                          <CheckCircle className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
                     <Textarea
-                      placeholder="Type your reply..."
+                      placeholder="Type your reply or use smart reply buttons above..."
                       value={replyText}
                       onChange={(e) => setReplyText(e.target.value)}
                       rows={4}
