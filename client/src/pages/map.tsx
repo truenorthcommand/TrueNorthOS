@@ -138,9 +138,8 @@ export default function MapPage() {
         <Button 
           variant="outline" 
           size="sm" 
-          onClick={handleRefresh}
-          disabled={isLoading}
-          className="cursor-pointer active:scale-95 transition-transform"
+          onClick={() => !isLoading && handleRefresh()}
+          className={`cursor-pointer active:scale-95 transition-transform hover:bg-accent ${isLoading ? 'opacity-70' : ''}`}
           data-testid="button-refresh-map"
         >
           <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />

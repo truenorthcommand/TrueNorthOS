@@ -132,8 +132,10 @@
     display: none !important;
   }
   body {
-    background: white;
-    color: black;
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   .print-only {
     display: block !important;
@@ -141,6 +143,18 @@
   .card {
     border: 1px solid #ccc;
     box-shadow: none;
+  }
+  /* Ensure main content is visible during print */
+  main {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  /* Hide navigation elements */
+  aside, header, nav {
+    display: none !important;
   }
 }
 
