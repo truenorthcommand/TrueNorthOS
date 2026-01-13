@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, User, Shield, Wrench, AlertCircle, Eye, EyeOff, Lock, KeyRound, Pencil, MapPin, Truck, X } from "lucide-react";
+import { Plus, Trash2, User, Shield, Wrench, AlertCircle, Eye, EyeOff, Lock, KeyRound, Pencil, MapPin, Truck, X, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -114,6 +114,7 @@ export default function Staff() {
   const [editVehicleId, setEditVehicleId] = useState<string>("");
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleVerifyPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1071,17 +1072,42 @@ export default function Staff() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <User className="h-5 w-5" />
-            All Staff ({staff.length})
-          </CardTitle>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <User className="h-5 w-5" />
+              All Staff ({staff.length})
+            </CardTitle>
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-staff"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {staff.length === 0 ? (
             <p className="text-muted-foreground text-sm">No staff members</p>
           ) : (
             <div className="space-y-3">
-              {staff.map(member => renderStaffCard(member))}
+              {staff
+                .filter(member => 
+                  member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  member.username.toLowerCase().includes(searchQuery.toLowerCase())
+                )
+                .map(member => renderStaffCard(member))}
+              {staff.filter(member => 
+                member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                member.username.toLowerCase().includes(searchQuery.toLowerCase())
+              ).length === 0 && searchQuery && (
+                <p className="text-muted-foreground text-sm text-center py-4">
+                  No staff members found matching "{searchQuery}"
+                </p>
+              )}
             </div>
           )}
         </CardContent>
