@@ -73,6 +73,7 @@ export default function Clients() {
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
 
   const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedContactId, setSelectedContactId] = useState("");
   const [selectedEngineerIds, setSelectedEngineerIds] = useState<string[]>([]);
   const [engineers, setEngineers] = useState<{id: string; name: string}[]>([]);
   const [jobForm, setJobForm] = useState({
@@ -244,6 +245,15 @@ export default function Clients() {
     }
   }, [expandedClientId]);
 
+  // Fetch contacts when a client is selected in job form
+  useEffect(() => {
+    if (selectedClientId && !clientContacts[selectedClientId]) {
+      fetchClientContacts(selectedClientId);
+    }
+    // Reset selected contact when client changes
+    setSelectedContactId("");
+  }, [selectedClientId]);
+
   const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newClient.name) {
@@ -324,6 +334,15 @@ export default function Clients() {
     const client = clients.find(c => c.id === selectedClientId);
     if (!client) return;
 
+    // Use selected contact if available, otherwise fall back to client defaults
+    const selectedContact = selectedContactId && clientContacts[selectedClientId]
+      ? clientContacts[selectedClientId].find(c => c.id === selectedContactId)
+      : null;
+
+    const contactName = selectedContact?.name || client.contactName || "";
+    const contactPhone = selectedContact?.phone || client.phone || "";
+    const contactEmail = selectedContact?.email || client.email || "";
+
     const assignToIds = user?.role === 'admin' && selectedEngineerIds.length > 0 
       ? selectedEngineerIds 
       : user?.id ? [user.id] : [];
@@ -336,9 +355,9 @@ export default function Clients() {
       customerName: client.name,
       address: client.address || "",
       postcode: client.postcode || "",
-      contactName: client.contactName || "",
-      contactPhone: client.phone || "",
-      contactEmail: client.email || "",
+      contactName: contactName,
+      contactPhone: contactPhone,
+      contactEmail: contactEmail,
       date: new Date(jobForm.date).toISOString(),
       session: jobForm.session,
       orderNumber: jobForm.orderNumber ? Number(jobForm.orderNumber) : null,
@@ -361,6 +380,7 @@ export default function Clients() {
       });
 
       setSelectedClientId("");
+      setSelectedContactId("");
       setSelectedEngineerIds([]);
       setJobForm({ nickname: "", description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "", isLongRunning: false });
       setJobPhotos([]);
@@ -424,6 +444,29 @@ export default function Clients() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {selectedClientId && clientContacts[selectedClientId] && clientContacts[selectedClientId].length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Contact Person</Label>
+                    <Select value={selectedContactId} onValueChange={setSelectedContactId}>
+                      <SelectTrigger data-testid="select-contact-person">
+                        <SelectValue placeholder="Select a contact person..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {clientContacts[selectedClientId].map((contact) => (
+                          <SelectItem key={contact.id} value={contact.id}>
+                            <div className="flex flex-col">
+                              <span>{contact.name}{contact.isPrimary ? ' (Primary)' : ''}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {contact.role && `${contact.role} • `}{contact.phone || contact.email || 'No contact info'}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {selectedClient && (
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border space-y-3">
@@ -631,6 +674,7 @@ export default function Clients() {
                     variant="outline" 
                     onClick={() => {
                       setSelectedClientId("");
+                      setSelectedContactId("");
                       setSelectedEngineerIds([]);
                       setJobForm({ nickname: "", description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "", isLongRunning: false });
                       setJobPhotos([]);
