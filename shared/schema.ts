@@ -1216,6 +1216,9 @@ export const insertEicrReportSchema = createInsertSchema(eicrReports, {
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  reference: z.string().optional(),
+  createdById: z.string().optional(),
 });
 
 export const insertDistributionBoardSchema = createInsertSchema(distributionBoards).omit({

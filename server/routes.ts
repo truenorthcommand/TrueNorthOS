@@ -8,11 +8,12 @@ import QRCode from "qrcode";
 import Stripe from "stripe";
 import { storage } from "./storage";
 import { pool } from "./db";
-import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalkaroundCheckSchema, insertCheckItemSchema, insertDefectSchema, insertDefectUpdateSchema, insertTimesheetSchema, insertExpenseSchema, insertPaymentSchema, insertCertificateSchema, type User } from "@shared/schema";
+import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalkaroundCheckSchema, insertCheckItemSchema, insertDefectSchema, insertDefectUpdateSchema, insertTimesheetSchema, insertExpenseSchema, insertPaymentSchema, insertCertificateSchema, insertEicrReportSchema, insertDistributionBoardSchema, insertEicrCircuitSchema, insertEicrObservationSchema, type User } from "@shared/schema";
 import { z } from "zod";
 import { notifyAdmins, notifyUser } from "./notifications";
 import { sessionMiddleware } from "./session";
 import * as outlook from "./outlook";
+import { generateEicrPdf } from "./eicr-pdf";
 
 function getStripeClient(): Stripe | null {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -6645,6 +6646,264 @@ Be concise and practical. Focus on real issues that affect the business.`;
     } catch (error) {
       console.error("Error generating certificate number:", error);
       res.status(500).json({ error: "Failed to generate certificate number" });
+    }
+  });
+
+  // ==================== EICR (Electrical Installation Condition Reports) ====================
+
+  // Get all EICR reports
+  app.get("/api/eicr/reports", requireAuth, async (req, res) => {
+    try {
+      const reports = await storage.getEicrReports();
+      res.json(reports);
+    } catch (error) {
+      console.error("Error fetching EICR reports:", error);
+      res.status(500).json({ error: "Failed to fetch EICR reports" });
+    }
+  });
+
+  // Get single EICR report with boards, circuits, observations
+  app.get("/api/eicr/reports/:id", requireAuth, async (req, res) => {
+    try {
+      const report = await storage.getEicrReport(req.params.id);
+      if (!report) {
+        return res.status(404).json({ error: "EICR report not found" });
+      }
+      res.json(report);
+    } catch (error) {
+      console.error("Error fetching EICR report:", error);
+      res.status(500).json({ error: "Failed to fetch EICR report" });
+    }
+  });
+
+  // Create new EICR report
+  app.post("/api/eicr/reports", requireAuth, async (req, res) => {
+    try {
+      const reference = await storage.getNextEicrReference();
+      const validatedBody = insertEicrReportSchema.parse(req.body);
+      const data = {
+        ...validatedBody,
+        reference,
+        createdById: req.session.userId,
+      };
+      const report = await storage.createEicrReport(data);
+      res.json(report);
+    } catch (error) {
+      console.error("Error creating EICR report:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create EICR report" });
+    }
+  });
+
+  // Update EICR report
+  app.patch("/api/eicr/reports/:id", requireAuth, async (req, res) => {
+    try {
+      const { id, reference, createdById, createdAt, ...updateData } = req.body;
+      const report = await storage.updateEicrReport(req.params.id, updateData);
+      if (!report) {
+        return res.status(404).json({ error: "EICR report not found" });
+      }
+      res.json(report);
+    } catch (error) {
+      console.error("Error updating EICR report:", error);
+      res.status(500).json({ error: "Failed to update EICR report" });
+    }
+  });
+
+  // Delete EICR report
+  app.delete("/api/eicr/reports/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteEicrReport(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting EICR report:", error);
+      res.status(500).json({ error: "Failed to delete EICR report" });
+    }
+  });
+
+  // Get distribution boards for a report
+  app.get("/api/eicr/reports/:reportId/boards", requireAuth, async (req, res) => {
+    try {
+      const boards = await storage.getDistributionBoards(req.params.reportId);
+      res.json(boards);
+    } catch (error) {
+      console.error("Error fetching distribution boards:", error);
+      res.status(500).json({ error: "Failed to fetch distribution boards" });
+    }
+  });
+
+  // Create distribution board
+  app.post("/api/eicr/reports/:reportId/boards", requireAuth, async (req, res) => {
+    try {
+      const data = insertDistributionBoardSchema.parse({
+        ...req.body,
+        reportId: req.params.reportId,
+      });
+      const board = await storage.createDistributionBoard(data);
+      res.json(board);
+    } catch (error) {
+      console.error("Error creating distribution board:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create distribution board" });
+    }
+  });
+
+  // Update distribution board
+  app.patch("/api/eicr/boards/:id", requireAuth, async (req, res) => {
+    try {
+      const { id, reportId, createdAt, ...updateData } = req.body;
+      const board = await storage.updateDistributionBoard(req.params.id, updateData);
+      if (!board) {
+        return res.status(404).json({ error: "Distribution board not found" });
+      }
+      res.json(board);
+    } catch (error) {
+      console.error("Error updating distribution board:", error);
+      res.status(500).json({ error: "Failed to update distribution board" });
+    }
+  });
+
+  // Delete distribution board
+  app.delete("/api/eicr/boards/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteDistributionBoard(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting distribution board:", error);
+      res.status(500).json({ error: "Failed to delete distribution board" });
+    }
+  });
+
+  // Get circuits for a board
+  app.get("/api/eicr/boards/:boardId/circuits", requireAuth, async (req, res) => {
+    try {
+      const circuits = await storage.getEicrCircuits(req.params.boardId);
+      res.json(circuits);
+    } catch (error) {
+      console.error("Error fetching circuits:", error);
+      res.status(500).json({ error: "Failed to fetch circuits" });
+    }
+  });
+
+  // Create circuit
+  app.post("/api/eicr/boards/:boardId/circuits", requireAuth, async (req, res) => {
+    try {
+      const data = insertEicrCircuitSchema.parse({
+        ...req.body,
+        boardId: req.params.boardId,
+      });
+      const circuit = await storage.createEicrCircuit(data);
+      res.json(circuit);
+    } catch (error) {
+      console.error("Error creating circuit:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create circuit" });
+    }
+  });
+
+  // Update circuit
+  app.patch("/api/eicr/circuits/:id", requireAuth, async (req, res) => {
+    try {
+      const { id, boardId, createdAt, ...updateData } = req.body;
+      const circuit = await storage.updateEicrCircuit(req.params.id, updateData);
+      if (!circuit) {
+        return res.status(404).json({ error: "Circuit not found" });
+      }
+      res.json(circuit);
+    } catch (error) {
+      console.error("Error updating circuit:", error);
+      res.status(500).json({ error: "Failed to update circuit" });
+    }
+  });
+
+  // Delete circuit
+  app.delete("/api/eicr/circuits/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteEicrCircuit(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting circuit:", error);
+      res.status(500).json({ error: "Failed to delete circuit" });
+    }
+  });
+
+  // Get observations for a report
+  app.get("/api/eicr/reports/:reportId/observations", requireAuth, async (req, res) => {
+    try {
+      const observations = await storage.getEicrObservations(req.params.reportId);
+      res.json(observations);
+    } catch (error) {
+      console.error("Error fetching observations:", error);
+      res.status(500).json({ error: "Failed to fetch observations" });
+    }
+  });
+
+  // Create observation
+  app.post("/api/eicr/reports/:reportId/observations", requireAuth, async (req, res) => {
+    try {
+      const data = insertEicrObservationSchema.parse({
+        ...req.body,
+        reportId: req.params.reportId,
+      });
+      const observation = await storage.createEicrObservation(data);
+      res.json(observation);
+    } catch (error) {
+      console.error("Error creating observation:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create observation" });
+    }
+  });
+
+  // Update observation
+  app.patch("/api/eicr/observations/:id", requireAuth, async (req, res) => {
+    try {
+      const { id, reportId, createdAt, ...updateData } = req.body;
+      const observation = await storage.updateEicrObservation(req.params.id, updateData);
+      if (!observation) {
+        return res.status(404).json({ error: "Observation not found" });
+      }
+      res.json(observation);
+    } catch (error) {
+      console.error("Error updating observation:", error);
+      res.status(500).json({ error: "Failed to update observation" });
+    }
+  });
+
+  // Delete observation
+  app.delete("/api/eicr/observations/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteEicrObservation(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting observation:", error);
+      res.status(500).json({ error: "Failed to delete observation" });
+    }
+  });
+
+  // Generate EICR PDF
+  app.get("/api/eicr/reports/:id/pdf", requireAuth, async (req, res) => {
+    try {
+      const report = await storage.getEicrReport(req.params.id);
+      if (!report) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+      
+      const pdfBytes = await generateEicrPdf(report);
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="EICR-${report.reference}.pdf"`);
+      res.send(Buffer.from(pdfBytes));
+    } catch (error) {
+      console.error("Error generating EICR PDF:", error);
+      res.status(500).json({ error: "Failed to generate PDF" });
     }
   });
 

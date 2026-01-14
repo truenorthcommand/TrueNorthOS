@@ -37,6 +37,9 @@ import {
   type CertificateType, type InsertCertificateType,
   type Certificate, type InsertCertificate, type CertificateWithDetails,
   type CertificateReminder, type InsertCertificateReminder,
+  type EicrReport, type InsertEicrReport, type DistributionBoard, type InsertDistributionBoard,
+  type EicrCircuit, type InsertEicrCircuit, type EicrObservation, type InsertEicrObservation,
+  type EicrReportWithDetails,
   users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, clientContacts, clientProperties, jobUpdates,
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
@@ -44,7 +47,8 @@ import {
   skills, userSkills,
   inspections, inspectionItems, snaggingSheets, snagItems,
   accountsReceipts, invoiceChaseLogs, fixedCosts, snippets,
-  certificateTypes, certificates, certificateReminders
+  certificateTypes, certificates, certificateReminders,
+  eicrReports, distributionBoards, eicrCircuits, eicrObservations
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and, ne, inArray, gt, asc } from "drizzle-orm";
@@ -284,6 +288,32 @@ export interface IStorage {
   createCertificateReminder(data: InsertCertificateReminder): Promise<CertificateReminder>;
   updateCertificateReminder(id: string, data: Partial<CertificateReminder>): Promise<CertificateReminder | undefined>;
   getPendingReminders(): Promise<CertificateReminder[]>;
+  
+  // EICR Reports
+  getEicrReports(): Promise<EicrReport[]>;
+  getEicrReport(id: string): Promise<EicrReportWithDetails | undefined>;
+  createEicrReport(data: InsertEicrReport & { reference: string }): Promise<EicrReport>;
+  updateEicrReport(id: string, data: Partial<EicrReport>): Promise<EicrReport | undefined>;
+  deleteEicrReport(id: string): Promise<void>;
+  getNextEicrReference(): Promise<string>;
+  
+  // Distribution Boards
+  getDistributionBoards(reportId: string): Promise<DistributionBoard[]>;
+  createDistributionBoard(data: InsertDistributionBoard): Promise<DistributionBoard>;
+  updateDistributionBoard(id: string, data: Partial<DistributionBoard>): Promise<DistributionBoard | undefined>;
+  deleteDistributionBoard(id: string): Promise<void>;
+  
+  // EICR Circuits
+  getEicrCircuits(boardId: string): Promise<EicrCircuit[]>;
+  createEicrCircuit(data: InsertEicrCircuit): Promise<EicrCircuit>;
+  updateEicrCircuit(id: string, data: Partial<EicrCircuit>): Promise<EicrCircuit | undefined>;
+  deleteEicrCircuit(id: string): Promise<void>;
+  
+  // EICR Observations
+  getEicrObservations(reportId: string): Promise<EicrObservation[]>;
+  createEicrObservation(data: InsertEicrObservation): Promise<EicrObservation>;
+  updateEicrObservation(id: string, data: Partial<EicrObservation>): Promise<EicrObservation | undefined>;
+  deleteEicrObservation(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2123,6 +2153,155 @@ export class DatabaseStorage implements IStorage {
         sql`${certificateReminders.reminderDate} <= NOW()`
       ))
       .orderBy(certificateReminders.reminderDate);
+  }
+
+  // EICR Reports
+  async getEicrReports(): Promise<EicrReport[]> {
+    return db.select().from(eicrReports).orderBy(desc(eicrReports.createdAt));
+  }
+
+  async getEicrReport(id: string): Promise<EicrReportWithDetails | undefined> {
+    const [report] = await db.select().from(eicrReports).where(eq(eicrReports.id, id));
+    if (!report) return undefined;
+
+    const boards = await db.select().from(distributionBoards)
+      .where(eq(distributionBoards.reportId, id))
+      .orderBy(asc(distributionBoards.sortOrder));
+
+    const boardsWithCircuits = await Promise.all(
+      boards.map(async (board) => {
+        const circuits = await db.select().from(eicrCircuits)
+          .where(eq(eicrCircuits.boardId, board.id))
+          .orderBy(asc(eicrCircuits.sortOrder));
+        return { ...board, circuits };
+      })
+    );
+
+    const observations = await db.select().from(eicrObservations)
+      .where(eq(eicrObservations.reportId, id))
+      .orderBy(asc(eicrObservations.sortOrder));
+
+    return {
+      ...report,
+      boards: boardsWithCircuits,
+      observations,
+    };
+  }
+
+  async createEicrReport(data: InsertEicrReport & { reference: string }): Promise<EicrReport> {
+    const [report] = await db.insert(eicrReports).values(data).returning();
+    return report;
+  }
+
+  async updateEicrReport(id: string, data: Partial<EicrReport>): Promise<EicrReport | undefined> {
+    const [report] = await db.update(eicrReports)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(eicrReports.id, id))
+      .returning();
+    return report;
+  }
+
+  async deleteEicrReport(id: string): Promise<void> {
+    const boards = await db.select().from(distributionBoards)
+      .where(eq(distributionBoards.reportId, id));
+    
+    for (const board of boards) {
+      await db.delete(eicrCircuits).where(eq(eicrCircuits.boardId, board.id));
+    }
+    
+    await db.delete(distributionBoards).where(eq(distributionBoards.reportId, id));
+    await db.delete(eicrObservations).where(eq(eicrObservations.reportId, id));
+    await db.delete(eicrReports).where(eq(eicrReports.id, id));
+  }
+
+  async getNextEicrReference(): Promise<string> {
+    const year = new Date().getFullYear().toString().slice(-2);
+    const allReports = await db.select().from(eicrReports)
+      .where(sql`${eicrReports.reference} LIKE ${'EICR-' + year + '%'}`);
+    
+    let maxNum = 0;
+    for (const report of allReports) {
+      const match = report.reference.match(new RegExp(`EICR-${year}-(\\d+)`));
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    }
+    
+    return `EICR-${year}-${String(maxNum + 1).padStart(4, '0')}`;
+  }
+
+  // Distribution Boards
+  async getDistributionBoards(reportId: string): Promise<DistributionBoard[]> {
+    return db.select().from(distributionBoards)
+      .where(eq(distributionBoards.reportId, reportId))
+      .orderBy(asc(distributionBoards.sortOrder));
+  }
+
+  async createDistributionBoard(data: InsertDistributionBoard): Promise<DistributionBoard> {
+    const [board] = await db.insert(distributionBoards).values(data).returning();
+    return board;
+  }
+
+  async updateDistributionBoard(id: string, data: Partial<DistributionBoard>): Promise<DistributionBoard | undefined> {
+    const [board] = await db.update(distributionBoards)
+      .set(data)
+      .where(eq(distributionBoards.id, id))
+      .returning();
+    return board;
+  }
+
+  async deleteDistributionBoard(id: string): Promise<void> {
+    await db.delete(eicrCircuits).where(eq(eicrCircuits.boardId, id));
+    await db.delete(distributionBoards).where(eq(distributionBoards.id, id));
+  }
+
+  // EICR Circuits
+  async getEicrCircuits(boardId: string): Promise<EicrCircuit[]> {
+    return db.select().from(eicrCircuits)
+      .where(eq(eicrCircuits.boardId, boardId))
+      .orderBy(asc(eicrCircuits.sortOrder));
+  }
+
+  async createEicrCircuit(data: InsertEicrCircuit): Promise<EicrCircuit> {
+    const [circuit] = await db.insert(eicrCircuits).values(data).returning();
+    return circuit;
+  }
+
+  async updateEicrCircuit(id: string, data: Partial<EicrCircuit>): Promise<EicrCircuit | undefined> {
+    const [circuit] = await db.update(eicrCircuits)
+      .set(data)
+      .where(eq(eicrCircuits.id, id))
+      .returning();
+    return circuit;
+  }
+
+  async deleteEicrCircuit(id: string): Promise<void> {
+    await db.delete(eicrCircuits).where(eq(eicrCircuits.id, id));
+  }
+
+  // EICR Observations
+  async getEicrObservations(reportId: string): Promise<EicrObservation[]> {
+    return db.select().from(eicrObservations)
+      .where(eq(eicrObservations.reportId, reportId))
+      .orderBy(asc(eicrObservations.sortOrder));
+  }
+
+  async createEicrObservation(data: InsertEicrObservation): Promise<EicrObservation> {
+    const [observation] = await db.insert(eicrObservations).values(data).returning();
+    return observation;
+  }
+
+  async updateEicrObservation(id: string, data: Partial<EicrObservation>): Promise<EicrObservation | undefined> {
+    const [observation] = await db.update(eicrObservations)
+      .set(data)
+      .where(eq(eicrObservations.id, id))
+      .returning();
+    return observation;
+  }
+
+  async deleteEicrObservation(id: string): Promise<void> {
+    await db.delete(eicrObservations).where(eq(eicrObservations.id, id));
   }
 }
 
