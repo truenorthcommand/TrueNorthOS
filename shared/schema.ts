@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, doublePrecision, boolean, jsonb, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, doublePrecision, boolean, jsonb, integer, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1123,4 +1123,133 @@ export type CertificateWithDetails = Certificate & {
   property?: Pick<ClientProperty, 'id' | 'name' | 'address'> | null;
   engineer?: Pick<User, 'id' | 'name'> | null;
   job?: Pick<Job, 'id' | 'jobNo'> | null;
+};
+
+// ==================== EICR (Electrical Installation Condition Report) ====================
+
+export const eicrReports = pgTable("eicr_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reference: text("reference").notNull(),
+  standard: text("standard").notNull().default("BS 7671:2018+A2:2022"),
+  outcome: text("outcome"), // "SATISFACTORY" | "UNSATISFACTORY"
+  clientName: text("client_name").notNull(),
+  clientAddress: text("client_address"),
+  installationAddress: text("installation_address").notNull(),
+  installationPostcode: text("installation_postcode"),
+  occupierName: text("occupier_name"),
+  occupierPhone: text("occupier_phone"),
+  maxDemand: text("max_demand"),
+  supplyType: text("supply_type"), // TN-C-S, TN-S, TT
+  zeValue: real("ze_value"),
+  inspectorName: text("inspector_name"),
+  inspectorSignature: text("inspector_signature"),
+  inspectorRegistration: text("inspector_registration"),
+  inspectionDate: timestamp("inspection_date"),
+  nextInspectionDate: timestamp("next_inspection_date"),
+  createdById: varchar("created_by_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const distributionBoards = pgTable("distribution_boards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reportId: varchar("report_id").notNull(),
+  dbRef: text("db_ref").notNull(), // e.g., "DB1", "DB2"
+  location: text("location").notNull(),
+  designation: text("designation"), // e.g., "Main Consumer Unit"
+  supplyType: text("supply_type"), // TN-C-S, TN-S, TT
+  earthingArrangement: text("earthing_arrangement"),
+  mainSwitchRating: integer("main_switch_rating"),
+  mainSwitchBs: text("main_switch_bs"), // e.g., "BS EN 60898"
+  rcdProtected: boolean("rcd_protected").default(false),
+  rcdType: text("rcd_type"), // AC, A, F, B
+  rcdRating: integer("rcd_rating"), // 30, 100, 300 mA
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const eicrCircuits = pgTable("eicr_circuits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  boardId: varchar("board_id").notNull(),
+  circuitRef: text("circuit_ref").notNull(), // e.g., "1", "2", "L1"
+  description: text("description").notNull(),
+  breakerType: text("breaker_type").notNull().default("MCB"), // MCB, RCBO, FUSE, OTHER
+  breakerRating: integer("breaker_rating"), // e.g., 6, 16, 32
+  curve: text("curve"), // B, C, D
+  rcdProtected: boolean("rcd_protected").default(false),
+  rcdType: text("rcd_type"), // AC, A, F, B
+  rcdIdeltaMa: integer("rcd_idelta_ma"), // e.g., 30
+  rcdTripTime: real("rcd_trip_time"), // ms
+  lineMm2: real("line_mm2"), // Cable size
+  cpcMm2: real("cpc_mm2"), // CPC size
+  r1PlusR2: real("r1_plus_r2"), // Ω
+  zs: real("zs"), // Ω
+  maxZs: real("max_zs"), // Maximum permitted Zs
+  irLn: real("ir_ln"), // Insulation resistance L-N (MΩ)
+  irLe: real("ir_le"), // Insulation resistance L-E (MΩ)
+  irNe: real("ir_ne"), // Insulation resistance N-E (MΩ)
+  polarityOk: boolean("polarity_ok").default(true),
+  limitationCode: text("limitation_code"), // LIM
+  remarks: text("remarks"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const eicrObservations = pgTable("eicr_observations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reportId: varchar("report_id").notNull(),
+  code: text("code").notNull(), // C1, C2, C3, FI
+  location: text("location"),
+  circuitRef: text("circuit_ref"),
+  item: text("item"), // Item number reference
+  description: text("description").notNull(),
+  recommendation: text("recommendation"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// EICR Insert Schemas
+export const insertEicrReportSchema = createInsertSchema(eicrReports, {
+  inspectionDate: z.coerce.date().optional(),
+  nextInspectionDate: z.coerce.date().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDistributionBoardSchema = createInsertSchema(distributionBoards).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertEicrCircuitSchema = createInsertSchema(eicrCircuits).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertEicrObservationSchema = createInsertSchema(eicrObservations).omit({
+  id: true,
+  createdAt: true,
+});
+
+// EICR Types
+export type InsertEicrReport = z.infer<typeof insertEicrReportSchema>;
+export type EicrReport = typeof eicrReports.$inferSelect;
+
+export type InsertDistributionBoard = z.infer<typeof insertDistributionBoardSchema>;
+export type DistributionBoard = typeof distributionBoards.$inferSelect;
+
+export type InsertEicrCircuit = z.infer<typeof insertEicrCircuitSchema>;
+export type EicrCircuit = typeof eicrCircuits.$inferSelect;
+
+export type InsertEicrObservation = z.infer<typeof insertEicrObservationSchema>;
+export type EicrObservation = typeof eicrObservations.$inferSelect;
+
+// EICR Report with all related data
+export type EicrReportWithDetails = EicrReport & {
+  boards: (DistributionBoard & {
+    circuits: EicrCircuit[];
+  })[];
+  observations: EicrObservation[];
 };
