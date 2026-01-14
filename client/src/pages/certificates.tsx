@@ -257,14 +257,13 @@ export default function Certificates() {
     }
   }, [selectedPropertyId, clientProperties]);
 
-  const getSelectedTypeShortCode = () => {
+  const selectedTypeShortCode = useMemo(() => {
     const selectedType = certificateTypes.find(t => t.id === selectedTypeId);
     return selectedType?.shortCode || "";
-  };
+  }, [certificateTypes, selectedTypeId]);
 
   useEffect(() => {
-    const shortCode = getSelectedTypeShortCode();
-    switch (shortCode) {
+    switch (selectedTypeShortCode) {
       case "EICR":
         setCertificateData({ ...defaultEICRData });
         break;
@@ -286,7 +285,7 @@ export default function Certificates() {
       default:
         setCertificateData({});
     }
-  }, [selectedTypeId, certificateTypes]);
+  }, [selectedTypeShortCode]);
 
   const createCertificateMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -1578,7 +1577,7 @@ export default function Certificates() {
               </Select>
             </div>
 
-            {getSelectedTypeShortCode() === "EICR" && (
+            {selectedTypeShortCode === "EICR" && (
               <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
                 <h4 className="font-medium">EICR Details</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1649,7 +1648,7 @@ export default function Certificates() {
               </div>
             )}
 
-            {getSelectedTypeShortCode() === "CP12" && (
+            {selectedTypeShortCode === "CP12" && (
               <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
                 <h4 className="font-medium">Gas Appliances</h4>
                 {((certificateData as CP12Data).appliances || []).map((appliance, index) => (
@@ -1749,7 +1748,7 @@ export default function Certificates() {
               </div>
             )}
 
-            {getSelectedTypeShortCode() === "BOILER" && (
+            {selectedTypeShortCode === "BOILER" && (
               <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
                 <h4 className="font-medium">Boiler Service Details</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1826,7 +1825,7 @@ export default function Certificates() {
               </div>
             )}
 
-            {getSelectedTypeShortCode() === "PAT" && (
+            {selectedTypeShortCode === "PAT" && (
               <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
                 <div className="flex items-center justify-between">
                   <h4 className="font-medium">Appliances Tested</h4>
@@ -1945,7 +1944,7 @@ export default function Certificates() {
               </div>
             )}
 
-            {getSelectedTypeShortCode() === "FIRE" && (
+            {selectedTypeShortCode === "FIRE" && (
               <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
                 <h4 className="font-medium">Fire Alarm System Details</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2015,7 +2014,7 @@ export default function Certificates() {
               </div>
             )}
 
-            {getSelectedTypeShortCode() === "SMOKE" && (
+            {selectedTypeShortCode === "SMOKE" && (
               <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
                 <div className="flex items-center justify-between">
                   <h4 className="font-medium">Smoke & CO Alarm Locations</h4>

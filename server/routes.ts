@@ -6555,16 +6555,14 @@ Be concise and practical. Focus on real issues that affect the business.`;
         return res.status(401).json({ error: "User not found" });
       }
       
-      // Validate request body with Zod
-      const validatedData = insertCertificateSchema.omit({ 
-        id: true, 
-        certificateNo: true, 
-        createdById: true, 
-        createdAt: true 
-      }).parse(req.body);
+      // Basic validation - ensure required fields are present
+      const { certificateTypeId, propertyAddress, issueDate } = req.body;
+      if (!certificateTypeId || !propertyAddress || !issueDate) {
+        return res.status(400).json({ error: "Missing required fields: certificateTypeId, propertyAddress, issueDate" });
+      }
       
       // Get certificate type for generating number
-      const certType = await storage.getCertificateType(validatedData.certificateTypeId);
+      const certType = await storage.getCertificateType(certificateTypeId);
       if (!certType) {
         return res.status(400).json({ error: "Invalid certificate type" });
       }
@@ -6572,15 +6570,15 @@ Be concise and practical. Focus on real issues that affect the business.`;
       const certificateNo = await storage.getNextCertificateNo(certType.shortCode);
       
       // Calculate expiry date if not provided
-      let expiryDate = validatedData.expiryDate;
-      if (!expiryDate && validatedData.issueDate && certType.expiryMonths) {
-        const issue = new Date(validatedData.issueDate);
+      let expiryDate = req.body.expiryDate;
+      if (!expiryDate && issueDate && certType.expiryMonths) {
+        const issue = new Date(issueDate);
         issue.setMonth(issue.getMonth() + certType.expiryMonths);
         expiryDate = issue;
       }
       
       const cert = await storage.createCertificate({
-        ...validatedData,
+        ...req.body,
         certificateNo,
         expiryDate,
         createdById: user.id,
@@ -6614,15 +6612,10 @@ Be concise and practical. Focus on real issues that affect the business.`;
   // Update certificate
   app.patch("/api/certificates/:id", requireAuth, async (req, res) => {
     try {
-      // Validate request body with partial schema (allows updating only some fields)
-      const validatedData = insertCertificateSchema.omit({ 
-        id: true, 
-        certificateNo: true, 
-        createdById: true, 
-        createdAt: true 
-      }).partial().parse(req.body);
+      // Don't allow updating protected fields
+      const { id, certificateNo, createdById, createdAt, ...updateData } = req.body;
       
-      const cert = await storage.updateCertificate(req.params.id, validatedData);
+      const cert = await storage.updateCertificate(req.params.id, updateData);
       if (!cert) {
         return res.status(404).json({ error: "Certificate not found" });
       }
