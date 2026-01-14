@@ -161,3 +161,350 @@
 .print-only {
   display: none;
 }
+
+/* Certificate Print Styles */
+.print-certificate-container {
+  display: none;
+}
+
+@media print {
+  .print-certificate-container {
+    display: block !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: white;
+    z-index: 99999;
+    overflow: auto;
+  }
+
+  .print-certificate {
+    max-width: 210mm;
+    margin: 0 auto;
+    padding: 15mm;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 10pt;
+    color: #000;
+    background: white;
+  }
+
+  .print-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #333;
+  }
+
+  .print-logo-section {
+    flex: 0 0 30%;
+  }
+
+  .print-logo-placeholder {
+    width: 80px;
+    height: 80px;
+    border: 2px dashed #999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8pt;
+    color: #666;
+    text-align: center;
+    margin-bottom: 5px;
+  }
+
+  .print-company-name {
+    font-weight: bold;
+    font-size: 11pt;
+    color: #333;
+  }
+
+  .print-title-section {
+    flex: 0 0 65%;
+    text-align: right;
+  }
+
+  .print-certificate-title {
+    font-size: 16pt;
+    font-weight: bold;
+    color: #1a365d;
+    margin: 0 0 8px 0;
+    text-transform: uppercase;
+  }
+
+  .print-certificate-number {
+    font-size: 11pt;
+    color: #333;
+  }
+
+  .print-result-banner {
+    padding: 10px 15px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 12pt;
+  }
+
+  .print-result-banner[data-result="satisfactory"] {
+    background-color: #d4edda !important;
+    border: 2px solid #28a745 !important;
+    color: #155724 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-result-banner[data-result="unsatisfactory"] {
+    background-color: #f8d7da !important;
+    border: 2px solid #dc3545 !important;
+    color: #721c24 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-result-banner[data-result="improvements_required"] {
+    background-color: #fff3cd !important;
+    border: 2px solid #ffc107 !important;
+    color: #856404 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-result-label {
+    font-weight: normal;
+    margin-right: 8px;
+  }
+
+  .print-result-value {
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+
+  .print-body {
+    margin-bottom: 15px;
+  }
+
+  .print-section {
+    margin-bottom: 15px;
+    page-break-inside: avoid;
+  }
+
+  .print-section-title {
+    font-size: 11pt;
+    font-weight: bold;
+    color: #1a365d;
+    margin: 0 0 8px 0;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #ccc;
+    text-transform: uppercase;
+  }
+
+  .print-section-inner {
+    margin-top: 10px;
+  }
+
+  .print-subsection-title {
+    font-size: 10pt;
+    font-weight: bold;
+    color: #333;
+    margin: 0 0 5px 0;
+  }
+
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8px;
+  }
+
+  .print-table td {
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    vertical-align: top;
+  }
+
+  .print-table .label-cell {
+    width: 35%;
+    background-color: #f5f5f5 !important;
+    font-weight: 600;
+    color: #333;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-table .value-cell {
+    width: 65%;
+    color: #000;
+  }
+
+  .print-table-full {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8px;
+  }
+
+  .print-table-full th,
+  .print-table-full td {
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    text-align: left;
+  }
+
+  .print-table-full th {
+    background-color: #f5f5f5 !important;
+    font-weight: 600;
+    color: #333;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .result-pass {
+    color: #155724 !important;
+    font-weight: bold;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .result-fail {
+    color: #721c24 !important;
+    font-weight: bold;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-appliances {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .print-appliance-card {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    page-break-inside: avoid;
+  }
+
+  .print-appliance-title {
+    font-size: 10pt;
+    font-weight: bold;
+    color: #333;
+    margin: 0 0 8px 0;
+    text-transform: capitalize;
+  }
+
+  .print-text {
+    margin: 0;
+    line-height: 1.4;
+    white-space: pre-wrap;
+  }
+
+  .print-observation-block {
+    margin-bottom: 10px;
+  }
+
+  .print-signatures {
+    page-break-inside: avoid;
+  }
+
+  .print-signature-grid {
+    display: flex;
+    gap: 30px;
+    justify-content: space-between;
+  }
+
+  .print-signature-box {
+    flex: 1;
+    text-align: center;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+
+  .print-signature-label {
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #333;
+  }
+
+  .print-signature-img {
+    max-width: 200px;
+    max-height: 60px;
+    margin: 10px auto;
+    display: block;
+  }
+
+  .print-signature-line {
+    width: 80%;
+    height: 40px;
+    border-bottom: 1px solid #333;
+    margin: 10px auto;
+  }
+
+  .print-signature-name {
+    font-weight: 600;
+    margin-top: 5px;
+    color: #333;
+  }
+
+  .print-signature-date {
+    font-size: 9pt;
+    color: #666;
+    margin-top: 3px;
+  }
+
+  .print-footer {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 2px solid #333;
+    page-break-inside: avoid;
+  }
+
+  .print-declaration {
+    margin-bottom: 15px;
+    padding: 10px;
+    background-color: #f9f9f9 !important;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-declaration-text {
+    font-size: 9pt;
+    font-style: italic;
+    color: #333;
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  .print-company-footer {
+    text-align: center;
+    font-size: 9pt;
+    color: #666;
+  }
+
+  .print-company-footer p {
+    margin: 2px 0;
+  }
+
+  /* Hide everything else when printing certificate */
+  body > *:not(.print-certificate-container) {
+    display: none !important;
+  }
+
+  #root {
+    display: none !important;
+  }
+
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+}

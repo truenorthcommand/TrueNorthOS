@@ -34,13 +34,17 @@ import {
   type FixedCost, type InsertFixedCost,
   type InvoiceWithChaseInfo, type FinancialSummary,
   type Snippet, type InsertSnippet,
+  type CertificateType, type InsertCertificateType,
+  type Certificate, type InsertCertificate, type CertificateWithDetails,
+  type CertificateReminder, type InsertCertificateReminder,
   users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, clientContacts, clientProperties, jobUpdates,
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
   timesheets, expenses, payments,
   skills, userSkills,
   inspections, inspectionItems, snaggingSheets, snagItems,
-  accountsReceipts, invoiceChaseLogs, fixedCosts, snippets
+  accountsReceipts, invoiceChaseLogs, fixedCosts, snippets,
+  certificateTypes, certificates, certificateReminders
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and, ne, inArray, gt, asc } from "drizzle-orm";
@@ -102,6 +106,7 @@ export interface IStorage {
   
   getClient(id: string): Promise<Client | undefined>;
   getClientByEmail(email: string): Promise<Client | undefined>;
+  getClientByPortalToken(token: string): Promise<Client | undefined>;
   getAllClients(): Promise<Client[]>;
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: string, updates: Partial<Client>): Promise<Client | undefined>;
@@ -258,6 +263,27 @@ export interface IStorage {
   createSnippet(data: InsertSnippet): Promise<Snippet>;
   updateSnippet(id: string, data: Partial<Snippet>): Promise<Snippet | undefined>;
   deleteSnippet(id: string): Promise<void>;
+  
+  // Certificates & Compliance
+  getCertificateTypes(): Promise<CertificateType[]>;
+  getCertificateType(id: string): Promise<CertificateType | undefined>;
+  createCertificateType(data: InsertCertificateType): Promise<CertificateType>;
+  updateCertificateType(id: string, data: Partial<CertificateType>): Promise<CertificateType | undefined>;
+  
+  getCertificates(): Promise<Certificate[]>;
+  getCertificate(id: string): Promise<CertificateWithDetails | undefined>;
+  getCertificatesByClient(clientId: string): Promise<Certificate[]>;
+  getCertificatesByProperty(propertyId: string): Promise<Certificate[]>;
+  getExpiringCertificates(daysAhead: number): Promise<Certificate[]>;
+  createCertificate(data: InsertCertificate): Promise<Certificate>;
+  updateCertificate(id: string, data: Partial<Certificate>): Promise<Certificate | undefined>;
+  deleteCertificate(id: string): Promise<void>;
+  getNextCertificateNo(typeCode: string): Promise<string>;
+  
+  getCertificateReminders(certificateId: string): Promise<CertificateReminder[]>;
+  createCertificateReminder(data: InsertCertificateReminder): Promise<CertificateReminder>;
+  updateCertificateReminder(id: string, data: Partial<CertificateReminder>): Promise<CertificateReminder | undefined>;
+  getPendingReminders(): Promise<CertificateReminder[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -556,6 +582,11 @@ export class DatabaseStorage implements IStorage {
 
   async getClientByEmail(email: string): Promise<Client | undefined> {
     const [client] = await db.select().from(clients).where(eq(clients.email, email));
+    return client;
+  }
+
+  async getClientByPortalToken(token: string): Promise<Client | undefined> {
+    const [client] = await db.select().from(clients).where(eq(clients.portalToken, token));
     return client;
   }
 
@@ -1934,6 +1965,164 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSnippet(id: string): Promise<void> {
     await db.delete(snippets).where(eq(snippets.id, id));
+  }
+
+  // ==================== CERTIFICATES & COMPLIANCE ====================
+
+  async getCertificateTypes(): Promise<CertificateType[]> {
+    return db.select().from(certificateTypes)
+      .where(eq(certificateTypes.isActive, true))
+      .orderBy(certificateTypes.sortOrder, certificateTypes.name);
+  }
+
+  async getCertificateType(id: string): Promise<CertificateType | undefined> {
+    const [type] = await db.select().from(certificateTypes).where(eq(certificateTypes.id, id));
+    return type;
+  }
+
+  async createCertificateType(data: InsertCertificateType): Promise<CertificateType> {
+    const [type] = await db.insert(certificateTypes).values(data).returning();
+    return type;
+  }
+
+  async updateCertificateType(id: string, data: Partial<CertificateType>): Promise<CertificateType | undefined> {
+    const [type] = await db.update(certificateTypes)
+      .set(data)
+      .where(eq(certificateTypes.id, id))
+      .returning();
+    return type;
+  }
+
+  async getCertificates(): Promise<Certificate[]> {
+    return db.select().from(certificates).orderBy(desc(certificates.createdAt));
+  }
+
+  async getCertificate(id: string): Promise<CertificateWithDetails | undefined> {
+    const [cert] = await db.select().from(certificates).where(eq(certificates.id, id));
+    if (!cert) return undefined;
+
+    const [certType] = await db.select().from(certificateTypes)
+      .where(eq(certificateTypes.id, cert.certificateTypeId));
+    
+    let client = null;
+    if (cert.clientId) {
+      const [c] = await db.select().from(clients).where(eq(clients.id, cert.clientId));
+      if (c) client = { id: c.id, name: c.name, email: c.email, phone: c.phone };
+    }
+
+    let property = null;
+    if (cert.propertyId) {
+      const [p] = await db.select().from(clientProperties).where(eq(clientProperties.id, cert.propertyId));
+      if (p) property = { id: p.id, name: p.name, address: p.address };
+    }
+
+    let engineer = null;
+    if (cert.engineerId) {
+      const [e] = await db.select().from(users).where(eq(users.id, cert.engineerId));
+      if (e) engineer = { id: e.id, name: e.name };
+    }
+
+    let job = null;
+    if (cert.jobId) {
+      const [j] = await db.select().from(jobs).where(eq(jobs.id, cert.jobId));
+      if (j) job = { id: j.id, jobNo: j.jobNo };
+    }
+
+    return {
+      ...cert,
+      certificateType: certType,
+      client,
+      property,
+      engineer,
+      job,
+    };
+  }
+
+  async getCertificatesByClient(clientId: string): Promise<Certificate[]> {
+    return db.select().from(certificates)
+      .where(eq(certificates.clientId, clientId))
+      .orderBy(desc(certificates.issueDate));
+  }
+
+  async getCertificatesByProperty(propertyId: string): Promise<Certificate[]> {
+    return db.select().from(certificates)
+      .where(eq(certificates.propertyId, propertyId))
+      .orderBy(desc(certificates.issueDate));
+  }
+
+  async getExpiringCertificates(daysAhead: number): Promise<Certificate[]> {
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + daysAhead);
+    
+    return db.select().from(certificates)
+      .where(and(
+        gt(certificates.expiryDate, new Date()),
+        sql`${certificates.expiryDate} <= ${futureDate}`
+      ))
+      .orderBy(certificates.expiryDate);
+  }
+
+  async createCertificate(data: InsertCertificate): Promise<Certificate> {
+    const [cert] = await db.insert(certificates).values(data).returning();
+    return cert;
+  }
+
+  async updateCertificate(id: string, data: Partial<Certificate>): Promise<Certificate | undefined> {
+    const [cert] = await db.update(certificates)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(certificates.id, id))
+      .returning();
+    return cert;
+  }
+
+  async deleteCertificate(id: string): Promise<void> {
+    await db.delete(certificateReminders).where(eq(certificateReminders.certificateId, id));
+    await db.delete(certificates).where(eq(certificates.id, id));
+  }
+
+  async getNextCertificateNo(typeCode: string): Promise<string> {
+    const year = new Date().getFullYear().toString().slice(-2);
+    const allCerts = await db.select().from(certificates)
+      .where(sql`${certificates.certificateNo} LIKE ${typeCode + '-' + year + '%'}`);
+    
+    let maxNum = 0;
+    for (const cert of allCerts) {
+      const match = cert.certificateNo.match(new RegExp(`${typeCode}-${year}-(\\d+)`));
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    }
+    
+    return `${typeCode}-${year}-${String(maxNum + 1).padStart(4, '0')}`;
+  }
+
+  async getCertificateReminders(certificateId: string): Promise<CertificateReminder[]> {
+    return db.select().from(certificateReminders)
+      .where(eq(certificateReminders.certificateId, certificateId))
+      .orderBy(certificateReminders.reminderDate);
+  }
+
+  async createCertificateReminder(data: InsertCertificateReminder): Promise<CertificateReminder> {
+    const [reminder] = await db.insert(certificateReminders).values(data).returning();
+    return reminder;
+  }
+
+  async updateCertificateReminder(id: string, data: Partial<CertificateReminder>): Promise<CertificateReminder | undefined> {
+    const [reminder] = await db.update(certificateReminders)
+      .set(data)
+      .where(eq(certificateReminders.id, id))
+      .returning();
+    return reminder;
+  }
+
+  async getPendingReminders(): Promise<CertificateReminder[]> {
+    return db.select().from(certificateReminders)
+      .where(and(
+        eq(certificateReminders.status, 'pending'),
+        sql`${certificateReminders.reminderDate} <= NOW()`
+      ))
+      .orderBy(certificateReminders.reminderDate);
   }
 }
 

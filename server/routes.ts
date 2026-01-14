@@ -8,7 +8,7 @@ import QRCode from "qrcode";
 import Stripe from "stripe";
 import { storage } from "./storage";
 import { pool } from "./db";
-import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalkaroundCheckSchema, insertCheckItemSchema, insertDefectSchema, insertDefectUpdateSchema, insertTimesheetSchema, insertExpenseSchema, insertPaymentSchema } from "@shared/schema";
+import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalkaroundCheckSchema, insertCheckItemSchema, insertDefectSchema, insertDefectUpdateSchema, insertTimesheetSchema, insertExpenseSchema, insertPaymentSchema, insertCertificateSchema, type User } from "@shared/schema";
 import { z } from "zod";
 import { notifyAdmins, notifyUser } from "./notifications";
 import { sessionMiddleware } from "./session";
@@ -6472,6 +6472,275 @@ Be concise and practical. Focus on real issues that affect the business.`;
     } catch (error) {
       console.error("Database health check error:", error);
       res.status(500).json({ error: "Failed to check database health" });
+    }
+  });
+
+  // ==================== CERTIFICATES & COMPLIANCE ====================
+
+  // Get all certificate types
+  app.get("/api/certificate-types", requireAuth, async (req, res) => {
+    try {
+      const types = await storage.getCertificateTypes();
+      res.json(types);
+    } catch (error) {
+      console.error("Error fetching certificate types:", error);
+      res.status(500).json({ error: "Failed to fetch certificate types" });
+    }
+  });
+
+  // Get all certificates
+  app.get("/api/certificates", requireAuth, async (req, res) => {
+    try {
+      const certs = await storage.getCertificates();
+      res.json(certs);
+    } catch (error) {
+      console.error("Error fetching certificates:", error);
+      res.status(500).json({ error: "Failed to fetch certificates" });
+    }
+  });
+
+  // Get single certificate with full details
+  app.get("/api/certificates/:id", requireAuth, async (req, res) => {
+    try {
+      const cert = await storage.getCertificate(req.params.id);
+      if (!cert) {
+        return res.status(404).json({ error: "Certificate not found" });
+      }
+      res.json(cert);
+    } catch (error) {
+      console.error("Error fetching certificate:", error);
+      res.status(500).json({ error: "Failed to fetch certificate" });
+    }
+  });
+
+  // Get certificates by client
+  app.get("/api/clients/:clientId/certificates", requireAuth, async (req, res) => {
+    try {
+      const certs = await storage.getCertificatesByClient(req.params.clientId);
+      res.json(certs);
+    } catch (error) {
+      console.error("Error fetching client certificates:", error);
+      res.status(500).json({ error: "Failed to fetch client certificates" });
+    }
+  });
+
+  // Get certificates by property
+  app.get("/api/properties/:propertyId/certificates", requireAuth, async (req, res) => {
+    try {
+      const certs = await storage.getCertificatesByProperty(req.params.propertyId);
+      res.json(certs);
+    } catch (error) {
+      console.error("Error fetching property certificates:", error);
+      res.status(500).json({ error: "Failed to fetch property certificates" });
+    }
+  });
+
+  // Get expiring certificates
+  app.get("/api/certificates/expiring/:days", requireAuth, async (req, res) => {
+    try {
+      const days = parseInt(req.params.days) || 30;
+      const certs = await storage.getExpiringCertificates(days);
+      res.json(certs);
+    } catch (error) {
+      console.error("Error fetching expiring certificates:", error);
+      res.status(500).json({ error: "Failed to fetch expiring certificates" });
+    }
+  });
+
+  // Create certificate
+  app.post("/api/certificates", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      
+      // Validate request body with Zod
+      const validatedData = insertCertificateSchema.omit({ 
+        id: true, 
+        certificateNo: true, 
+        createdById: true, 
+        createdAt: true 
+      }).parse(req.body);
+      
+      // Get certificate type for generating number
+      const certType = await storage.getCertificateType(validatedData.certificateTypeId);
+      if (!certType) {
+        return res.status(400).json({ error: "Invalid certificate type" });
+      }
+      
+      const certificateNo = await storage.getNextCertificateNo(certType.shortCode);
+      
+      // Calculate expiry date if not provided
+      let expiryDate = validatedData.expiryDate;
+      if (!expiryDate && validatedData.issueDate && certType.expiryMonths) {
+        const issue = new Date(validatedData.issueDate);
+        issue.setMonth(issue.getMonth() + certType.expiryMonths);
+        expiryDate = issue;
+      }
+      
+      const cert = await storage.createCertificate({
+        ...validatedData,
+        certificateNo,
+        expiryDate,
+        createdById: user.id,
+      });
+      
+      // Create expiry reminders (30, 14, 7 days before)
+      if (expiryDate) {
+        const reminderDays = [30, 14, 7];
+        for (const days of reminderDays) {
+          const reminderDate = new Date(expiryDate);
+          reminderDate.setDate(reminderDate.getDate() - days);
+          if (reminderDate > new Date()) {
+            await storage.createCertificateReminder({
+              certificateId: cert.id,
+              reminderDate,
+              daysBefore: days,
+              reminderType: 'email',
+              status: 'pending',
+            });
+          }
+        }
+      }
+      
+      res.status(201).json(cert);
+    } catch (error) {
+      console.error("Error creating certificate:", error);
+      res.status(500).json({ error: "Failed to create certificate" });
+    }
+  });
+
+  // Update certificate
+  app.patch("/api/certificates/:id", requireAuth, async (req, res) => {
+    try {
+      // Validate request body with partial schema (allows updating only some fields)
+      const validatedData = insertCertificateSchema.omit({ 
+        id: true, 
+        certificateNo: true, 
+        createdById: true, 
+        createdAt: true 
+      }).partial().parse(req.body);
+      
+      const cert = await storage.updateCertificate(req.params.id, validatedData);
+      if (!cert) {
+        return res.status(404).json({ error: "Certificate not found" });
+      }
+      res.json(cert);
+    } catch (error) {
+      console.error("Error updating certificate:", error);
+      res.status(500).json({ error: "Failed to update certificate" });
+    }
+  });
+
+  // Delete certificate
+  app.delete("/api/certificates/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteCertificate(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting certificate:", error);
+      res.status(500).json({ error: "Failed to delete certificate" });
+    }
+  });
+
+  // Get next certificate number preview
+  app.get("/api/certificates/next-number/:typeCode", requireAuth, async (req, res) => {
+    try {
+      const nextNo = await storage.getNextCertificateNo(req.params.typeCode);
+      res.json({ certificateNo: nextNo });
+    } catch (error) {
+      console.error("Error generating certificate number:", error);
+      res.status(500).json({ error: "Failed to generate certificate number" });
+    }
+  });
+
+  // ==================== CLIENT PORTAL (PUBLIC) ====================
+
+  // Public endpoint - Get certificates for a client via portal token
+  app.get("/api/client-portal/certificates", async (req, res) => {
+    try {
+      const { email, token } = req.query;
+      
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ error: "Access token is required" });
+      }
+      
+      // Find client by portal token
+      const client = await storage.getClientByPortalToken(token);
+      if (!client) {
+        return res.status(404).json({ error: "Invalid access link" });
+      }
+      
+      // Optionally verify email matches if provided
+      if (email && typeof email === 'string' && client.email && client.email.toLowerCase() !== email.toLowerCase()) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Get certificates for this client
+      const certificates = await storage.getCertificatesByClient(client.id);
+      
+      // Get certificate types for display
+      const certificateTypes = await storage.getCertificateTypes();
+      
+      // Get company settings for branding
+      const companySettings = await storage.getCompanySettings();
+      
+      // Enrich certificates with type info
+      const enrichedCerts = certificates.map(cert => {
+        const certType = certificateTypes.find(t => t.id === cert.certificateTypeId);
+        return {
+          ...cert,
+          certificateType: certType || null,
+        };
+      });
+      
+      res.json({
+        client: {
+          id: client.id,
+          name: client.name,
+          email: client.email,
+        },
+        certificates: enrichedCerts,
+        companySettings: companySettings || null,
+      });
+    } catch (error) {
+      console.error("Error fetching client portal certificates:", error);
+      res.status(500).json({ error: "Failed to fetch certificates" });
+    }
+  });
+
+  // Generate portal access link for a client
+  app.post("/api/clients/:clientId/portal-link", requireAuth, async (req, res) => {
+    try {
+      const client = await storage.getClient(req.params.clientId);
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      // Generate a new portal token if one doesn't exist, or use existing
+      let portalToken = client.portalToken;
+      if (!portalToken || req.body.regenerate) {
+        portalToken = crypto.randomBytes(32).toString('hex');
+        await storage.updateClient(client.id, { portalToken });
+      }
+      
+      // Construct the portal URL
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : process.env.REPLIT_DOMAINS 
+          ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+          : 'http://localhost:5000';
+      
+      const portalUrl = `${baseUrl}/client/certificates?token=${portalToken}${client.email ? `&email=${encodeURIComponent(client.email)}` : ''}`;
+      
+      res.json({
+        portalUrl,
+        token: portalToken,
+      });
+    } catch (error) {
+      console.error("Error generating portal link:", error);
+      res.status(500).json({ error: "Failed to generate portal link" });
     }
   });
 

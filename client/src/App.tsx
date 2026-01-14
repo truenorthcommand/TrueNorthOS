@@ -60,6 +60,8 @@ import SnaggingSheets from "@/pages/snagging-sheets";
 import SnaggingDetail from "@/pages/snagging-detail";
 import AccountsDashboard from "@/pages/accounts-dashboard";
 import OutlookInbox from "@/pages/outlook-inbox";
+import Certificates from "@/pages/certificates";
+import ClientCertificates from "@/pages/client-certificates";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -149,6 +151,7 @@ function Router() {
         <PrivateRoute component={InvoiceDetail} />
       </Route>
       <Route path="/invoice/:token" component={ClientInvoice} />
+      <Route path="/client/certificates" component={ClientCertificates} />
       <Route path="/settings">
         <PrivateRoute component={Settings} />
       </Route>
@@ -220,6 +223,9 @@ function Router() {
       </Route>
       <Route path="/outlook-inbox">
         <PrivateRoute component={OutlookInbox} />
+      </Route>
+      <Route path="/certificates">
+        <PrivateRoute component={Certificates} />
       </Route>
       <Route path="/">
         <PrivateRoute component={Dashboard} />

@@ -113,6 +113,7 @@ export const clients = pgTable("clients", {
   postcode: text("postcode"),
   contactName: text("contact_name"),
   notes: text("notes"),
+  portalToken: text("portal_token"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1026,3 +1027,100 @@ export const insertOutlookSettingsSchema = createInsertSchema(outlookSettings).o
 
 export type InsertOutlookSettings = z.infer<typeof insertOutlookSettingsSchema>;
 export type OutlookSettings = typeof outlookSettings.$inferSelect;
+
+// ==================== COMPLIANCE & CERTIFICATES ====================
+
+export const certificateTypes = pgTable("certificate_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  shortCode: text("short_code").notNull(), // e.g., "EICR", "CP12", "GAS"
+  category: text("category").notNull().default("electrical"), // electrical, gas, fire, water, general
+  description: text("description"),
+  expiryMonths: integer("expiry_months").notNull().default(12), // Default validity period
+  requiredFields: jsonb("required_fields").default([]), // Array of required field definitions
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const certificates = pgTable("certificates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  certificateNo: text("certificate_no").notNull(), // Unique certificate number
+  certificateTypeId: varchar("certificate_type_id").notNull(),
+  clientId: varchar("client_id"),
+  propertyId: varchar("property_id"), // Link to client property
+  jobId: varchar("job_id"), // Optional link to job that created it
+  propertyAddress: text("property_address").notNull(),
+  propertyPostcode: text("property_postcode"),
+  issueDate: timestamp("issue_date").notNull(),
+  expiryDate: timestamp("expiry_date"),
+  status: text("status").notNull().default("valid"), // valid, expiring_soon, expired, superseded
+  result: text("result").default("satisfactory"), // satisfactory, unsatisfactory, improvements_required
+  observations: text("observations"),
+  recommendations: text("recommendations"),
+  certificateData: jsonb("certificate_data").default({}), // Type-specific data (appliances, circuits, etc.)
+  photos: jsonb("photos").default([]),
+  engineerSignature: text("engineer_signature"), // Base64 signature
+  engineerName: text("engineer_name"),
+  engineerId: varchar("engineer_id"),
+  engineerRegistration: text("engineer_registration"), // Gas Safe number, NICEIC number, etc.
+  clientSignature: text("client_signature"), // Base64 signature
+  clientName: text("client_name"),
+  signedAt: timestamp("signed_at"),
+  pdfUrl: text("pdf_url"), // Generated PDF location
+  notes: text("notes"),
+  createdById: varchar("created_by_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const certificateReminders = pgTable("certificate_reminders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  certificateId: varchar("certificate_id").notNull(),
+  reminderDate: timestamp("reminder_date").notNull(),
+  reminderType: text("reminder_type").notNull().default("email"), // email, sms, both
+  daysBefore: integer("days_before").notNull(), // 30, 14, 7 days before expiry
+  status: text("status").notNull().default("pending"), // pending, sent, failed
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCertificateTypeSchema = createInsertSchema(certificateTypes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCertificateType = z.infer<typeof insertCertificateTypeSchema>;
+export type CertificateType = typeof certificateTypes.$inferSelect;
+
+export const insertCertificateSchema = createInsertSchema(certificates, {
+  issueDate: z.coerce.date(),
+  expiryDate: z.coerce.date().optional(),
+  signedAt: z.coerce.date().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCertificate = z.infer<typeof insertCertificateSchema>;
+export type Certificate = typeof certificates.$inferSelect;
+
+export const insertCertificateReminderSchema = createInsertSchema(certificateReminders, {
+  reminderDate: z.coerce.date(),
+  sentAt: z.coerce.date().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCertificateReminder = z.infer<typeof insertCertificateReminderSchema>;
+export type CertificateReminder = typeof certificateReminders.$inferSelect;
+
+export type CertificateWithDetails = Certificate & {
+  certificateType: CertificateType;
+  client?: Pick<Client, 'id' | 'name' | 'email' | 'phone'> | null;
+  property?: Pick<ClientProperty, 'id' | 'name' | 'address'> | null;
+  engineer?: Pick<User, 'id' | 'name'> | null;
+  job?: Pick<Job, 'id' | 'jobNo'> | null;
+};
