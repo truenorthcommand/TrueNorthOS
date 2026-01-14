@@ -16,7 +16,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, CalendarIcon, Search, FileCheck, Eye, Loader2, Eraser, Trash2, Printer, AlertTriangle, Bell, CheckCircle2, XCircle, Link2, Copy, Check } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Plus, CalendarIcon, Search, FileCheck, Eye, Loader2, Eraser, Trash2, Printer, AlertTriangle, Bell, CheckCircle2, XCircle, Link2, Copy, Check, ChevronDown } from "lucide-react";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { toast } from "sonner";
 import SignatureCanvas from "react-signature-canvas";
@@ -203,6 +205,8 @@ export default function Certificates() {
   const [showPrintView, setShowPrintView] = useState(false);
   const [copyingPortalLinkFor, setCopyingPortalLinkFor] = useState<string | null>(null);
   const [copiedPortalLinkFor, setCopiedPortalLinkFor] = useState<string | null>(null);
+  const [certTypeSearchTerm, setCertTypeSearchTerm] = useState("");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const [selectedTypeId, setSelectedTypeId] = useState<string>("");
   const [selectedClientId, setSelectedClientId] = useState<string>("");
@@ -261,6 +265,16 @@ export default function Certificates() {
     const selectedType = certificateTypes.find(t => t.id === selectedTypeId);
     return selectedType?.shortCode || "";
   }, [certificateTypes, selectedTypeId]);
+
+  const filteredCertTypes = useMemo(() => {
+    if (!certTypeSearchTerm.trim()) return certificateTypes;
+    const search = certTypeSearchTerm.toLowerCase();
+    return certificateTypes.filter(type => 
+      type.name.toLowerCase().includes(search) || 
+      type.shortCode.toLowerCase().includes(search) ||
+      type.category.toLowerCase().includes(search)
+    );
+  }, [certificateTypes, certTypeSearchTerm]);
 
   useEffect(() => {
     switch (selectedTypeShortCode) {
@@ -1135,10 +1149,59 @@ export default function Certificates() {
           </p>
         </div>
 
-        <Button size="lg" className="w-full sm:w-auto" onClick={() => setCreateDialogOpen(true)} data-testid="button-new-certificate">
-          <Plus className="mr-2 h-5 w-5" />
-          New Certificate
-        </Button>
+        <DropdownMenu open={dropdownOpen} onOpenChange={(open) => {
+          setDropdownOpen(open);
+          if (!open) setCertTypeSearchTerm("");
+        }}>
+          <DropdownMenuTrigger asChild>
+            <Button size="lg" className="w-full sm:w-auto" data-testid="button-new-certificate">
+              <Plus className="mr-2 h-5 w-5" />
+              New Certificate
+              <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-80">
+            <div className="p-2 border-b">
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search certificate types..."
+                  value={certTypeSearchTerm}
+                  onChange={(e) => setCertTypeSearchTerm(e.target.value)}
+                  className="pl-8"
+                  data-testid="input-cert-type-search"
+                />
+              </div>
+            </div>
+            <ScrollArea className="max-h-[300px]">
+              {filteredCertTypes.length === 0 ? (
+                <div className="p-4 text-center text-sm text-muted-foreground">
+                  No certificate types found
+                </div>
+              ) : (
+                filteredCertTypes.map((type) => (
+                  <DropdownMenuItem
+                    key={type.id}
+                    className="flex flex-col items-start gap-1 p-3 cursor-pointer"
+                    onClick={() => {
+                      setSelectedTypeId(type.id);
+                      setCreateDialogOpen(true);
+                      setDropdownOpen(false);
+                      setCertTypeSearchTerm("");
+                    }}
+                    data-testid={`dropdown-cert-type-${type.shortCode}`}
+                  >
+                    <div className="flex items-center gap-2 w-full">
+                      <span className="font-medium">{type.shortCode}</span>
+                      <Badge variant="outline" className="text-xs">{type.category}</Badge>
+                    </div>
+                    <span className="text-sm text-muted-foreground">{type.name}</span>
+                  </DropdownMenuItem>
+                ))
+              )}
+            </ScrollArea>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1477,15 +1540,15 @@ export default function Certificates() {
 
               <div className="space-y-2">
                 <Label htmlFor="client">Client (Optional)</Label>
-                <Select value={selectedClientId} onValueChange={(val) => {
-                  setSelectedClientId(val);
+                <Select value={selectedClientId || "__none__"} onValueChange={(val) => {
+                  setSelectedClientId(val === "__none__" ? "" : val);
                   setSelectedPropertyId("");
                 }}>
                   <SelectTrigger data-testid="select-client">
                     <SelectValue placeholder="Select client" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No client</SelectItem>
+                    <SelectItem value="__none__">No client</SelectItem>
                     {clients.map((client) => (
                       <SelectItem key={client.id} value={client.id}>
                         {client.name}
@@ -1499,12 +1562,12 @@ export default function Certificates() {
             {selectedClientId && clientProperties.length > 0 && (
               <div className="space-y-2">
                 <Label htmlFor="property">Property (Optional)</Label>
-                <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
+                <Select value={selectedPropertyId || "__none__"} onValueChange={(val) => setSelectedPropertyId(val === "__none__" ? "" : val)}>
                   <SelectTrigger data-testid="select-property">
                     <SelectValue placeholder="Select property" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Manual entry</SelectItem>
+                    <SelectItem value="__none__">Manual entry</SelectItem>
                     {clientProperties.map((property) => (
                       <SelectItem key={property.id} value={property.id}>
                         {property.name} - {property.address}
