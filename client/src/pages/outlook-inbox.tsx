@@ -51,6 +51,8 @@ import {
   Reply,
   X,
   LinkIcon,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 interface OutlookEmail {
@@ -148,6 +150,7 @@ export default function OutlookInbox() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [linkedClientId, setLinkedClientId] = useState<string>("");
   const [linkedJobId, setLinkedJobId] = useState<string>("");
+  const [sidebarExpanded, setSidebarExpanded] = useState(true);
 
   const { data: currentUser, isLoading: loadingCurrentUser } = useQuery<{ email: string; displayName: string }>({
     queryKey: ["/api/outlook/me"],
@@ -644,11 +647,21 @@ export default function OutlookInbox() {
           </div>
 
           {selectedEmail && (
-            <div className="w-72 border rounded-lg bg-white dark:bg-slate-900 shadow-sm flex flex-col">
-              <div className="p-3 border-b bg-blue-600 text-white rounded-t-lg">
-                <h3 className="font-semibold text-sm">Quick Actions</h3>
+            <div className={`${sidebarExpanded ? 'w-72' : 'w-12'} border rounded-lg bg-white dark:bg-slate-900 shadow-sm flex flex-col transition-all duration-200`}>
+              <div className="p-3 border-b bg-blue-600 text-white rounded-t-lg flex items-center justify-between">
+                {sidebarExpanded && <h3 className="font-semibold text-sm">Quick Actions</h3>}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 text-white hover:bg-blue-500"
+                  onClick={() => setSidebarExpanded(!sidebarExpanded)}
+                  data-testid="button-toggle-sidebar"
+                >
+                  {sidebarExpanded ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                </Button>
               </div>
               
+              {sidebarExpanded ? (
               <ScrollArea className="flex-1 p-3">
                 <div className="space-y-2">
                   <Button
@@ -804,6 +817,50 @@ export default function OutlookInbox() {
                   )}
                 </div>
               </ScrollArea>
+              ) : (
+                <div className="flex-1 flex flex-col items-center py-4 gap-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={handleAnalyzeEmail}
+                    disabled={isAnalyzing}
+                    title="AI Analyze"
+                  >
+                    {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4 text-blue-500" />}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={handleCreateClient}
+                    title="Create Contact"
+                  >
+                    <UserPlus className="h-4 w-4 text-green-600" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={handleCreateJob}
+                    title="Create Job"
+                  >
+                    <Briefcase className="h-4 w-4 text-purple-600" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => {
+                      setReplyText("");
+                      setComposeDialogOpen(true);
+                    }}
+                    title="Reply"
+                  >
+                    <Reply className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
