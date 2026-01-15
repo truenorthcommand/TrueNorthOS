@@ -38,15 +38,10 @@ import {
   Briefcase,
   RefreshCw,
   Loader2,
-  MailOpen,
-  ChevronLeft,
   AlertTriangle,
-  MessageSquare,
   Zap,
   CheckCircle,
-  XCircle,
   Link,
-  Download,
   FileText,
   ThumbsUp,
   ThumbsDown,
@@ -55,8 +50,7 @@ import {
   Image,
   Reply,
   X,
-  ListTodo,
-  Users,
+  LinkIcon,
 } from "lucide-react";
 
 interface OutlookEmail {
@@ -150,11 +144,10 @@ export default function OutlookInbox() {
   const [composeDialogOpen, setComposeDialogOpen] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
-  const [isExtracting, setIsExtracting] = useState(false);
   const [emailAnalysis, setEmailAnalysis] = useState<EmailAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [selectedJobForAttachment, setSelectedJobForAttachment] = useState<string>("");
-  const [savingAttachment, setSavingAttachment] = useState<string | null>(null);
+  const [linkedClientId, setLinkedClientId] = useState<string>("");
+  const [linkedJobId, setLinkedJobId] = useState<string>("");
 
   const { data: currentUser, isLoading: loadingCurrentUser } = useQuery<{ email: string; displayName: string }>({
     queryKey: ["/api/outlook/me"],
@@ -304,6 +297,8 @@ export default function OutlookInbox() {
     setExtractedData(null);
     setEmailAnalysis(null);
     setReplyText("");
+    setLinkedClientId("");
+    setLinkedJobId("");
     if (!email.isRead) {
       markAsReadMutation.mutate(email.id);
     }
@@ -336,27 +331,19 @@ export default function OutlookInbox() {
     }
   };
 
-  const handleSaveAttachmentToJob = async (attachmentId: string, jobId: number) => {
-    if (!selectedEmail || !userEmail) return;
-    
-    setSavingAttachment(attachmentId);
-    try {
-      const res = await fetch(`/api/outlook/emails/${encodeURIComponent(userEmail)}/${selectedEmail.id}/attachments/${attachmentId}/save-to-job`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId, photoType: 'evidence' }),
-      });
-      
-      if (res.ok) {
-        toast.success("Attachment saved to job");
-      } else {
-        const error = await res.json();
-        toast.error(error.error || "Failed to save attachment");
-      }
-    } catch (error) {
-      toast.error("Save failed");
-    } finally {
-      setSavingAttachment(null);
+  const handleLinkToClient = (clientId: string) => {
+    const client = clients.find(c => c.id === clientId);
+    if (client) {
+      setLinkedClientId(clientId);
+      toast.success(`Linked to client: ${client.name}`);
+    }
+  };
+
+  const handleLinkToJob = (jobId: string) => {
+    const job = jobs.find(j => j.id.toString() === jobId);
+    if (job) {
+      setLinkedJobId(jobId);
+      toast.success(`Linked to job: ${job.jobNo}`);
     }
   };
 
@@ -705,9 +692,12 @@ export default function OutlookInbox() {
 
                   {clients.length > 0 && (
                     <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Link to Client</Label>
-                      <Select>
-                        <SelectTrigger className="w-full">
+                      <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                        <LinkIcon className="h-3 w-3" />
+                        Link to Client
+                      </Label>
+                      <Select value={linkedClientId} onValueChange={handleLinkToClient}>
+                        <SelectTrigger className="w-full" data-testid="select-link-client">
                           <SelectValue placeholder="Select client..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -718,14 +708,23 @@ export default function OutlookInbox() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {linkedClientId && (
+                        <Badge variant="secondary" className="text-xs">
+                          <CheckCircle className="h-3 w-3 mr-1 text-green-500" />
+                          Linked
+                        </Badge>
+                      )}
                     </div>
                   )}
 
                   {jobs.length > 0 && (
                     <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Link to Job</Label>
-                      <Select>
-                        <SelectTrigger className="w-full">
+                      <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                        <LinkIcon className="h-3 w-3" />
+                        Link to Job
+                      </Label>
+                      <Select value={linkedJobId} onValueChange={handleLinkToJob}>
+                        <SelectTrigger className="w-full" data-testid="select-link-job">
                           <SelectValue placeholder="Select job..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -736,6 +735,12 @@ export default function OutlookInbox() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {linkedJobId && (
+                        <Badge variant="secondary" className="text-xs">
+                          <CheckCircle className="h-3 w-3 mr-1 text-green-500" />
+                          Linked
+                        </Badge>
+                      )}
                     </div>
                   )}
 
