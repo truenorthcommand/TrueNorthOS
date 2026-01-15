@@ -33,7 +33,14 @@ import {
   MoreVertical,
   X,
   GripVertical,
+  Gauge,
 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Progress } from "@/components/ui/progress";
 import {
   format,
   startOfMonth,
@@ -153,16 +160,16 @@ function SortableJobCard({
     listeners,
     setNodeRef,
     transform,
-    transition,
     isDragging,
   } = useSortable({
     id: job.id,
     data: { type: 'job', job },
+    animateLayoutChanges: () => false, // Disable layout animations for instant snapping
   });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
-    transition,
+    transition: 'none', // Instant snap - no animation delay
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 1000 : 1,
     touchAction: 'none',
@@ -277,6 +284,7 @@ export default function CalendarPage() {
   const [overId, setOverId] = useState<string | null>(null);
   const [engineerDialogOpen, setEngineerDialogOpen] = useState(false);
   const [updateCounts, setUpdateCounts] = useState<Record<string, { count: number; remaining: number }>>({});
+  const [utilizationPopoverDay, setUtilizationPopoverDay] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -431,6 +439,43 @@ export default function CalendarPage() {
         return hasNoAssignment || assignedToHiddenEngineer;
       })
       .sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+  };
+
+  // Calculate labor utilization for a specific day
+  const getUtilizationForDay = (date: Date) => {
+    const standardHoursPerDay = 8;
+    const estimatedHoursPerJob = 2; // Assume 2 hours per job as default
+
+    const staffBreakdown = visibleEngineers.map((engineer) => {
+      const engineerJobs = getJobsForCell(engineer.id, date);
+      const hoursWorked = engineerJobs.length * estimatedHoursPerJob;
+      const availableHours = standardHoursPerDay;
+      const percentage = Math.min(100, Math.round((hoursWorked / availableHours) * 100));
+      
+      return {
+        id: engineer.id,
+        name: engineer.name,
+        hoursWorked: Math.min(hoursWorked, availableHours),
+        availableHours,
+        percentage,
+        jobCount: engineerJobs.length,
+      };
+    });
+
+    const totalHoursAvailable = staffBreakdown.length * standardHoursPerDay;
+    const totalHoursWorked = staffBreakdown.reduce((sum, s) => sum + s.hoursWorked, 0);
+    const totalPercentage = totalHoursAvailable > 0 
+      ? Math.round((totalHoursWorked / totalHoursAvailable) * 100) 
+      : 0;
+
+    return {
+      totalHoursWorked,
+      totalHoursAvailable,
+      totalPercentage,
+      staffBreakdown,
+      staffCount: visibleEngineers.length,
+      totalJobs: staffBreakdown.reduce((sum, s) => sum + s.jobCount, 0),
+    };
   };
 
   const updateJobMutation = useMutation({
@@ -1106,21 +1151,118 @@ export default function CalendarPage() {
                   <div className="p-2 font-medium text-sm bg-slate-100 dark:bg-slate-800 border-r border-b">
                     Engineer
                   </div>
-                  {weekDays.map((day) => (
-                    <div
-                      key={day.toISOString()}
-                      className={`p-2 text-center font-medium text-sm border-r border-b ${
-                        isSameDay(day, new Date())
-                          ? "bg-primary/10 text-primary"
-                          : "bg-slate-100 dark:bg-slate-800"
-                      }`}
-                    >
-                      <div>{format(day, "EEE")}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {format(day, "dd MMM")}
-                      </div>
-                    </div>
-                  ))}
+                  {weekDays.map((day) => {
+                    const dayStr = format(day, "yyyy-MM-dd");
+                    const utilization = getUtilizationForDay(day);
+                    return (
+                      <Popover 
+                        key={day.toISOString()}
+                        open={utilizationPopoverDay === dayStr}
+                        onOpenChange={(open) => setUtilizationPopoverDay(open ? dayStr : null)}
+                      >
+                        <PopoverTrigger asChild>
+                          <div
+                            className={`p-2 text-center font-medium text-sm border-r border-b cursor-pointer hover:bg-primary/5 transition-colors ${
+                              isSameDay(day, new Date())
+                                ? "bg-primary/10 text-primary"
+                                : "bg-slate-100 dark:bg-slate-800"
+                            }`}
+                            data-testid={`planner-day-header-${dayStr}`}
+                          >
+                            <div>{format(day, "EEE")}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {format(day, "dd MMM")}
+                            </div>
+                          </div>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-72" align="start">
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Gauge className="h-4 w-4 text-primary" />
+                                <span className="font-semibold text-sm">Labor Utilization</span>
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {format(day, "EEE dd MMM")}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="text-xs text-muted-foreground">Total</div>
+                                <div className="text-lg font-bold">
+                                  {utilization.totalHoursWorked}h / {utilization.totalHoursAvailable}h
+                                </div>
+                              </div>
+                              <div className="relative w-14 h-14">
+                                <svg className="w-14 h-14 -rotate-90">
+                                  <circle
+                                    cx="28"
+                                    cy="28"
+                                    r="24"
+                                    stroke="currentColor"
+                                    strokeWidth="4"
+                                    fill="none"
+                                    className="text-slate-200 dark:text-slate-700"
+                                  />
+                                  <circle
+                                    cx="28"
+                                    cy="28"
+                                    r="24"
+                                    stroke="currentColor"
+                                    strokeWidth="4"
+                                    fill="none"
+                                    strokeDasharray={`${utilization.totalPercentage * 1.51} 151`}
+                                    className={
+                                      utilization.totalPercentage > 80
+                                        ? "text-green-500"
+                                        : utilization.totalPercentage > 50
+                                        ? "text-yellow-500"
+                                        : "text-red-500"
+                                    }
+                                  />
+                                </svg>
+                                <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold">
+                                  {utilization.totalPercentage}%
+                                </span>
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="text-xs font-semibold text-muted-foreground mb-2">
+                                STAFF BREAKDOWN
+                              </div>
+                              <div className="space-y-2 max-h-40 overflow-y-auto">
+                                {utilization.staffBreakdown.map((staff) => (
+                                  <div key={staff.id} className="flex items-center justify-between gap-2">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-sm font-medium truncate">{staff.name}</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {staff.hoursWorked}h / {staff.availableHours}h
+                                      </div>
+                                    </div>
+                                    <div className="w-10">
+                                      <Progress 
+                                        value={staff.percentage} 
+                                        className="h-2"
+                                      />
+                                    </div>
+                                  </div>
+                                ))}
+                                {utilization.staffBreakdown.length === 0 && (
+                                  <p className="text-xs text-muted-foreground">No engineers visible</p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="text-[10px] text-muted-foreground pt-2 border-t">
+                              Available hours based on 8h workday. Jobs estimated at 2h each.
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    );
+                  })}
 
                   {visibleEngineers.map((engineer) => (
                     <>
