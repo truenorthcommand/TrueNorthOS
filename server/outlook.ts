@@ -222,18 +222,40 @@ export async function sendEmail(fromEmail: string, message: EmailMessage): Promi
   await client.api(`${getUserPath(fromEmail)}/sendMail`).post(mail);
 }
 
-export async function getEmails(userEmail: string, top: number = 10): Promise<any[]> {
+export async function getEmails(userEmail: string, top: number = 50): Promise<any[]> {
   const accessToken = await getAccessToken();
   const client = getGraphClient(accessToken);
 
-  const messages = await client
-    .api(`${getUserPath(userEmail)}/messages`)
-    .top(top)
-    .select("id,subject,from,receivedDateTime,bodyPreview,isRead")
-    .orderby("receivedDateTime DESC")
-    .get();
+  const apiPath = `${getUserPath(userEmail)}/mailFolders/inbox/messages`;
+  console.log('Fetching emails from:', apiPath, 'isUsingDelegatedAuth:', isUsingDelegatedAuth);
 
-  return messages.value;
+  try {
+    const messages = await client
+      .api(apiPath)
+      .top(top)
+      .select("id,subject,from,receivedDateTime,bodyPreview,isRead")
+      .orderby("receivedDateTime DESC")
+      .get();
+
+    console.log('Email fetch result count:', messages.value?.length || 0);
+    return messages.value || [];
+  } catch (error: any) {
+    console.error('Email fetch error:', error?.message || error);
+    // Fall back to all messages if inbox folder fails
+    try {
+      const messages = await client
+        .api(`${getUserPath(userEmail)}/messages`)
+        .top(top)
+        .select("id,subject,from,receivedDateTime,bodyPreview,isRead")
+        .orderby("receivedDateTime DESC")
+        .get();
+      console.log('Fallback email fetch result count:', messages.value?.length || 0);
+      return messages.value || [];
+    } catch (fallbackError: any) {
+      console.error('Fallback email fetch error:', fallbackError?.message || fallbackError);
+      return [];
+    }
+  }
 }
 
 export async function getCalendarEvents(userEmail: string, top: number = 10): Promise<any[]> {
