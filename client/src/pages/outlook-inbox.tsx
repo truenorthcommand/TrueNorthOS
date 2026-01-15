@@ -53,6 +53,10 @@ import {
   Meh,
   Clock,
   Image,
+  Reply,
+  X,
+  ListTodo,
+  Users,
 } from "lucide-react";
 
 interface OutlookEmail {
@@ -142,18 +146,16 @@ export default function OutlookInbox() {
   const [userEmail, setUserEmail] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEmail, setSelectedEmail] = useState<OutlookEmail | null>(null);
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+  const [composeDialogOpen, setComposeDialogOpen] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [emailAnalysis, setEmailAnalysis] = useState<EmailAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isGeneratingReply, setIsGeneratingReply] = useState(false);
   const [selectedJobForAttachment, setSelectedJobForAttachment] = useState<string>("");
   const [savingAttachment, setSavingAttachment] = useState<string | null>(null);
 
-  // Fetch current user from connector (delegated auth uses /me endpoint)
   const { data: currentUser, isLoading: loadingCurrentUser } = useQuery<{ email: string; displayName: string }>({
     queryKey: ["/api/outlook/me"],
     queryFn: async () => {
@@ -164,20 +166,17 @@ export default function OutlookInbox() {
     retry: false,
   });
 
-  // Fall back to users list for application permissions (legacy)
   const { data: outlookUsers = [], isLoading: loadingUsers } = useQuery<OutlookUser[]>({
     queryKey: ["/api/outlook/users"],
     retry: false,
-    enabled: !currentUser, // Only fetch if no current user from /me
+    enabled: !currentUser,
   });
 
   useEffect(() => {
-    // Prefer current user from /me endpoint (delegated auth)
     if (currentUser?.email && !userEmail) {
       setUserEmail(currentUser.email);
       return;
     }
-    // Fall back to users list (application permissions)
     if (outlookUsers.length > 0 && !userEmail) {
       const savedEmail = localStorage.getItem("outlook_default_email");
       if (savedEmail && outlookUsers.some(u => u.mail === savedEmail || u.userPrincipalName === savedEmail)) {
@@ -212,14 +211,14 @@ export default function OutlookInbox() {
   });
 
   const { data: emailDetail, isLoading: loadingDetail } = useQuery<OutlookEmail>({
-    queryKey: ["/api/outlook/emails", userEmail, selectedEmail?.id],
+    queryKey: ["/api/outlook/emails", userEmail, selectedEmail?.id, "detail"],
     queryFn: async () => {
       if (!userEmail || !selectedEmail) return null;
       const res = await fetch(`/api/outlook/emails/${encodeURIComponent(userEmail)}/${selectedEmail.id}`);
       if (!res.ok) throw new Error("Failed to fetch email details");
       return res.json();
     },
-    enabled: !!userEmail && !!selectedEmail && detailDialogOpen,
+    enabled: !!userEmail && !!selectedEmail,
   });
 
   const { data: attachments = [] } = useQuery<Attachment[]>({
@@ -230,12 +229,17 @@ export default function OutlookInbox() {
       if (!res.ok) throw new Error("Failed to fetch attachments");
       return res.json();
     },
-    enabled: !!userEmail && !!selectedEmail && detailDialogOpen && selectedEmail.hasAttachments,
+    enabled: !!userEmail && !!selectedEmail && selectedEmail.hasAttachments,
   });
 
   const { data: jobs = [] } = useQuery<Array<{ id: number; jobNo: string; customerName: string }>>({
     queryKey: ["/api/jobs"],
-    enabled: detailDialogOpen,
+    enabled: !!selectedEmail,
+  });
+
+  const { data: clients = [] } = useQuery<Array<{ id: string; name: string; email: string }>>({
+    queryKey: ["/api/clients"],
+    enabled: !!selectedEmail,
   });
 
   const replyMutation = useMutation({
@@ -246,7 +250,7 @@ export default function OutlookInbox() {
     onSuccess: () => {
       toast.success("Reply sent successfully");
       setReplyText("");
-      setDetailDialogOpen(false);
+      setComposeDialogOpen(false);
     },
     onError: () => {
       toast.error("Failed to send reply");
@@ -270,7 +274,7 @@ export default function OutlookInbox() {
     },
     onSuccess: (data) => {
       toast.success(`Client "${data.name}" created successfully`);
-      setExtractedData(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
     },
     onError: () => {
       toast.error("Failed to create client");
@@ -288,7 +292,7 @@ export default function OutlookInbox() {
     },
     onSuccess: (data) => {
       toast.success(`Job created successfully`);
-      setExtractedData(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
     },
     onError: () => {
       toast.error("Failed to create job");
@@ -297,7 +301,6 @@ export default function OutlookInbox() {
 
   const handleEmailClick = async (email: OutlookEmail) => {
     setSelectedEmail(email);
-    setDetailDialogOpen(true);
     setExtractedData(null);
     setEmailAnalysis(null);
     setReplyText("");
@@ -306,7 +309,6 @@ export default function OutlookInbox() {
     }
   };
 
-  // AI-powered full email analysis
   const handleAnalyzeEmail = async () => {
     if (!selectedEmail || !userEmail) return;
     
@@ -320,7 +322,6 @@ export default function OutlookInbox() {
       if (res.ok) {
         const analysis = await res.json();
         setEmailAnalysis(analysis);
-        // Also populate extracted data if available
         if (analysis.extractedData) {
           setExtractedData(analysis.extractedData);
         }
@@ -335,33 +336,6 @@ export default function OutlookInbox() {
     }
   };
 
-  // Generate smart reply
-  const handleSmartReply = async (replyType: 'acknowledge' | 'quote' | 'schedule' | 'followup' | 'resolve') => {
-    if (!selectedEmail || !userEmail) return;
-    
-    setIsGeneratingReply(true);
-    try {
-      const res = await fetch(`/api/outlook/emails/${encodeURIComponent(userEmail)}/${selectedEmail.id}/smart-reply`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ replyType }),
-      });
-      
-      if (res.ok) {
-        const { reply } = await res.json();
-        setReplyText(reply);
-        toast.success("Reply generated");
-      } else {
-        toast.error("Failed to generate reply");
-      }
-    } catch (error) {
-      toast.error("Reply generation failed");
-    } finally {
-      setIsGeneratingReply(false);
-    }
-  };
-
-  // Save attachment to job
   const handleSaveAttachmentToJob = async (attachmentId: string, jobId: number) => {
     if (!selectedEmail || !userEmail) return;
     
@@ -392,64 +366,20 @@ export default function OutlookInbox() {
     toast.success("Settings saved");
   };
 
-  const handleExtractWithAI = async () => {
-    if (!emailDetail?.body?.content) {
-      toast.error("No email content to extract from");
-      return;
-    }
-
-    setIsExtracting(true);
-    try {
-      const prompt = `Extract client and job information from this email. Return a JSON object with these fields (leave empty if not found):
-- clientName: the name of the client or person
-- clientEmail: their email address
-- clientPhone: their phone number
-- clientAddress: their address
-- jobDescription: what work they need done
-- jobDate: when they want the work done
-- notes: any other important details
-
-Email content:
-${emailDetail.body.content.replace(/<[^>]*>/g, ' ').substring(0, 3000)}
-
-Respond with only valid JSON, no markdown.`;
-
-      const res = await fetch("/api/ai/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        try {
-          const extracted = typeof data.result === "string" ? JSON.parse(data.result) : data.result;
-          setExtractedData(extracted);
-          toast.success("Information extracted successfully");
-        } catch {
-          setExtractedData(data.result || data);
-          toast.success("Information extracted");
-        }
-      } else {
-        toast.error("Failed to extract information");
-      }
-    } catch (error) {
-      toast.error("AI extraction failed");
-    } finally {
-      setIsExtracting(false);
-    }
-  };
-
   const handleCreateClient = () => {
-    if (!extractedData?.clientName) {
+    const name = extractedData?.clientName || emailDetail?.from?.emailAddress?.name || "";
+    const email = extractedData?.clientEmail || emailDetail?.from?.emailAddress?.address || "";
+    
+    if (!name) {
       toast.error("Client name is required");
       return;
     }
+    
     createClientMutation.mutate({
-      name: extractedData.clientName,
-      email: extractedData.clientEmail,
-      phone: extractedData.clientPhone,
-      address: extractedData.clientAddress,
+      name,
+      email,
+      phone: extractedData?.clientPhone,
+      address: extractedData?.clientAddress,
     });
   };
 
@@ -457,9 +387,16 @@ Respond with only valid JSON, no markdown.`;
     const customerName = extractedData?.clientName || emailDetail?.from?.emailAddress?.name || "Unknown";
     createJobMutation.mutate({
       customerName,
-      description: extractedData?.jobDescription,
-      notes: extractedData?.notes,
+      description: extractedData?.jobDescription || emailDetail?.subject,
+      notes: emailDetail?.bodyPreview,
     });
+  };
+
+  const handleUseReply = () => {
+    if (emailAnalysis?.suggestedReply) {
+      setReplyText(emailAnalysis.suggestedReply);
+      setComposeDialogOpen(true);
+    }
   };
 
   const handleReply = () => {
@@ -481,516 +418,473 @@ Respond with only valid JSON, no markdown.`;
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="h-[calc(100vh-120px)] flex flex-col">
+      <div className="flex items-center justify-between gap-4 mb-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-outlook-inbox-title">
+          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-outlook-inbox-title">
             Outlook Inbox
           </h1>
-          <p className="text-muted-foreground">
-            {userEmail ? `Viewing emails for ${userEmail}` : "Configure email account to view messages"}
+          <p className="text-sm text-muted-foreground">
+            {userEmail || "Configure email account"}
           </p>
         </div>
         <div className="flex gap-2">
           <Button
             variant="outline"
+            size="sm"
             onClick={() => refetchEmails()}
             disabled={loadingEmails || !userEmail}
             data-testid="button-refresh-emails"
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loadingEmails ? "animate-spin" : ""}`} />
-            Refresh
+            <RefreshCw className={`h-4 w-4 ${loadingEmails ? "animate-spin" : ""}`} />
           </Button>
-          <Button variant="outline" onClick={() => setSettingsDialogOpen(true)} data-testid="button-settings">
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
+          <Button variant="outline" size="sm" onClick={() => setSettingsDialogOpen(true)} data-testid="button-settings">
+            <Settings className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      <div className="flex items-center space-x-2 bg-white dark:bg-slate-900 p-2 rounded-lg border shadow-sm">
-        <Search className="w-5 h-5 text-muted-foreground ml-2" />
-        <Input
-          placeholder="Search emails by subject or sender..."
-          className="border-none shadow-none focus-visible:ring-0"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          data-testid="input-search-emails"
-        />
-        {loadingSearch && <Loader2 className="h-4 w-4 animate-spin" />}
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
-          {loadingEmails || loadingUsers ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="flex-1 flex gap-4 min-h-0">
+        <div className="w-80 flex flex-col border rounded-lg bg-white dark:bg-slate-900 shadow-sm">
+          <div className="p-3 border-b">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search emails..."
+                className="pl-9 h-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                data-testid="input-search-emails"
+              />
             </div>
-          ) : !userEmail ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Mail className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No email account configured</p>
-              <Button variant="link" onClick={() => setSettingsDialogOpen(true)}>
-                Configure Settings
-              </Button>
-            </div>
-          ) : displayEmails.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Mail className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>{searchQuery ? "No emails match your search" : "No emails found"}</p>
-            </div>
-          ) : (
-            <ScrollArea className="h-[600px]">
-              {displayEmails.map((email, index) => (
-                <div key={email.id}>
-                  <div
-                    className={`p-4 cursor-pointer hover:bg-muted/50 transition-colors ${
-                      !email.isRead ? "bg-blue-50 dark:bg-blue-950/20" : ""
-                    }`}
-                    onClick={() => handleEmailClick(email)}
-                    data-testid={`email-item-${email.id}`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          {!email.isRead ? (
-                            <Mail className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                          ) : (
-                            <MailOpen className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                          )}
-                          <span
-                            className={`font-medium truncate ${!email.isRead ? "text-foreground" : "text-muted-foreground"}`}
-                            data-testid={`email-sender-${email.id}`}
-                          >
-                            {email.from?.emailAddress?.name || email.from?.emailAddress?.address || "Unknown"}
-                          </span>
-                          {email.hasAttachments && (
-                            <Badge variant="secondary" className="flex-shrink-0" data-testid={`email-attachment-badge-${email.id}`}>
-                              <Paperclip className="h-3 w-3" />
-                            </Badge>
-                          )}
-                        </div>
-                        <p
-                          className={`text-sm truncate ${!email.isRead ? "font-semibold" : ""}`}
-                          data-testid={`email-subject-${email.id}`}
-                        >
-                          {email.subject || "(No Subject)"}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate mt-1">{email.bodyPreview}</p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        <span className="text-xs text-muted-foreground" data-testid={`email-date-${email.id}`}>
-                          {format(new Date(email.receivedDateTime), "MMM d, h:mm a")}
+          </div>
+          
+          <ScrollArea className="flex-1">
+            {loadingEmails || loadingUsers ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : !userEmail ? (
+              <div className="text-center py-12 text-muted-foreground px-4">
+                <Mail className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">No email configured</p>
+              </div>
+            ) : displayEmails.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground px-4">
+                <Mail className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">{searchQuery ? "No results" : "No emails"}</p>
+              </div>
+            ) : (
+              displayEmails.map((email) => (
+                <div
+                  key={email.id}
+                  className={`p-3 cursor-pointer border-b transition-colors ${
+                    selectedEmail?.id === email.id 
+                      ? "bg-blue-50 dark:bg-blue-950/30 border-l-2 border-l-blue-500" 
+                      : "hover:bg-muted/50"
+                  } ${!email.isRead ? "bg-blue-50/50 dark:bg-blue-950/20" : ""}`}
+                  onClick={() => handleEmailClick(email)}
+                  data-testid={`email-item-${email.id}`}
+                >
+                  <div className="flex items-start gap-2">
+                    <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${!email.isRead ? "bg-blue-500" : "bg-transparent"}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-sm truncate ${!email.isRead ? "font-semibold" : "font-medium"}`}>
+                          {email.from?.emailAddress?.name || email.from?.emailAddress?.address || "Unknown"}
                         </span>
-                        {!email.isRead && (
-                          <Badge variant="default" className="text-xs" data-testid={`email-unread-badge-${email.id}`}>
-                            New
-                          </Badge>
-                        )}
+                        <span className="text-xs text-muted-foreground flex-shrink-0">
+                          {format(new Date(email.receivedDateTime), "MMM d")}
+                        </span>
                       </div>
-                    </div>
-                  </div>
-                  {index < displayEmails.length - 1 && <Separator />}
-                </div>
-              ))}
-            </ScrollArea>
-          )}
-        </CardContent>
-      </Card>
-
-      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2" data-testid="text-email-detail-title">
-              <Mail className="h-5 w-5" />
-              {emailDetail?.subject || selectedEmail?.subject || "Email Details"}
-            </DialogTitle>
-            <DialogDescription>
-              From: {emailDetail?.from?.emailAddress?.name || selectedEmail?.from?.emailAddress?.name} (
-              {emailDetail?.from?.emailAddress?.address || selectedEmail?.from?.emailAddress?.address})
-              {emailDetail?.receivedDateTime && (
-                <> • {format(new Date(emailDetail.receivedDateTime), "MMMM d, yyyy 'at' h:mm a")}</>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          <ScrollArea className="flex-1 min-h-0">
-            <div className="space-y-4">
-              {loadingDetail ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                </div>
-              ) : (
-                <>
-                  {emailDetail?.body?.content && (
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                      {emailDetail.body.contentType === "html" ? (
-                        <div
-                          dangerouslySetInnerHTML={{ __html: emailDetail.body.content }}
-                          className="overflow-x-auto"
-                          data-testid="email-body-content"
-                        />
-                      ) : (
-                        <pre className="whitespace-pre-wrap" data-testid="email-body-content">
-                          {emailDetail.body.content}
-                        </pre>
+                      <p className={`text-sm truncate ${!email.isRead ? "font-medium" : "text-muted-foreground"}`}>
+                        {email.subject || "(No Subject)"}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">
+                        {email.bodyPreview}
+                      </p>
+                      {email.hasAttachments && (
+                        <Paperclip className="h-3 w-3 text-muted-foreground mt-1" />
                       )}
                     </div>
-                  )}
+                  </div>
+                </div>
+              ))
+            )}
+          </ScrollArea>
+        </div>
 
-                  {attachments.length > 0 && (
-                    <div className="space-y-2">
-                      <Label>Attachments ({attachments.length})</Label>
-                      <div className="space-y-2">
-                        {attachments.map((att) => (
-                          <div key={att.id} className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                            <div className="flex items-center gap-2">
-                              {att.contentType?.startsWith('image/') ? (
-                                <Image className="h-4 w-4 text-blue-500" />
-                              ) : (
-                                <FileText className="h-4 w-4" />
+        <div className="flex-1 flex gap-4 min-w-0">
+          <div className="flex-1 border rounded-lg bg-white dark:bg-slate-900 shadow-sm flex flex-col min-w-0">
+            {selectedEmail ? (
+              <>
+                <div className="p-4 border-b">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <h2 className="text-lg font-semibold truncate" data-testid="text-email-subject">
+                        {emailDetail?.subject || selectedEmail.subject || "(No Subject)"}
+                      </h2>
+                      <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                        <span className="font-medium text-foreground">
+                          {emailDetail?.from?.emailAddress?.name || selectedEmail.from?.emailAddress?.name}
+                        </span>
+                        <span>&lt;{emailDetail?.from?.emailAddress?.address || selectedEmail.from?.emailAddress?.address}&gt;</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {emailDetail?.receivedDateTime && format(new Date(emailDetail.receivedDateTime), "MMMM d, yyyy 'at' h:mm a")}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedEmail(null)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <ScrollArea className="flex-1 p-4">
+                  {loadingDetail ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {emailDetail?.body?.content && (
+                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                          {emailDetail.body.contentType === "html" ? (
+                            <div
+                              dangerouslySetInnerHTML={{ __html: emailDetail.body.content }}
+                              className="overflow-x-auto"
+                              data-testid="email-body-content"
+                            />
+                          ) : (
+                            <pre className="whitespace-pre-wrap font-sans" data-testid="email-body-content">
+                              {emailDetail.body.content}
+                            </pre>
+                          )}
+                        </div>
+                      )}
+
+                      {attachments.length > 0 && (
+                        <div className="pt-4 border-t">
+                          <Label className="text-xs text-muted-foreground mb-2 block">
+                            Attachments ({attachments.length})
+                          </Label>
+                          <div className="flex flex-wrap gap-2">
+                            {attachments.map((att) => (
+                              <div key={att.id} className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded text-sm">
+                                {att.contentType?.startsWith('image/') ? (
+                                  <Image className="h-4 w-4 text-blue-500" />
+                                ) : (
+                                  <FileText className="h-4 w-4" />
+                                )}
+                                <span>{att.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  ({Math.round(att.size / 1024)}KB)
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {emailAnalysis && (
+                        <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 border-blue-200 dark:border-blue-800">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm flex items-center gap-2">
+                              <Zap className="h-4 w-4 text-blue-500" />
+                              AI Analysis
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            <div className="flex flex-wrap gap-2">
+                              <Badge className={categoryLabels[emailAnalysis.category]?.color || 'bg-gray-100'}>
+                                {categoryLabels[emailAnalysis.category]?.label || emailAnalysis.category}
+                              </Badge>
+                              {priorityConfig[emailAnalysis.priority] && (
+                                <Badge variant="outline" className="flex items-center gap-1">
+                                  {(() => {
+                                    const PriorityIcon = priorityConfig[emailAnalysis.priority].icon;
+                                    return <PriorityIcon className={`h-3 w-3 ${priorityConfig[emailAnalysis.priority].color}`} />;
+                                  })()}
+                                  {priorityConfig[emailAnalysis.priority].label}
+                                </Badge>
                               )}
-                              <span className="text-sm">{att.name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                ({Math.round(att.size / 1024)}KB)
-                              </span>
+                              {sentimentConfig[emailAnalysis.sentiment] && (
+                                <Badge variant="outline" className="flex items-center gap-1">
+                                  {(() => {
+                                    const SentimentIcon = sentimentConfig[emailAnalysis.sentiment].icon;
+                                    return <SentimentIcon className={`h-3 w-3 ${sentimentConfig[emailAnalysis.sentiment].color}`} />;
+                                  })()}
+                                  {sentimentConfig[emailAnalysis.sentiment].label}
+                                </Badge>
+                              )}
                             </div>
-                            {att.contentType?.startsWith('image/') && jobs.length > 0 && (
-                              <div className="flex items-center gap-2">
-                                <Select value={selectedJobForAttachment} onValueChange={setSelectedJobForAttachment}>
-                                  <SelectTrigger className="w-[180px] h-8 text-xs">
-                                    <SelectValue placeholder="Select job..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {jobs.slice(0, 20).map((job) => (
-                                      <SelectItem key={job.id} value={job.id.toString()}>
-                                        {job.jobNo} - {job.customerName}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleSaveAttachmentToJob(att.id, parseInt(selectedJobForAttachment))}
-                                  disabled={!selectedJobForAttachment || savingAttachment === att.id}
-                                >
-                                  {savingAttachment === att.id ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                  ) : (
-                                    <Download className="h-3 w-3" />
-                                  )}
-                                </Button>
+                            <p className="text-sm">{emailAnalysis.summary}</p>
+                            {(emailAnalysis.matchedClientId || emailAnalysis.matchedJobId) && (
+                              <div className="flex gap-2">
+                                {emailAnalysis.matchedClientId && (
+                                  <Badge variant="secondary" className="flex items-center gap-1">
+                                    <Link className="h-3 w-3" />
+                                    Linked to Client
+                                  </Badge>
+                                )}
+                                {emailAnalysis.matchedJobId && (
+                                  <Badge variant="secondary" className="flex items-center gap-1">
+                                    <Link className="h-3 w-3" />
+                                    Linked to Job
+                                  </Badge>
+                                )}
                               </div>
                             )}
-                          </div>
-                        ))}
-                      </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  )}
+                </ScrollArea>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                  <Mail className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>Select an email to view</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {selectedEmail && (
+            <div className="w-72 border rounded-lg bg-white dark:bg-slate-900 shadow-sm flex flex-col">
+              <div className="p-3 border-b bg-blue-600 text-white rounded-t-lg">
+                <h3 className="font-semibold text-sm">Quick Actions</h3>
+              </div>
+              
+              <ScrollArea className="flex-1 p-3">
+                <div className="space-y-2">
+                  <Button
+                    className="w-full justify-start"
+                    variant="outline"
+                    onClick={handleAnalyzeEmail}
+                    disabled={isAnalyzing}
+                    data-testid="button-analyze-ai"
+                  >
+                    {isAnalyzing ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Zap className="h-4 w-4 mr-2 text-blue-500" />
+                    )}
+                    AI Analyze
+                  </Button>
+
+                  <Separator className="my-3" />
+
+                  <Button
+                    className="w-full justify-start"
+                    variant="outline"
+                    onClick={handleCreateClient}
+                    disabled={createClientMutation.isPending}
+                    data-testid="button-create-client"
+                  >
+                    <UserPlus className="h-4 w-4 mr-2 text-green-600" />
+                    Create Contact
+                  </Button>
+
+                  <Button
+                    className="w-full justify-start"
+                    variant="outline"
+                    onClick={handleCreateJob}
+                    disabled={createJobMutation.isPending}
+                    data-testid="button-create-job"
+                  >
+                    <Briefcase className="h-4 w-4 mr-2 text-purple-600" />
+                    Create Job
+                  </Button>
+
+                  {clients.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Link to Client</Label>
+                      <Select>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select client..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {clients.slice(0, 10).map((client) => (
+                            <SelectItem key={client.id} value={client.id}>
+                              {client.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   )}
 
-                  <Separator />
-
-                  <div className="flex gap-2 flex-wrap">
-                    <Button
-                      variant="default"
-                      onClick={handleAnalyzeEmail}
-                      disabled={isAnalyzing || !emailDetail}
-                      data-testid="button-analyze-ai"
-                    >
-                      {isAnalyzing ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Zap className="h-4 w-4 mr-2" />
-                      )}
-                      AI Analyze
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={handleExtractWithAI}
-                      disabled={isExtracting || !emailDetail}
-                      data-testid="button-extract-ai"
-                    >
-                      {isExtracting ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Sparkles className="h-4 w-4 mr-2" />
-                      )}
-                      Extract Data
-                    </Button>
-                  </div>
-
-                  {emailAnalysis && (
-                    <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 border-blue-200 dark:border-blue-800">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm flex items-center gap-2">
-                          <Zap className="h-4 w-4 text-blue-500" />
-                          AI Analysis Results
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="flex flex-wrap gap-2">
-                          <Badge className={categoryLabels[emailAnalysis.category]?.color || 'bg-gray-100'}>
-                            {categoryLabels[emailAnalysis.category]?.label || emailAnalysis.category}
-                          </Badge>
-                          {priorityConfig[emailAnalysis.priority] && (
-                            <Badge variant="outline" className="flex items-center gap-1">
-                              {(() => {
-                                const PriorityIcon = priorityConfig[emailAnalysis.priority].icon;
-                                return <PriorityIcon className={`h-3 w-3 ${priorityConfig[emailAnalysis.priority].color}`} />;
-                              })()}
-                              {priorityConfig[emailAnalysis.priority].label}
-                            </Badge>
-                          )}
-                          {sentimentConfig[emailAnalysis.sentiment] && (
-                            <Badge variant="outline" className="flex items-center gap-1">
-                              {(() => {
-                                const SentimentIcon = sentimentConfig[emailAnalysis.sentiment].icon;
-                                return <SentimentIcon className={`h-3 w-3 ${sentimentConfig[emailAnalysis.sentiment].color}`} />;
-                              })()}
-                              {sentimentConfig[emailAnalysis.sentiment].label}
-                            </Badge>
-                          )}
-                        </div>
-
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Summary</Label>
-                          <p className="text-sm">{emailAnalysis.summary}</p>
-                        </div>
-
-                        {(emailAnalysis.matchedClientId || emailAnalysis.matchedJobId) && (
-                          <div className="flex gap-2">
-                            {emailAnalysis.matchedClientId && (
-                              <Badge variant="secondary" className="flex items-center gap-1">
-                                <Link className="h-3 w-3" />
-                                Linked to Client #{emailAnalysis.matchedClientId}
-                              </Badge>
-                            )}
-                            {emailAnalysis.matchedJobId && (
-                              <Badge variant="secondary" className="flex items-center gap-1">
-                                <Link className="h-3 w-3" />
-                                Linked to Job #{emailAnalysis.matchedJobId}
-                              </Badge>
-                            )}
-                          </div>
-                        )}
-
-                        {emailAnalysis.suggestedReply && (
-                          <div>
-                            <Label className="text-xs text-muted-foreground">Suggested Reply</Label>
-                            <p className="text-sm italic bg-white dark:bg-slate-900 p-2 rounded border mt-1">
-                              {emailAnalysis.suggestedReply}
-                            </p>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="mt-2"
-                              onClick={() => setReplyText(emailAnalysis.suggestedReply || '')}
-                            >
-                              Use This Reply
-                            </Button>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
+                  {jobs.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Link to Job</Label>
+                      <Select>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select job..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {jobs.slice(0, 10).map((job) => (
+                            <SelectItem key={job.id} value={job.id.toString()}>
+                              {job.jobNo}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   )}
 
-                  {extractedData && (
-                    <Card className="bg-muted/50">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm flex items-center gap-2">
-                          <Sparkles className="h-4 w-4" />
-                          Extracted Information
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="grid grid-cols-2 gap-3 text-sm">
+                  <Separator className="my-3" />
+
+                  {emailAnalysis?.suggestedReply && (
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Suggested Reply</Label>
+                      <p className="text-xs bg-muted p-2 rounded italic">
+                        {emailAnalysis.suggestedReply.substring(0, 150)}...
+                      </p>
+                      <Button
+                        className="w-full"
+                        onClick={handleUseReply}
+                        data-testid="button-use-reply"
+                      >
+                        <Reply className="h-4 w-4 mr-2" />
+                        Use This Reply
+                      </Button>
+                    </div>
+                  )}
+
+                  {!emailAnalysis?.suggestedReply && (
+                    <Button
+                      className="w-full"
+                      variant="outline"
+                      onClick={() => {
+                        setReplyText("");
+                        setComposeDialogOpen(true);
+                      }}
+                    >
+                      <Reply className="h-4 w-4 mr-2" />
+                      Reply
+                    </Button>
+                  )}
+
+                  {extractedData && Object.values(extractedData).some(v => v) && (
+                    <>
+                      <Separator className="my-3" />
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Sparkles className="h-3 w-3" />
+                          Extracted Data
+                        </Label>
+                        <div className="text-xs space-y-1 bg-muted p-2 rounded">
                           {extractedData.clientName && (
-                            <div>
-                              <Label className="text-xs text-muted-foreground">Client Name</Label>
-                              <p data-testid="extracted-client-name">{extractedData.clientName}</p>
-                            </div>
+                            <p><span className="font-medium">Name:</span> {extractedData.clientName}</p>
                           )}
                           {extractedData.clientEmail && (
-                            <div>
-                              <Label className="text-xs text-muted-foreground">Email</Label>
-                              <p data-testid="extracted-client-email">{extractedData.clientEmail}</p>
-                            </div>
+                            <p><span className="font-medium">Email:</span> {extractedData.clientEmail}</p>
                           )}
                           {extractedData.clientPhone && (
-                            <div>
-                              <Label className="text-xs text-muted-foreground">Phone</Label>
-                              <p data-testid="extracted-client-phone">{extractedData.clientPhone}</p>
-                            </div>
-                          )}
-                          {extractedData.clientAddress && (
-                            <div>
-                              <Label className="text-xs text-muted-foreground">Address</Label>
-                              <p data-testid="extracted-client-address">{extractedData.clientAddress}</p>
-                            </div>
+                            <p><span className="font-medium">Phone:</span> {extractedData.clientPhone}</p>
                           )}
                           {extractedData.jobDescription && (
-                            <div className="col-span-2">
-                              <Label className="text-xs text-muted-foreground">Job Description</Label>
-                              <p data-testid="extracted-job-description">{extractedData.jobDescription}</p>
-                            </div>
-                          )}
-                          {extractedData.notes && (
-                            <div className="col-span-2">
-                              <Label className="text-xs text-muted-foreground">Notes</Label>
-                              <p data-testid="extracted-notes">{extractedData.notes}</p>
-                            </div>
+                            <p><span className="font-medium">Job:</span> {extractedData.jobDescription}</p>
                           )}
                         </div>
-                        <div className="flex gap-2 pt-2">
-                          <Button
-                            size="sm"
-                            onClick={handleCreateClient}
-                            disabled={!extractedData.clientName || createClientMutation.isPending}
-                            data-testid="button-create-client"
-                          >
-                            <UserPlus className="h-4 w-4 mr-2" />
-                            Create Client
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={handleCreateJob}
-                            disabled={createJobMutation.isPending}
-                            data-testid="button-create-job"
-                          >
-                            <Briefcase className="h-4 w-4 mr-2" />
-                            Create Job
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  <Separator />
-
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label>Reply</Label>
-                      <div className="flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleSmartReply('acknowledge')}
-                          disabled={isGeneratingReply}
-                          title="Generate acknowledgment"
-                        >
-                          {isGeneratingReply ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageSquare className="h-3 w-3" />}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleSmartReply('quote')}
-                          disabled={isGeneratingReply}
-                          title="Generate quote offer"
-                        >
-                          <FileText className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleSmartReply('schedule')}
-                          disabled={isGeneratingReply}
-                          title="Generate scheduling reply"
-                        >
-                          <Clock className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleSmartReply('resolve')}
-                          disabled={isGeneratingReply}
-                          title="Generate resolution reply"
-                        >
-                          <CheckCircle className="h-3 w-3" />
-                        </Button>
                       </div>
-                    </div>
-                    <Textarea
-                      placeholder="Type your reply or use smart reply buttons above..."
-                      value={replyText}
-                      onChange={(e) => setReplyText(e.target.value)}
-                      rows={4}
-                      data-testid="textarea-reply"
-                    />
-                    <Button
-                      onClick={handleReply}
-                      disabled={!replyText.trim() || replyMutation.isPending}
-                      data-testid="button-send-reply"
-                    >
-                      {replyMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4 mr-2" />
-                      )}
-                      Send Reply
-                    </Button>
-                  </div>
-                </>
-              )}
+                    </>
+                  )}
+                </div>
+              </ScrollArea>
             </div>
-          </ScrollArea>
+          )}
+        </div>
+      </div>
+
+      <Dialog open={composeDialogOpen} onOpenChange={setComposeDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Reply className="h-5 w-5" />
+              Reply to: {selectedEmail?.from?.emailAddress?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Re: {selectedEmail?.subject}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Textarea
+              placeholder="Type your reply..."
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              rows={8}
+              data-testid="textarea-reply"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setComposeDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleReply}
+              disabled={!replyText.trim() || replyMutation.isPending}
+              data-testid="button-send-reply"
+            >
+              {replyMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+              Send Reply
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle data-testid="text-settings-title">Outlook Settings</DialogTitle>
-            <DialogDescription>Configure which email account to view</DialogDescription>
+            <DialogTitle>Email Settings</DialogTitle>
+            <DialogDescription>
+              Configure your Outlook integration settings.
+            </DialogDescription>
           </DialogHeader>
-
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email-select">Email Account</Label>
-              {loadingUsers ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading accounts...
-                </div>
-              ) : outlookUsers.length > 0 ? (
-                <Select value={userEmail} onValueChange={setUserEmail} data-testid="select-email-account">
-                  <SelectTrigger data-testid="select-email-trigger">
-                    <SelectValue placeholder="Select an email account" />
+            {currentUser ? (
+              <div className="space-y-2">
+                <Label>Connected Account</Label>
+                <p className="text-sm text-muted-foreground">
+                  {currentUser.displayName} ({currentUser.email})
+                </p>
+              </div>
+            ) : outlookUsers.length > 0 ? (
+              <div className="space-y-2">
+                <Label>Select Email Account</Label>
+                <Select value={userEmail} onValueChange={setUserEmail}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select account..." />
                   </SelectTrigger>
                   <SelectContent>
                     {outlookUsers.map((u) => (
-                      <SelectItem key={u.id} value={u.mail || u.userPrincipalName} data-testid={`select-email-option-${u.id}`}>
+                      <SelectItem key={u.id} value={u.mail || u.userPrincipalName}>
                         {u.displayName} ({u.mail || u.userPrincipalName})
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              ) : (
-                <div className="space-y-2">
-                  <Input
-                    id="email-input"
-                    type="email"
-                    placeholder="Enter email address manually"
-                    value={userEmail}
-                    onChange={(e) => setUserEmail(e.target.value)}
-                    data-testid="input-email-manual"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Could not fetch users from Outlook. Enter email manually.
-                  </p>
-                </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="text-center py-4 text-muted-foreground">
+                <p>No Outlook accounts available.</p>
+                <p className="text-sm mt-1">Please connect your Outlook account.</p>
+              </div>
+            )}
           </div>
-
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSettingsDialogOpen(false)} data-testid="button-cancel-settings">
-              Cancel
-            </Button>
-            <Button onClick={handleSaveSettings} data-testid="button-save-settings">
-              Save Settings
-            </Button>
+            <Button onClick={handleSaveSettings}>Save Settings</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
