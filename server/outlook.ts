@@ -1,13 +1,94 @@
 import { ConfidentialClientApplication, Configuration } from "@azure/msal-node";
 import { Client } from "@microsoft/microsoft-graph-client";
 
-function getMsalClient(): ConfidentialClientApplication {
+// Replit Outlook Connector - connection:conn_outlook_01KF1GC1SRTJYFTZF7P2MXQ82W
+let connectionSettings: any;
+
+// Helper to extract access token from connection settings
+function extractAccessToken(settings: any): string | null {
+  if (!settings?.settings) return null;
+  return settings.settings.access_token || 
+         settings.settings.oauth?.credentials?.access_token || 
+         null;
+}
+
+// Get access token via Replit Connector (preferred method)
+async function getConnectorAccessToken(): Promise<string | null> {
+  try {
+    // Check if we have a cached token that's still valid
+    if (connectionSettings?.settings?.expires_at && 
+        new Date(connectionSettings.settings.expires_at).getTime() > Date.now()) {
+      const cachedToken = extractAccessToken(connectionSettings);
+      if (cachedToken) {
+        return cachedToken;
+      }
+      // Token missing from cache, reset and refetch
+      connectionSettings = null;
+    }
+
+    const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
+    if (!hostname) {
+      return null; // Connector not available
+    }
+
+    const xReplitToken = process.env.REPL_IDENTITY 
+      ? 'repl ' + process.env.REPL_IDENTITY 
+      : process.env.WEB_REPL_RENEWAL 
+      ? 'depl ' + process.env.WEB_REPL_RENEWAL 
+      : null;
+
+    if (!xReplitToken) {
+      return null; // Token not available
+    }
+
+    const response = await fetch(
+      'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=outlook',
+      {
+        headers: {
+          'Accept': 'application/json',
+          'X_REPLIT_TOKEN': xReplitToken
+        }
+      }
+    );
+
+    if (!response.ok) {
+      console.error('Connector API error:', response.status, response.statusText);
+      connectionSettings = null;
+      return null;
+    }
+
+    const data = await response.json();
+    connectionSettings = data.items?.[0];
+
+    if (!connectionSettings) {
+      console.error('No Outlook connection found in connector response');
+      return null;
+    }
+
+    const accessToken = extractAccessToken(connectionSettings);
+
+    if (!accessToken) {
+      console.error('No access token found in connector settings');
+      connectionSettings = null;
+      return null;
+    }
+
+    return accessToken;
+  } catch (error) {
+    console.error('Connector auth error:', error);
+    connectionSettings = null;
+    return null;
+  }
+}
+
+// Legacy Azure credentials authentication (fallback)
+function getMsalClient(): ConfidentialClientApplication | null {
   const clientId = process.env.AZURE_CLIENT_ID;
   const tenantId = process.env.AZURE_TENANT_ID;
   const clientSecret = process.env.AZURE_CLIENT_SECRET;
 
   if (!clientId || !tenantId || !clientSecret) {
-    throw new Error("Azure credentials not configured. Please set AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_CLIENT_SECRET environment variables.");
+    return null;
   }
 
   const msalConfig: Configuration = {
@@ -21,17 +102,38 @@ function getMsalClient(): ConfidentialClientApplication {
   return new ConfidentialClientApplication(msalConfig);
 }
 
-async function getAccessToken(): Promise<string> {
+async function getLegacyAccessToken(): Promise<string | null> {
   const cca = getMsalClient();
+  if (!cca) return null;
+
   const tokenRequest = {
     scopes: ["https://graph.microsoft.com/.default"],
   };
 
-  const response = await cca.acquireTokenByClientCredential(tokenRequest);
-  if (!response || !response.accessToken) {
-    throw new Error("Failed to acquire access token");
+  try {
+    const response = await cca.acquireTokenByClientCredential(tokenRequest);
+    return response?.accessToken || null;
+  } catch (error) {
+    console.error('Legacy auth error:', error);
+    return null;
   }
-  return response.accessToken;
+}
+
+// Get access token - tries Replit Connector first, then falls back to Azure credentials
+async function getAccessToken(): Promise<string> {
+  // Try Replit Connector first (preferred)
+  const connectorToken = await getConnectorAccessToken();
+  if (connectorToken) {
+    return connectorToken;
+  }
+
+  // Fall back to legacy Azure credentials
+  const legacyToken = await getLegacyAccessToken();
+  if (legacyToken) {
+    return legacyToken;
+  }
+
+  throw new Error("Outlook not connected. Please connect via the Outlook connector or configure Azure credentials.");
 }
 
 function getGraphClient(accessToken: string): Client {
@@ -40,6 +142,12 @@ function getGraphClient(accessToken: string): Client {
       done(null, accessToken);
     },
   });
+}
+
+// Get a fresh Graph client (never cache - tokens expire)
+export async function getOutlookClient(): Promise<Client> {
+  const accessToken = await getAccessToken();
+  return getGraphClient(accessToken);
 }
 
 export interface EmailMessage {
