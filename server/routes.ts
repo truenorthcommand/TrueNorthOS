@@ -2080,7 +2080,7 @@ export async function registerRoutes(
 
       const defaultAdvisors = [
         {
-          name: "Snagging Pro",
+          name: "Snagging Pro (Julian)",
           description: "Professional UK refurbishment snagging agent. Assesses photos and videos of refurbishment works to identify snags and produce contractor-ready snag lists.",
           icon: "ClipboardCheck",
           category: "quality",
@@ -3929,7 +3929,7 @@ Return ONLY valid JSON.`;
 
       const advisors = [
         {
-          name: "Snagging Pro",
+          name: "Snagging Pro (Julian)",
           description: "Professional UK refurbishment snagging agent. Assesses photos and videos of refurbishment works to identify snags and produce contractor-ready snag lists.",
           icon: "ClipboardCheck",
           category: "quality",

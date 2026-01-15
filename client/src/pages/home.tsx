@@ -141,7 +141,7 @@ const stats = [
 const advisors = [
   {
     icon: HardHat,
-    name: "Snagging Pro",
+    name: "Snagging Pro (Julian)",
     description: "Quality assessment & defects",
     bgClass: "bg-amber-100 dark:bg-amber-900/30",
     iconClass: "text-amber-600",
