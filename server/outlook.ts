@@ -119,21 +119,31 @@ async function getLegacyAccessToken(): Promise<string | null> {
   }
 }
 
+// Track which auth method is being used (delegated = /me, application = /users/{email})
+let isUsingDelegatedAuth = false;
+
 // Get access token - tries Replit Connector first, then falls back to Azure credentials
 async function getAccessToken(): Promise<string> {
-  // Try Replit Connector first (preferred)
+  // Try Replit Connector first (preferred) - uses delegated permissions
   const connectorToken = await getConnectorAccessToken();
   if (connectorToken) {
+    isUsingDelegatedAuth = true;
     return connectorToken;
   }
 
-  // Fall back to legacy Azure credentials
+  // Fall back to legacy Azure credentials - uses application permissions
   const legacyToken = await getLegacyAccessToken();
   if (legacyToken) {
+    isUsingDelegatedAuth = false;
     return legacyToken;
   }
 
   throw new Error("Outlook not connected. Please connect via the Outlook connector or configure Azure credentials.");
+}
+
+// Get the right API path for current auth mode
+function getUserPath(userEmail: string): string {
+  return isUsingDelegatedAuth ? "/me" : `/users/${userEmail}`;
 }
 
 function getGraphClient(accessToken: string): Client {
@@ -148,6 +158,27 @@ function getGraphClient(accessToken: string): Client {
 export async function getOutlookClient(): Promise<Client> {
   const accessToken = await getAccessToken();
   return getGraphClient(accessToken);
+}
+
+// Get the current authenticated user's profile
+export async function getCurrentUser(): Promise<{ email: string; displayName: string } | null> {
+  try {
+    const accessToken = await getAccessToken();
+    const client = getGraphClient(accessToken);
+    
+    const user = await client
+      .api('/me')
+      .select('mail,displayName,userPrincipalName')
+      .get();
+    
+    return {
+      email: user.mail || user.userPrincipalName,
+      displayName: user.displayName
+    };
+  } catch (error) {
+    console.error('Failed to get current user:', error);
+    return null;
+  }
 }
 
 export interface EmailMessage {
@@ -188,7 +219,7 @@ export async function sendEmail(fromEmail: string, message: EmailMessage): Promi
     saveToSentItems: true,
   };
 
-  await client.api(`/users/${fromEmail}/sendMail`).post(mail);
+  await client.api(`${getUserPath(fromEmail)}/sendMail`).post(mail);
 }
 
 export async function getEmails(userEmail: string, top: number = 10): Promise<any[]> {
@@ -196,7 +227,7 @@ export async function getEmails(userEmail: string, top: number = 10): Promise<an
   const client = getGraphClient(accessToken);
 
   const messages = await client
-    .api(`/users/${userEmail}/messages`)
+    .api(`${getUserPath(userEmail)}/messages`)
     .top(top)
     .select("id,subject,from,receivedDateTime,bodyPreview,isRead")
     .orderby("receivedDateTime DESC")
@@ -210,7 +241,7 @@ export async function getCalendarEvents(userEmail: string, top: number = 10): Pr
   const client = getGraphClient(accessToken);
 
   const events = await client
-    .api(`/users/${userEmail}/calendar/events`)
+    .api(`${getUserPath(userEmail)}/calendar/events`)
     .top(top)
     .select("id,subject,start,end,location,bodyPreview,attendees")
     .orderby("start/dateTime DESC")
@@ -244,7 +275,7 @@ export async function createCalendarEvent(userEmail: string, event: CalendarEven
     })),
   };
 
-  return await client.api(`/users/${userEmail}/calendar/events`).post(graphEvent);
+  return await client.api(`${getUserPath(userEmail)}/calendar/events`).post(graphEvent);
 }
 
 export async function testConnection(): Promise<{ success: boolean; message: string }> {
@@ -264,7 +295,7 @@ export async function getEmailById(userEmail: string, messageId: string): Promis
   const client = getGraphClient(accessToken);
 
   const message = await client
-    .api(`/users/${userEmail}/messages/${messageId}`)
+    .api(`${getUserPath(userEmail)}/messages/${messageId}`)
     .select("id,subject,from,toRecipients,ccRecipients,receivedDateTime,body,bodyPreview,isRead,hasAttachments,importance,conversationId")
     .get();
 
@@ -276,7 +307,7 @@ export async function getEmailAttachments(userEmail: string, messageId: string):
   const client = getGraphClient(accessToken);
 
   const attachments = await client
-    .api(`/users/${userEmail}/messages/${messageId}/attachments`)
+    .api(`${getUserPath(userEmail)}/messages/${messageId}/attachments`)
     .get();
 
   return attachments.value;
@@ -287,7 +318,7 @@ export async function getAttachmentContent(userEmail: string, messageId: string,
   const client = getGraphClient(accessToken);
 
   const attachment = await client
-    .api(`/users/${userEmail}/messages/${messageId}/attachments/${attachmentId}`)
+    .api(`${getUserPath(userEmail)}/messages/${messageId}/attachments/${attachmentId}`)
     .get();
 
   return attachment;
@@ -307,7 +338,7 @@ export async function replyToEmail(userEmail: string, messageId: string, replyBo
   };
 
   const endpoint = replyAll ? "replyAll" : "reply";
-  await client.api(`/users/${userEmail}/messages/${messageId}/${endpoint}`).post(reply);
+  await client.api(`${getUserPath(userEmail)}/messages/${messageId}/${endpoint}`).post(reply);
 }
 
 export async function searchEmails(userEmail: string, query: string, top: number = 20): Promise<any[]> {
@@ -317,7 +348,7 @@ export async function searchEmails(userEmail: string, query: string, top: number
   const sanitizedQuery = query.replace(/'/g, "''").replace(/[\\"%&]/g, "");
 
   const messages = await client
-    .api(`/users/${userEmail}/messages`)
+    .api(`${getUserPath(userEmail)}/messages`)
     .filter(`contains(subject,'${sanitizedQuery}') or contains(from/emailAddress/address,'${sanitizedQuery}')`)
     .top(top)
     .select("id,subject,from,receivedDateTime,bodyPreview,isRead,hasAttachments")
@@ -332,7 +363,7 @@ export async function markEmailAsRead(userEmail: string, messageId: string, isRe
   const client = getGraphClient(accessToken);
 
   await client
-    .api(`/users/${userEmail}/messages/${messageId}`)
+    .api(`${getUserPath(userEmail)}/messages/${messageId}`)
     .patch({ isRead });
 }
 

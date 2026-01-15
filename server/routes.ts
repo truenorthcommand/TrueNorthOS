@@ -4859,6 +4859,19 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
+  app.get("/api/outlook/me", requireRoles('admin'), async (req, res) => {
+    try {
+      const user = await outlook.getCurrentUser();
+      if (!user) {
+        return res.status(404).json({ error: "Could not get current user" });
+      }
+      res.json(user);
+    } catch (error: any) {
+      console.error("Get current user error:", error);
+      res.status(500).json({ error: error.message || "Failed to get current user" });
+    }
+  });
+
   app.post("/api/outlook/send", requireRoles('admin'), async (req, res) => {
     try {
       const { fromEmail, subject, body, toRecipients, ccRecipients, isHtml } = req.body;

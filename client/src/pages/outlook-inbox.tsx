@@ -153,12 +153,31 @@ export default function OutlookInbox() {
   const [selectedJobForAttachment, setSelectedJobForAttachment] = useState<string>("");
   const [savingAttachment, setSavingAttachment] = useState<string | null>(null);
 
-  const { data: outlookUsers = [], isLoading: loadingUsers } = useQuery<OutlookUser[]>({
-    queryKey: ["/api/outlook/users"],
+  // Fetch current user from connector (delegated auth uses /me endpoint)
+  const { data: currentUser, isLoading: loadingCurrentUser } = useQuery<{ email: string; displayName: string }>({
+    queryKey: ["/api/outlook/me"],
+    queryFn: async () => {
+      const res = await fetch("/api/outlook/me");
+      if (!res.ok) throw new Error("Failed to get current user");
+      return res.json();
+    },
     retry: false,
   });
 
+  // Fall back to users list for application permissions (legacy)
+  const { data: outlookUsers = [], isLoading: loadingUsers } = useQuery<OutlookUser[]>({
+    queryKey: ["/api/outlook/users"],
+    retry: false,
+    enabled: !currentUser, // Only fetch if no current user from /me
+  });
+
   useEffect(() => {
+    // Prefer current user from /me endpoint (delegated auth)
+    if (currentUser?.email && !userEmail) {
+      setUserEmail(currentUser.email);
+      return;
+    }
+    // Fall back to users list (application permissions)
     if (outlookUsers.length > 0 && !userEmail) {
       const savedEmail = localStorage.getItem("outlook_default_email");
       if (savedEmail && outlookUsers.some(u => u.mail === savedEmail || u.userPrincipalName === savedEmail)) {
@@ -168,7 +187,7 @@ export default function OutlookInbox() {
         setUserEmail(firstEmail);
       }
     }
-  }, [outlookUsers, userEmail]);
+  }, [currentUser, outlookUsers, userEmail]);
 
   const { data: emails = [], isLoading: loadingEmails, refetch: refetchEmails } = useQuery<OutlookEmail[]>({
     queryKey: ["/api/outlook/emails", userEmail],
