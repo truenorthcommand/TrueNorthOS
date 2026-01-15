@@ -1,0 +1,55 @@
+Build a full-stack monorepo (pnpm workspaces) for a PWA ERP with a global AI assistant that can operate the UI (Option B). Use:
+
+Frontend:
+- React + TypeScript + Vite
+- Tailwind + shadcn/ui
+- TanStack Query
+- Wouter routing
+- PWA (vite-plugin-pwa)
+
+Backend:
+- Node.js + Express + TypeScript
+- PostgreSQL + Drizzle ORM
+- Zod for validation
+
+Core feature: “Global Assistant Panel”
+- Right-side panel with chat
+- Sends {message, context} to backend
+- Backend returns a Step Plan (JSON DSL) and draft artifacts
+- Frontend executes steps using an in-app Automation Runtime (not Playwright)
+- Must support Plan → Preview → Confirm → Apply
+- Must log an audit trail of executed steps and DB changes
+
+Implement these entities (minimal):
+- Customer {id, name, email}
+- Job {id, customerId, title, status}
+- JobSheet {id, jobId, notes, outcome, updatedAt}
+- Appointment {id, jobId, startAt, endAt, assignedTo}
+- Part {id, sku, name, supplier, price}
+- DraftPO {id, jobId, supplier, lines(json), status}
+- EmailThread {id, customerId, subject}
+- EmailDraft {id, threadId, subject, body, status}
+
+Implement screens:
+- /jobs (list)
+- /jobs/:id (job detail with tabs: Job Sheet, Appointments, Parts, Comms)
+
+Option B requirements:
+- Add stable automation hooks using data-ai attributes on buttons/inputs/tabs/list rows.
+- Implement a route-level “Capabilities Manifest” registry that lists actions and fields.
+- Implement a Step Plan DSL with step types: NAVIGATE, OPEN, SET_VALUE, CLICK, CALL_ACTION, ASSERT, PAUSE_FOR_CONFIRM, CAPTURE.
+- Implement an in-app step executor that can target data-ai elements and call semantic actions for complex operations (e.g. jobsheet.reorder, appointment.reschedule).
+- Implement confirmation gates: reschedule + creating draft PO requires confirm; email is draft-only.
+
+Backend AI:
+- Create POST /api/ai/plan that accepts {message, context}.
+- Do not send emails; draft only.
+- For now, implement a deterministic “planner” (rule-based) that creates step plans based on keywords so the app works without external AI keys.
+- Also include optional OpenAI integration (env var OPENAI_API_KEY). If key exists, use it to generate step plans, otherwise use the rule-based planner.
+- Validate all tool/step outputs with Zod.
+
+Deliverables:
+- Working dev scripts: pnpm dev (runs web + api)
+- Drizzle migrations + seed script
+- README with setup steps and env vars
+- Clean code, typed, minimal but functional.
