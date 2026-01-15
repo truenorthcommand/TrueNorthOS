@@ -761,7 +761,20 @@ export default function OutlookInbox() {
 
                   {emailAnalysis?.suggestedReply && (
                     <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Suggested Reply</Label>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-muted-foreground">Suggested Reply</Label>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={handleAnalyzeEmail}
+                          disabled={isAnalyzing}
+                          title="Get a different reply"
+                          data-testid="button-retry-reply"
+                        >
+                          <RefreshCw className={`h-3 w-3 ${isAnalyzing ? 'animate-spin' : ''}`} />
+                        </Button>
+                      </div>
                       <p className="text-xs bg-muted p-2 rounded italic">
                         {emailAnalysis.suggestedReply.substring(0, 150)}...
                       </p>
