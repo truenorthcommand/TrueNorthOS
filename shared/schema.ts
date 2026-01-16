@@ -90,6 +90,7 @@ export const jobs = pgTable("jobs", {
   urgency: text("urgency").default("normal"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  updatedByUserId: varchar("updated_by_user_id"),
 });
 
 // Job updates for long-running jobs (2 updates per day max)
@@ -115,6 +116,7 @@ export const clients = pgTable("clients", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  updatedByUserId: varchar("updated_by_user_id"),
 });
 
 // Client contacts - multiple contact persons per client
