@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { hasRole } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, Bell, Shield, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw, Mic, BookOpen, Scan, Mail } from "lucide-react";
+import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, Bell, Shield, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw, Mic, BookOpen, Scan, Mail, LayoutGrid } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -303,7 +303,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* Schedule Section - Admin Only */}
         {hasRole(user, 'admin') && (
           <MenuGroup title="Schedule" icon={Calendar} section="schedule">
-            <NavLink href="/calendar" icon={Calendar}>Calendar</NavLink>
+            <NavLink href="/schedule/calendar" icon={Calendar}>Calendar</NavLink>
+            <NavLink href="/schedule/planner" icon={LayoutGrid}>Planner</NavLink>
             <NavLink href="/time-logs" icon={Clock}>Time Logs</NavLink>
           </MenuGroup>
         )}
