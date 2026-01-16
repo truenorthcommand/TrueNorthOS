@@ -701,8 +701,21 @@ export default function JobDetail() {
         </div>
       </div>
 
+      {/* Job Locked Banner - Show when signed off */}
+      {isReadOnly && (
+        <Card className="mb-6 border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 no-print" data-testid="card-job-locked">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
+              <FileCheck className="h-5 w-5" />
+              <span className="font-medium">Job Signed Off & Locked</span>
+              <span className="text-sm text-muted-foreground ml-2">— This job has been completed and signed off. No further edits are allowed.</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Admin View Banner */}
-      {showAdminView && (
+      {showAdminView && !isReadOnly && (
         <Card className="mb-6 border-2 border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/30 no-print">
           <CardContent className="py-4">
             <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">

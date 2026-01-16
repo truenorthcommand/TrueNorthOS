@@ -150,6 +150,8 @@ export default function Clients() {
     role: "",
     isPrimary: false,
   });
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [isSavingClient, setIsSavingClient] = useState(false);
 
   const fetchClientContacts = async (clientId: string) => {
     try {
@@ -462,6 +464,42 @@ export default function Clients() {
       }
     } catch (error) {
       toast({ title: "Error", description: "Failed to delete client.", variant: "destructive" });
+    }
+  };
+
+  const handleUpdateClient = async () => {
+    if (!editingClient) return;
+    setIsSavingClient(true);
+    try {
+      const res = await fetch(`/api/clients/${editingClient.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editingClient.name,
+          contactName: editingClient.contactName,
+          email: editingClient.email,
+          phone: editingClient.phone,
+          address: editingClient.address,
+          postcode: editingClient.postcode,
+          notes: editingClient.notes,
+        }),
+        credentials: 'include',
+      });
+      if (res.ok) {
+        toast({ title: "Success", description: "Client updated successfully." });
+        setEditingClient(null);
+        const clientsRes = await fetch('/api/clients', { credentials: 'include' });
+        if (clientsRes.ok) {
+          setClients(await clientsRes.json());
+        }
+      } else {
+        const error = await res.json();
+        toast({ title: "Error", description: error.error || "Failed to update client.", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update client.", variant: "destructive" });
+    } finally {
+      setIsSavingClient(false);
     }
   };
 
@@ -1538,6 +1576,20 @@ export default function Clients() {
                         </p>
                       </div>
                     </div>
+                    {user.role === 'admin' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingClient(client);
+                        }}
+                        className="h-8 w-8 p-0 shrink-0"
+                        data-testid={`button-edit-client-${client.id}`}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1555,6 +1607,97 @@ export default function Clients() {
 
                 {expandedClientId === client.id && (
                   <CardContent className="border-t space-y-6 pt-6">
+                    {editingClient?.id === client.id ? (
+                      <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg space-y-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Edit2 className="h-4 w-4 text-primary" />
+                          <p className="text-sm font-semibold">Edit Client</p>
+                        </div>
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-sm">Company Name</Label>
+                            <Input
+                              value={editingClient.name}
+                              onChange={(e) => setEditingClient({ ...editingClient, name: e.target.value })}
+                              data-testid={`input-edit-client-name-${client.id}`}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm">Contact Name</Label>
+                            <Input
+                              value={editingClient.contactName || ""}
+                              onChange={(e) => setEditingClient({ ...editingClient, contactName: e.target.value })}
+                              data-testid={`input-edit-client-contactName-${client.id}`}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm">Email</Label>
+                            <Input
+                              type="email"
+                              value={editingClient.email || ""}
+                              onChange={(e) => setEditingClient({ ...editingClient, email: e.target.value })}
+                              data-testid={`input-edit-client-email-${client.id}`}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm">Phone</Label>
+                            <Input
+                              value={editingClient.phone || ""}
+                              onChange={(e) => setEditingClient({ ...editingClient, phone: e.target.value })}
+                              data-testid={`input-edit-client-phone-${client.id}`}
+                            />
+                          </div>
+                          <div className="space-y-2 md:col-span-2">
+                            <Label className="text-sm">Address</Label>
+                            <Textarea
+                              value={editingClient.address || ""}
+                              onChange={(e) => setEditingClient({ ...editingClient, address: e.target.value })}
+                              className="min-h-[80px]"
+                              data-testid={`input-edit-client-address-${client.id}`}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm">Postcode</Label>
+                            <Input
+                              value={editingClient.postcode || ""}
+                              onChange={(e) => setEditingClient({ ...editingClient, postcode: e.target.value })}
+                              data-testid={`input-edit-client-postcode-${client.id}`}
+                            />
+                          </div>
+                          <div className="space-y-2 md:col-span-2">
+                            <Label className="text-sm">Notes</Label>
+                            <Textarea
+                              value={editingClient.notes || ""}
+                              onChange={(e) => setEditingClient({ ...editingClient, notes: e.target.value })}
+                              className="min-h-[80px]"
+                              placeholder="Additional notes about this client..."
+                              data-testid={`input-edit-client-notes-${client.id}`}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2 pt-2">
+                          <Button
+                            size="sm"
+                            onClick={handleUpdateClient}
+                            disabled={isSavingClient || !editingClient.name.trim()}
+                            data-testid={`button-save-client-${client.id}`}
+                          >
+                            <Save className="h-4 w-4 mr-1" />
+                            {isSavingClient ? "Saving..." : "Save"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setEditingClient(null)}
+                            disabled={isSavingClient}
+                            data-testid={`button-cancel-edit-client-${client.id}`}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
                     <div className="grid md:grid-cols-2 gap-4">
                       {client.email && (
                         <div>
@@ -1848,6 +1991,8 @@ export default function Clients() {
                         </div>
                       )}
                     </div>
+                      </>
+                    )}
                   </CardContent>
                 )}
               </Card>
