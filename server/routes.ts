@@ -1192,10 +1192,13 @@ export async function registerRoutes(
       }
 
       if (existingJob.status === 'Signed Off') {
-        return res.status(400).json({ error: "Cannot modify a signed-off job" });
+        return res.status(409).json({ error: "Job is signed off and locked from editing" });
       }
 
       let updates = req.body;
+      
+      // Track who made the update
+      updates.updatedByUserId = req.session.userId;
       
       if (req.session.userRole === 'engineer') {
         const engineerAllowedFields = ['worksCompleted', 'notes', 'materials', 'photos', 'signatures', 'furtherActions'];
@@ -1803,7 +1806,20 @@ export async function registerRoutes(
 
   app.put("/api/clients/:id", requireAdmin, async (req, res) => {
     try {
-      const client = await storage.updateClient(req.params.id, req.body);
+      // Whitelist allowed fields for client updates
+      const allowedFields = ['name', 'email', 'phone', 'address', 'postcode', 'contactName', 'notes'];
+      const updates: Record<string, any> = {};
+      
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          updates[field] = req.body[field];
+        }
+      }
+      
+      // Track who made the update
+      updates.updatedByUserId = req.session.userId;
+      
+      const client = await storage.updateClient(req.params.id, updates);
       if (!client) {
         return res.status(404).json({ error: "Client not found" });
       }
