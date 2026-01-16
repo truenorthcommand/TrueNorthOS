@@ -1,0 +1,337 @@
+Title: TrueNorth Trade OS — Editable Clients + Editable Job Sheets
+
+Goal: Add robust edit functionality for Client CRM records and Job Sheets, with safe permissioning and guardrails so signed-off jobs remain compliant.
+
+Stack: Use the existing project stack as implemented (React 18 + TS + Vite + Wouter + TanStack Query; Node/Express TS; PostgreSQL; Drizzle ORM; sessions/2FA as already present). Do NOT migrate frameworks/ORM/auth.
+
+Scope (MVP):
+
+Client edits
+
+Add “Edit Client” UI for client records
+
+Server PATCH route to update allowed fields
+
+Basic validation + error states
+
+Job sheet edits
+
+Add “Edit Job” UI (job sheet) for core editable job fields
+
+Server PATCH route to update allowed fields
+
+Enforce status-based locking rules to protect signed-off jobs
+
+Audit + safety
+
+Store updated_at / updated_by (and optional change notes) for clients and jobs
+
+Block or limit edits after sign-off (see assumptions)
+
+Ensure existing sign-off validation rules remain unchanged
+
+Data model (extend only if missing; prefer existing columns):
+
+clients
+
+id, company_name, email/phone (if present), address fields (if present)
+
+updated_at, updated_by (add if missing)
+
+jobs
+
+id, client_id, title/description, status, scheduled dates, assigned engineer(s) (as per existing schema)
+
+updated_at, updated_by (add if missing)
+
+(Optional) audit_events table ONLY if an audit trail table already exists; otherwise add minimal columns above.
+
+Endpoints (use existing conventions/routers):
+
+PATCH /api/clients/:id
+
+Body: allowed editable client fields only
+
+Auth: admin + works_manager (assumption below)
+
+GET /api/clients/:id (if needed by editor view)
+
+PATCH /api/jobs/:id
+
+Body: allowed editable job sheet fields only
+
+Auth: admin + works_manager; optionally engineer for own jobs (assumption below)
+
+Must enforce status locking rules
+
+GET /api/jobs/:id (if needed by editor view)
+
+UI views:
+
+Clients
+
+ClientDetail view: add “Edit” button
+
+ClientEdit view or modal:
+
+Prefill current values
+
+Save -> optimistic UI via TanStack Query, then refetch
+
+Show success toast + error messages
+
+Jobs
+
+JobDetail/JobSheet view: add “Edit Job Sheet” button
+
+JobEdit view or section:
+
+Editable: description/notes, dates, client reference fields, non-signoff metadata
+
+NOT editable: signatures, evidence photos list integrity, geo sign-off data (unless your existing UI supports adding evidence photos separately)
+
+If status is Signed Off: disable editor and show reason (or allow limited fields if you choose)
+
+Non-goals (explicitly out of scope):
+
+Rebuilding client portal, quotes/invoices flows, or job lifecycle redesign
+
+New role system (use existing roles)
+
+Full historical diff viewer (unless an audit_events table already exists)
+
+Changing sign-off rules/validation
+
+Assumptions:
+
+Roles: Only admin and works_manager can edit clients; jobs editable by admin/works_manager; engineers can edit ONLY their own jobs while status != Signed Off.
+
+Signed Off jobs are locked: no edits to job core fields after Signed Off. (If you want revisions, agent must Stop & Ask.)
+
+“Job sheet” refers to the jobs table record + related display fields, not quotes/invoices.
+
+Acceptance criteria (testable):
+
+Client: An authorized user can edit a client, save, and see updated values on refresh; unauthorized users receive 403 and UI shows “not permitted”.
+
+Job: An authorized user can edit a job (status not Signed Off), save, and see updated values; unauthorized users receive 403.
+
+Signed Off job: PATCH /api/jobs/:id returns 409 or 403 when status is Signed Off; UI disables editing and explains why.
+
+Existing sign-off completion rules remain intact (evidence photo + both signatures + geolocation are still required to sign off; editing does not bypass or remove them).
+
+updated_at and updated_by are correctly set on both clients and jobs updates.
+
+Stop & Ask:
+
+If the codebase uses different route naming, auth middleware, or schema fields than assumed, pause and ask before implementing.
+
+If product requirements want post–Signed Off edits or revisions, pause and ask for the exact workflow (rev numbers, audit log expectations, who can unlock).
+
+If clients have “contacts” and “properties” tables and you want those editable too, pause and ask which sub-entities are in scope.
+
+Integrations (only if requested):
+
+None. Do not touch OpenAI/Maps/Stripe/Outlook.
+
+Notes:
+
+Validate inputs server-side (Zod if already used with drizzle-zod); never trust client.
+
+Prevent mass assignment: whitelist fields allowed to update.
+
+Ensure TanStack Query cache invalidation is correct for list + detail queries.
+
+Add minimal unit tests if an existing test setup exists; otherwise keep changes minimal.
+
+Prompt cost savers
+
+Implement edit UI as a single shared “ClientForm” and “JobForm” used by create/edit if create already exists.
+
+Avoid new tables unless audit trail is mandatory—use updated_at/updated_by first.
+
+CRM export (JSON)
+
+{
+  "user_goal": "Add edit functionality for client CRM records and job sheets in TrueNorth Trade OS with permissions and safe locking for signed-off jobs.",
+  "core_features": [
+    "Edit client records (UI + PATCH endpoint)",
+    "Edit job sheets (UI + PATCH endpoint)",
+    "Role-based access control for edits",
+    "Lock or restrict edits after Signed Off",
+    "Track updated_at and updated_by"
+  ],
+  "missing_info": [
+    "Exact role permissions for editing clients/jobs",
+    "Whether signed-off jobs can be edited via revisions/unlock flow",
+    "Whether client contacts/properties are in scope for editing now"
+  ],
+  "replit_prompt": "Title: TrueNorth Trade OS — Editable Clients + Editable Job Sheets\n\nGoal: Add robust edit functionality for Client CRM records and Job Sheets, with safe permissioning and guardrails so signed-off jobs remain compliant.\n\nStack: Use the existing project stack as implemented (React 18 + TS + Vite + Wouter + TanStack Query; Node/Express TS; PostgreSQL; Drizzle ORM; sessions/2FA as already present). Do NOT migrate frameworks/ORM/auth.\n\nScope (MVP):\n- Client edits\n  - Add “Edit Client” UI for client records\n  - Server PATCH route to update allowed fields\n  - Basic validation + error states\n- Job sheet edits\n  - Add “Edit Job” UI (job sheet) for core editable job fields\n  - Server PATCH route to update allowed fields\n  - Enforce status-based locking rules to protect signed-off jobs\n- Audit + safety\n  - Store updated_at / updated_by (and optional change notes) for clients and jobs\n  - Block or limit edits after sign-off\n  - Ensure existing sign-off validation rules remain unchanged\n\nData model (extend only if missing; prefer existing columns):\n- clients: id, company fields, updated_at, updated_by\n- jobs: id, client_id, core fields, status, updated_at, updated_by\n\nEndpoints:\n- PATCH /api/clients/:id\n- PATCH /api/jobs/:id\n\nUI views:\n- Add Edit buttons on ClientDetail and JobDetail/JobSheet; forms prefill; save via TanStack Query; show success/error.\n\nNon-goals:\n- No redesign of quotes/invoices/job lifecycle; no new audit UI.\n\nAssumptions:\n- admin/works_manager can edit; engineers can edit own jobs only before Signed Off; Signed Off locked.\n\nAcceptance criteria:\n- Authorized edits persist; unauthorized blocked; Signed Off jobs cannot be edited; sign-off rules unchanged; updated_at/updated_by set.\n\nStop & Ask:\n- Pause if requirements include post–Signed Off edits/revisions/unlock; or if contacts/properties editing is in scope.\n",
+  "clarifications_asked": 3
+}
+
+no its so the admin staff can edit the clients details name address etc and edit job sheets apointment time job details etc i would there to be a button on the relevant pages this is for admin only
+Thought for a second
+
+Goal summary
+You want admin-only editing: admin staff can click an Edit button on Client pages (name/address/etc.) and Job Sheet pages (appointment time, job details, etc.), update fields, and save.
+
+Gaps / risks
+
+You already have PATCH /api/jobs/:id in your API list; clients edit endpoints aren’t explicitly listed—agent should add PATCH /api/clients/:id following existing patterns.
+
+Must enforce role gating: admin only (not works_manager). Users can have multiple roles, so check roles includes admin.
+
+Signed-off flow has validation rules; editing should not allow bypassing sign-off requirements (photos/signatures/geo).
+
+Clarifying questions (not blocking — assumptions below)
+
+Should super_admin also be allowed (I assume yes)?
+
+Can admin edit a job even after Signed Off, or should it be locked (I assume locked)?
+
+Which job fields are editable: just appointment + description/notes, or also engineer assignment/status (I assume appointment + core details only)?
+
+Replit implementation prompt (copy/paste)
+
+Title: TrueNorth Trade OS — Admin-only Edit Clients + Edit Job Sheets
+
+Goal: Add admin-only edit capability for Client details and Job Sheets, using existing app patterns, with Edit buttons on the relevant pages and safe server-side validation.
+
+Stack: Use the existing project stack (React 18 + TS + Vite + Wouter + TanStack Query; shadcn/ui + Tailwind; Node.js + Express TS; PostgreSQL + Drizzle ORM; session-based auth). Do NOT migrate frameworks/ORM/auth.
+
+Scope (MVP):
+
+Client editing (admin-only)
+
+Add an “Edit Client” button on Client Detail page
+
+Edit form (prefilled) for: company/name, phone, email, billing/service address fields (whatever exists in schema)
+
+Save updates via API; show success/error UI
+
+Job sheet editing (admin-only)
+
+Add an “Edit Job Sheet” button on Job Detail/Job Sheet page
+
+Edit form (prefilled) for: appointment date/time, job description/details, internal notes, access notes (only fields that exist)
+
+Save updates via existing PATCH /api/jobs/:id (or extend it safely)
+
+Permissions + guardrails
+
+Server must enforce admin-only on all edit endpoints (not just UI hiding)
+
+Block edits when job status is Signed Off (assumption) to protect compliance and sign-off integrity
+
+Prevent “mass assignment” by whitelisting editable fields server-side
+
+Data model:
+
+Use existing clients and jobs tables.
+
+If not already present, add minimal tracking columns:
+
+clients: updated_at, updated_by_user_id (or equivalent)
+
+jobs: updated_at, updated_by_user_id
+
+Do NOT create new tables unless the project already has an audit trail table.
+
+Endpoints (follow existing routing + middleware conventions):
+
+Clients
+
+GET /api/clients/:id (if not already present for detail view)
+
+PATCH /api/clients/:id (admin-only)
+
+Body: whitelist only editable client fields
+
+Jobs
+
+PATCH /api/jobs/:id (admin-only)
+
+Body: whitelist only editable job-sheet fields
+
+If status == “Signed Off”: return 409 (or 403) with message “Job is signed off and locked”
+
+AuthZ middleware
+
+Implement/extend a reusable requireRole('admin') (and allow super_admin) guard used by both PATCH routes
+
+UI views:
+
+Client Detail page
+
+Add “Edit Client” button (visible only to admin in UI)
+
+Clicking opens a modal or navigates to /clients/:id/edit
+
+Form validates required fields; Save triggers PATCH; on success return to detail and refresh cached queries
+
+Job Detail / Job Sheet page
+
+Add “Edit Job Sheet” button (admin only)
+
+Modal or /jobs/:id/edit
+
+Disable editing UI if job is Signed Off; show reason
+
+State management
+
+Use TanStack Query mutations; invalidate/refetch clients and jobs detail queries after save
+
+Non-goals:
+
+Engineer editing, works_manager editing, or any client portal editing
+
+Changing sign-off requirements (photos + both signatures + geolocation) or sign-off workflow
+
+Bulk editing, imports, or advanced audit-diff UI
+
+Assumptions:
+
+Only users with role admin (and super_admin) can edit clients and jobs.
+
+Jobs with status “Signed Off” are locked from edits (server-enforced).
+
+Editable job-sheet fields are limited to appointment time/date + job description/details + notes (no engineer assignment/status changes unless fields already safely editable).
+
+Acceptance criteria:
+
+As admin: I can click “Edit Client”, change name/address, save, and the Client Detail page shows updated values after save/refresh.
+
+As non-admin: I do not see Edit buttons; if I call PATCH endpoints directly I receive 403.
+
+As admin: I can click “Edit Job Sheet”, change appointment time and job details, save, and the Job page shows updated values.
+
+If job status is Signed Off: PATCH /api/jobs/:id rejects with 409/403 and UI shows “locked”.
+
+Server only updates whitelisted fields (attempts to update disallowed fields are ignored or rejected with 400).
+
+updated_at and updated_by are set on successful updates (if those columns exist/added).
+
+Stop & Ask:
+
+If the existing role storage differs (e.g., roles array vs join table) or there is already a permissions helper, pause and use it.
+
+If you want admins to edit Signed Off jobs, pause and ask for the exact rules (what fields, audit trail requirements, re-sign needed or not).
+
+If you want “contacts” and “properties” sub-entities editable from the client page, pause and ask which tables/fields are in scope.
+
+Integrations:
+
+None.
+
+Notes:
+
+Validate input server-side (Zod + drizzle-zod if already used).
+
+Use consistent error codes/messages used elsewhere in the API.
+
+Keep UI minimal; reuse existing form components if they exist.
+
+Prompt cost savers
+
+Use a single reusable <EditModal> pattern and a shared <ClientForm> / <JobForm> if create forms already exist.
