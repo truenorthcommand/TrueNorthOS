@@ -42,7 +42,6 @@ export default function ReportDefect() {
   const [severity, setSeverity] = useState<"critical" | "major" | "minor">("minor");
   const [description, setDescription] = useState("");
   const [vehicleOffRoad, setVehicleOffRoad] = useState(false);
-  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
   const { data: vehicles = [] } = useQuery<Vehicle[]>({
     queryKey: ["/api/fleet/vehicles"],
@@ -74,11 +73,6 @@ export default function ReportDefect() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setAttemptedSubmit(true);
-    if (!vehicleId || !category || !description) {
-      toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" });
-      return;
-    }
 
     createDefectMutation.mutate({
       vehicleId,
@@ -109,9 +103,9 @@ export default function ReportDefect() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="vehicle">Vehicle <span className="text-red-500">*</span></Label>
+              <Label htmlFor="vehicle">Vehicle</Label>
               <Select value={vehicleId} onValueChange={setVehicleId}>
-                <SelectTrigger className={attemptedSubmit && !vehicleId ? "border-red-500" : ""} data-testid="select-vehicle">
+                <SelectTrigger data-testid="select-vehicle">
                   <SelectValue placeholder="Select a vehicle" />
                 </SelectTrigger>
                 <SelectContent>
@@ -122,13 +116,12 @@ export default function ReportDefect() {
                   ))}
                 </SelectContent>
               </Select>
-              {!vehicleId && <p className="text-xs text-muted-foreground">Please select the affected vehicle</p>}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="category">Category <span className="text-red-500">*</span></Label>
+              <Label htmlFor="category">Category</Label>
               <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger className={attemptedSubmit && !category ? "border-red-500" : ""} data-testid="select-category">
+                <SelectTrigger data-testid="select-category">
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -142,7 +135,7 @@ export default function ReportDefect() {
             </div>
 
             <div className="space-y-2">
-              <Label>Severity <span className="text-red-500">*</span></Label>
+              <Label>Severity</Label>
               <RadioGroup
                 value={severity}
                 onValueChange={(v) => setSeverity(v as "critical" | "major" | "minor")}
@@ -169,19 +162,15 @@ export default function ReportDefect() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description <span className="text-red-500">*</span></Label>
+              <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
                 placeholder="Describe the defect in detail..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={4}
-                className={attemptedSubmit && !description.trim() ? "border-red-500" : ""}
                 data-testid="input-description"
               />
-              {attemptedSubmit && !description.trim() && (
-                <p className="text-xs text-red-500">Please provide a detailed description of the defect</p>
-              )}
             </div>
 
             <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-4 border border-blue-200 dark:border-blue-800">
@@ -198,7 +187,7 @@ export default function ReportDefect() {
           </CardContent>
         </Card>
 
-        <Card className={vehicleOffRoad ? "border-red-500" : ""}>
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className={`h-5 w-5 ${vehicleOffRoad ? "text-red-500" : "text-muted-foreground"}`} />
@@ -232,7 +221,7 @@ export default function ReportDefect() {
           type="submit"
           className="w-full"
           size="lg"
-          disabled={!vehicleId || !category || !description || createDefectMutation.isPending}
+          disabled={createDefectMutation.isPending}
           data-testid="button-submit-defect"
         >
           {createDefectMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

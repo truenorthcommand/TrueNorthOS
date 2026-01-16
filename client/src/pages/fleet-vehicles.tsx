@@ -28,7 +28,6 @@ export default function FleetVehicles() {
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
   const [type, setType] = useState("Van");
-  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
   const { data: vehicles = [], isLoading } = useQuery<VehicleWithStats[]>({
     queryKey: ["/api/fleet/vehicles"],
@@ -65,26 +64,10 @@ export default function FleetVehicles() {
     setModel("");
     setYear("");
     setType("Van");
-    setAttemptedSubmit(false);
   };
-
-  const isVehicleFormValid = registration.trim() && make.trim() && model.trim();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setAttemptedSubmit(true);
-    if (!registration.trim()) {
-      toast({ title: "Error", description: "Registration is required", variant: "destructive" });
-      return;
-    }
-    if (!make.trim()) {
-      toast({ title: "Error", description: "Make is required", variant: "destructive" });
-      return;
-    }
-    if (!model.trim()) {
-      toast({ title: "Error", description: "Model is required", variant: "destructive" });
-      return;
-    }
     createVehicleMutation.mutate({
       registration: registration.toUpperCase(),
       make,
@@ -127,52 +110,41 @@ export default function FleetVehicles() {
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="registration">Registration <span className="text-red-500">*</span></Label>
+                  <Label htmlFor="registration">Registration</Label>
                   <Input
                     id="registration"
                     placeholder="e.g. AB12 CDE"
                     value={registration}
                     onChange={(e) => setRegistration(e.target.value)}
-                    className={`uppercase ${attemptedSubmit && !registration.trim() ? 'border-red-500' : ''}`}
+                    className="uppercase"
                     data-testid="input-registration"
                   />
-                  {attemptedSubmit && !registration.trim() && (
-                    <p className="text-xs text-red-500">Registration is required</p>
-                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="make">Make <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="make">Make</Label>
                     <Input
                       id="make"
                       placeholder="e.g. Ford"
                       value={make}
                       onChange={(e) => setMake(e.target.value)}
-                      className={attemptedSubmit && !make.trim() ? 'border-red-500' : ''}
                       data-testid="input-make"
                     />
-                    {attemptedSubmit && !make.trim() && (
-                      <p className="text-xs text-red-500">Make is required</p>
-                    )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="model">Model <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="model">Model</Label>
                     <Input
                       id="model"
                       placeholder="e.g. Transit"
                       value={model}
                       onChange={(e) => setModel(e.target.value)}
-                      className={attemptedSubmit && !model.trim() ? 'border-red-500' : ''}
                       data-testid="input-model"
                     />
-                    {attemptedSubmit && !model.trim() && (
-                      <p className="text-xs text-red-500">Model is required</p>
-                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="year">Year <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                    <Label htmlFor="year">Year</Label>
                     <Input
                       id="year"
                       type="number"
@@ -183,7 +155,7 @@ export default function FleetVehicles() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Type <span className="text-red-500">*</span></Label>
+                    <Label>Type</Label>
                     <Select value={type} onValueChange={setType}>
                       <SelectTrigger data-testid="select-type">
                         <SelectValue />
@@ -198,8 +170,7 @@ export default function FleetVehicles() {
                     </Select>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground"><span className="text-red-500">*</span> Required fields</p>
-                <Button type="submit" className="w-full" disabled={!isVehicleFormValid || createVehicleMutation.isPending} data-testid="button-submit-vehicle">
+                <Button type="submit" className="w-full" disabled={createVehicleMutation.isPending} data-testid="button-submit-vehicle">
                   {createVehicleMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Add Vehicle
                 </Button>

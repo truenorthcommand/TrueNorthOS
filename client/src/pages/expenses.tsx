@@ -95,22 +95,6 @@ export default function Expenses() {
   const [noReceipt, setNoReceipt] = useState(false);
   const [fromLocation, setFromLocation] = useState("");
   const [toLocation, setToLocation] = useState("");
-  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
-
-  const isFormValid = (): boolean => {
-    if (!expenseDate) return false;
-    if (!description.trim()) return false;
-    if (!amount || parseFloat(amount) <= 0) return false;
-    if (!noReceipt && !receiptUrl) return false;
-    
-    if (category === "mileage") {
-      if (!fromLocation.trim()) return false;
-      if (!toLocation.trim()) return false;
-      if (!mileage || parseFloat(mileage) <= 0) return false;
-    }
-    
-    return true;
-  };
 
   const { data: expenses = [], isLoading: expensesLoading } = useQuery<ExpenseWithDetails[]>({
     queryKey: ["/api/expenses"],
@@ -236,42 +220,9 @@ export default function Expenses() {
     setNoReceipt(false);
     setFromLocation("");
     setToLocation("");
-    setAttemptedSubmit(false);
   };
 
   const handleSubmit = () => {
-    setAttemptedSubmit(true);
-    if (!expenseDate) {
-      toast.error("Please select a date");
-      return;
-    }
-    if (!description.trim()) {
-      toast.error("Please enter a description");
-      return;
-    }
-    if (!amount || parseFloat(amount) <= 0) {
-      toast.error("Please enter a valid amount");
-      return;
-    }
-    if (!noReceipt && !receiptUrl) {
-      toast.error("Please add a receipt photo or mark as 'No receipt'");
-      return;
-    }
-    if (category === "mileage") {
-      if (!fromLocation.trim()) {
-        toast.error("Please enter a 'From' location");
-        return;
-      }
-      if (!toLocation.trim()) {
-        toast.error("Please enter a 'To' location");
-        return;
-      }
-      if (!mileage || parseFloat(mileage) <= 0) {
-        toast.error("Please enter miles travelled");
-        return;
-      }
-    }
-
     const expenseData: any = {
       date: expenseDate,
       category,
@@ -377,7 +328,7 @@ export default function Expenses() {
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label>Category <span className="text-red-500">*</span></Label>
+                <Label>Category</Label>
                 <Select value={category} onValueChange={(v) => setCategory(v as ExpenseCategory)}>
                   <SelectTrigger data-testid="select-category">
                     <SelectValue placeholder="Select category" />
@@ -396,7 +347,7 @@ export default function Expenses() {
               </div>
 
               <div className="space-y-2">
-                <Label>Date <span className="text-red-500">*</span></Label>
+                <Label>Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start text-left font-normal" data-testid="button-select-date">
@@ -411,7 +362,7 @@ export default function Expenses() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Description <span className="text-red-500">*</span></Label>
+                <Label htmlFor="description">Description</Label>
                 <Input
                   id="description"
                   value={description}
@@ -425,7 +376,7 @@ export default function Expenses() {
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="fromLocation">From Location <span className="text-red-500">*</span></Label>
+                      <Label htmlFor="fromLocation">From Location</Label>
                       <Input
                         id="fromLocation"
                         value={fromLocation}
@@ -435,7 +386,7 @@ export default function Expenses() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="toLocation">To Location <span className="text-red-500">*</span></Label>
+                      <Label htmlFor="toLocation">To Location</Label>
                       <Input
                         id="toLocation"
                         value={toLocation}
@@ -447,7 +398,7 @@ export default function Expenses() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="mileage">Miles Travelled <span className="text-red-500">*</span></Label>
+                      <Label htmlFor="mileage">Miles Travelled</Label>
                       <Input
                         id="mileage"
                         type="number"
@@ -459,7 +410,7 @@ export default function Expenses() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Rate <span className="text-red-500">*</span></Label>
+                      <Label>Rate</Label>
                       <Select value={mileageRate} onValueChange={setMileageRate}>
                         <SelectTrigger data-testid="select-mileage-rate">
                           <SelectValue placeholder="Select rate" />
@@ -482,7 +433,7 @@ export default function Expenses() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Amount (£) <span className="text-red-500">*</span></Label>
+                  <Label htmlFor="amount">Amount (£)</Label>
                   <Input
                     id="amount"
                     type="number"
@@ -562,7 +513,7 @@ export default function Expenses() {
               <Button variant="outline" onClick={() => setAddExpenseOpen(false)} data-testid="button-cancel">
                 Cancel
               </Button>
-              <Button onClick={handleSubmit} disabled={createExpenseMutation.isPending || !isFormValid()} data-testid="button-submit-expense">
+              <Button onClick={handleSubmit} disabled={createExpenseMutation.isPending} data-testid="button-submit-expense">
                 {createExpenseMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Submit Expense
               </Button>

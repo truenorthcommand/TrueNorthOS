@@ -52,25 +52,12 @@ export default function WalkaroundCheck() {
   );
   const [hasSignature, setHasSignature] = useState(false);
   const signatureRef = useRef<SignatureCanvas>(null);
-  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
   const { data: vehicles = [], isLoading: vehiclesLoading } = useQuery<Vehicle[]>({
     queryKey: ["/api/fleet/vehicles"],
   });
 
   const hasFailures = Object.values(items).some((item) => item.status === "fail");
-  
-  const failedItemsWithoutNote = Object.entries(items)
-    .filter(([_, value]) => value.status === "fail" && !value.note.trim())
-    .map(([key]) => key);
-  
-  const failedItemsWithoutSeverity = Object.entries(items)
-    .filter(([_, value]) => value.status === "fail" && !value.severity)
-    .map(([key]) => key);
-  
-  const isFormValid = vehicleId && hasSignature && 
-    failedItemsWithoutNote.length === 0 && 
-    failedItemsWithoutSeverity.length === 0;
 
   const clearSignature = () => {
     signatureRef.current?.clear();
@@ -109,26 +96,6 @@ export default function WalkaroundCheck() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setAttemptedSubmit(true);
-    if (!vehicleId) {
-      toast({ title: "Error", description: "Please select a vehicle", variant: "destructive" });
-      return;
-    }
-    
-    if (failedItemsWithoutSeverity.length > 0) {
-      toast({ title: "Error", description: "Please select severity for all failed items", variant: "destructive" });
-      return;
-    }
-    
-    if (failedItemsWithoutNote.length > 0) {
-      toast({ title: "Error", description: "Please add a note describing each failed item", variant: "destructive" });
-      return;
-    }
-    
-    if (!hasSignature) {
-      toast({ title: "Error", description: "Signature is required to complete the check", variant: "destructive" });
-      return;
-    }
 
     const signatureData = signatureRef.current?.toDataURL() || null;
 
@@ -190,9 +157,9 @@ export default function WalkaroundCheck() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="vehicle">Vehicle <span className="text-red-500">*</span></Label>
+              <Label htmlFor="vehicle">Vehicle</Label>
               <Select value={vehicleId} onValueChange={setVehicleId}>
-                <SelectTrigger className={attemptedSubmit && !vehicleId ? "border-red-500" : ""} data-testid="select-vehicle">
+                <SelectTrigger data-testid="select-vehicle">
                   <SelectValue placeholder="Select a vehicle" />
                 </SelectTrigger>
                 <SelectContent>
@@ -257,7 +224,7 @@ export default function WalkaroundCheck() {
                 {items[item.key].status === "fail" && (
                   <div className="space-y-3 pt-2 border-t">
                     <div className="space-y-2">
-                      <Label>Severity <span className="text-red-500">*</span></Label>
+                      <Label>Severity</Label>
                       <RadioGroup
                         value={items[item.key].severity || ""}
                         onValueChange={(v) => updateItem(item.key, { severity: v as "critical" | "major" | "minor" })}
@@ -276,22 +243,15 @@ export default function WalkaroundCheck() {
                           <Label htmlFor={`${item.key}-minor`} className="text-yellow-600">Minor</Label>
                         </div>
                       </RadioGroup>
-                      {attemptedSubmit && !items[item.key].severity && (
-                        <p className="text-xs text-red-500">Please select a severity level</p>
-                      )}
                     </div>
                     <div className="space-y-2">
-                      <Label>Note <span className="text-red-500">*</span></Label>
+                      <Label>Note</Label>
                       <Textarea
                         placeholder="Describe the issue..."
                         value={items[item.key].note}
                         onChange={(e) => updateItem(item.key, { note: e.target.value })}
-                        className={attemptedSubmit && !items[item.key].note.trim() ? "border-red-500" : ""}
                         data-testid={`input-${item.key}-note`}
                       />
-                      {attemptedSubmit && !items[item.key].note.trim() && (
-                        <p className="text-xs text-red-500">A note is required for failed items</p>
-                      )}
                     </div>
                   </div>
                 )}
@@ -344,11 +304,11 @@ export default function WalkaroundCheck() {
           </CardContent>
         </Card>
 
-        <Card className={attemptedSubmit && !hasSignature ? "border-red-500" : hasSignature ? "border-green-500" : ""}>
+        <Card className={hasSignature ? "border-green-500" : ""}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PenTool className="h-5 w-5" />
-              Signature <span className="text-red-500">*</span>
+              Signature
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -392,7 +352,7 @@ export default function WalkaroundCheck() {
           type="submit"
           className="w-full"
           size="lg"
-          disabled={!isFormValid || createCheckMutation.isPending}
+          disabled={createCheckMutation.isPending}
           data-testid="button-submit-check"
         >
           {createCheckMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

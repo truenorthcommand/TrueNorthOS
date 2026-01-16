@@ -31,7 +31,6 @@ export default function Timesheets() {
   const [manualClockOut, setManualClockOut] = useState("17:00");
   const [manualBreak, setManualBreak] = useState("30");
   const [manualNotes, setManualNotes] = useState("");
-  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
@@ -93,7 +92,6 @@ export default function Timesheets() {
       setManualClockOut("17:00");
       setManualBreak("30");
       setManualNotes("");
-      setAttemptedSubmit(false);
       toast.success("Manual entry created successfully");
     },
     onError: (error: Error) => {
@@ -143,70 +141,18 @@ export default function Timesheets() {
     },
   });
 
-  const isManualFormValid = () => {
-    if (!manualDate) return false;
-    if (!manualClockIn) return false;
-    if (!manualClockOut) return false;
-    
-    const [clockInHours, clockInMins] = manualClockIn.split(":").map(Number);
-    const [clockOutHours, clockOutMins] = manualClockOut.split(":").map(Number);
-    const clockInMinutes = clockInHours * 60 + clockInMins;
-    const clockOutMinutes = clockOutHours * 60 + clockOutMins;
-    
-    if (clockOutMinutes <= clockInMinutes) return false;
-    
-    return true;
-  };
-
-  const getClockOutError = () => {
-    if (!manualClockIn || !manualClockOut) return null;
-    
-    const [clockInHours, clockInMins] = manualClockIn.split(":").map(Number);
-    const [clockOutHours, clockOutMins] = manualClockOut.split(":").map(Number);
-    const clockInMinutes = clockInHours * 60 + clockInMins;
-    const clockOutMinutes = clockOutHours * 60 + clockOutMins;
-    
-    if (clockOutMinutes <= clockInMinutes) {
-      return "Clock out must be after clock in time";
-    }
-    return null;
-  };
-
-  const clockOutError = getClockOutError();
-
   const handleManualSubmit = () => {
-    setAttemptedSubmit(true);
-    if (!manualDate) {
-      toast.error("Please select a date");
-      return;
-    }
+    const [clockInHours, clockInMins] = (manualClockIn || "09:00").split(":").map(Number);
+    const [clockOutHours, clockOutMins] = (manualClockOut || "17:00").split(":").map(Number);
 
-    if (!manualClockIn) {
-      toast.error("Please enter clock in time");
-      return;
-    }
-
-    if (!manualClockOut) {
-      toast.error("Please enter clock out time");
-      return;
-    }
-
-    const [clockInHours, clockInMins] = manualClockIn.split(":").map(Number);
-    const [clockOutHours, clockOutMins] = manualClockOut.split(":").map(Number);
-
-    const clockIn = new Date(manualDate);
+    const clockIn = new Date(manualDate || new Date());
     clockIn.setHours(clockInHours, clockInMins, 0, 0);
 
-    const clockOut = new Date(manualDate);
+    const clockOut = new Date(manualDate || new Date());
     clockOut.setHours(clockOutHours, clockOutMins, 0, 0);
 
-    if (clockOut <= clockIn) {
-      toast.error("Clock out time must be after clock in time");
-      return;
-    }
-
     createManualEntryMutation.mutate({
-      date: manualDate,
+      date: manualDate || new Date(),
       clockIn,
       clockOut,
       breakMinutes: parseInt(manualBreak) || 0,
@@ -276,10 +222,10 @@ export default function Timesheets() {
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label>Date <span className="text-red-500">*</span></Label>
+                <Label>Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className={`w-full justify-start text-left font-normal ${attemptedSubmit && !manualDate ? 'border-red-500' : ''}`} data-testid="button-select-date">
+                    <Button variant="outline" className="w-full justify-start text-left font-normal" data-testid="button-select-date">
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {manualDate ? format(manualDate, "PPP") : "Select date"}
                     </Button>
@@ -291,29 +237,24 @@ export default function Timesheets() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="clockIn">Clock In Time <span className="text-red-500">*</span></Label>
+                  <Label htmlFor="clockIn">Clock In Time</Label>
                   <Input
                     id="clockIn"
                     type="time"
                     value={manualClockIn}
                     onChange={(e) => setManualClockIn(e.target.value)}
-                    className={attemptedSubmit && !manualClockIn ? 'border-red-500' : ''}
                     data-testid="input-clock-in-time"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="clockOut">Clock Out Time <span className="text-red-500">*</span></Label>
+                  <Label htmlFor="clockOut">Clock Out Time</Label>
                   <Input
                     id="clockOut"
                     type="time"
                     value={manualClockOut}
                     onChange={(e) => setManualClockOut(e.target.value)}
-                    className={attemptedSubmit && (!manualClockOut || clockOutError) ? 'border-red-500' : ''}
                     data-testid="input-clock-out-time"
                   />
-                  {attemptedSubmit && clockOutError && (
-                    <p className="text-sm text-red-500" data-testid="text-clock-out-error">{clockOutError}</p>
-                  )}
                 </div>
               </div>
               <div className="space-y-2">
@@ -342,7 +283,7 @@ export default function Timesheets() {
               <Button variant="outline" onClick={() => setManualEntryOpen(false)} data-testid="button-cancel-manual">
                 Cancel
               </Button>
-              <Button onClick={handleManualSubmit} disabled={createManualEntryMutation.isPending || !isManualFormValid()} data-testid="button-submit-manual">
+              <Button onClick={handleManualSubmit} disabled={createManualEntryMutation.isPending} data-testid="button-submit-manual">
                 {createManualEntryMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit"}
               </Button>
             </DialogFooter>

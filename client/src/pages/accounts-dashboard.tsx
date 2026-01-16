@@ -710,7 +710,6 @@ export default function AccountsDashboard() {
                     <Button variant="outline" onClick={() => setShowFixedCostDialog(false)}>Cancel</Button>
                     <Button 
                       onClick={() => createFixedCostMutation.mutate(newFixedCost)}
-                      disabled={!newFixedCost.name || newFixedCost.amount <= 0}
                       data-testid="save-fixed-cost"
                     >
                       Add Cost

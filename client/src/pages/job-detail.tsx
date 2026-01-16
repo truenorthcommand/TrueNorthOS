@@ -614,19 +614,8 @@ export default function JobDetail() {
     }
   };
 
-  // Validation for sign-off readiness
-  const hasEvidencePhotos = (job.photos || []).filter(p => !p.source || p.source === 'engineer').length > 0;
-  const hasDescription = formData.description && formData.description.trim().length > 0;
-  const hasWorksCompleted = formData.worksCompleted && formData.worksCompleted.trim().length > 0;
-  const materialsValid = (job.materials || []).every(m => m.name && m.name.trim() && m.quantity && m.quantity.trim());
-  
-  const validationIssues: string[] = [];
-  if (!hasDescription) validationIssues.push("Description of Works is required");
-  if (!hasWorksCompleted) validationIssues.push("Works Completed field is required (enter N/A if no work done)");
-  if (!hasEvidencePhotos) validationIssues.push("At least one evidence photo is required");
-  if ((job.materials || []).length > 0 && !materialsValid) validationIssues.push("All materials must have both name and quantity");
-  
-  const isReadyForSignOff = validationIssues.length === 0;
+  // Sign-off is always available - no validation required
+  const isReadyForSignOff = true;
 
   return (
     <div className="max-w-4xl mx-auto pb-20">
@@ -689,12 +678,11 @@ export default function JobDetail() {
           {job.status !== "Signed Off" && (
             <Link href={`/jobs/${job.id}/sign-off`}>
               <Button 
-                className={`flex-1 sm:flex-none ${isReadyForSignOff ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'}`}
+                className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700"
                 data-testid="button-sign-off"
               >
                 <FileCheck className="mr-2 h-4 w-4" />
                 Sign Off
-                {!isReadyForSignOff && <span className="ml-1 text-xs">({validationIssues.length})</span>}
               </Button>
             </Link>
           )}
@@ -727,30 +715,6 @@ export default function JobDetail() {
         </Card>
       )}
 
-      {/* Sign-off Validation Status - Only show in engineer view */}
-      {!showAdminView && job.status !== "Signed Off" && !isReadyForSignOff && (
-        <Card className="mb-6 border-2 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 no-print" data-testid="card-validation-status">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2 text-amber-700 dark:text-amber-300">
-              <AlertTriangle className="h-5 w-5" />
-              Required Before Sign-off
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <ul className="space-y-2">
-              {validationIssues.map((issue, idx) => (
-                <li key={idx} className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200">
-                  <X className="h-4 w-4 text-amber-600" />
-                  {issue}
-                </li>
-              ))}
-            </ul>
-            <p className="text-xs text-muted-foreground mt-3">
-              Engineer and customer signatures will be captured on the sign-off page
-            </p>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Sign-off Ready Indicator - Only show in engineer view */}
       {!showAdminView && job.status !== "Signed Off" && isReadyForSignOff && (
