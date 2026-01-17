@@ -80,6 +80,8 @@ TrueNorth Trade OS is a comprehensive business management platform that enables 
 - **Quote Pricing Advisor** - AI-powered pricing suggestions based on historical data
 - **Receipt OCR** - Automatic data extraction from expense receipts
 - **Smart File Assignment** - AI analyzes uploaded files to suggest client/job assignments
+- **Web Search** - AI can search the web for suppliers, regulations, product specs, and technical info
+- **Conversation Memory** - AI remembers past conversations and learns from business patterns
 
 ### 8. File Storage
 - Central file browser with grid/list view and search filters
