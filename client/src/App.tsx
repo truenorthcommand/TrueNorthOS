@@ -61,6 +61,7 @@ import SnaggingSheets from "@/pages/snagging-sheets";
 import SnaggingDetail from "@/pages/snagging-detail";
 import AccountsDashboard from "@/pages/accounts-dashboard";
 import OutlookInbox from "@/pages/outlook-inbox";
+import Files from "@/pages/files";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -188,6 +189,9 @@ function Router() {
       </Route>
       <Route path="/voice-notes">
         <PrivateRoute component={VoiceNotes} />
+      </Route>
+      <Route path="/files">
+        <PrivateRoute component={Files} />
       </Route>
       <Route path="/document-scanner">
         <PrivateRoute component={DocumentScanner} />
