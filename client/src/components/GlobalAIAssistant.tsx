@@ -387,12 +387,24 @@ export function GlobalAIAssistant() {
                 <Plus className="h-4 w-4" />
               </button>
               <button
+                onClick={() => {
+                  setInput("Search the web for ");
+                  inputRef.current?.focus();
+                }}
+                className="p-1.5 text-white/80 hover:bg-white/10 rounded-lg transition-colors"
+                data-testid="button-web-search"
+                title="Search the web"
+              >
+                <Globe className="h-4 w-4" />
+              </button>
+              <button
                 onClick={() => setShowSearch(!showSearch)}
                 className={cn(
                   "p-1.5 rounded-lg transition-colors",
                   showSearch ? "bg-white/20 text-white" : "text-white/80 hover:bg-white/10"
                 )}
                 data-testid="button-toggle-search"
+                title="Search records"
               >
                 <Search className="h-4 w-4" />
               </button>
