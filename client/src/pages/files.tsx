@@ -316,12 +316,12 @@ export default function Files() {
               
               <div>
                 <Label>Assign to Client (Optional)</Label>
-                <Select value={newFileData.clientId} onValueChange={(v) => setNewFileData({ ...newFileData, clientId: v })}>
+                <Select value={newFileData.clientId || "none"} onValueChange={(v) => setNewFileData({ ...newFileData, clientId: v === "none" ? "" : v })}>
                   <SelectTrigger data-testid="select-client">
                     <SelectValue placeholder="Select client..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {clients.map((client) => (
                       <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                     ))}
@@ -331,12 +331,12 @@ export default function Files() {
               
               <div>
                 <Label>Assign to Job (Optional)</Label>
-                <Select value={newFileData.jobId} onValueChange={(v) => setNewFileData({ ...newFileData, jobId: v })}>
+                <Select value={newFileData.jobId || "none"} onValueChange={(v) => setNewFileData({ ...newFileData, jobId: v === "none" ? "" : v })}>
                   <SelectTrigger data-testid="select-job">
                     <SelectValue placeholder="Select job..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {jobs.map((job) => (
                       <SelectItem key={job.id} value={job.id}>{job.jobNo} - {job.customerName}</SelectItem>
                     ))}
@@ -346,12 +346,12 @@ export default function Files() {
               
               <div>
                 <Label>Category</Label>
-                <Select value={newFileData.category} onValueChange={(v) => setNewFileData({ ...newFileData, category: v })}>
+                <Select value={newFileData.category || "none"} onValueChange={(v) => setNewFileData({ ...newFileData, category: v === "none" ? "" : v })}>
                   <SelectTrigger data-testid="select-category">
                     <SelectValue placeholder="Select category..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     <SelectItem value="contract">Contract</SelectItem>
                     <SelectItem value="invoice">Invoice</SelectItem>
                     <SelectItem value="receipt">Receipt</SelectItem>
@@ -589,12 +589,12 @@ export default function Files() {
 
               <div>
                 <Label>Assign to Client</Label>
-                <Select value={newFileData.clientId} onValueChange={(v) => setNewFileData({ ...newFileData, clientId: v })}>
+                <Select value={newFileData.clientId || "none"} onValueChange={(v) => setNewFileData({ ...newFileData, clientId: v === "none" ? "" : v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select client..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {clients.map((client) => (
                       <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                     ))}
@@ -604,12 +604,12 @@ export default function Files() {
               
               <div>
                 <Label>Assign to Job</Label>
-                <Select value={newFileData.jobId} onValueChange={(v) => setNewFileData({ ...newFileData, jobId: v })}>
+                <Select value={newFileData.jobId || "none"} onValueChange={(v) => setNewFileData({ ...newFileData, jobId: v === "none" ? "" : v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select job..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {jobs.map((job) => (
                       <SelectItem key={job.id} value={job.id}>{job.jobNo} - {job.customerName}</SelectItem>
                     ))}
@@ -619,12 +619,12 @@ export default function Files() {
               
               <div>
                 <Label>Category</Label>
-                <Select value={newFileData.category} onValueChange={(v) => setNewFileData({ ...newFileData, category: v })}>
+                <Select value={newFileData.category || "none"} onValueChange={(v) => setNewFileData({ ...newFileData, category: v === "none" ? "" : v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select category..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     <SelectItem value="contract">Contract</SelectItem>
                     <SelectItem value="invoice">Invoice</SelectItem>
                     <SelectItem value="receipt">Receipt</SelectItem>
