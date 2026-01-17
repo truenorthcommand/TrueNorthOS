@@ -3,6 +3,98 @@ import OpenAI from "openai";
 import { storage } from "./storage";
 import type { Job, Client, Quote, Invoice, AiMessage, AiBusinessPattern, AiUserPreference } from "@shared/schema";
 
+// Tavily Web Search types
+interface TavilySearchResult {
+  title: string;
+  url: string;
+  content: string;
+  score: number;
+}
+
+interface TavilySearchResponse {
+  results: TavilySearchResult[];
+  answer?: string;
+}
+
+async function searchWeb(query: string): Promise<{ results: TavilySearchResult[]; answer?: string } | null> {
+  const apiKey = process.env.TAVILY_API_KEY;
+  if (!apiKey) {
+    console.log("Tavily API key not configured");
+    return null;
+  }
+
+  try {
+    const response = await fetch("https://api.tavily.com/search", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        api_key: apiKey,
+        query: query,
+        search_depth: "basic",
+        include_answer: true,
+        include_raw_content: false,
+        max_results: 5,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Tavily search failed:", response.statusText);
+      return null;
+    }
+
+    const data = await response.json() as TavilySearchResponse;
+    return {
+      results: data.results || [],
+      answer: data.answer,
+    };
+  } catch (error) {
+    console.error("Error calling Tavily:", error);
+    return null;
+  }
+}
+
+function shouldSearchWeb(message: string): boolean {
+  const searchTriggers = [
+    "search for",
+    "search the web",
+    "look up",
+    "find online",
+    "google",
+    "research",
+    "what is",
+    "how to",
+    "where can i",
+    "where to buy",
+    "supplier",
+    "price of",
+    "cost of",
+    "regulations",
+    "bs 7671",
+    "gas safe",
+    "building regs",
+    "part p",
+    "wiring regulations",
+    "specifications",
+    "specs for",
+    "datasheet",
+    "technical",
+    "manufacturer",
+    "stockist",
+    "wholesaler",
+    "trade counter",
+    "plumbers merchant",
+    "electrical wholesaler",
+    "compare",
+    "alternative to",
+    "equivalent",
+  ];
+
+  const lowerMessage = message.toLowerCase();
+  return searchTriggers.some(trigger => lowerMessage.includes(trigger));
+}
+
 function getOpenAIClient(): OpenAI | null {
   if (process.env.AI_INTEGRATIONS_OPENAI_API_KEY && process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) {
     return new OpenAI({
@@ -24,12 +116,22 @@ You have access to business data and can help with:
 - Answering questions about the platform
 - Helping navigate and use features
 - Offering proactive suggestions
+- Searching the web for products, suppliers, regulations, and technical information
 
 CAPABILITIES:
 1. SEARCH: Find jobs, clients, quotes, invoices by natural language
-2. INSIGHTS: Analyze business data and provide actionable insights
-3. NAVIGATION: Guide users to the right features and pages
-4. COMMANDS: Help create jobs, quotes, invoices, assign engineers
+2. WEB SEARCH: Research products, suppliers, regulations, specifications, and technical info online
+3. INSIGHTS: Analyze business data and provide actionable insights
+4. NAVIGATION: Guide users to the right features and pages
+5. COMMANDS: Help create jobs, quotes, invoices, assign engineers
+
+WEB SEARCH:
+When the user asks about products, suppliers, regulations, or technical specifications, I automatically search the web and include source links. I can help research:
+- Trade suppliers and wholesalers (plumbers merchants, electrical wholesalers)
+- Product specifications and datasheets
+- UK regulations (BS 7671, Gas Safe, Part P, Building Regs)
+- Material prices and alternatives
+- Technical how-to guides
 
 CONTEXT PROVIDED:
 - Current page the user is viewing
@@ -372,10 +474,28 @@ export function registerGlobalAssistantRoutes(app: Express): void {
 
       const businessContext = await getBusinessContext(userId);
 
+      // Check if web search is needed
+      let webSearchResults = "";
+      if (shouldSearchWeb(message)) {
+        console.log("Performing web search for:", message);
+        const searchData = await searchWeb(message);
+        if (searchData && searchData.results.length > 0) {
+          webSearchResults = `\n\nWEB SEARCH RESULTS:`;
+          if (searchData.answer) {
+            webSearchResults += `\nSummary: ${searchData.answer}\n`;
+          }
+          webSearchResults += `\nSources:`;
+          searchData.results.forEach((result, i) => {
+            webSearchResults += `\n${i + 1}. ${result.title}\n   URL: ${result.url}\n   ${result.content.slice(0, 200)}...`;
+          });
+        }
+      }
+
       const contextMessage = `
 CURRENT CONTEXT:
 - Page: ${currentPage || 'Dashboard'}
 ${businessContext}
+${webSearchResults}
 
 USER MESSAGE: ${message}`;
 
@@ -475,8 +595,8 @@ function getPageSuggestions(page: string): string[] {
     dashboard: [
       "Show me today's jobs",
       "What invoices are overdue?",
-      "Who has the most workload this week?",
-      "Create a new quote",
+      "Search for a supplier near me",
+      "Look up BS 7671 regulations",
     ],
     jobs: [
       "Find jobs in London",

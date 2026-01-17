@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MessageSquare, X, Send, Sparkles, Search, Loader2, ExternalLink, Minimize2, Maximize2, History, Plus, Trash2, ChevronLeft } from "lucide-react";
+import { MessageSquare, X, Send, Sparkles, Search, Loader2, ExternalLink, Minimize2, Maximize2, History, Plus, Trash2, ChevronLeft, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
 
@@ -38,9 +38,23 @@ export function GlobalAIAssistant() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [isSearchingWeb, setIsSearchingWeb] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [location, navigate] = useLocation();
+
+  const willSearchWeb = (message: string): boolean => {
+    const searchTriggers = [
+      "search for", "search the web", "look up", "find online", "google", "research",
+      "what is", "how to", "where can i", "where to buy", "supplier", "price of",
+      "cost of", "regulations", "bs 7671", "gas safe", "building regs", "part p",
+      "wiring regulations", "specifications", "specs for", "datasheet", "technical",
+      "manufacturer", "stockist", "wholesaler", "trade counter", "plumbers merchant",
+      "electrical wholesaler", "compare", "alternative to", "equivalent",
+    ];
+    const lowerMessage = message.toLowerCase();
+    return searchTriggers.some(trigger => lowerMessage.includes(trigger));
+  };
 
   const currentPage = location.split("/")[1] || "dashboard";
 
@@ -189,6 +203,7 @@ export function GlobalAIAssistant() {
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
+    setIsSearchingWeb(willSearchWeb(messageToSend));
     setSuggestions([]);
     setSearchResults([]);
     setShowSearch(false);
@@ -259,6 +274,7 @@ export function GlobalAIAssistant() {
       ]);
     } finally {
       setIsLoading(false);
+      setIsSearchingWeb(false);
     }
   };
 
@@ -538,8 +554,15 @@ export function GlobalAIAssistant() {
             )}
             {isLoading && messages[messages.length - 1]?.content === "" && (
               <div className="flex justify-start">
-                <div className="bg-gray-100 rounded-2xl px-4 py-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
+                <div className="bg-gray-100 rounded-2xl px-4 py-2 flex items-center gap-2">
+                  {isSearchingWeb ? (
+                    <>
+                      <Globe className="h-4 w-4 animate-pulse text-blue-500" />
+                      <span className="text-sm text-gray-500">Searching the web...</span>
+                    </>
+                  ) : (
+                    <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
+                  )}
                 </div>
               </div>
             )}
