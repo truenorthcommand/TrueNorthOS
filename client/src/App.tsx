@@ -66,6 +66,7 @@ import GlassDemo from "@/pages/glass-demo";
 import GlassDashboardDemo from "@/pages/glass-dashboard-demo";
 import IconStylesDemo from "@/pages/icon-styles-demo";
 import GlowDashboardDemo from "@/pages/glow-dashboard-demo";
+import BigChangeDashboardDemo from "@/pages/bigchange-dashboard-demo";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -112,6 +113,7 @@ function Router() {
       <Route path="/glass-dashboard" component={GlassDashboardDemo} />
       <Route path="/icon-styles" component={IconStylesDemo} />
       <Route path="/glow-dashboard" component={GlowDashboardDemo} />
+      <Route path="/bigchange-dashboard" component={BigChangeDashboardDemo} />
       <Route path="/clients">
         <PrivateRoute component={Clients} />
       </Route>
