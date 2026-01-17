@@ -282,36 +282,84 @@ export default function Files() {
               )}
 
               {aiSuggestion && !isAnalyzing && (
-                <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
-                  <Sparkles className="h-4 w-4 text-blue-600" />
-                  <AlertDescription>
-                    <div className="space-y-2">
-                      <p className="font-medium text-blue-800 dark:text-blue-200">
-                        AI Suggestion ({aiSuggestion.confidence} confidence)
-                      </p>
-                      <p className="text-sm text-blue-700 dark:text-blue-300">
-                        {aiSuggestion.reasoning}
-                      </p>
-                      {aiSuggestion.suggestedClientName && (
-                        <Badge variant="outline" className="mr-1">
-                          <Check className="h-3 w-3 mr-1" />
-                          Client: {aiSuggestion.suggestedClientName}
-                        </Badge>
+                <div className="rounded-lg border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-full bg-blue-100 dark:bg-blue-900">
+                      <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-blue-900 dark:text-blue-100">AI Analysis Results</h4>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 capitalize">{aiSuggestion.confidence} confidence</p>
+                    </div>
+                  </div>
+                  
+                  <p className="text-sm text-blue-800 dark:text-blue-200 bg-white/50 dark:bg-black/20 rounded p-2">
+                    {aiSuggestion.reasoning}
+                  </p>
+                  
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-blue-700 dark:text-blue-300 uppercase tracking-wide">Suggested Actions</p>
+                    <div className="flex flex-wrap gap-2">
+                      {aiSuggestion.suggestedClientId && aiSuggestion.suggestedClientName && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="bg-white dark:bg-gray-800 border-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900"
+                          onClick={() => setNewFileData({ ...newFileData, clientId: aiSuggestion.suggestedClientId || "" })}
+                          data-testid="button-apply-client"
+                        >
+                          <Check className="h-3 w-3 mr-1 text-green-600" />
+                          Assign to {aiSuggestion.suggestedClientName}
+                        </Button>
                       )}
-                      {aiSuggestion.suggestedJobNo && (
-                        <Badge variant="secondary" className="mr-1">
-                          <Check className="h-3 w-3 mr-1" />
-                          Job: {aiSuggestion.suggestedJobNo}
-                        </Badge>
+                      {aiSuggestion.suggestedJobId && aiSuggestion.suggestedJobNo && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="bg-white dark:bg-gray-800 border-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900"
+                          onClick={() => setNewFileData({ ...newFileData, jobId: aiSuggestion.suggestedJobId || "" })}
+                          data-testid="button-apply-job"
+                        >
+                          <Check className="h-3 w-3 mr-1 text-green-600" />
+                          Assign to Job {aiSuggestion.suggestedJobNo}
+                        </Button>
                       )}
                       {aiSuggestion.suggestedCategory && (
-                        <Badge className="capitalize">
-                          {aiSuggestion.suggestedCategory}
-                        </Badge>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="bg-white dark:bg-gray-800 border-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 capitalize"
+                          onClick={() => setNewFileData({ ...newFileData, category: aiSuggestion.suggestedCategory || "" })}
+                          data-testid="button-apply-category"
+                        >
+                          <Check className="h-3 w-3 mr-1 text-green-600" />
+                          Set as {aiSuggestion.suggestedCategory}
+                        </Button>
+                      )}
+                      {(aiSuggestion.suggestedClientId || aiSuggestion.suggestedJobId || aiSuggestion.suggestedCategory) && (
+                        <Button
+                          type="button"
+                          variant="default"
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700"
+                          onClick={() => setNewFileData({
+                            ...newFileData,
+                            clientId: aiSuggestion.suggestedClientId || newFileData.clientId,
+                            jobId: aiSuggestion.suggestedJobId || newFileData.jobId,
+                            category: aiSuggestion.suggestedCategory || newFileData.category
+                          })}
+                          data-testid="button-apply-all"
+                        >
+                          <Check className="h-3 w-3 mr-1" />
+                          Apply All Suggestions
+                        </Button>
                       )}
                     </div>
-                  </AlertDescription>
-                </Alert>
+                  </div>
+                </div>
               )}
               
               <div>
