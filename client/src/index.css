@@ -161,3 +161,32 @@
 .print-only {
   display: none;
 }
+
+/* Button Bounce Animation */
+@keyframes button-bounce {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+button,
+[role="button"],
+.btn,
+input[type="submit"],
+input[type="button"] {
+  transition: transform 0.1s ease-out;
+}
+
+button:active,
+[role="button"]:active,
+.btn:active,
+input[type="submit"]:active,
+input[type="button"]:active {
+  animation: button-bounce 0.15s ease-out;
+}
