@@ -77,15 +77,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Tooltip>
           <TooltipTrigger asChild>
             <Link href={href}>
-              <Button
-                variant={isActive ? "secondary" : "ghost"}
-                size="icon"
-                className="w-10 h-10"
+              <button
+                className={cn(
+                  "w-10 h-10 flex items-center justify-center rounded-lg transition-colors",
+                  isActive 
+                    ? "bg-blue-600 text-white" 
+                    : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                )}
                 onClick={onClick}
                 data-testid={`nav-link-${href.replace(/\//g, '-').slice(1) || 'home'}`}
               >
                 <Icon className="h-4 w-4" />
-              </Button>
+              </button>
             </Link>
           </TooltipTrigger>
           <TooltipContent side="right">
@@ -97,18 +100,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
     
     return (
       <Link href={href}>
-        <Button
-          variant={isActive ? "secondary" : "ghost"}
-          className="w-full justify-start h-10 text-base font-medium pl-10"
+        <button
+          className={cn(
+            "w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors pl-10",
+            isActive 
+              ? "bg-blue-600 text-white" 
+              : "text-slate-300 hover:bg-slate-700 hover:text-white"
+          )}
           onClick={() => {
             setIsOpen(false);
             onClick?.();
           }}
           data-testid={`nav-link-${href.replace(/\//g, '-').slice(1) || 'home'}`}
         >
-          <Icon className="mr-3 h-4 w-4" />
+          <Icon className="h-4 w-4" />
           {linkChildren}
-        </Button>
+        </button>
       </Link>
     );
   };
@@ -128,15 +135,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
       return (
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="w-10 h-10"
+            <button
+              className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
               onClick={() => setSidebarCollapsed(false)}
               data-testid={`menu-group-${section}`}
             >
               <Icon className="h-5 w-5" />
-            </Button>
+            </button>
           </TooltipTrigger>
           <TooltipContent side="right">
             {title}
@@ -148,20 +153,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
     return (
       <Collapsible open={isExpanded(section)} onOpenChange={() => toggleSection(section)}>
         <CollapsibleTrigger asChild>
-          <Button
-            variant="ghost"
-            className="w-full justify-start h-12 text-lg font-medium hover:bg-accent"
+          <button
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-200 hover:bg-slate-700 hover:text-white rounded-lg transition-colors"
             data-testid={`menu-group-${section}`}
           >
-            <Icon className="mr-3 h-5 w-5" />
+            <Icon className="h-5 w-5" />
             {title}
             <ChevronDown className={cn(
               "ml-auto h-4 w-4 transition-transform duration-200",
               isExpanded(section) ? "rotate-180" : ""
             )} />
-          </Button>
+          </button>
         </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-1 ml-2 border-l-2 border-muted pl-2">
+        <CollapsibleContent className="space-y-1 ml-2 border-l-2 border-slate-600 pl-2">
           {groupChildren}
         </CollapsibleContent>
       </Collapsible>
@@ -171,14 +175,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const NavContent = ({ collapsed = false }: { collapsed?: boolean }) => (
     <div className="flex flex-col gap-2 h-full">
       <div className={cn(
-        "flex items-center gap-2 mb-6",
+        "flex items-center gap-2 mb-6 pb-4 border-b border-slate-700",
         collapsed ? "justify-center" : "px-2"
       )}>
         {!collapsed && (
           <div className="flex flex-col">
-            <span className="text-lg font-bold tracking-tight leading-tight">Pro Main Solutions</span>
-            <span className="text-[10px] text-muted-foreground leading-tight">Powered By TrueNorth Operations Group</span>
+            <span className="text-xl font-bold text-white tracking-tight leading-tight">TrueNorth</span>
+            <span className="text-xs text-slate-400 leading-tight">Trade OS</span>
           </div>
+        )}
+        {collapsed && (
+          <span className="text-xl font-bold text-white">TN</span>
         )}
       </div>
 
@@ -190,29 +197,36 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Tooltip>
             <TooltipTrigger asChild>
               <Link href="/">
-                <Button
-                  variant={location === "/" ? "secondary" : "ghost"}
-                  size="icon"
-                  className="w-10 h-10"
+                <button
+                  className={cn(
+                    "w-10 h-10 flex items-center justify-center rounded-lg transition-colors",
+                    location === "/" 
+                      ? "bg-blue-600 text-white" 
+                      : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                  )}
                   data-testid="nav-dashboard"
                 >
                   <LayoutDashboard className="h-5 w-5" />
-                </Button>
+                </button>
               </Link>
             </TooltipTrigger>
             <TooltipContent side="right">Dashboard</TooltipContent>
           </Tooltip>
         ) : (
           <Link href="/">
-            <Button
-              variant={location === "/" ? "secondary" : "ghost"}
-              className="w-full justify-start h-12 text-lg font-medium"
+            <button
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors",
+                location === "/" 
+                  ? "bg-blue-600 text-white" 
+                  : "text-slate-300 hover:bg-slate-700 hover:text-white"
+              )}
               onClick={() => setIsOpen(false)}
               data-testid="nav-dashboard"
             >
-              <LayoutDashboard className="mr-3 h-5 w-5" />
+              <LayoutDashboard className="h-5 w-5" />
               Dashboard
-            </Button>
+            </button>
           </Link>
         )}
 
@@ -222,29 +236,36 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Tooltip>
               <TooltipTrigger asChild>
                 <Link href="/clients">
-                  <Button
-                    variant={location === "/clients" ? "secondary" : "ghost"}
-                    size="icon"
-                    className="w-10 h-10"
+                  <button
+                    className={cn(
+                      "w-10 h-10 flex items-center justify-center rounded-lg transition-colors",
+                      location === "/clients" 
+                        ? "bg-blue-600 text-white" 
+                        : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                    )}
                     data-testid="nav-clients"
                   >
                     <Building2Icon className="h-5 w-5" />
-                  </Button>
+                  </button>
                 </Link>
               </TooltipTrigger>
               <TooltipContent side="right">Clients</TooltipContent>
             </Tooltip>
           ) : (
             <Link href="/clients">
-              <Button
-                variant={location === "/clients" ? "secondary" : "ghost"}
-                className="w-full justify-start h-12 text-lg font-medium"
+              <button
+                className={cn(
+                  "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors",
+                  location === "/clients" 
+                    ? "bg-blue-600 text-white" 
+                    : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                )}
                 onClick={() => setIsOpen(false)}
                 data-testid="nav-clients"
               >
-                <Building2Icon className="mr-3 h-5 w-5" />
+                <Building2Icon className="h-5 w-5" />
                 Clients
-              </Button>
+              </button>
             </Link>
           )
         )}
@@ -255,29 +276,36 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Tooltip>
               <TooltipTrigger asChild>
                 <Link href="/outlook-inbox">
-                  <Button
-                    variant={location === "/outlook-inbox" ? "secondary" : "ghost"}
-                    size="icon"
-                    className="w-10 h-10"
+                  <button
+                    className={cn(
+                      "w-10 h-10 flex items-center justify-center rounded-lg transition-colors",
+                      location === "/outlook-inbox" 
+                        ? "bg-blue-600 text-white" 
+                        : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                    )}
                     data-testid="nav-email"
                   >
                     <Mail className="h-5 w-5" />
-                  </Button>
+                  </button>
                 </Link>
               </TooltipTrigger>
               <TooltipContent side="right">Email</TooltipContent>
             </Tooltip>
           ) : (
             <Link href="/outlook-inbox">
-              <Button
-                variant={location === "/outlook-inbox" ? "secondary" : "ghost"}
-                className="w-full justify-start h-12 text-lg font-medium"
+              <button
+                className={cn(
+                  "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors",
+                  location === "/outlook-inbox" 
+                    ? "bg-blue-600 text-white" 
+                    : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                )}
                 onClick={() => setIsOpen(false)}
                 data-testid="nav-email"
               >
-                <Mail className="mr-3 h-5 w-5" />
+                <Mail className="h-5 w-5" />
                 Email
-              </Button>
+              </button>
             </Link>
           )
         )}
@@ -325,42 +353,46 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Tooltip>
             <TooltipTrigger asChild>
               <Link href="/messages">
-                <Button
-                  variant={location === "/messages" ? "secondary" : "ghost"}
-                  size="icon"
-                  className="w-10 h-10 relative"
+                <button
+                  className={cn(
+                    "w-10 h-10 flex items-center justify-center rounded-lg transition-colors relative",
+                    location === "/messages" 
+                      ? "bg-blue-600 text-white" 
+                      : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                  )}
                   data-testid="nav-messages"
                 >
                   <MessageCircle className="h-5 w-5" />
                   {unreadCount > 0 && (
-                    <Badge 
-                      variant="destructive" 
-                      className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
-                    >
+                    <span className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center bg-red-500 text-white text-xs rounded-full">
                       {unreadCount > 9 ? "9+" : unreadCount}
-                    </Badge>
+                    </span>
                   )}
-                </Button>
+                </button>
               </Link>
             </TooltipTrigger>
             <TooltipContent side="right">Messages{unreadCount > 0 ? ` (${unreadCount})` : ""}</TooltipContent>
           </Tooltip>
         ) : (
           <Link href="/messages">
-            <Button
-              variant={location === "/messages" ? "secondary" : "ghost"}
-              className="w-full justify-start h-12 text-lg font-medium relative"
+            <button
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors",
+                location === "/messages" 
+                  ? "bg-blue-600 text-white" 
+                  : "text-slate-300 hover:bg-slate-700 hover:text-white"
+              )}
               onClick={() => setIsOpen(false)}
               data-testid="nav-messages"
             >
-              <MessageCircle className="mr-3 h-5 w-5" />
+              <MessageCircle className="h-5 w-5" />
               Messages
               {unreadCount > 0 && (
-                <Badge variant="destructive" className="ml-auto">
+                <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
                   {unreadCount > 9 ? "9+" : unreadCount}
-                </Badge>
+                </span>
               )}
-            </Button>
+            </button>
           </Link>
         )}
 
@@ -402,22 +434,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </MenuGroup>
       </nav>
 
-      <div className={cn("border-t pt-4 mt-auto", collapsed && "flex flex-col items-center")}>
+      <div className={cn("border-t border-slate-700 pt-4 mt-auto", collapsed && "flex flex-col items-center")}>
         {!collapsed && (
-          <div className="px-4 py-2 mb-2">
-            <p className="text-sm font-medium">{user.name}</p>
-            <p className="text-xs text-muted-foreground capitalize">
-              {(user.roles && user.roles.length > 0 ? user.roles : [user.role]).join(' • ')}
-            </p>
+          <div className="px-4 py-2 mb-2 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium">
+              {user.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U'}
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-white">{user.name}</p>
+              <p className="text-xs text-slate-400 capitalize">
+                {(user.roles && user.roles.length > 0 ? user.roles : [user.role]).join(' • ')}
+              </p>
+            </div>
           </div>
         )}
         {collapsed ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="icon"
-                className="w-10 h-10 text-destructive hover:text-destructive" 
+              <button 
+                className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-300 hover:bg-red-600 hover:text-white transition-colors" 
                 onClick={() => {
                   setIsOpen(false);
                   logout();
@@ -425,23 +460,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 data-testid="button-logout"
               >
                 <LogOut className="h-4 w-4" />
-              </Button>
+              </button>
             </TooltipTrigger>
             <TooltipContent side="right">Sign Out</TooltipContent>
           </Tooltip>
         ) : (
-          <Button 
-            variant="outline" 
-            className="w-full justify-start text-destructive hover:text-destructive" 
+          <button 
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-300 hover:bg-red-600 hover:text-white rounded-lg transition-colors" 
             onClick={() => {
               setIsOpen(false);
               logout();
             }}
             data-testid="button-logout"
           >
-            <LogOut className="mr-3 h-4 w-4" />
+            <LogOut className="h-4 w-4" />
             Sign Out
-          </Button>
+          </button>
         )}
       </div>
     </div>
@@ -449,26 +483,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <TooltipProvider delayDuration={0}>
-      <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950">
-        {/* Desktop Sidebar */}
+      <div className="min-h-screen flex bg-gray-100">
+        {/* Desktop Sidebar - BigChange Navy Style */}
         <aside className={cn(
-          "hidden md:flex flex-col border-r bg-background h-screen sticky top-0 transition-all duration-300 print:hidden",
-          sidebarCollapsed ? "w-16" : "w-64 lg:w-72"
+          "hidden md:flex flex-col bg-slate-800 h-screen sticky top-0 transition-all duration-300 print:hidden",
+          sidebarCollapsed ? "w-16" : "w-64"
         )}>
           {/* Collapse Toggle Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute -right-3 top-6 z-10 h-6 w-6 rounded-full border bg-background shadow-md hover:bg-accent"
+          <button
+            className="absolute -right-3 top-6 z-10 h-6 w-6 rounded-full border border-slate-300 bg-white shadow-md hover:bg-gray-50 flex items-center justify-center"
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             data-testid="button-toggle-sidebar"
           >
             {sidebarCollapsed ? (
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-4 w-4 text-slate-600" />
             ) : (
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-4 w-4 text-slate-600" />
             )}
-          </Button>
+          </button>
           
           <div className={cn(
             "flex-1 overflow-hidden flex flex-col",
@@ -479,39 +511,42 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </aside>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-h-screen">
-          {/* Mobile Header */}
-          <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6 shadow-sm md:hidden print:hidden">
+        <div className="flex-1 flex flex-col min-h-screen bg-gray-100">
+          {/* Mobile Header - BigChange Style */}
+          <header className="sticky top-0 z-30 flex h-16 items-center gap-4 bg-slate-800 px-4 shadow-md md:hidden print:hidden">
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <button className="p-2 text-white hover:bg-slate-700 rounded-lg">
                   <Menu className="h-6 w-6" />
                   <span className="sr-only">Toggle menu</span>
-                </Button>
+                </button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[300px] sm:w-[350px] p-6">
+              <SheetContent side="left" className="w-[300px] sm:w-[350px] p-6 bg-slate-800 border-slate-700">
                 <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                 <NavContent collapsed={false} />
               </SheetContent>
             </Sheet>
             
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold leading-tight">Pro Main Solutions</span>
+              <span className="text-lg font-bold text-white leading-tight">TrueNorth</span>
+              <span className="text-xs text-slate-400">Trade OS</span>
             </div>
 
             <div className="ml-auto flex items-center gap-2">
-              <Button 
-                variant="ghost" 
-                size="icon"
+              <button 
+                className="p-2 text-white hover:bg-slate-700 rounded-lg"
                 onClick={() => window.location.reload()}
                 data-testid="button-refresh-app-mobile"
               >
                 <RefreshCw className="h-5 w-5" />
                 <span className="sr-only">Refresh app</span>
-              </Button>
-              <Button variant="outline" size="sm" onClick={logout}>
+              </button>
+              <button 
+                className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg"
+                onClick={logout}
+              >
                 Sign Out
-              </Button>
+              </button>
             </div>
           </header>
 
@@ -542,8 +577,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </div>
           )}
 
-          <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full">
-            {children}
+          <main className="flex-1 p-4 md:p-6 lg:p-8 w-full bg-gray-100">
+            <div className="max-w-7xl mx-auto">
+              {children}
+            </div>
           </main>
           
           <SnippetWidget />
@@ -551,16 +588,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {/* Floating Refresh Button - Desktop */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="fixed bottom-6 right-6 h-12 w-12 rounded-full shadow-lg bg-background hover:bg-accent hidden md:flex print:hidden z-40"
+              <button
+                className="fixed bottom-6 right-6 h-12 w-12 rounded-full shadow-lg bg-white hover:bg-gray-50 border border-gray-200 hidden md:flex items-center justify-center print:hidden z-40"
                 onClick={() => window.location.reload()}
                 data-testid="button-refresh-app-desktop"
               >
-                <RefreshCw className="h-5 w-5" />
+                <RefreshCw className="h-5 w-5 text-gray-600" />
                 <span className="sr-only">Refresh app</span>
-              </Button>
+              </button>
             </TooltipTrigger>
             <TooltipContent side="left">
               <p>Refresh app</p>
