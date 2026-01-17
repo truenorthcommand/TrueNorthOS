@@ -15,11 +15,29 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, CalendarIcon, Car, Package, Wrench, Fuel, Utensils, MoreHorizontal, Check, X, Loader2, Wallet, Camera } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Plus, CalendarIcon, Car, Package, Wrench, Fuel, Utensils, MoreHorizontal, Check, X, Loader2, Wallet, Camera, FileText, Image, FileSpreadsheet, File, Upload, ExternalLink, Trash2 } from "lucide-react";
 import { ReceiptPhotoCapture } from "@/components/receipt-photo-capture";
+import { useUpload } from "@/hooks/use-upload";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { toast } from "sonner";
-import type { ExpenseWithDetails, User, Job } from "@shared/schema";
+import type { ExpenseWithDetails, User, Job, FileWithRelations } from "@shared/schema";
+
+function getFileIcon(mimeType: string | null) {
+  if (!mimeType) return <File className="h-5 w-5 text-muted-foreground" />;
+  if (mimeType.startsWith("image/")) return <Image className="h-5 w-5 text-blue-500" />;
+  if (mimeType.includes("pdf")) return <FileText className="h-5 w-5 text-red-500" />;
+  if (mimeType.includes("spreadsheet") || mimeType.includes("excel") || mimeType.includes("csv")) 
+    return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
+  return <FileText className="h-5 w-5 text-muted-foreground" />;
+}
+
+function formatFileSize(bytes: number | null) {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 type ExpenseCategory = "mileage" | "materials" | "tools" | "fuel" | "subsistence" | "other";
 type ExpenseStatus = "pending" | "approved" | "rejected" | "paid";
@@ -95,6 +113,7 @@ export default function Expenses() {
   const [noReceipt, setNoReceipt] = useState(false);
   const [fromLocation, setFromLocation] = useState("");
   const [toLocation, setToLocation] = useState("");
+  const [uploadingExpenseFile, setUploadingExpenseFile] = useState<File | null>(null);
 
   const { data: expenses = [], isLoading: expensesLoading } = useQuery<ExpenseWithDetails[]>({
     queryKey: ["/api/expenses"],
@@ -108,6 +127,67 @@ export default function Expenses() {
   const { data: jobs = [] } = useQuery<Job[]>({
     queryKey: ["/api/jobs"],
   });
+
+  const { data: expenseFiles = [], isLoading: expenseFilesLoading, refetch: refetchExpenseFiles } = useQuery<FileWithRelations[]>({
+    queryKey: ["/api/expenses", selectedExpense?.id, "files"],
+    queryFn: async () => {
+      if (!selectedExpense?.id) return [];
+      const res = await apiRequest("GET", `/api/expenses/${selectedExpense.id}/files`);
+      return res.json();
+    },
+    enabled: !!selectedExpense?.id,
+  });
+
+  const { uploadFile, isUploading: isUploadingFile, progress: uploadProgress } = useUpload({
+    onSuccess: async (response) => {
+      if (!selectedExpense || !uploadingExpenseFile) return;
+      await createFileMutation.mutateAsync({
+        name: uploadingExpenseFile.name,
+        objectPath: response.objectPath,
+        mimeType: uploadingExpenseFile.type || null,
+        size: uploadingExpenseFile.size || null,
+        expenseId: selectedExpense.id,
+        category: "receipt",
+        notes: null,
+      });
+    },
+    onError: (error) => {
+      toast.error(error.message || "Upload failed");
+    },
+  });
+
+  const createFileMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/files", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchExpenseFiles();
+      toast.success("File uploaded successfully");
+      setUploadingExpenseFile(null);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to save file");
+    },
+  });
+
+  const deleteFileMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/files/${id}`);
+    },
+    onSuccess: () => {
+      refetchExpenseFiles();
+      toast.success("File deleted successfully");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to delete file");
+    },
+  });
+
+  const handleExpenseFileUpload = async () => {
+    if (!uploadingExpenseFile) return;
+    await uploadFile(uploadingExpenseFile);
+  };
 
   useEffect(() => {
     if (category === "mileage" && mileage && mileageRate) {
@@ -812,6 +892,129 @@ export default function Expenses() {
                   <p className="font-medium">{selectedExpense.approvedBy.name}</p>
                 </div>
               )}
+
+              <Separator className="my-4" />
+
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <Label className="text-muted-foreground">Files & Documents</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="file"
+                      id="expense-file-upload"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setUploadingExpenseFile(file);
+                        }
+                      }}
+                      data-testid="input-expense-file"
+                    />
+                    <label htmlFor="expense-file-upload">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        asChild
+                        className="cursor-pointer"
+                        data-testid="button-select-expense-file"
+                      >
+                        <span>
+                          <Upload className="h-4 w-4 mr-1" />
+                          Select File
+                        </span>
+                      </Button>
+                    </label>
+                  </div>
+                </div>
+
+                {uploadingExpenseFile && (
+                  <div className="flex items-center gap-2 p-2 mb-3 bg-muted rounded-md">
+                    {getFileIcon(uploadingExpenseFile.type)}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{uploadingExpenseFile.name}</p>
+                      <p className="text-xs text-muted-foreground">{formatFileSize(uploadingExpenseFile.size)}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={handleExpenseFileUpload}
+                      disabled={isUploadingFile || createFileMutation.isPending}
+                      data-testid="button-upload-expense-file"
+                    >
+                      {isUploadingFile ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          {uploadProgress}%
+                        </>
+                      ) : (
+                        "Upload"
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setUploadingExpenseFile(null)}
+                      data-testid="button-cancel-expense-file"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+
+                {expenseFilesLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : expenseFiles.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No files attached to this expense
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {expenseFiles.map((file) => (
+                      <div
+                        key={file.id}
+                        className="flex items-center gap-3 p-2 rounded-md border hover:bg-accent"
+                        data-testid={`expense-file-${file.id}`}
+                      >
+                        {getFileIcon(file.mimeType)}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{file.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatFileSize(file.size)}
+                            {file.category && ` • ${file.category}`}
+                          </p>
+                        </div>
+                        <a
+                          href={file.objectPath}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          data-testid={`button-open-file-${file.id}`}
+                        >
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </a>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm("Delete this file?")) {
+                              deleteFileMutation.mutate(file.id);
+                            }
+                          }}
+                          data-testid={`button-delete-file-${file.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
           <DialogFooter>

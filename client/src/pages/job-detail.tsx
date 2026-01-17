@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useRoute, Link, useLocation } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +14,29 @@ import {
   ArrowLeft, Save, Printer, Trash2, Plus, 
   MapPin, Phone, Mail, Calendar, Upload, X, FileCheck,
   AlertCircle, AlertTriangle, AlertOctagon, Users, ChevronDown, ClipboardList,
-  Sparkles, Loader2, Briefcase, User, Navigation, FileText
+  Sparkles, Loader2, Briefcase, User, Navigation, FileText,
+  File, Image, FileSpreadsheet, ExternalLink, FolderOpen
 } from "lucide-react";
+import { useUpload } from "@/hooks/use-upload";
+import { apiRequest } from "@/lib/queryClient";
+import type { FileWithRelations } from "@shared/schema";
+
+function getFileIcon(mimeType: string | null) {
+  if (!mimeType) return <File className="h-5 w-5 text-muted-foreground" />;
+  if (mimeType.startsWith("image/")) return <Image className="h-5 w-5 text-blue-500" />;
+  if (mimeType.includes("pdf")) return <FileText className="h-5 w-5 text-red-500" />;
+  if (mimeType.includes("spreadsheet") || mimeType.includes("excel") || mimeType.includes("csv")) 
+    return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
+  return <FileText className="h-5 w-5 text-muted-foreground" />;
+}
+
+function formatFileSize(bytes: number | null) {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 import {
   Dialog,
   DialogContent,
@@ -109,6 +131,11 @@ export default function JobDetail() {
   });
   const [formInitialized, setFormInitialized] = useState(false);
 
+  // Files state
+  const queryClient = useQueryClient();
+  const jobFilesInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingJobFile, setUploadingJobFile] = useState<File | null>(null);
+
   useEffect(() => {
     if (user?.role === 'admin') {
       fetch('/api/users', { credentials: 'include' })
@@ -141,6 +168,51 @@ export default function JobDetail() {
   const jobId = params?.id;
   const job = jobId ? getJob(jobId) : undefined;
   const [hasTriedRefresh, setHasTriedRefresh] = useState(false);
+
+  // Files query and mutations
+  const { data: jobFiles = [], isLoading: isLoadingFiles } = useQuery<FileWithRelations[]>({
+    queryKey: [`/api/jobs/${jobId}/files`],
+    enabled: !!jobId,
+  });
+
+  const createFileMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/files", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/jobs/${jobId}/files`] });
+      toast({ title: "File uploaded successfully" });
+      setUploadingJobFile(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to save file", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const { uploadFile: uploadJobFile, isUploading: isUploadingJobFile, progress: uploadProgress } = useUpload({
+    onSuccess: async (response) => {
+      await createFileMutation.mutateAsync({
+        name: uploadingJobFile?.name || "Uploaded file",
+        objectPath: response.objectPath,
+        mimeType: uploadingJobFile?.type || null,
+        size: uploadingJobFile?.size || null,
+        jobId: jobId,
+      });
+    },
+    onError: (error) => {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleJobFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadingJobFile(file);
+      await uploadJobFile(file);
+      e.target.value = "";
+    }
+  };
   
   // Refresh jobs if job not found in cache (may have been created elsewhere)
   useEffect(() => {
@@ -1538,6 +1610,95 @@ export default function JobDetail() {
                  ))}
                </div>
              )}
+          </CardContent>
+        </Card>
+
+        {/* Job Files Section */}
+        <Card className="print:shadow-none print:border-none border-2 border-violet-200 dark:border-violet-900">
+          <CardHeader className="bg-violet-50 dark:bg-violet-900/20 print:bg-transparent print:p-0 print:mb-4">
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FolderOpen className="h-5 w-5 text-violet-600" />
+                Job Files
+              </CardTitle>
+              {!isReadOnly && (
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="no-print"
+                  onClick={() => jobFilesInputRef.current?.click()}
+                  disabled={isUploadingJobFile}
+                  data-testid="button-upload-job-file"
+                >
+                  {isUploadingJobFile ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Uploading {uploadProgress}%
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload File
+                    </>
+                  )}
+                </Button>
+              )}
+              <input 
+                type="file" 
+                ref={jobFilesInputRef} 
+                className="hidden" 
+                onChange={handleJobFileSelect}
+                data-testid="input-job-file"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">Documents, certificates, and other files related to this job</p>
+          </CardHeader>
+          <CardContent className="pt-6 print:pt-0">
+            {isLoadingFiles ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : jobFiles.length === 0 ? (
+              <div className="text-center py-6 border-2 border-dashed rounded-lg text-muted-foreground bg-violet-50/50">
+                <FolderOpen className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                <p>No files attached to this job.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {jobFiles.map((file) => (
+                  <div 
+                    key={file.id}
+                    className="flex items-center gap-3 p-3 rounded-lg border hover:bg-accent transition-colors"
+                    data-testid={`file-item-${file.id}`}
+                  >
+                    {getFileIcon(file.mimeType)}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{file.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatFileSize(file.size)}
+                        {file.createdAt && ` • ${format(new Date(file.createdAt), "dd MMM yyyy")}`}
+                      </p>
+                    </div>
+                    {file.category && (
+                      <Badge variant="secondary" className="text-xs">
+                        {file.category}
+                      </Badge>
+                    )}
+                    <a 
+                      href={file.objectPath} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      data-testid={`button-download-file-${file.id}`}
+                    >
+                      <Button variant="ghost" size="icon" className="no-print">
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 

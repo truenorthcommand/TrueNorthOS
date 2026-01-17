@@ -10,12 +10,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { AITextarea } from "@/components/ui/ai-assist";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search, User, Phone, Mail, Star, Edit2, ChevronRight, ChevronLeft, Check, Home, Save } from "lucide-react";
+import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search, User, Phone, Mail, Star, Edit2, ChevronRight, ChevronLeft, Check, Home, Save, Upload, ExternalLink, FolderOpen, Image, FileSpreadsheet, File, Loader2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
+import { useUpload } from "@/hooks/use-upload";
+import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import type { FileWithRelations } from "@shared/schema";
 
 interface JobPhoto {
   id: string;
@@ -139,6 +143,13 @@ export default function Clients() {
   });
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [isSavingClient, setIsSavingClient] = useState(false);
+  
+  // Client files state
+  const [clientFiles, setClientFiles] = useState<Record<string, FileWithRelations[]>>({});
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [filesExpanded, setFilesExpanded] = useState<Record<string, boolean>>({});
+  const [uploadingFileForClient, setUploadingFileForClient] = useState<string | null>(null);
+  const [selectedFileForUpload, setSelectedFileForUpload] = useState<globalThis.File | null>(null);
 
   const fetchClientContacts = async (clientId: string) => {
     try {
@@ -168,6 +179,75 @@ export default function Clients() {
     } finally {
       setIsLoadingProperties(false);
     }
+  };
+
+  const fetchClientFiles = async (clientId: string) => {
+    try {
+      setIsLoadingFiles(true);
+      const res = await fetch(`/api/clients/${clientId}/files`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setClientFiles(prev => ({ ...prev, [clientId]: data }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch files:', error);
+    } finally {
+      setIsLoadingFiles(false);
+    }
+  };
+
+  const { uploadFile, isUploading, progress } = useUpload({
+    onSuccess: async (response) => {
+      if (!uploadingFileForClient || !selectedFileForUpload) return;
+      try {
+        const res = await apiRequest("POST", "/api/files", {
+          name: selectedFileForUpload.name,
+          objectPath: response.objectPath,
+          mimeType: selectedFileForUpload.type || null,
+          size: selectedFileForUpload.size || null,
+          clientId: uploadingFileForClient,
+        });
+        if (res.ok) {
+          toast({ title: "File uploaded successfully" });
+          fetchClientFiles(uploadingFileForClient);
+        }
+      } catch (error: any) {
+        toast({ title: "Failed to save file", description: error.message, variant: "destructive" });
+      } finally {
+        setUploadingFileForClient(null);
+        setSelectedFileForUpload(null);
+      }
+    },
+    onError: (error) => {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+      setUploadingFileForClient(null);
+      setSelectedFileForUpload(null);
+    },
+  });
+
+  const handleClientFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, clientId: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingFileForClient(clientId);
+    setSelectedFileForUpload(file);
+    await uploadFile(file);
+    e.target.value = '';
+  };
+
+  const getFileIcon = (mimeType: string | null) => {
+    if (!mimeType) return <File className="h-5 w-5 text-muted-foreground" />;
+    if (mimeType.startsWith("image/")) return <Image className="h-5 w-5 text-blue-500" />;
+    if (mimeType.includes("pdf")) return <FileText className="h-5 w-5 text-red-500" />;
+    if (mimeType.includes("spreadsheet") || mimeType.includes("excel") || mimeType.includes("csv")) 
+      return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
+    return <FileText className="h-5 w-5 text-muted-foreground" />;
+  };
+
+  const formatFileSize = (bytes: number | null) => {
+    if (!bytes) return "";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const handleAddProperty = async () => {
@@ -1783,6 +1863,100 @@ export default function Clients() {
                           )}
                         </div>
                       )}
+                    </div>
+
+                    {/* Files Section */}
+                    <div className="border-t pt-4">
+                      <Collapsible
+                        open={filesExpanded[client.id] ?? false}
+                        onOpenChange={(isOpen) => {
+                          setFilesExpanded(prev => ({ ...prev, [client.id]: isOpen }));
+                          if (isOpen && !clientFiles[client.id]) {
+                            fetchClientFiles(client.id);
+                          }
+                        }}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <CollapsibleTrigger asChild>
+                            <Button variant="ghost" className="flex items-center gap-2 p-0 h-auto hover:bg-transparent">
+                              <FolderOpen className="h-4 w-4 text-primary" />
+                              <p className="text-sm font-semibold">Files</p>
+                              <ChevronRight className={`h-4 w-4 transition-transform ${filesExpanded[client.id] ? 'rotate-90' : ''}`} />
+                              {clientFiles[client.id]?.length ? (
+                                <Badge variant="secondary" className="ml-1">{clientFiles[client.id].length}</Badge>
+                              ) : null}
+                            </Button>
+                          </CollapsibleTrigger>
+                          <div className="relative">
+                            <input
+                              type="file"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              onChange={(e) => handleClientFileUpload(e, client.id)}
+                              disabled={isUploading && uploadingFileForClient === client.id}
+                              data-testid={`input-file-upload-${client.id}`}
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={isUploading && uploadingFileForClient === client.id}
+                              data-testid={`button-upload-file-${client.id}`}
+                            >
+                              {isUploading && uploadingFileForClient === client.id ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                  {progress}%
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="h-4 w-4 mr-1" />
+                                  Upload
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+
+                        <CollapsibleContent className="space-y-2">
+                          {isLoadingFiles && !clientFiles[client.id] ? (
+                            <div className="flex items-center gap-2 py-4 text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <p className="text-sm">Loading files...</p>
+                            </div>
+                          ) : (clientFiles[client.id] || []).length === 0 ? (
+                            <p className="text-sm text-muted-foreground py-4">No files uploaded yet.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {(clientFiles[client.id] || []).map((file) => (
+                                <div
+                                  key={file.id}
+                                  className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors"
+                                  data-testid={`file-item-${file.id}`}
+                                >
+                                  {getFileIcon(file.mimeType)}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-sm truncate">{file.name}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {formatFileSize(file.size)}
+                                      {file.createdAt && ` • ${format(new Date(file.createdAt), "dd MMM yyyy")}`}
+                                    </p>
+                                  </div>
+                                  <a
+                                    href={file.objectPath}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    data-testid={`button-open-file-${file.id}`}
+                                  >
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                      <ExternalLink className="h-4 w-4" />
+                                    </Button>
+                                  </a>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </CollapsibleContent>
+                      </Collapsible>
                     </div>
                       </>
                     )}
