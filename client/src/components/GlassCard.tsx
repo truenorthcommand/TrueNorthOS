@@ -1,8 +1,11 @@
 import React, { forwardRef, KeyboardEvent } from 'react';
 import './GlassCard.css';
 
+type AccentColor = 'pink' | 'purple' | 'teal' | 'green' | 'orange' | 'blue' | 'red' | 'yellow';
+
 type GlassCardBaseProps = {
   variant?: 'default' | 'subtle' | 'strong';
+  accent?: AccentColor;
   disabled?: boolean;
   className?: string;
   children: React.ReactNode;
@@ -32,6 +35,7 @@ export const GlassCard = forwardRef<
   const {
     as = 'button',
     variant = 'default',
+    accent,
     disabled = false,
     className = '',
     children,
@@ -39,8 +43,9 @@ export const GlassCard = forwardRef<
   } = props;
 
   const baseClass = `glasscard glasscard--${variant}`;
+  const accentClass = accent ? `glasscard--accent-${accent}` : '';
   const disabledClass = disabled ? 'glasscard--disabled' : '';
-  const combinedClass = `${baseClass} ${disabledClass} ${className}`.trim();
+  const combinedClass = `${baseClass} ${accentClass} ${disabledClass} ${className}`.trim();
 
   if (as === 'a') {
     const anchorProps = rest as React.AnchorHTMLAttributes<HTMLAnchorElement>;
