@@ -64,6 +64,7 @@ import OutlookInbox from "@/pages/outlook-inbox";
 import Files from "@/pages/files";
 import GlassDemo from "@/pages/glass-demo";
 import GlassDashboardDemo from "@/pages/glass-dashboard-demo";
+import IconStylesDemo from "@/pages/icon-styles-demo";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -108,6 +109,7 @@ function Router() {
       <Route path="/proposal" component={Proposal} />
       <Route path="/glass-demo" component={GlassDemo} />
       <Route path="/glass-dashboard" component={GlassDashboardDemo} />
+      <Route path="/icon-styles" component={IconStylesDemo} />
       <Route path="/clients">
         <PrivateRoute component={Clients} />
       </Route>
