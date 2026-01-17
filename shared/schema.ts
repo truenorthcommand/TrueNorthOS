@@ -1060,7 +1060,7 @@ export type FileRecord = typeof files.$inferSelect;
 export type FileWithRelations = FileRecord & {
   client?: Pick<Client, 'id' | 'name'> | null;
   job?: Pick<Job, 'id' | 'jobNo' | 'customerName'> | null;
-  expense?: Pick<Expense, 'id' | 'description' | 'vendor'> | null;
+  expense?: Pick<Expense, 'id' | 'description' | 'category'> | null;
   uploadedBy?: Pick<User, 'id' | 'name'> | null;
 };
 

@@ -1970,7 +1970,7 @@ export class DatabaseStorage implements IStorage {
         fileWithRelations.job = job || null;
       }
       if (file.expenseId) {
-        const [expense] = await db.select({ id: expenses.id, description: expenses.description, vendor: expenses.vendor })
+        const [expense] = await db.select({ id: expenses.id, description: expenses.description, category: expenses.category })
           .from(expenses).where(eq(expenses.id, file.expenseId));
         fileWithRelations.expense = expense || null;
       }

@@ -13,6 +13,8 @@ import { z } from "zod";
 import { notifyAdmins, notifyUser } from "./notifications";
 import { sessionMiddleware } from "./session";
 import * as outlook from "./outlook";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { insertFileSchema } from "@shared/schema";
 
 function getStripeClient(): Stripe | null {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -4862,6 +4864,108 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
       return res.status(500).json({ error: "Stripe is not configured" });
     }
     res.json({ publishableKey });
+  });
+
+  // ==================== FILE STORAGE ROUTES ====================
+  
+  registerObjectStorageRoutes(app);
+
+  app.get("/api/files", requireAuth, async (req, res) => {
+    try {
+      const files = await storage.getAllFiles();
+      res.json(files);
+    } catch (error) {
+      console.error("Get files error:", error);
+      res.status(500).json({ error: "Failed to get files" });
+    }
+  });
+
+  app.get("/api/files/:id", requireAuth, async (req, res) => {
+    try {
+      const file = await storage.getFile(req.params.id);
+      if (!file) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      res.json(file);
+    } catch (error) {
+      console.error("Get file error:", error);
+      res.status(500).json({ error: "Failed to get file" });
+    }
+  });
+
+  app.get("/api/clients/:clientId/files", requireAuth, async (req, res) => {
+    try {
+      const files = await storage.getFilesByClient(req.params.clientId);
+      res.json(files);
+    } catch (error) {
+      console.error("Get client files error:", error);
+      res.status(500).json({ error: "Failed to get client files" });
+    }
+  });
+
+  app.get("/api/jobs/:jobId/files", requireAuth, async (req, res) => {
+    try {
+      const files = await storage.getFilesByJob(req.params.jobId);
+      res.json(files);
+    } catch (error) {
+      console.error("Get job files error:", error);
+      res.status(500).json({ error: "Failed to get job files" });
+    }
+  });
+
+  app.get("/api/expenses/:expenseId/files", requireAuth, async (req, res) => {
+    try {
+      const files = await storage.getFilesByExpense(req.params.expenseId);
+      res.json(files);
+    } catch (error) {
+      console.error("Get expense files error:", error);
+      res.status(500).json({ error: "Failed to get expense files" });
+    }
+  });
+
+  app.post("/api/files", requireAuth, async (req, res) => {
+    try {
+      const data = insertFileSchema.parse({
+        ...req.body,
+        uploadedById: req.session.userId,
+      });
+      const file = await storage.createFile(data);
+      res.status(201).json(file);
+    } catch (error) {
+      console.error("Create file error:", error);
+      res.status(500).json({ error: "Failed to create file" });
+    }
+  });
+
+  app.patch("/api/files/:id", requireAuth, async (req, res) => {
+    try {
+      const { clientId, jobId, expenseId, category, tags, notes } = req.body;
+      const file = await storage.updateFile(req.params.id, {
+        clientId,
+        jobId,
+        expenseId,
+        category,
+        tags,
+        notes,
+      });
+      if (!file) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      res.json(file);
+    } catch (error) {
+      console.error("Update file error:", error);
+      res.status(500).json({ error: "Failed to update file" });
+    }
+  });
+
+  app.delete("/api/files/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteFile(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete file error:", error);
+      res.status(500).json({ error: "Failed to delete file" });
+    }
   });
 
   // ==================== OUTLOOK / EMAIL ROUTES ====================
