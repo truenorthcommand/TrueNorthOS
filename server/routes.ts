@@ -4989,8 +4989,8 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
       const host = req.headers.host;
       const publicFileUrl = `${protocol}://${host}${objectPath}`;
 
-      const clients = await storage.getClients();
-      const jobs = await storage.getJobs();
+      const clients = await storage.getAllClients();
+      const jobs = await storage.getAllJobs();
 
       const clientList = clients.slice(0, 50).map(c => `- ${c.name} (ID: ${c.id})`).join("\n");
       const jobList = jobs.slice(0, 50).map(j => `- ${j.jobNo}: ${j.customerName || 'No customer'} - ${j.description || 'No description'}${j.address ? ` at ${j.address}` : ''} (ID: ${j.id})`).join("\n");
