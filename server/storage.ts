@@ -34,13 +34,14 @@ import {
   type FixedCost, type InsertFixedCost,
   type InvoiceWithChaseInfo, type FinancialSummary,
   type Snippet, type InsertSnippet,
+  type FileRecord, type InsertFile, type FileWithRelations,
   users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, clientContacts, clientProperties, jobUpdates,
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
   timesheets, expenses, payments,
   skills, userSkills,
   inspections, inspectionItems, snaggingSheets, snagItems,
-  accountsReceipts, invoiceChaseLogs, fixedCosts, snippets
+  accountsReceipts, invoiceChaseLogs, fixedCosts, snippets, files
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and, ne, inArray, gt, asc } from "drizzle-orm";
@@ -258,6 +259,16 @@ export interface IStorage {
   createSnippet(data: InsertSnippet): Promise<Snippet>;
   updateSnippet(id: string, data: Partial<Snippet>): Promise<Snippet | undefined>;
   deleteSnippet(id: string): Promise<void>;
+  
+  // Files
+  getFile(id: string): Promise<FileRecord | undefined>;
+  getAllFiles(): Promise<FileWithRelations[]>;
+  getFilesByClient(clientId: string): Promise<FileWithRelations[]>;
+  getFilesByJob(jobId: string): Promise<FileWithRelations[]>;
+  getFilesByExpense(expenseId: string): Promise<FileWithRelations[]>;
+  createFile(data: InsertFile): Promise<FileRecord>;
+  updateFile(id: string, data: Partial<FileRecord>): Promise<FileRecord | undefined>;
+  deleteFile(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1934,6 +1945,125 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSnippet(id: string): Promise<void> {
     await db.delete(snippets).where(eq(snippets.id, id));
+  }
+
+  async getFile(id: string): Promise<FileRecord | undefined> {
+    const [file] = await db.select().from(files).where(eq(files.id, id));
+    return file;
+  }
+
+  async getAllFiles(): Promise<FileWithRelations[]> {
+    const allFiles = await db.select().from(files).orderBy(desc(files.createdAt));
+    
+    const result: FileWithRelations[] = [];
+    for (const file of allFiles) {
+      const fileWithRelations: FileWithRelations = { ...file };
+      
+      if (file.clientId) {
+        const [client] = await db.select({ id: clients.id, name: clients.name })
+          .from(clients).where(eq(clients.id, file.clientId));
+        fileWithRelations.client = client || null;
+      }
+      if (file.jobId) {
+        const [job] = await db.select({ id: jobs.id, jobNo: jobs.jobNo, customerName: jobs.customerName })
+          .from(jobs).where(eq(jobs.id, file.jobId));
+        fileWithRelations.job = job || null;
+      }
+      if (file.expenseId) {
+        const [expense] = await db.select({ id: expenses.id, description: expenses.description, vendor: expenses.vendor })
+          .from(expenses).where(eq(expenses.id, file.expenseId));
+        fileWithRelations.expense = expense || null;
+      }
+      if (file.uploadedById) {
+        const [uploader] = await db.select({ id: users.id, name: users.name })
+          .from(users).where(eq(users.id, file.uploadedById));
+        fileWithRelations.uploadedBy = uploader || null;
+      }
+      
+      result.push(fileWithRelations);
+    }
+    
+    return result;
+  }
+
+  async getFilesByClient(clientId: string): Promise<FileWithRelations[]> {
+    const clientFiles = await db.select().from(files)
+      .where(eq(files.clientId, clientId))
+      .orderBy(desc(files.createdAt));
+    
+    const result: FileWithRelations[] = [];
+    for (const file of clientFiles) {
+      const fileWithRelations: FileWithRelations = { ...file };
+      
+      if (file.uploadedById) {
+        const [uploader] = await db.select({ id: users.id, name: users.name })
+          .from(users).where(eq(users.id, file.uploadedById));
+        fileWithRelations.uploadedBy = uploader || null;
+      }
+      
+      result.push(fileWithRelations);
+    }
+    
+    return result;
+  }
+
+  async getFilesByJob(jobId: string): Promise<FileWithRelations[]> {
+    const jobFiles = await db.select().from(files)
+      .where(eq(files.jobId, jobId))
+      .orderBy(desc(files.createdAt));
+    
+    const result: FileWithRelations[] = [];
+    for (const file of jobFiles) {
+      const fileWithRelations: FileWithRelations = { ...file };
+      
+      if (file.uploadedById) {
+        const [uploader] = await db.select({ id: users.id, name: users.name })
+          .from(users).where(eq(users.id, file.uploadedById));
+        fileWithRelations.uploadedBy = uploader || null;
+      }
+      
+      result.push(fileWithRelations);
+    }
+    
+    return result;
+  }
+
+  async getFilesByExpense(expenseId: string): Promise<FileWithRelations[]> {
+    const expenseFiles = await db.select().from(files)
+      .where(eq(files.expenseId, expenseId))
+      .orderBy(desc(files.createdAt));
+    
+    const result: FileWithRelations[] = [];
+    for (const file of expenseFiles) {
+      const fileWithRelations: FileWithRelations = { ...file };
+      
+      if (file.uploadedById) {
+        const [uploader] = await db.select({ id: users.id, name: users.name })
+          .from(users).where(eq(users.id, file.uploadedById));
+        fileWithRelations.uploadedBy = uploader || null;
+      }
+      
+      result.push(fileWithRelations);
+    }
+    
+    return result;
+  }
+
+  async createFile(data: InsertFile): Promise<FileRecord> {
+    const [file] = await db.insert(files).values(data).returning();
+    return file;
+  }
+
+  async updateFile(id: string, data: Partial<FileRecord>): Promise<FileRecord | undefined> {
+    const [file] = await db.update(files)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(files.id, id))
+      .returning();
+    return file;
+  }
+
+  async deleteFile(id: string): Promise<void> {
+    await db.delete(files).where(eq(files.id, id));
   }
 }
 

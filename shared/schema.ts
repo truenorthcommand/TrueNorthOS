@@ -1028,3 +1028,47 @@ export const insertOutlookSettingsSchema = createInsertSchema(outlookSettings).o
 
 export type InsertOutlookSettings = z.infer<typeof insertOutlookSettingsSchema>;
 export type OutlookSettings = typeof outlookSettings.$inferSelect;
+
+// Files - Uploaded files with optional assignment to clients, jobs, or expenses
+export const files = pgTable("files", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  objectPath: text("object_path").notNull(),
+  mimeType: text("mime_type"),
+  size: integer("size"),
+  clientId: varchar("client_id"),
+  jobId: varchar("job_id"),
+  expenseId: varchar("expense_id"),
+  category: text("category"),
+  tags: jsonb("tags").default([]),
+  notes: text("notes"),
+  aiSuggestion: jsonb("ai_suggestion"),
+  uploadedById: varchar("uploaded_by_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFileSchema = createInsertSchema(files).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFile = z.infer<typeof insertFileSchema>;
+export type FileRecord = typeof files.$inferSelect;
+
+export type FileWithRelations = FileRecord & {
+  client?: Pick<Client, 'id' | 'name'> | null;
+  job?: Pick<Job, 'id' | 'jobNo' | 'customerName'> | null;
+  expense?: Pick<Expense, 'id' | 'description' | 'vendor'> | null;
+  uploadedBy?: Pick<User, 'id' | 'name'> | null;
+};
+
+export type AiFileSuggestion = {
+  clientId?: string;
+  jobId?: string;
+  expenseId?: string;
+  category?: string;
+  confidence: number;
+  reasoning: string;
+};
