@@ -62,6 +62,7 @@ import SnaggingDetail from "@/pages/snagging-detail";
 import AccountsDashboard from "@/pages/accounts-dashboard";
 import OutlookInbox from "@/pages/outlook-inbox";
 import Files from "@/pages/files";
+import GlassDemo from "@/pages/glass-demo";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -104,6 +105,7 @@ function Router() {
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
       <Route path="/proposal" component={Proposal} />
+      <Route path="/glass-demo" component={GlassDemo} />
       <Route path="/clients">
         <PrivateRoute component={Clients} />
       </Route>

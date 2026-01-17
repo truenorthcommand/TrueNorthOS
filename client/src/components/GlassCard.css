@@ -1,0 +1,207 @@
+/* GlassCard - iOS-style frosted glass component */
+
+.glasscard {
+  /* Reset */
+  all: unset;
+  box-sizing: border-box;
+  
+  /* Layout */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  
+  /* iOS Glass Effect */
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  
+  /* Border */
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  
+  /* Shadow */
+  box-shadow: 
+    0 4px 24px rgba(0, 0, 0, 0.12),
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  
+  /* Typography */
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.95);
+  
+  /* Padding */
+  padding: 12px 20px;
+  
+  /* Transitions */
+  transition: 
+    transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    box-shadow 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease;
+  
+  /* Cursor */
+  cursor: pointer;
+}
+
+.glasscard__content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Variants */
+.glasscard--default {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.glasscard--subtle {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    0 2px 12px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.glasscard--strong {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.16),
+    0 2px 4px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* Hover State */
+.glasscard:hover:not(.glasscard--disabled):not([disabled]) {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.18),
+    0 2px 8px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.glasscard--subtle:hover:not(.glasscard--disabled):not([disabled]) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.glasscard--strong:hover:not(.glasscard--disabled):not([disabled]) {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* Active/Pressed State */
+.glasscard:active:not(.glasscard--disabled):not([disabled]) {
+  transform: translateY(0);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.1),
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Focus Visible Ring */
+.glasscard:focus-visible {
+  outline: none;
+  box-shadow: 
+    0 4px 24px rgba(0, 0, 0, 0.12),
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 0 3px rgba(59, 130, 246, 0.5);
+}
+
+/* Disabled State */
+.glasscard--disabled,
+.glasscard[disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Non-interactive div (no click handler) */
+div.glasscard:not(.glasscard--clickable) {
+  cursor: default;
+}
+
+/* Light mode support */
+@media (prefers-color-scheme: light) {
+  .glasscard {
+    background: rgba(255, 255, 255, 0.7);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: rgba(0, 0, 0, 0.85);
+    box-shadow: 
+      0 4px 24px rgba(0, 0, 0, 0.08),
+      0 1px 2px rgba(0, 0, 0, 0.04),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+  
+  .glasscard--subtle {
+    background: rgba(255, 255, 255, 0.5);
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+  
+  .glasscard--strong {
+    background: rgba(255, 255, 255, 0.85);
+    border-color: rgba(255, 255, 255, 0.6);
+  }
+  
+  .glasscard:hover:not(.glasscard--disabled):not([disabled]) {
+    background: rgba(255, 255, 255, 0.85);
+    border-color: rgba(255, 255, 255, 0.6);
+    box-shadow: 
+      0 8px 32px rgba(0, 0, 0, 0.12),
+      0 2px 8px rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  }
+  
+  .glasscard:active:not(.glasscard--disabled):not([disabled]) {
+    background: rgba(255, 255, 255, 0.6);
+  }
+  
+  .glasscard--disabled,
+  .glasscard[disabled] {
+    background: rgba(255, 255, 255, 0.4);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+}
+
+/* Size variants (optional utility classes) */
+.glasscard--sm {
+  padding: 8px 14px;
+  font-size: 13px;
+  border-radius: 12px;
+}
+
+.glasscard--lg {
+  padding: 16px 28px;
+  font-size: 16px;
+  border-radius: 20px;
+}
+
+.glasscard--xl {
+  padding: 20px 32px;
+  font-size: 18px;
+  border-radius: 24px;
+}
+
+/* Full width variant */
+.glasscard--full {
+  width: 100%;
+}
+
+/* Card container variant (larger padding for content cards) */
+.glasscard--card {
+  padding: 20px 24px;
+  text-align: left;
+  align-items: flex-start;
+  justify-content: flex-start;
+}

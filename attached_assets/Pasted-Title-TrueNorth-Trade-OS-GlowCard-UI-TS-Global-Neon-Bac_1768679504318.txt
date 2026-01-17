@@ -1,0 +1,81 @@
+Title: TrueNorth Trade OS — GlowCard UI (TS) + Global Neon Background + Custom Glow Presets
+
+Goal: Add a reusable GlowCard component to the TrueNorth Trade OS React 18 + TypeScript + Vite app that supports interactive (button/link) and non-interactive (div) usage, with glassmorphism styling, neon glow halo, hover lift, press settle, focus-visible ring, and a “custom” glow mode using curated gradients chosen by the agent for a cutting-edge look. Also set a global neon “vibe” background in src/index.css.  ￼
+
+Stack: React + Vite (frontend), Express (backend), PostgreSQL + Prisma (data)
+
+Scope (MVP):
+	•	Create files:
+	•	src/components/GlowCard.tsx
+	•	src/components/GlowCard.css
+	•	Implement GlowCard props (TypeScript, strict):
+	•	as?: React.ElementType (default "button")
+	•	glow?: "purple" | "teal" | "pink" | "none" | "custom" (default "purple")
+	•	glowPreset?: "aurora" | "cyber" | "plasma" (only used when glow="custom"; default chosen by agent)
+	•	disabled?: boolean (only meaningful for as="button")
+	•	className?: string
+	•	children: React.ReactNode
+	•	plus pass-through props typed safely for the chosen tag
+	•	Semantics + accessibility:
+	•	If as="button":
+	•	default type="button" unless caller provides type
+	•	support disabled (no hover/active lift; muted glow; cursor not-allowed)
+	•	If as="a":
+	•	support href
+	•	if target="_blank" and caller did not provide rel, set rel="noreferrer noopener"
+	•	If as="div":
+	•	treat as non-interactive container by default
+	•	BUT if an onClick prop is provided, add role="button", tabIndex={0}, and keyboard activation:
+	•	Enter triggers click
+	•	Space triggers click and prevents page scroll
+	•	CSS requirements (GlowCard.css):
+	•	Glass inner panel: rgba() background, border, elevation shadow, backdrop-filter: blur(...)
+	•	Halo behind: blurred radial gradient layer (transition opacity/blur on hover/active)
+	•	Hover state: lift with transform: translateY(-2px) and slightly stronger glow/shadow
+	•	Active state: settle with transform: translateY(0) and slightly reduced glow/shadow
+	•	Focus-visible ring: visible outline on inner panel
+	•	Variants: purple/teal/pink/none
+	•	Custom mode: create 3 curated “cutting-edge” presets (aurora/cyber/plasma) using CSS variables:
+	•	Define --glow-c1, --glow-c2, --glow-c3 per preset
+	•	Use them in the halo’s gradient so tweaking is easy
+	•	Agent picks modern neon colors that POP on dark background but preserve text legibility (no washed-out inner panel)
+	•	Global background (src/index.css):
+	•	:root { color-scheme: dark; }
+	•	Apply layered radial gradients + dark base background globally on body
+	•	Keep it non-invasive: don’t introduce layout-breaking resets; only set margin:0, typography baseline, min-height:100vh, and background
+	•	Demo usage:
+	•	Update an existing dev/demo area (or App.tsx if appropriate) to show:
+	•	Button GlowCard (purple) with click handler
+	•	Link GlowCard (as="a", teal) example
+	•	Container GlowCard (as="div", none) non-interactive example
+	•	Custom GlowCard preset example
+	•	A disabled button GlowCard example
+	•	Keep demo minimal and easy to delete later
+
+Data model: None (UI-only; do not modify DB).  ￼
+Endpoints: None (UI-only; do not modify backend).  ￼
+
+Non-goals:
+	•	No backend changes, no DB changes, no auth changes
+	•	No new libraries/dependencies
+	•	No Tailwind/shadcn refactors (component is plain CSS for portability)
+	•	No theming-system overhaul
+
+Acceptance criteria (testable):
+	•	GlowCard.tsx compiles with TypeScript and can be imported anywhere
+	•	Hover lifts and strengthens glow; active settles and reduces glow; focus-visible ring appears via keyboard navigation
+	•	glow="none" renders a glass card with no halo
+	•	glow="custom" renders a strong, modern neon look using one of the presets (aurora/cyber/plasma)
+	•	as="button" defaults to type="button" and supports disabled visuals + behavior
+	•	as="a" safely handles target="_blank" by defaulting rel to noreferrer noopener when missing
+	•	as="div" is non-interactive unless onClick exists; if clickable, it’s keyboard operable with Enter/Space
+	•	Global background applies across the app without breaking layout
+
+Stop & Ask:
+	•	If the new global background clashes with existing module styling/readability, pause and propose 2 alternative intensity variants (lower/higher saturation) before committing.
+	•	If clickable div usage is requested widely, pause and recommend converting those cases to semantic button/a vs expanding div-button behavior everywhere.
+	•	If custom glow palette conflicts with TrueNorth brand accents, pause and present 2 palette options (still neon/cutting-edge) for selection.
+
+Notes:
+	•	Keep styles namespaced under .glowcard* to avoid collisions with Tailwind/shadcn.
+	•	Prefer CSS variables for preset colors so future tweaks are trivial.
