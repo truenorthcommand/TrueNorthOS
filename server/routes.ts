@@ -14,6 +14,7 @@ import { notifyAdmins, notifyUser } from "./notifications";
 import { sessionMiddleware } from "./session";
 import * as outlook from "./outlook";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { registerGlobalAssistantRoutes } from "./globalAssistant";
 import { insertFileSchema } from "@shared/schema";
 
 function getStripeClient(): Stripe | null {
@@ -4869,6 +4870,7 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
   // ==================== FILE STORAGE ROUTES ====================
   
   registerObjectStorageRoutes(app);
+  registerGlobalAssistantRoutes(app);
 
   app.get("/api/files", requireAuth, async (req, res) => {
     try {

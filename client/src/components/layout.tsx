@@ -14,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/lib/store";
 import { SnippetWidget } from "@/components/snippet-widget";
+import { GlobalAIAssistant } from "@/components/GlobalAIAssistant";
 
 type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools' | 'fleet' | 'finance' | 'clients';
 import { LayoutDashboard as DashboardIcon } from "lucide-react";
@@ -584,6 +585,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </main>
           
           <SnippetWidget />
+          <GlobalAIAssistant />
           
           {/* Floating Refresh Button - Desktop */}
           <Tooltip>
