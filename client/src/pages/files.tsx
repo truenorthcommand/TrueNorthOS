@@ -11,8 +11,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useUpload } from "@/hooks/use-upload";
 import { apiRequest } from "@/lib/queryClient";
-import { FolderOpen, Upload, FileText, Image, FileSpreadsheet, File, Search, Grid, List, Trash2, Link2, ExternalLink, X, Loader2 } from "lucide-react";
+import { FolderOpen, Upload, FileText, Image, FileSpreadsheet, File, Search, Grid, List, Trash2, Link2, ExternalLink, X, Loader2, Sparkles, Check } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { FileWithRelations, Client, Job, Expense } from "@shared/schema";
+
+interface AiSuggestion {
+  suggestedClientId: string | null;
+  suggestedClientName?: string | null;
+  suggestedJobId: string | null;
+  suggestedJobNo?: string | null;
+  suggestedCategory: string | null;
+  confidence: "high" | "medium" | "low";
+  reasoning: string;
+}
 
 function getFileIcon(mimeType: string | null) {
   if (!mimeType) return <File className="h-8 w-8 text-muted-foreground" />;
@@ -41,6 +52,9 @@ export default function Files() {
   const [selectedFile, setSelectedFile] = useState<FileWithRelations | null>(null);
   
   const [uploadingFile, setUploadingFile] = useState<File | null>(null);
+  const [uploadedObjectPath, setUploadedObjectPath] = useState<string | null>(null);
+  const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [newFileData, setNewFileData] = useState({
     clientId: "",
     jobId: "",
@@ -67,17 +81,32 @@ export default function Files() {
 
   const { uploadFile, isUploading, progress } = useUpload({
     onSuccess: async (response) => {
-      await createFileMutation.mutateAsync({
-        name: uploadingFile?.name || "Uploaded file",
-        objectPath: response.objectPath,
-        mimeType: uploadingFile?.type || null,
-        size: uploadingFile?.size || null,
-        clientId: newFileData.clientId || null,
-        jobId: newFileData.jobId || null,
-        expenseId: newFileData.expenseId || null,
-        category: newFileData.category || null,
-        notes: newFileData.notes || null,
-      });
+      setUploadedObjectPath(response.objectPath);
+      
+      setIsAnalyzing(true);
+      try {
+        const analysisRes = await apiRequest("POST", "/api/files/analyze", {
+          objectPath: response.objectPath,
+          fileName: uploadingFile?.name,
+          mimeType: uploadingFile?.type,
+        });
+        const suggestion = await analysisRes.json();
+        setAiSuggestion(suggestion);
+        
+        if (suggestion.suggestedClientId && !newFileData.clientId) {
+          setNewFileData(prev => ({ ...prev, clientId: suggestion.suggestedClientId }));
+        }
+        if (suggestion.suggestedJobId && !newFileData.jobId) {
+          setNewFileData(prev => ({ ...prev, jobId: suggestion.suggestedJobId }));
+        }
+        if (suggestion.suggestedCategory && !newFileData.category) {
+          setNewFileData(prev => ({ ...prev, category: suggestion.suggestedCategory }));
+        }
+      } catch (error) {
+        console.error("AI analysis failed:", error);
+      } finally {
+        setIsAnalyzing(false);
+      }
     },
     onError: (error) => {
       toast({ title: "Upload failed", description: error.message, variant: "destructive" });
@@ -94,12 +123,29 @@ export default function Files() {
       toast({ title: "File uploaded successfully" });
       setUploadDialogOpen(false);
       setUploadingFile(null);
+      setUploadedObjectPath(null);
+      setAiSuggestion(null);
       setNewFileData({ clientId: "", jobId: "", expenseId: "", category: "", notes: "" });
     },
     onError: (error: any) => {
       toast({ title: "Failed to save file", description: error.message, variant: "destructive" });
     },
   });
+
+  const handleSaveUploadedFile = async () => {
+    if (!uploadedObjectPath || !uploadingFile) return;
+    await createFileMutation.mutateAsync({
+      name: uploadingFile.name || "Uploaded file",
+      objectPath: uploadedObjectPath,
+      mimeType: uploadingFile.type || null,
+      size: uploadingFile.size || null,
+      clientId: newFileData.clientId || null,
+      jobId: newFileData.jobId || null,
+      expenseId: newFileData.expenseId || null,
+      category: newFileData.category || null,
+      notes: newFileData.notes || null,
+    });
+  };
 
   const updateFileMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
@@ -215,6 +261,7 @@ export default function Files() {
                 <Input 
                   type="file" 
                   onChange={handleFileSelect}
+                  disabled={!!uploadedObjectPath}
                   data-testid="input-file-upload"
                 />
                 {uploadingFile && (
@@ -223,6 +270,49 @@ export default function Files() {
                   </p>
                 )}
               </div>
+
+              {isAnalyzing && (
+                <Alert>
+                  <Sparkles className="h-4 w-4" />
+                  <AlertDescription className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    AI is analyzing your file to suggest assignment...
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {aiSuggestion && !isAnalyzing && (
+                <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+                  <Sparkles className="h-4 w-4 text-blue-600" />
+                  <AlertDescription>
+                    <div className="space-y-2">
+                      <p className="font-medium text-blue-800 dark:text-blue-200">
+                        AI Suggestion ({aiSuggestion.confidence} confidence)
+                      </p>
+                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                        {aiSuggestion.reasoning}
+                      </p>
+                      {aiSuggestion.suggestedClientName && (
+                        <Badge variant="outline" className="mr-1">
+                          <Check className="h-3 w-3 mr-1" />
+                          Client: {aiSuggestion.suggestedClientName}
+                        </Badge>
+                      )}
+                      {aiSuggestion.suggestedJobNo && (
+                        <Badge variant="secondary" className="mr-1">
+                          <Check className="h-3 w-3 mr-1" />
+                          Job: {aiSuggestion.suggestedJobNo}
+                        </Badge>
+                      )}
+                      {aiSuggestion.suggestedCategory && (
+                        <Badge className="capitalize">
+                          {aiSuggestion.suggestedCategory}
+                        </Badge>
+                      )}
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
               
               <div>
                 <Label>Assign to Client (Optional)</Label>
@@ -285,21 +375,50 @@ export default function Files() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>Cancel</Button>
-              <Button 
-                onClick={handleUpload} 
-                disabled={!uploadingFile || isUploading}
-                data-testid="button-confirm-upload"
-              >
-                {isUploading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Uploading {progress}%
-                  </>
-                ) : (
-                  "Upload"
-                )}
-              </Button>
+              <Button variant="outline" onClick={() => {
+                setUploadDialogOpen(false);
+                setUploadingFile(null);
+                setUploadedObjectPath(null);
+                setAiSuggestion(null);
+                setNewFileData({ clientId: "", jobId: "", expenseId: "", category: "", notes: "" });
+              }}>Cancel</Button>
+              {!uploadedObjectPath ? (
+                <Button 
+                  onClick={handleUpload} 
+                  disabled={!uploadingFile || isUploading}
+                  data-testid="button-confirm-upload"
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Uploading {progress}%
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload & Analyze
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button 
+                  onClick={handleSaveUploadedFile}
+                  disabled={isAnalyzing || createFileMutation.isPending}
+                  data-testid="button-save-file"
+                >
+                  {createFileMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="mr-2 h-4 w-4" />
+                      Save File
+                    </>
+                  )}
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>

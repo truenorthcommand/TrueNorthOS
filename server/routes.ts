@@ -4968,6 +4968,134 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
+  app.post("/api/files/analyze", requireAdmin, async (req, res) => {
+    try {
+      const { objectPath, fileName, mimeType } = req.body;
+      
+      if (!objectPath || typeof objectPath !== 'string') {
+        return res.status(400).json({ error: "Valid object path is required" });
+      }
+
+      if (!objectPath.startsWith('/objects/')) {
+        return res.status(400).json({ error: "Invalid object path format" });
+      }
+
+      const openai = getOpenAIClient();
+      if (!openai) {
+        return res.status(503).json({ error: "AI service not available" });
+      }
+
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      const host = req.headers.host;
+      const publicFileUrl = `${protocol}://${host}${objectPath}`;
+
+      const clients = await storage.getClients();
+      const jobs = await storage.getJobs();
+
+      const clientList = clients.slice(0, 50).map(c => `- ${c.name} (ID: ${c.id})`).join("\n");
+      const jobList = jobs.slice(0, 50).map(j => `- ${j.jobNo}: ${j.customerName || 'No customer'} - ${j.description || 'No description'}${j.address ? ` at ${j.address}` : ''} (ID: ${j.id})`).join("\n");
+
+      const isImage = mimeType?.startsWith("image/");
+      
+      let messageContent: any[];
+      if (isImage) {
+        messageContent = [
+          { 
+            type: "text", 
+            text: `Analyze this uploaded file named "${fileName || 'unnamed'}".
+            
+Based on any text, logos, names, addresses, or context visible in the image, suggest which client or job it might belong to.
+
+Available Clients:
+${clientList}
+
+Available Jobs:
+${jobList}
+
+Return ONLY valid JSON with these fields:
+{
+  "suggestedClientId": "client_id_or_null",
+  "suggestedJobId": "job_id_or_null",
+  "suggestedCategory": "contract|invoice|receipt|photo|certificate|warranty|manual|other",
+  "confidence": "high|medium|low",
+  "reasoning": "Brief explanation of why you made this suggestion"
+}
+
+If you cannot determine a match, return nulls for IDs with low confidence.` 
+          },
+          { type: "image_url", image_url: { url: publicFileUrl } }
+        ];
+      } else {
+        messageContent = [
+          { 
+            type: "text", 
+            text: `Based on the filename "${fileName || 'unnamed'}" with type "${mimeType || 'unknown'}", suggest which client or job it might belong to.
+
+Available Clients:
+${clientList}
+
+Available Jobs:
+${jobList}
+
+Return ONLY valid JSON with these fields:
+{
+  "suggestedClientId": "client_id_or_null",
+  "suggestedJobId": "job_id_or_null", 
+  "suggestedCategory": "contract|invoice|receipt|photo|certificate|warranty|manual|other",
+  "confidence": "high|medium|low",
+  "reasoning": "Brief explanation of why you made this suggestion"
+}
+
+If you cannot determine a match, return nulls for IDs with low confidence.`
+          }
+        ];
+      }
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "You are a file classification assistant for a trade/field service business. Analyze files to determine which client or job they belong to."
+          },
+          {
+            role: "user",
+            content: messageContent
+          }
+        ],
+        max_tokens: 500,
+      });
+
+      const content = response.choices[0]?.message?.content || '{}';
+      let suggestion;
+      try {
+        suggestion = JSON.parse(content.replace(/```json\n?|\n?```/g, '').trim());
+      } catch {
+        suggestion = { 
+          suggestedClientId: null, 
+          suggestedJobId: null, 
+          suggestedCategory: "other",
+          confidence: "low",
+          reasoning: "Could not analyze file" 
+        };
+      }
+
+      if (suggestion.suggestedClientId) {
+        const client = clients.find(c => c.id === suggestion.suggestedClientId);
+        suggestion.suggestedClientName = client?.name || null;
+      }
+      if (suggestion.suggestedJobId) {
+        const job = jobs.find(j => j.id === suggestion.suggestedJobId);
+        suggestion.suggestedJobNo = job?.jobNo || null;
+      }
+
+      res.json(suggestion);
+    } catch (error) {
+      console.error("File analysis error:", error);
+      res.status(500).json({ error: "Failed to analyze file" });
+    }
+  });
+
   // ==================== OUTLOOK / EMAIL ROUTES ====================
 
   app.get("/api/outlook/test", requireRoles('admin'), async (req, res) => {
