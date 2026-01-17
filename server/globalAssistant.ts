@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import OpenAI from "openai";
 import { storage } from "./storage";
-import type { Job, Client, Quote, Invoice } from "@shared/schema";
+import type { Job, Client, Quote, Invoice, AiMessage, AiBusinessPattern, AiUserPreference } from "@shared/schema";
 
 function getOpenAIClient(): OpenAI | null {
   if (process.env.AI_INTEGRATIONS_OPENAI_API_KEY && process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) {
@@ -57,6 +57,60 @@ interface SearchResult {
   status?: string;
 }
 
+async function getLearnedPatterns(): Promise<string> {
+  try {
+    const patterns = await storage.getAiBusinessPatterns();
+    if (patterns.length === 0) return "";
+    
+    const pricingPatterns = patterns.filter(p => p.patternType === 'pricing');
+    const materialPatterns = patterns.filter(p => p.patternType === 'materials');
+    const engineerPatterns = patterns.filter(p => p.patternType === 'engineer_assignment');
+    
+    let context = "\n\nLEARNED BUSINESS PATTERNS:";
+    
+    if (pricingPatterns.length > 0) {
+      const pricing = pricingPatterns[0].data as { avgPrice: number; minPrice: number; maxPrice: number; sampleSize: number };
+      context += `\n- Typical Quote Range: £${pricing.minPrice.toFixed(0)} - £${pricing.maxPrice.toFixed(0)} (avg: £${pricing.avgPrice.toFixed(0)}, based on ${pricing.sampleSize} quotes)`;
+    }
+    
+    if (materialPatterns.length > 0) {
+      const topMaterials = materialPatterns.slice(0, 5);
+      context += `\n- Common Materials: ${topMaterials.map(m => (m.data as { materialName: string }).materialName).join(', ')}`;
+    }
+    
+    if (engineerPatterns.length > 0) {
+      const topEngineers = engineerPatterns.slice(0, 3);
+      context += `\n- Most Active Engineers: ${topEngineers.map(e => (e.data as { engineerName: string }).engineerName).join(', ')}`;
+    }
+    
+    return context;
+  } catch (error) {
+    console.error("Error fetching learned patterns:", error);
+    return "";
+  }
+}
+
+async function getUserPreferenceContext(userId: string): Promise<string> {
+  try {
+    const pref = await storage.getAiUserPreference(userId);
+    if (!pref) return "";
+    
+    let context = "\n\nUSER PREFERENCES:";
+    context += `\n- Communication style: ${pref.communicationStyle || 'professional'}`;
+    
+    const actions = (pref.preferredActions as { action: string; count: number }[]) || [];
+    if (actions.length > 0) {
+      const topActions = actions.slice(0, 5).map(a => a.action);
+      context += `\n- Frequent actions: ${topActions.join(', ')}`;
+    }
+    
+    return context;
+  } catch (error) {
+    console.error("Error fetching user preferences:", error);
+    return "";
+  }
+}
+
 async function getBusinessContext(userId: string): Promise<string> {
   try {
     const [jobs, clients, quotes, invoices, user] = await Promise.all([
@@ -74,6 +128,12 @@ async function getBusinessContext(userId: string): Promise<string> {
     const overdueInvoices = invoices.filter((i: Invoice) => i.status === 'overdue');
 
     const totalUnpaid = unpaidInvoices.reduce((sum: number, inv: Invoice) => sum + Number(inv.total || 0), 0);
+
+    // Get learned patterns and user preferences
+    const [learnedPatterns, userPreferences] = await Promise.all([
+      getLearnedPatterns(),
+      getUserPreferenceContext(userId),
+    ]);
 
     return `
 BUSINESS SUMMARY:
@@ -97,6 +157,7 @@ ${quotes.slice(0, 5).map((q: Quote) => `- #${q.id}: £${q.total} - ${q.status}`)
 
 RECENT INVOICES (last 5):
 ${invoices.slice(0, 5).map((i: Invoice) => `- #${i.id}: £${i.total} - ${i.status}`).join('\n')}
+${learnedPatterns}${userPreferences}
 `;
   } catch (error) {
     console.error("Error fetching business context:", error);
@@ -192,6 +253,90 @@ async function searchEntities(query: string): Promise<SearchResult[]> {
 }
 
 export function registerGlobalAssistantRoutes(app: Express): void {
+  // Get user's conversation history
+  app.get("/api/global-assistant/conversations", async (req: Request, res: Response) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const conversations = await storage.getAiConversationsByUser(userId);
+      res.json({ conversations });
+    } catch (error) {
+      console.error("Error getting conversations:", error);
+      res.status(500).json({ error: "Failed to get conversations" });
+    }
+  });
+
+  // Get a specific conversation
+  app.get("/api/global-assistant/conversations/:id", async (req: Request, res: Response) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const conversation = await storage.getAiConversation(req.params.id);
+      if (!conversation || conversation.userId !== userId) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+
+      res.json({ conversation });
+    } catch (error) {
+      console.error("Error getting conversation:", error);
+      res.status(500).json({ error: "Failed to get conversation" });
+    }
+  });
+
+  // Create a new conversation
+  app.post("/api/global-assistant/conversations", async (req: Request, res: Response) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const { context } = req.body;
+      const conversation = await storage.createAiConversation({
+        userId,
+        title: "New Conversation",
+        messages: [],
+        context: context || null,
+        isArchived: false,
+        lastMessageAt: new Date(),
+      });
+
+      res.json({ conversation });
+    } catch (error) {
+      console.error("Error creating conversation:", error);
+      res.status(500).json({ error: "Failed to create conversation" });
+    }
+  });
+
+  // Delete/archive a conversation
+  app.delete("/api/global-assistant/conversations/:id", async (req: Request, res: Response) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const conversation = await storage.getAiConversation(req.params.id);
+      if (!conversation || conversation.userId !== userId) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+
+      // Archive instead of delete
+      await storage.updateAiConversation(req.params.id, { isArchived: true });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting conversation:", error);
+      res.status(500).json({ error: "Failed to delete conversation" });
+    }
+  });
+
+  // Chat endpoint with conversation persistence
   app.post("/api/global-assistant/chat", async (req: Request, res: Response) => {
     try {
       const openai = getOpenAIClient();
@@ -204,10 +349,25 @@ export function registerGlobalAssistantRoutes(app: Express): void {
         return res.status(401).json({ error: "Authentication required" });
       }
 
-      const { message, currentPage, conversationHistory = [] } = req.body;
+      const { message, currentPage, conversationId, conversationHistory = [] } = req.body;
 
       if (!message) {
         return res.status(400).json({ error: "Message is required" });
+      }
+
+      // Track user action for learning
+      storage.trackUserAction(userId, currentPage || 'dashboard').catch(console.error);
+
+      // Get or create conversation
+      let activeConversationId = conversationId;
+      if (conversationId) {
+        // Save user message to existing conversation
+        const userMessage: AiMessage = {
+          role: "user",
+          content: message,
+          timestamp: new Date().toISOString(),
+        };
+        await storage.addMessageToConversation(conversationId, userMessage);
       }
 
       const businessContext = await getBusinessContext(userId);
@@ -249,7 +409,17 @@ USER MESSAGE: ${message}`;
         }
       }
 
-      res.write(`data: ${JSON.stringify({ done: true, fullResponse })}\n\n`);
+      // Save assistant response to conversation
+      if (conversationId && fullResponse) {
+        const assistantMessage: AiMessage = {
+          role: "assistant",
+          content: fullResponse,
+          timestamp: new Date().toISOString(),
+        };
+        await storage.addMessageToConversation(conversationId, assistantMessage);
+      }
+
+      res.write(`data: ${JSON.stringify({ done: true, fullResponse, conversationId: activeConversationId })}\n\n`);
       res.end();
     } catch (error) {
       console.error("Error in global assistant:", error);

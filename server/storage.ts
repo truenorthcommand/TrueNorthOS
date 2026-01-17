@@ -35,13 +35,17 @@ import {
   type InvoiceWithChaseInfo, type FinancialSummary,
   type Snippet, type InsertSnippet,
   type FileRecord, type InsertFile, type FileWithRelations,
+  type AiConversation, type InsertAiConversation, type AiMessage,
+  type AiBusinessPattern, type InsertAiBusinessPattern,
+  type AiUserPreference, type InsertAiUserPreference,
   users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, clientContacts, clientProperties, jobUpdates,
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
   timesheets, expenses, payments,
   skills, userSkills,
   inspections, inspectionItems, snaggingSheets, snagItems,
-  accountsReceipts, invoiceChaseLogs, fixedCosts, snippets, files
+  accountsReceipts, invoiceChaseLogs, fixedCosts, snippets, files,
+  aiConversations, aiBusinessPatterns, aiUserPreferences
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and, ne, inArray, gt, asc } from "drizzle-orm";
@@ -269,6 +273,28 @@ export interface IStorage {
   createFile(data: InsertFile): Promise<FileRecord>;
   updateFile(id: string, data: Partial<FileRecord>): Promise<FileRecord | undefined>;
   deleteFile(id: string): Promise<void>;
+  
+  // AI Conversations
+  getAiConversation(id: string): Promise<AiConversation | undefined>;
+  getAiConversationsByUser(userId: string): Promise<AiConversation[]>;
+  createAiConversation(data: InsertAiConversation): Promise<AiConversation>;
+  updateAiConversation(id: string, data: Partial<AiConversation>): Promise<AiConversation | undefined>;
+  deleteAiConversation(id: string): Promise<void>;
+  addMessageToConversation(conversationId: string, message: AiMessage): Promise<AiConversation | undefined>;
+  
+  // AI Business Patterns
+  getAiBusinessPatterns(): Promise<AiBusinessPattern[]>;
+  getAiBusinessPatternsByType(patternType: string): Promise<AiBusinessPattern[]>;
+  createAiBusinessPattern(data: InsertAiBusinessPattern): Promise<AiBusinessPattern>;
+  updateAiBusinessPattern(id: string, data: Partial<AiBusinessPattern>): Promise<AiBusinessPattern | undefined>;
+  incrementPatternFrequency(id: string): Promise<AiBusinessPattern | undefined>;
+  learnFromJob(job: Job): Promise<void>;
+  learnFromQuote(quote: Quote): Promise<void>;
+  
+  // AI User Preferences
+  getAiUserPreference(userId: string): Promise<AiUserPreference | undefined>;
+  upsertAiUserPreference(userId: string, data: Partial<AiUserPreference>): Promise<AiUserPreference>;
+  trackUserAction(userId: string, action: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2064,6 +2090,235 @@ export class DatabaseStorage implements IStorage {
 
   async deleteFile(id: string): Promise<void> {
     await db.delete(files).where(eq(files.id, id));
+  }
+
+  // AI Conversations
+  async getAiConversation(id: string): Promise<AiConversation | undefined> {
+    const [conversation] = await db.select().from(aiConversations).where(eq(aiConversations.id, id));
+    return conversation;
+  }
+
+  async getAiConversationsByUser(userId: string): Promise<AiConversation[]> {
+    return db.select().from(aiConversations)
+      .where(and(eq(aiConversations.userId, userId), eq(aiConversations.isArchived, false)))
+      .orderBy(desc(aiConversations.lastMessageAt));
+  }
+
+  async createAiConversation(data: InsertAiConversation): Promise<AiConversation> {
+    const [conversation] = await db.insert(aiConversations).values(data).returning();
+    return conversation;
+  }
+
+  async updateAiConversation(id: string, data: Partial<AiConversation>): Promise<AiConversation | undefined> {
+    const [conversation] = await db.update(aiConversations)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(aiConversations.id, id))
+      .returning();
+    return conversation;
+  }
+
+  async deleteAiConversation(id: string): Promise<void> {
+    await db.delete(aiConversations).where(eq(aiConversations.id, id));
+  }
+
+  async addMessageToConversation(conversationId: string, message: AiMessage): Promise<AiConversation | undefined> {
+    const conversation = await this.getAiConversation(conversationId);
+    if (!conversation) return undefined;
+    
+    const currentMessages = (conversation.messages as AiMessage[]) || [];
+    const updatedMessages = [...currentMessages, message];
+    
+    // Generate title from first user message if still default
+    let title = conversation.title;
+    if (title === 'New Conversation' && message.role === 'user') {
+      title = message.content.substring(0, 50) + (message.content.length > 50 ? '...' : '');
+    }
+    
+    const [updated] = await db.update(aiConversations)
+      .set({ 
+        messages: updatedMessages,
+        title,
+        lastMessageAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(aiConversations.id, conversationId))
+      .returning();
+    return updated;
+  }
+
+  // AI Business Patterns
+  async getAiBusinessPatterns(): Promise<AiBusinessPattern[]> {
+    return db.select().from(aiBusinessPatterns).orderBy(desc(aiBusinessPatterns.frequency));
+  }
+
+  async getAiBusinessPatternsByType(patternType: string): Promise<AiBusinessPattern[]> {
+    return db.select().from(aiBusinessPatterns)
+      .where(eq(aiBusinessPatterns.patternType, patternType))
+      .orderBy(desc(aiBusinessPatterns.frequency));
+  }
+
+  async createAiBusinessPattern(data: InsertAiBusinessPattern): Promise<AiBusinessPattern> {
+    const [pattern] = await db.insert(aiBusinessPatterns).values(data).returning();
+    return pattern;
+  }
+
+  async updateAiBusinessPattern(id: string, data: Partial<AiBusinessPattern>): Promise<AiBusinessPattern | undefined> {
+    const [pattern] = await db.update(aiBusinessPatterns)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(aiBusinessPatterns.id, id))
+      .returning();
+    return pattern;
+  }
+
+  async incrementPatternFrequency(id: string): Promise<AiBusinessPattern | undefined> {
+    const [pattern] = await db.update(aiBusinessPatterns)
+      .set({ 
+        frequency: sql`${aiBusinessPatterns.frequency} + 1`,
+        lastOccurrence: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(aiBusinessPatterns.id, id))
+      .returning();
+    return pattern;
+  }
+
+  async learnFromJob(job: Job): Promise<void> {
+    // Learn from job completion - track materials used, duration, skills needed
+    if (job.status === 'Completed' && job.materials) {
+      const materials = job.materials as { description?: string; quantity?: number }[];
+      for (const material of materials) {
+        if (material.description) {
+          // Find or create material pattern
+          const existing = await db.select().from(aiBusinessPatterns)
+            .where(and(
+              eq(aiBusinessPatterns.patternType, 'materials'),
+              sql`${aiBusinessPatterns.data}->>'materialName' = ${material.description}`
+            ));
+          
+          if (existing.length > 0) {
+            await this.incrementPatternFrequency(existing[0].id);
+          } else {
+            await this.createAiBusinessPattern({
+              patternType: 'materials',
+              category: null,
+              data: {
+                materialName: material.description,
+                jobTypes: [],
+                avgQuantity: material.quantity || 1
+              }
+            });
+          }
+        }
+      }
+    }
+    
+    // Learn engineer assignments
+    if (job.assignedToId) {
+      const existing = await db.select().from(aiBusinessPatterns)
+        .where(and(
+          eq(aiBusinessPatterns.patternType, 'engineer_assignment'),
+          sql`${aiBusinessPatterns.data}->>'engineerId' = ${job.assignedToId}`
+        ));
+      
+      if (existing.length > 0) {
+        await this.incrementPatternFrequency(existing[0].id);
+      } else {
+        const engineer = await this.getUser(job.assignedToId);
+        if (engineer) {
+          await this.createAiBusinessPattern({
+            patternType: 'engineer_assignment',
+            category: null,
+            data: {
+              engineerId: engineer.id,
+              engineerName: engineer.name,
+              jobTypes: [],
+              successRate: 100,
+              avgJobsPerWeek: 1
+            }
+          });
+        }
+      }
+    }
+  }
+
+  async learnFromQuote(quote: Quote): Promise<void> {
+    // Learn pricing patterns from accepted quotes
+    if (quote.status === 'accepted' && quote.total) {
+      const existing = await db.select().from(aiBusinessPatterns)
+        .where(eq(aiBusinessPatterns.patternType, 'pricing'));
+      
+      // Simple averaging - in production you'd want more sophisticated analysis
+      if (existing.length === 0) {
+        await this.createAiBusinessPattern({
+          patternType: 'pricing',
+          category: 'general',
+          data: {
+            jobType: 'general',
+            avgPrice: Number(quote.total),
+            minPrice: Number(quote.total),
+            maxPrice: Number(quote.total),
+            sampleSize: 1
+          }
+        });
+      } else {
+        const pattern = existing[0];
+        const data = pattern.data as { avgPrice: number; minPrice: number; maxPrice: number; sampleSize: number };
+        const newSampleSize = data.sampleSize + 1;
+        const newAvg = (data.avgPrice * data.sampleSize + Number(quote.total)) / newSampleSize;
+        
+        await this.updateAiBusinessPattern(pattern.id, {
+          data: {
+            ...data,
+            avgPrice: newAvg,
+            minPrice: Math.min(data.minPrice, Number(quote.total)),
+            maxPrice: Math.max(data.maxPrice, Number(quote.total)),
+            sampleSize: newSampleSize
+          }
+        });
+      }
+    }
+  }
+
+  // AI User Preferences
+  async getAiUserPreference(userId: string): Promise<AiUserPreference | undefined> {
+    const [pref] = await db.select().from(aiUserPreferences).where(eq(aiUserPreferences.userId, userId));
+    return pref;
+  }
+
+  async upsertAiUserPreference(userId: string, data: Partial<AiUserPreference>): Promise<AiUserPreference> {
+    const existing = await this.getAiUserPreference(userId);
+    
+    if (existing) {
+      const [updated] = await db.update(aiUserPreferences)
+        .set({ ...data, lastLearnedAt: new Date(), updatedAt: new Date() })
+        .where(eq(aiUserPreferences.userId, userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(aiUserPreferences)
+        .values({ userId, ...data })
+        .returning();
+      return created;
+    }
+  }
+
+  async trackUserAction(userId: string, action: string): Promise<void> {
+    const pref = await this.getAiUserPreference(userId);
+    const actions = (pref?.preferredActions as { action: string; count: number; lastUsed: string }[]) || [];
+    
+    const existingIndex = actions.findIndex(a => a.action === action);
+    if (existingIndex >= 0) {
+      actions[existingIndex].count += 1;
+      actions[existingIndex].lastUsed = new Date().toISOString();
+    } else {
+      actions.push({ action, count: 1, lastUsed: new Date().toISOString() });
+    }
+    
+    // Sort by count and keep top 20
+    actions.sort((a, b) => b.count - a.count);
+    const topActions = actions.slice(0, 20);
+    
+    await this.upsertAiUserPreference(userId, { preferredActions: topActions });
   }
 }
 

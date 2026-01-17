@@ -1072,3 +1072,122 @@ export type AiFileSuggestion = {
   confidence: number;
   reasoning: string;
 };
+
+// AI Conversations - Store chat history for continuing past conversations
+export const aiConversations = pgTable("ai_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  title: text("title").notNull().default("New Conversation"),
+  messages: jsonb("messages").notNull().default([]),
+  context: text("context"), // Page context when conversation started
+  isArchived: boolean("is_archived").notNull().default(false),
+  lastMessageAt: timestamp("last_message_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAiConversationSchema = createInsertSchema(aiConversations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAiConversation = z.infer<typeof insertAiConversationSchema>;
+export type AiConversation = typeof aiConversations.$inferSelect;
+
+export type AiMessage = {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
+};
+
+// AI Business Patterns - Learn from business operations
+export const aiBusinessPatterns = pgTable("ai_business_patterns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  patternType: text("pattern_type").notNull(), // pricing, materials, suppliers, job_duration, engineer_assignment
+  category: text("category"), // e.g., "plumbing", "electrical", "HVAC"
+  data: jsonb("data").notNull(), // Pattern-specific data
+  frequency: integer("frequency").notNull().default(1), // How often this pattern occurs
+  lastOccurrence: timestamp("last_occurrence").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAiBusinessPatternSchema = createInsertSchema(aiBusinessPatterns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAiBusinessPattern = z.infer<typeof insertAiBusinessPatternSchema>;
+export type AiBusinessPattern = typeof aiBusinessPatterns.$inferSelect;
+
+export type PricingPattern = {
+  jobType: string;
+  avgPrice: number;
+  minPrice: number;
+  maxPrice: number;
+  sampleSize: number;
+};
+
+export type MaterialPattern = {
+  materialName: string;
+  jobTypes: string[];
+  avgQuantity: number;
+  preferredSupplier?: string;
+};
+
+export type SupplierPattern = {
+  supplierName: string;
+  materials: string[];
+  useCount: number;
+};
+
+export type JobDurationPattern = {
+  jobType: string;
+  avgDurationHours: number;
+  complexity: string;
+};
+
+export type EngineerAssignmentPattern = {
+  engineerId: string;
+  engineerName: string;
+  jobTypes: string[];
+  successRate: number;
+  avgJobsPerWeek: number;
+};
+
+// AI User Preferences - Remember individual team member preferences
+export const aiUserPreferences = pgTable("ai_user_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(),
+  communicationStyle: text("communication_style").default("professional"), // professional, casual, brief
+  preferredActions: jsonb("preferred_actions").default([]), // Common tasks they perform
+  shortcuts: jsonb("shortcuts").default([]), // Custom shortcuts they've created
+  dashboardPreferences: jsonb("dashboard_preferences").default({}), // What they like to see first
+  notificationPreferences: jsonb("notification_preferences").default({}),
+  lastLearnedAt: timestamp("last_learned_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAiUserPreferenceSchema = createInsertSchema(aiUserPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAiUserPreference = z.infer<typeof insertAiUserPreferenceSchema>;
+export type AiUserPreference = typeof aiUserPreferences.$inferSelect;
+
+export type UserAction = {
+  action: string;
+  count: number;
+  lastUsed: string;
+};
+
+export type UserShortcut = {
+  trigger: string;
+  action: string;
+  description: string;
+};
