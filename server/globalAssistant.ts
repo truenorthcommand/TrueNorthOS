@@ -16,12 +16,42 @@ interface TavilySearchResponse {
   answer?: string;
 }
 
+function enhanceSearchQuery(query: string): string {
+  const lowerQuery = query.toLowerCase();
+  
+  // Check if this is a product/price search
+  const isProductSearch = [
+    "price", "cost", "buy", "purchase", "where to get",
+    "stockist", "supplier", "merchant", "wholesaler",
+    "boiler", "radiator", "thermostat", "pump", "valve",
+    "cable", "switch", "socket", "fuse", "circuit",
+    "pipe", "fitting", "tap", "toilet", "sink"
+  ].some(term => lowerQuery.includes(term));
+  
+  // Enhance product searches to get direct product pages
+  if (isProductSearch && !lowerQuery.includes("product page")) {
+    return `${query} UK buy price product page`;
+  }
+  
+  // Add UK context for regulation searches
+  if (lowerQuery.includes("regulation") || lowerQuery.includes("bs 7671") || 
+      lowerQuery.includes("gas safe") || lowerQuery.includes("part p")) {
+    return `${query} UK official`;
+  }
+  
+  return query;
+}
+
 async function searchWeb(query: string): Promise<{ results: TavilySearchResult[]; answer?: string } | null> {
   const apiKey = process.env.TAVILY_API_KEY;
   if (!apiKey) {
     console.log("Tavily API key not configured");
     return null;
   }
+
+  // Enhance query to get more specific product links
+  const enhancedQuery = enhanceSearchQuery(query);
+  console.log("Enhanced search query:", enhancedQuery);
 
   try {
     const response = await fetch("https://api.tavily.com/search", {
@@ -31,11 +61,11 @@ async function searchWeb(query: string): Promise<{ results: TavilySearchResult[]
       },
       body: JSON.stringify({
         api_key: apiKey,
-        query: query,
-        search_depth: "basic",
+        query: enhancedQuery,
+        search_depth: "advanced", // Use advanced for better product page results
         include_answer: true,
         include_raw_content: false,
-        max_results: 5,
+        max_results: 8, // Get more results to find direct product links
       }),
     });
 
@@ -132,6 +162,12 @@ When the user asks about products, suppliers, regulations, or technical specific
 - UK regulations (BS 7671, Gas Safe, Part P, Building Regs)
 - Material prices and alternatives
 - Technical how-to guides
+
+IMPORTANT - DIRECT PRODUCT LINKS:
+When providing web search results for products, I ALWAYS give direct links to the specific product page, NOT just the store homepage. For example:
+- GOOD: https://www.screwfix.com/p/vaillant-ecotec-plus-832-combi-boiler/12345
+- BAD: https://www.screwfix.com
+I extract and present the most specific, deep links available from search results so users can go directly to the product, price, or specification page without additional searching.
 
 CONTEXT PROVIDED:
 - Current page the user is viewing
