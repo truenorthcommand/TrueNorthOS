@@ -85,9 +85,10 @@ export default function JobDetail() {
     engineerName: string;
     score: number;
     reason: string;
-    currentWorkload: number;
+    matchedSkills?: string[];
     skills: string[];
-    factors: { skills: number; workload: number; proximity: number; };
+    nextAvailability?: string;
+    isAvailableToday?: boolean;
   }>>([]);
   const [suggestionsAiPowered, setSuggestionsAiPowered] = useState(false);
   
@@ -1140,12 +1141,17 @@ export default function JobDetail() {
                                   <div className="font-medium flex items-center gap-2">
                                     {suggestion.engineerName}
                                     <Badge variant="outline" className="text-xs">
-                                      Score: {suggestion.score}
+                                      Skills Match: {suggestion.score}%
                                     </Badge>
                                   </div>
                                   <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                                    <Briefcase className="h-3 w-3" />
-                                    {suggestion.currentWorkload} active job{suggestion.currentWorkload !== 1 ? 's' : ''}
+                                    <Calendar className="h-3 w-3" />
+                                    {suggestion.isAvailableToday 
+                                      ? <span className="text-green-600 font-medium">Available Today</span>
+                                      : suggestion.nextAvailability 
+                                        ? `Next Available: ${format(new Date(suggestion.nextAvailability), "dd MMM yyyy")}`
+                                        : 'Availability unknown'
+                                    }
                                   </div>
                                 </div>
                               </div>

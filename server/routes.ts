@@ -3032,7 +3032,7 @@ TrueNorth Field View is a "business in a box" platform that enables field servic
 
   // ==================== AI-POWERED ENGINEER ASSIGNMENT ====================
 
-  // Get AI-powered engineer suggestions for a job based on skills, location, and workload
+  // Get AI-powered engineer suggestions for a job based on skills and availability
   app.get("/api/ai/suggest-engineers/:jobId", requireRoles('admin'), async (req, res) => {
     try {
       const job = await storage.getJob(req.params.jobId);
@@ -3051,32 +3051,66 @@ TrueNorth Field View is a "business in a box" platform that enables field servic
         return res.json({ suggestions: [], message: "No engineers available" });
       }
 
-      // Get all jobs to calculate workload
+      // Get all jobs to calculate next availability
       const allJobs = await storage.getAllJobs();
-      const activeJobs = allJobs.filter(j => j.status !== 'Signed Off');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-      // Calculate workload per engineer
-      const workloadMap: Record<string, number> = {};
-      for (const j of activeJobs) {
-        const assignedIds = (j.assignedToIds as string[]) || (j.assignedToId ? [j.assignedToId] : []);
-        for (const id of assignedIds) {
-          workloadMap[id] = (workloadMap[id] || 0) + 1;
+      // Calculate next availability per engineer based on scheduled jobs
+      const getNextAvailability = (engineerId: string): Date => {
+        const engineerJobs = allJobs.filter(j => {
+          const assignedIds = (j.assignedToIds as string[]) || (j.assignedToId ? [j.assignedToId] : []);
+          return assignedIds.includes(engineerId) && j.status !== 'Signed Off' && j.status !== 'Completed';
+        });
+
+        // Get all scheduled dates for this engineer
+        const scheduledDates = engineerJobs
+          .filter(j => j.scheduledDate)
+          .map(j => new Date(j.scheduledDate as string))
+          .filter(d => d >= today)
+          .sort((a, b) => a.getTime() - b.getTime());
+
+        if (scheduledDates.length === 0) {
+          return today; // Available today
         }
-      }
 
-      // Get skills for each engineer
+        // Find the first gap in scheduled dates or return day after last scheduled job
+        let checkDate = new Date(today);
+        for (const scheduled of scheduledDates) {
+          if (checkDate < scheduled) {
+            return checkDate; // Found a gap
+          }
+          checkDate = new Date(scheduled);
+          checkDate.setDate(checkDate.getDate() + 1);
+        }
+        return checkDate;
+      };
+
+      // Get skills and sub-skills for each engineer
       const engineerData = await Promise.all(engineers.map(async (eng) => {
         const skills = await storage.getUserSkills(eng.id);
+        const userSkillRecords = await storage.getUserSkillRecords(eng.id);
+        
+        // Get sub-skills for each skill
+        const skillsWithSubSkills = await Promise.all(skills.map(async (skill) => {
+          const userSkillRecord = userSkillRecords.find(us => us.skillId === skill.id);
+          const subSkillIds = (userSkillRecord?.subSkillIds as string[]) || [];
+          const subSkills = subSkillIds.length > 0 ? await storage.getSubSkillsByIds(subSkillIds) : [];
+          return {
+            name: skill.name,
+            subSkills: subSkills.map(ss => ss.name),
+          };
+        }));
+
+        const nextAvailable = getNextAvailability(eng.id);
+        
         return {
           id: eng.id,
           name: eng.name,
-          skills: skills.map(s => s.name),
-          currentWorkload: workloadMap[eng.id] || 0,
-          homePostcode: eng.homePostcode || null,
-          homeLat: eng.homeLat as number | null,
-          homeLng: eng.homeLng as number | null,
-          currentLat: eng.currentLat as number | null,
-          currentLng: eng.currentLng as number | null,
+          skills: skillsWithSubSkills,
+          skillNames: skills.map(s => s.name),
+          nextAvailability: nextAvailable.toISOString().split('T')[0],
+          isAvailableToday: nextAvailable.getTime() === today.getTime(),
         };
       }));
 
@@ -3086,37 +3120,31 @@ TrueNorth Field View is a "business in a box" platform that enables field servic
       // Build context for AI
       const jobContext = {
         description: job.description || 'No description',
-        address: job.address || 'No address specified',
-        postcode: job.postcode || null,
         requiredSkills: requiredSkills,
-        urgency: job.urgency || 'normal',
       };
 
       // Try AI-powered suggestions if available
       const openai = getOpenAIClient();
       if (openai) {
         try {
-          const systemPrompt = `You are an AI assistant helping assign field engineers to jobs. Analyze the job requirements and engineer profiles to suggest the best matches.
+          const systemPrompt = `You are an AI assistant helping assign field engineers to jobs. Your ONLY criteria for ranking is skills match.
 
-Consider these factors in order of importance:
-1. **Skills Match**: Engineers with relevant skills for the job type
-2. **Current Workload**: Prefer engineers with fewer active jobs
-3. **Location Proximity**: Engineers closer to the job site (use postcodes/coordinates if available)
-4. **Availability**: Balance workload across the team
+IMPORTANT: Rank engineers SOLELY based on how well their skills (including sub-skills) match the job requirements.
+Do NOT consider location, workload, or any other factors - only skills.
 
-Return your response as a JSON array of engineer suggestions, ordered by suitability (best first). Each suggestion should include:
+Return your response as a JSON object with a "suggestions" array of engineer suggestions, ordered by skills match (best first). Each suggestion should include:
 - engineerId: the engineer's ID
-- score: a suitability score from 0-100
-- reason: a brief explanation of why this engineer is suitable
-- factors: { skills: number, workload: number, proximity: number } - individual factor scores 0-100`;
+- score: a skills match score from 0-100 (100 = perfect match)
+- reason: a brief explanation of which skills match the job requirements
+- matchedSkills: array of skill names that match the job`;
 
           const userPrompt = `Job Details:
 ${JSON.stringify(jobContext, null, 2)}
 
-Available Engineers:
-${JSON.stringify(engineerData, null, 2)}
+Available Engineers (with their skills and sub-skills):
+${JSON.stringify(engineerData.map(e => ({ id: e.id, name: e.name, skills: e.skills })), null, 2)}
 
-Please analyze and rank the engineers for this job. Return only valid JSON array.`;
+Please rank the engineers by skills match ONLY. Return valid JSON.`;
 
           const response = await openai.chat.completions.create({
             model: "gpt-5",
@@ -3133,14 +3161,15 @@ Please analyze and rank the engineers for this job. Return only valid JSON array
             const parsed = JSON.parse(content);
             const suggestions = parsed.suggestions || parsed;
             
-            // Enrich with engineer names
+            // Enrich with engineer data
             const enrichedSuggestions = (Array.isArray(suggestions) ? suggestions : []).map((s: any) => {
               const eng = engineerData.find(e => e.id === s.engineerId);
               return {
                 ...s,
                 engineerName: eng?.name || 'Unknown',
-                currentWorkload: eng?.currentWorkload || 0,
-                skills: eng?.skills || [],
+                skills: eng?.skillNames || [],
+                nextAvailability: eng?.nextAvailability || null,
+                isAvailableToday: eng?.isAvailableToday || false,
               };
             });
 
@@ -3154,34 +3183,48 @@ Please analyze and rank the engineers for this job. Return only valid JSON array
         }
       }
 
-      // Fallback: Simple heuristic-based suggestions
+      // Fallback: Simple skills-based suggestions
       const scoredEngineers = engineerData.map(eng => {
-        let score = 50; // Base score
+        let score = 0;
+        let matchedSkills: string[] = [];
 
-        // Skills match bonus
+        // Skills match scoring - ONLY factor
         if (requiredSkills.length > 0) {
-          const matchCount = requiredSkills.filter(rs => 
-            eng.skills.some(s => s.toLowerCase().includes(rs.toLowerCase()))
-          ).length;
-          score += (matchCount / requiredSkills.length) * 30;
+          for (const required of requiredSkills) {
+            const reqLower = required.toLowerCase();
+            // Check main skills
+            const skillMatch = eng.skillNames.find(s => s.toLowerCase().includes(reqLower));
+            if (skillMatch) {
+              score += 100 / requiredSkills.length;
+              matchedSkills.push(skillMatch);
+            } else {
+              // Check sub-skills
+              for (const skill of eng.skills) {
+                const subMatch = skill.subSkills.find(ss => ss.toLowerCase().includes(reqLower));
+                if (subMatch) {
+                  score += 80 / requiredSkills.length; // Slightly lower score for sub-skill match
+                  matchedSkills.push(`${skill.name} (${subMatch})`);
+                  break;
+                }
+              }
+            }
+          }
+        } else {
+          // No required skills specified - give base score based on total skills
+          score = Math.min(50 + eng.skillNames.length * 10, 80);
         }
-
-        // Workload penalty (fewer jobs = better)
-        const maxWorkload = Math.max(...engineerData.map(e => e.currentWorkload), 1);
-        score += ((maxWorkload - eng.currentWorkload) / maxWorkload) * 20;
 
         return {
           engineerId: eng.id,
           engineerName: eng.name,
           score: Math.round(score),
-          reason: `${eng.currentWorkload} active jobs, ${eng.skills.length} skills`,
-          currentWorkload: eng.currentWorkload,
-          skills: eng.skills,
-          factors: {
-            skills: requiredSkills.length > 0 ? Math.round((eng.skills.length / 5) * 100) : 50,
-            workload: Math.round(((maxWorkload - eng.currentWorkload) / maxWorkload) * 100),
-            proximity: 50, // Unknown without geocoding
-          }
+          reason: matchedSkills.length > 0 
+            ? `Matches: ${matchedSkills.join(', ')}`
+            : `Has ${eng.skillNames.length} skills`,
+          matchedSkills,
+          skills: eng.skillNames,
+          nextAvailability: eng.nextAvailability,
+          isAvailableToday: eng.isAvailableToday,
         };
       });
 
@@ -3201,7 +3244,7 @@ Please analyze and rank the engineers for this job. Return only valid JSON array
   // POST endpoint for suggesting engineers for new job creation (no job ID required)
   app.post("/api/ai/suggest-engineers", requireRoles('admin'), async (req, res) => {
     try {
-      const { description, address, postcode, requiredSkills = [], urgency = 'normal' } = req.body;
+      const { description, requiredSkills = [] } = req.body;
 
       // Get all engineers (users with 'engineer' role)
       const allUsers = await storage.getAllUsers();
@@ -3214,69 +3257,97 @@ Please analyze and rank the engineers for this job. Return only valid JSON array
         return res.json({ suggestions: [], message: "No engineers available" });
       }
 
-      // Get all jobs to calculate workload
+      // Get all jobs to calculate next availability
       const allJobs = await storage.getAllJobs();
-      const activeJobs = allJobs.filter(j => j.status !== 'Signed Off');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-      // Calculate workload per engineer
-      const workloadMap: Record<string, number> = {};
-      for (const j of activeJobs) {
-        const assignedIds = (j.assignedToIds as string[]) || (j.assignedToId ? [j.assignedToId] : []);
-        for (const id of assignedIds) {
-          workloadMap[id] = (workloadMap[id] || 0) + 1;
+      // Calculate next availability per engineer based on scheduled jobs
+      const getNextAvailability = (engineerId: string): Date => {
+        const engineerJobs = allJobs.filter(j => {
+          const assignedIds = (j.assignedToIds as string[]) || (j.assignedToId ? [j.assignedToId] : []);
+          return assignedIds.includes(engineerId) && j.status !== 'Signed Off' && j.status !== 'Completed';
+        });
+
+        // Get all scheduled dates for this engineer
+        const scheduledDates = engineerJobs
+          .filter(j => j.scheduledDate)
+          .map(j => new Date(j.scheduledDate as string))
+          .filter(d => d >= today)
+          .sort((a, b) => a.getTime() - b.getTime());
+
+        if (scheduledDates.length === 0) {
+          return today; // Available today
         }
-      }
 
-      // Get skills for each engineer
+        // Find the first gap in scheduled dates or return day after last scheduled job
+        let checkDate = new Date(today);
+        for (const scheduled of scheduledDates) {
+          if (checkDate < scheduled) {
+            return checkDate; // Found a gap
+          }
+          checkDate = new Date(scheduled);
+          checkDate.setDate(checkDate.getDate() + 1);
+        }
+        return checkDate;
+      };
+
+      // Get skills and sub-skills for each engineer
       const engineerData = await Promise.all(engineers.map(async (eng) => {
         const skills = await storage.getUserSkills(eng.id);
+        const userSkillRecords = await storage.getUserSkillRecords(eng.id);
+        
+        // Get sub-skills for each skill
+        const skillsWithSubSkills = await Promise.all(skills.map(async (skill) => {
+          const userSkillRecord = userSkillRecords.find(us => us.skillId === skill.id);
+          const subSkillIds = (userSkillRecord?.subSkillIds as string[]) || [];
+          const subSkills = subSkillIds.length > 0 ? await storage.getSubSkillsByIds(subSkillIds) : [];
+          return {
+            name: skill.name,
+            subSkills: subSkills.map(ss => ss.name),
+          };
+        }));
+
+        const nextAvailable = getNextAvailability(eng.id);
+        
         return {
           id: eng.id,
           name: eng.name,
-          skills: skills.map(s => s.name),
-          currentWorkload: workloadMap[eng.id] || 0,
-          homePostcode: eng.homePostcode || null,
-          homeLat: eng.homeLat as number | null,
-          homeLng: eng.homeLng as number | null,
-          currentLat: eng.currentLat as number | null,
-          currentLng: eng.currentLng as number | null,
+          skills: skillsWithSubSkills,
+          skillNames: skills.map(s => s.name),
+          nextAvailability: nextAvailable.toISOString().split('T')[0],
+          isAvailableToday: nextAvailable.getTime() === today.getTime(),
         };
       }));
 
       // Build context for AI
       const jobContext = {
         description: description || 'No description',
-        address: address || 'No address specified',
-        postcode: postcode || null,
         requiredSkills: requiredSkills,
-        urgency: urgency,
       };
 
       // Try AI-powered suggestions if available
       const openai = getOpenAIClient();
       if (openai) {
         try {
-          const systemPrompt = `You are an AI assistant helping assign field engineers to jobs. Analyze the job requirements and engineer profiles to suggest the best matches.
+          const systemPrompt = `You are an AI assistant helping assign field engineers to jobs. Your ONLY criteria for ranking is skills match.
 
-Consider these factors in order of importance:
-1. **Skills Match**: Engineers with relevant skills for the job type
-2. **Current Workload**: Prefer engineers with fewer active jobs
-3. **Location Proximity**: Engineers closer to the job site (use postcodes/coordinates if available)
-4. **Availability**: Balance workload across the team
+IMPORTANT: Rank engineers SOLELY based on how well their skills (including sub-skills) match the job requirements.
+Do NOT consider location, workload, or any other factors - only skills.
 
-Return your response as a JSON array of engineer suggestions, ordered by suitability (best first). Each suggestion should include:
+Return your response as a JSON object with a "suggestions" array of engineer suggestions, ordered by skills match (best first). Each suggestion should include:
 - engineerId: the engineer's ID
-- score: a suitability score from 0-100
-- reason: a brief explanation of why this engineer is suitable
-- factors: { skills: number, workload: number, proximity: number } - individual factor scores 0-100`;
+- score: a skills match score from 0-100 (100 = perfect match)
+- reason: a brief explanation of which skills match the job requirements
+- matchedSkills: array of skill names that match the job`;
 
           const userPrompt = `Job Details:
 ${JSON.stringify(jobContext, null, 2)}
 
-Available Engineers:
-${JSON.stringify(engineerData, null, 2)}
+Available Engineers (with their skills and sub-skills):
+${JSON.stringify(engineerData.map(e => ({ id: e.id, name: e.name, skills: e.skills })), null, 2)}
 
-Please analyze and rank the engineers for this job. Return only valid JSON array.`;
+Please rank the engineers by skills match ONLY. Return valid JSON.`;
 
           const response = await openai.chat.completions.create({
             model: "gpt-5",
@@ -3293,14 +3364,15 @@ Please analyze and rank the engineers for this job. Return only valid JSON array
             const parsed = JSON.parse(content);
             const suggestions = parsed.suggestions || parsed;
             
-            // Enrich with engineer names
+            // Enrich with engineer data
             const enrichedSuggestions = (Array.isArray(suggestions) ? suggestions : []).map((s: any) => {
               const eng = engineerData.find(e => e.id === s.engineerId);
               return {
                 ...s,
                 engineerName: eng?.name || 'Unknown',
-                currentWorkload: eng?.currentWorkload || 0,
-                skills: eng?.skills || [],
+                skills: eng?.skillNames || [],
+                nextAvailability: eng?.nextAvailability || null,
+                isAvailableToday: eng?.isAvailableToday || false,
               };
             });
 
@@ -3314,34 +3386,48 @@ Please analyze and rank the engineers for this job. Return only valid JSON array
         }
       }
 
-      // Fallback: Simple heuristic-based suggestions
+      // Fallback: Simple skills-based suggestions
       const scoredEngineers = engineerData.map(eng => {
-        let score = 50; // Base score
+        let score = 0;
+        let matchedSkills: string[] = [];
 
-        // Skills match bonus
+        // Skills match scoring - ONLY factor
         if (requiredSkills.length > 0) {
-          const matchCount = requiredSkills.filter((rs: string) => 
-            eng.skills.some(s => s.toLowerCase().includes(rs.toLowerCase()))
-          ).length;
-          score += (matchCount / requiredSkills.length) * 30;
+          for (const required of requiredSkills) {
+            const reqLower = required.toLowerCase();
+            // Check main skills
+            const skillMatch = eng.skillNames.find(s => s.toLowerCase().includes(reqLower));
+            if (skillMatch) {
+              score += 100 / requiredSkills.length;
+              matchedSkills.push(skillMatch);
+            } else {
+              // Check sub-skills
+              for (const skill of eng.skills) {
+                const subMatch = skill.subSkills.find(ss => ss.toLowerCase().includes(reqLower));
+                if (subMatch) {
+                  score += 80 / requiredSkills.length; // Slightly lower score for sub-skill match
+                  matchedSkills.push(`${skill.name} (${subMatch})`);
+                  break;
+                }
+              }
+            }
+          }
+        } else {
+          // No required skills specified - give base score based on total skills
+          score = Math.min(50 + eng.skillNames.length * 10, 80);
         }
-
-        // Workload penalty (fewer jobs = better)
-        const maxWorkload = Math.max(...engineerData.map(e => e.currentWorkload), 1);
-        score += ((maxWorkload - eng.currentWorkload) / maxWorkload) * 20;
 
         return {
           engineerId: eng.id,
           engineerName: eng.name,
           score: Math.round(score),
-          reason: `${eng.currentWorkload} active jobs, ${eng.skills.length} skills`,
-          currentWorkload: eng.currentWorkload,
-          skills: eng.skills,
-          factors: {
-            skills: requiredSkills.length > 0 ? Math.round((eng.skills.length / 5) * 100) : 50,
-            workload: Math.round(((maxWorkload - eng.currentWorkload) / maxWorkload) * 100),
-            proximity: 50,
-          }
+          reason: matchedSkills.length > 0 
+            ? `Matches: ${matchedSkills.join(', ')}`
+            : `Has ${eng.skillNames.length} skills`,
+          matchedSkills,
+          skills: eng.skillNames,
+          nextAvailability: eng.nextAvailability,
+          isAvailableToday: eng.isAvailableToday,
         };
       });
 

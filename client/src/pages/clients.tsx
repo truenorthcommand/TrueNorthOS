@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AITextarea } from "@/components/ui/ai-assist";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search, User, Phone, Mail, Star, Edit2, ChevronRight, ChevronLeft, Check, Home, Save, Upload, ExternalLink, FolderOpen, Image, FileSpreadsheet, File, Loader2, Sparkles, Briefcase, AlertCircle, Users } from "lucide-react";
+import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search, User, Phone, Mail, Star, Edit2, ChevronRight, ChevronLeft, Check, Home, Save, Upload, ExternalLink, FolderOpen, Image, FileSpreadsheet, File, Loader2, Sparkles, Briefcase, AlertCircle, Users, Calendar } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
@@ -158,9 +158,10 @@ export default function Clients() {
     engineerName: string;
     score: number;
     reason: string;
-    currentWorkload: number;
+    matchedSkills?: string[];
     skills: string[];
-    factors: { skills: number; workload: number; proximity: number };
+    nextAvailability?: string;
+    isAvailableToday?: boolean;
   }
   const [suggestDialogOpen, setSuggestDialogOpen] = useState(false);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
@@ -1276,12 +1277,17 @@ export default function Clients() {
                                   <div className="font-medium flex items-center gap-2">
                                     {suggestion.engineerName}
                                     <Badge variant="outline" className="text-xs">
-                                      Score: {suggestion.score}
+                                      Skills Match: {suggestion.score}%
                                     </Badge>
                                   </div>
                                   <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                                    <Briefcase className="h-3 w-3" />
-                                    {suggestion.currentWorkload} active job{suggestion.currentWorkload !== 1 ? 's' : ''}
+                                    <Calendar className="h-3 w-3" />
+                                    {suggestion.isAvailableToday 
+                                      ? <span className="text-green-600 font-medium">Available Today</span>
+                                      : suggestion.nextAvailability 
+                                        ? `Next Available: ${format(new Date(suggestion.nextAvailability), "dd MMM yyyy")}`
+                                        : 'Availability unknown'
+                                    }
                                   </div>
                                 </div>
                               </div>
