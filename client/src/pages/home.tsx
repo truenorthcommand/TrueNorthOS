@@ -35,7 +35,9 @@ import {
   Gauge,
   Brain,
   Mic,
-  ShieldCheck
+  ShieldCheck,
+  Presentation,
+  ExternalLink
 } from "lucide-react";
 
 const modules = [
@@ -392,6 +394,73 @@ export default function Home() {
                   GDPR compliant with 2FA, role-based access, and full audit trails.
                 </p>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="py-16 bg-slate-100 dark:bg-slate-900 px-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-8">
+              <Badge className="mb-4 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+                <Presentation className="h-3 w-3 mr-1" />
+                Presentations
+              </Badge>
+              <h3 className="text-2xl md:text-3xl font-bold mb-2" data-testid="text-pitch-title">
+                Pitch Decks
+              </h3>
+              <p className="text-muted-foreground">
+                Professional presentations for investors, customers, and networking events
+              </p>
+            </div>
+            <div className="grid md:grid-cols-3 gap-4">
+              <Link href="/pitch/investor">
+                <Card className="h-full hover:border-indigo-500 hover:shadow-md transition-all cursor-pointer" data-testid="link-pitch-investor">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">Investor Pitch</CardTitle>
+                      <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <CardDescription>10 slides</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      Full investor deck with market opportunity, competition, business model, ROI, and funding ask.
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+              <Link href="/pitch/sales">
+                <Card className="h-full hover:border-green-500 hover:shadow-md transition-all cursor-pointer" data-testid="link-pitch-sales">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">Sales Pitch</CardTitle>
+                      <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <CardDescription>7 slides</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      Customer-focused deck with pain points, features, ROI calculator, and pricing.
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+              <Link href="/pitch/onepager">
+                <Card className="h-full hover:border-blue-500 hover:shadow-md transition-all cursor-pointer" data-testid="link-pitch-onepager">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">One-Pager</CardTitle>
+                      <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <CardDescription>Printable PDF</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      Quick overview for networking events. Print or save as PDF.
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
             </div>
           </div>
         </section>
