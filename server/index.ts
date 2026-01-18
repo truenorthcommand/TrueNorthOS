@@ -100,6 +100,99 @@ app.use((req, res, next) => {
   
   await seedDefaultSkills();
 
+  // Seed default sub-skills for each main skill
+  const seedDefaultSubSkills = async () => {
+    try {
+      log("Ensuring default sub-skills exist...");
+      
+      // Define sub-skills for each main skill
+      const subSkillsConfig: Record<string, string[]> = {
+        "Gas & Heating": [
+          "LPG",
+          "Oil Boilers", 
+          "Commercial Gas",
+          "Domestic Gas",
+          "Unvented Hot Water",
+          "Warm Air Systems",
+          "Gas Fire Servicing",
+        ],
+        "Electrical": [
+          "18th Edition",
+          "Solar PV Installation",
+          "EV Charger Installation",
+          "Emergency Lighting",
+          "Fire Alarm Systems",
+          "Data/Network Cabling",
+          "Three Phase",
+          "PAT Testing",
+        ],
+        "Plumbing": [
+          "Bathroom Installation",
+          "Kitchen Installation",
+          "Underfloor Heating",
+          "Water Treatment",
+          "Rainwater Harvesting",
+          "Mains Water Connection",
+        ],
+        "HVAC": [
+          "Air Conditioning",
+          "Ventilation Systems",
+          "Heat Pumps",
+          "Commercial Refrigeration",
+          "Ductwork",
+          "F-Gas Certified",
+        ],
+        "Roofing": [
+          "Flat Roofing",
+          "Pitched Roofing",
+          "Slate & Tile",
+          "Metal Roofing",
+          "Green Roofs",
+          "Fascia & Soffits",
+        ],
+        "Carpentry": [
+          "First Fix",
+          "Second Fix",
+          "Kitchen Fitting",
+          "Staircase Installation",
+          "Door Hanging",
+          "Sash Windows",
+        ],
+        "Fire Safety": [
+          "Fire Door Installation",
+          "Fire Stopping",
+          "Passive Fire Protection",
+          "Fire Risk Assessment",
+          "Sprinkler Systems",
+        ],
+        "Security Systems": [
+          "CCTV Installation",
+          "Intruder Alarms",
+          "Access Control",
+          "Intercom Systems",
+          "Safe Installation",
+        ],
+      };
+
+      let seededCount = 0;
+      for (const [skillName, subSkillNames] of Object.entries(subSkillsConfig)) {
+        // Find the skill by name
+        const skill = await storage.getSkillByName(skillName);
+        if (!skill) continue;
+
+        for (const subSkillName of subSkillNames) {
+          const result = await storage.upsertSubSkill(skill.id, subSkillName);
+          if (result) seededCount++;
+        }
+      }
+      log(`Verified ${seededCount} default sub-skills exist`);
+    } catch (error) {
+      console.error("Failed to seed default sub-skills:", error);
+    }
+  };
+
+  await seedDefaultSubSkills();
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";

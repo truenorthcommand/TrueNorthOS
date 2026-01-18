@@ -1153,6 +1153,67 @@ export async function registerRoutes(
     }
   });
 
+  // Get user's negative skills (skills they should NOT be assigned to) - Super Admin only
+  app.get("/api/users/:userId/negative-skills", requireRoles('super_admin'), async (req, res) => {
+    try {
+      const user = await storage.getUser(req.params.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      const negativeSkillIds = (user.negativeSkillIds as string[]) || [];
+      res.json({ negativeSkillIds });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch negative skills" });
+    }
+  });
+
+  // Set user's negative skills (Super Admin only)
+  app.put("/api/users/:userId/negative-skills", requireRoles('super_admin'), async (req, res) => {
+    try {
+      const { negativeSkillIds } = req.body;
+      if (!Array.isArray(negativeSkillIds)) {
+        return res.status(400).json({ error: "negativeSkillIds must be an array" });
+      }
+      const updated = await storage.updateUser(req.params.userId, { negativeSkillIds });
+      if (!updated) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json({ message: "Negative skills updated", negativeSkillIds });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update negative skills" });
+    }
+  });
+
+  // Get user's working at height certification
+  app.get("/api/users/:userId/working-at-height", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.params.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json({ workingAtHeight: user.workingAtHeight || false });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch working at height status" });
+    }
+  });
+
+  // Set user's working at height certification (Admin only)
+  app.put("/api/users/:userId/working-at-height", requireAdmin, async (req, res) => {
+    try {
+      const { workingAtHeight } = req.body;
+      if (typeof workingAtHeight !== 'boolean') {
+        return res.status(400).json({ error: "workingAtHeight must be a boolean" });
+      }
+      const updated = await storage.updateUser(req.params.userId, { workingAtHeight });
+      if (!updated) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json({ message: "Working at height status updated", workingAtHeight });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update working at height status" });
+    }
+  });
+
   // ==================== JOB ROUTES (PROTECTED) ====================
 
   app.get("/api/jobs", requireAuth, async (req, res) => {
@@ -3065,8 +3126,8 @@ TrueNorth Field View is a "business in a box" platform that enables field servic
 
         // Get all scheduled dates for this engineer
         const scheduledDates = engineerJobs
-          .filter(j => j.scheduledDate)
-          .map(j => new Date(j.scheduledDate as string))
+          .filter(j => j.date)
+          .map(j => new Date(j.date as Date))
           .filter(d => d >= today)
           .sort((a, b) => a.getTime() - b.getTime());
 
@@ -3271,8 +3332,8 @@ Please rank the engineers by skills match ONLY. Return valid JSON.`;
 
         // Get all scheduled dates for this engineer
         const scheduledDates = engineerJobs
-          .filter(j => j.scheduledDate)
-          .map(j => new Date(j.scheduledDate as string))
+          .filter(j => j.date)
+          .map(j => new Date(j.date as Date))
           .filter(d => d >= today)
           .sort((a, b) => a.getTime() - b.getTime());
 

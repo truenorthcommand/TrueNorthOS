@@ -55,7 +55,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   deleteUser(id: string): Promise<void>;
-  updateUser(id: string, updates: Partial<{ name: string; email: string | null; phone: string | null; tabletNumber: string | null; username: string; password: string; role: string; roles: string[]; superAdmin: boolean; twoFactorSecret: string | null; twoFactorEnabled: boolean; gdprConsentDate: Date | null; gdprConsentVersion: string | null; deletionRequestedAt: Date | null; status: string }>): Promise<User | undefined>;
+  updateUser(id: string, updates: Partial<{ name: string; email: string | null; phone: string | null; tabletNumber: string | null; username: string; password: string; role: string; roles: string[]; superAdmin: boolean; twoFactorSecret: string | null; twoFactorEnabled: boolean; gdprConsentDate: Date | null; gdprConsentVersion: string | null; deletionRequestedAt: Date | null; status: string; workingAtHeight: boolean; negativeSkillIds: string[] }>): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
   getAllEngineers(): Promise<User[]>;
   updateEngineerLocation(id: string, lat: number, lng: number): Promise<User | undefined>;
@@ -201,6 +201,7 @@ export interface IStorage {
   // Skills
   getAllSkills(): Promise<Skill[]>;
   getSkillsCount(): Promise<number>;
+  getSkillByName(name: string): Promise<Skill | undefined>;
   createSkill(name: string, category: string, icon: string): Promise<Skill>;
   upsertSkill(name: string, category: string, icon: string): Promise<Skill>;
   getUserSkills(userId: string): Promise<Skill[]>;
@@ -209,12 +210,15 @@ export interface IStorage {
   
   // Sub-Skills
   getSubSkillsBySkill(skillId: string): Promise<SubSkill[]>;
+  getSubSkillsByIds(ids: string[]): Promise<SubSkill[]>;
   getAllSubSkills(): Promise<SubSkill[]>;
   createSubSkill(skillId: string, name: string, description?: string): Promise<SubSkill>;
+  upsertSubSkill(skillId: string, name: string, description?: string): Promise<SubSkill>;
   updateSubSkill(id: string, updates: Partial<SubSkill>): Promise<SubSkill | undefined>;
   deleteSubSkill(id: string): Promise<void>;
   getUserSubSkills(userId: string, skillId: string): Promise<string[]>;
   setUserSubSkills(userId: string, skillId: string, subSkillIds: string[]): Promise<void>;
+  getUserSkillRecords(userId: string): Promise<UserSkill[]>;
   
   // Works Manager
   getTeamMembers(managerId: string): Promise<User[]>;
@@ -326,7 +330,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(users).where(eq(users.id, id));
   }
 
-  async updateUser(id: string, updates: Partial<{ name: string; email: string | null; phone: string | null; tabletNumber: string | null; username: string; password: string; role: string; roles: string[]; superAdmin: boolean; twoFactorSecret: string | null; twoFactorEnabled: boolean; gdprConsentDate: Date | null; gdprConsentVersion: string | null; deletionRequestedAt: Date | null; status: string }>): Promise<User | undefined> {
+  async updateUser(id: string, updates: Partial<{ name: string; email: string | null; phone: string | null; tabletNumber: string | null; username: string; password: string; role: string; roles: string[]; superAdmin: boolean; twoFactorSecret: string | null; twoFactorEnabled: boolean; gdprConsentDate: Date | null; gdprConsentVersion: string | null; deletionRequestedAt: Date | null; status: string; workingAtHeight: boolean; negativeSkillIds: string[] }>): Promise<User | undefined> {
     const [user] = await db.update(users).set(updates).where(eq(users.id, id)).returning();
     return user;
   }
@@ -1476,6 +1480,11 @@ export class DatabaseStorage implements IStorage {
     return result[0]?.count || 0;
   }
 
+  async getSkillByName(name: string): Promise<Skill | undefined> {
+    const result = await db.select().from(skills).where(eq(skills.name, name)).limit(1);
+    return result[0];
+  }
+
   async createSkill(name: string, category: string, icon: string): Promise<Skill> {
     const [skill] = await db.insert(skills).values({ name, category, icon, isActive: true }).returning();
     return skill;
@@ -1535,6 +1544,17 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async upsertSubSkill(skillId: string, name: string, description?: string): Promise<SubSkill> {
+    // Check if sub-skill already exists for this skill
+    const existing = await db.select().from(subSkills)
+      .where(and(eq(subSkills.skillId, skillId), eq(subSkills.name, name)))
+      .limit(1);
+    if (existing.length > 0) {
+      return existing[0];
+    }
+    return this.createSubSkill(skillId, name, description);
+  }
+
   async updateSubSkill(id: string, updates: Partial<SubSkill>): Promise<SubSkill | undefined> {
     const [updated] = await db.update(subSkills)
       .set(updates)
@@ -1560,6 +1580,15 @@ export class DatabaseStorage implements IStorage {
     await db.update(userSkills)
       .set({ subSkillIds })
       .where(and(eq(userSkills.userId, userId), eq(userSkills.skillId, skillId)));
+  }
+
+  async getSubSkillsByIds(ids: string[]): Promise<SubSkill[]> {
+    if (ids.length === 0) return [];
+    return db.select().from(subSkills).where(inArray(subSkills.id, ids));
+  }
+
+  async getUserSkillRecords(userId: string): Promise<UserSkill[]> {
+    return db.select().from(userSkills).where(eq(userSkills.userId, userId));
   }
 
   // ==================== WORKS MANAGER ====================

@@ -34,6 +34,8 @@ export const users = pgTable("users", {
   gdprConsentDate: timestamp("gdpr_consent_date"),
   gdprConsentVersion: text("gdpr_consent_version"),
   deletionRequestedAt: timestamp("deletion_requested_at"),
+  workingAtHeight: boolean("working_at_height").notNull().default(false),
+  negativeSkillIds: jsonb("negative_skill_ids").default([]),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

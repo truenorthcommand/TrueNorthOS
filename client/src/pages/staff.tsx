@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, User, Shield, Wrench, AlertCircle, Eye, EyeOff, Lock, KeyRound, Pencil, MapPin, Truck, X, Search, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Trash2, User, Shield, Wrench, AlertCircle, Eye, EyeOff, Lock, KeyRound, Pencil, MapPin, Truck, X, Search, ChevronDown, ChevronRight, AlertTriangle, Mountain } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -35,6 +35,8 @@ interface StaffMember {
   dayRate?: number | null;
   skills?: Skill[];
   managerId?: string | null;
+  workingAtHeight?: boolean;
+  negativeSkillIds?: string[];
 }
 
 interface WorksManager {
@@ -121,6 +123,11 @@ export default function Staff() {
   const [allSubSkills, setAllSubSkills] = useState<SubSkill[]>([]);
   const [editSubSkills, setEditSubSkills] = useState<Record<string, string[]>>({}); // skillId -> subSkillIds[]
   const [expandedSkillId, setExpandedSkillId] = useState<string | null>(null);
+  
+  // Working at height and negative skills state
+  const [editWorkingAtHeight, setEditWorkingAtHeight] = useState(false);
+  const [editNegativeSkillIds, setEditNegativeSkillIds] = useState<string[]>([]);
+  const [showNegativeSkillsSection, setShowNegativeSkillsSection] = useState(false);
 
   const handleVerifyPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -613,6 +620,36 @@ export default function Staff() {
       setEditVehicleId("");
     }
     
+    // Fetch working at height certification status
+    try {
+      const wahRes = await fetch(`/api/users/${member.id}/working-at-height`, { credentials: 'include' });
+      if (wahRes.ok) {
+        const wahData = await wahRes.json();
+        setEditWorkingAtHeight(wahData.workingAtHeight || false);
+      }
+    } catch (error) {
+      console.error('Failed to fetch working at height status:', error);
+      setEditWorkingAtHeight(false);
+    }
+    
+    // Fetch negative skills (Super Admin only)
+    if (user?.superAdmin) {
+      try {
+        const negSkillsRes = await fetch(`/api/users/${member.id}/negative-skills`, { credentials: 'include' });
+        if (negSkillsRes.ok) {
+          const negSkillsData = await negSkillsRes.json();
+          setEditNegativeSkillIds(negSkillsData.negativeSkillIds || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch negative skills:', error);
+        setEditNegativeSkillIds([]);
+      }
+      setShowNegativeSkillsSection(true);
+    } else {
+      setShowNegativeSkillsSection(false);
+      setEditNegativeSkillIds([]);
+    }
+    
     setShowEditPassword(false);
   };
 
@@ -631,6 +668,51 @@ export default function Staff() {
     } catch (error) {
       toast({ title: "Error", description: "Failed to update manager", variant: "destructive" });
     }
+  };
+
+  const handleUpdateWorkingAtHeight = async (userId: string, enabled: boolean) => {
+    try {
+      const res = await fetch(`/api/users/${userId}/working-at-height`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ workingAtHeight: enabled }),
+      });
+      if (!res.ok) throw new Error('Failed to update working at height');
+      setEditWorkingAtHeight(enabled);
+      setStaff(staff.map(s => s.id === userId ? { ...s, workingAtHeight: enabled } : s));
+      toast({ 
+        title: "Updated", 
+        description: enabled ? "Working at height certification enabled" : "Working at height certification disabled" 
+      });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update working at height status", variant: "destructive" });
+    }
+  };
+
+  const handleUpdateNegativeSkills = async (userId: string, skillIds: string[]) => {
+    try {
+      const res = await fetch(`/api/users/${userId}/negative-skills`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ negativeSkillIds: skillIds }),
+      });
+      if (!res.ok) throw new Error('Failed to update negative skills');
+      setEditNegativeSkillIds(skillIds);
+      setStaff(staff.map(s => s.id === userId ? { ...s, negativeSkillIds: skillIds } : s));
+      toast({ title: "Updated", description: "Negative skills have been updated" });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update negative skills", variant: "destructive" });
+    }
+  };
+
+  const toggleNegativeSkill = (skillId: string) => {
+    if (!editingStaff) return;
+    const newNegativeSkills = editNegativeSkillIds.includes(skillId)
+      ? editNegativeSkillIds.filter(id => id !== skillId)
+      : [...editNegativeSkillIds, skillId];
+    handleUpdateNegativeSkills(editingStaff.id, newNegativeSkills);
   };
 
   const handleUpdateStaff = async (e: React.FormEvent) => {
@@ -1507,6 +1589,79 @@ export default function Staff() {
                   </div>
                 )}
               </div>
+
+              {/* Working at Height Certification - Only show for engineers */}
+              {editForm.roles.includes('engineer') && (
+                <div className="border-t pt-4">
+                  <Label className="text-base font-medium mb-3 block flex items-center gap-2">
+                    <Mountain className="h-4 w-4" />
+                    Working at Height Certification
+                  </Label>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="working-at-height"
+                      checked={editWorkingAtHeight}
+                      onCheckedChange={(checked) => {
+                        if (editingStaff) {
+                          handleUpdateWorkingAtHeight(editingStaff.id, !!checked);
+                        }
+                      }}
+                      data-testid="checkbox-working-at-height"
+                    />
+                    <Label htmlFor="working-at-height" className="cursor-pointer">
+                      Certified to work at height
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Enable this if the engineer has completed working at height safety training
+                  </p>
+                </div>
+              )}
+
+              {/* Negative Skills - Only show for Super Admins */}
+              {showNegativeSkillsSection && (
+                <div className="border-t pt-4">
+                  <Label className="text-base font-medium mb-3 block flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    Negative Skills (Exclusions)
+                  </Label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Select skills this engineer should NOT be assigned to. They will be excluded from AI suggestions for jobs requiring these skills.
+                  </p>
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded-lg p-3 bg-amber-50/50 dark:bg-amber-900/10">
+                    {availableSkills.length > 0 ? (
+                      availableSkills.map(skill => (
+                        <label
+                          key={skill.id}
+                          className="flex items-center gap-2 text-sm hover:bg-amber-100/50 dark:hover:bg-amber-900/20 p-1 rounded cursor-pointer"
+                        >
+                          <Checkbox
+                            checked={editNegativeSkillIds.includes(skill.id)}
+                            onCheckedChange={() => toggleNegativeSkill(skill.id)}
+                            data-testid={`checkbox-negative-skill-${skill.id}`}
+                          />
+                          <span>{skill.name}</span>
+                          <span className="text-xs text-muted-foreground">({skill.category})</span>
+                        </label>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No skills available</p>
+                    )}
+                  </div>
+                  {editNegativeSkillIds.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {editNegativeSkillIds.map(id => {
+                        const skill = availableSkills.find(s => s.id === id);
+                        return skill ? (
+                          <Badge key={id} variant="destructive" className="text-xs">
+                            {skill.name}
+                          </Badge>
+                        ) : null;
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="border-t pt-4">
                 <Label className="text-base font-medium mb-3 block flex items-center gap-2">
