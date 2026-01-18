@@ -8,13 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, User, Shield, Wrench, AlertCircle, Eye, EyeOff, Lock, KeyRound, Pencil, MapPin, Truck, X, Search } from "lucide-react";
+import { Plus, Trash2, User, Shield, Wrench, AlertCircle, Eye, EyeOff, Lock, KeyRound, Pencil, MapPin, Truck, X, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 type Role = 'admin' | 'engineer' | 'surveyor' | 'fleet_manager' | 'works_manager' | 'accounts';
 type Skill = { id: string; name: string; category: string; icon?: string; };
+type SubSkill = { id: string; skillId: string; name: string; description?: string | null; };
 type Vehicle = { id: string; registration: string; make: string | null; model: string | null; type: string | null; assignedUserId: string | null; };
 
 interface StaffMember {
@@ -115,6 +116,11 @@ export default function Staff() {
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Sub-skills state
+  const [allSubSkills, setAllSubSkills] = useState<SubSkill[]>([]);
+  const [editSubSkills, setEditSubSkills] = useState<Record<string, string[]>>({}); // skillId -> subSkillIds[]
+  const [expandedSkillId, setExpandedSkillId] = useState<string | null>(null);
 
   const handleVerifyPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,6 +148,7 @@ export default function Staff() {
         setVerifyPassword("");
         fetchStaff();
         fetchSkills();
+        fetchSubSkills();
         fetchWorksManagers();
         fetchVehicles();
       } else {
@@ -173,6 +180,61 @@ export default function Staff() {
     } catch (error) {
       console.error('Failed to fetch skills:', error);
     }
+  };
+
+  const fetchSubSkills = async () => {
+    try {
+      const res = await fetch('/api/sub-skills', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setAllSubSkills(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch sub-skills:', error);
+    }
+  };
+
+  const fetchUserSubSkills = async (userId: string, skillId: string): Promise<string[]> => {
+    try {
+      const res = await fetch(`/api/users/${userId}/skills/${skillId}/sub-skills`, { credentials: 'include' });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (error) {
+      console.error('Failed to fetch user sub-skills:', error);
+    }
+    return [];
+  };
+
+  const toggleSubSkill = async (skillId: string, subSkillId: string) => {
+    if (!editingStaff) return;
+    
+    const currentSubSkills = editSubSkills[skillId] || [];
+    let newSubSkills: string[];
+    
+    if (currentSubSkills.includes(subSkillId)) {
+      newSubSkills = currentSubSkills.filter(id => id !== subSkillId);
+    } else {
+      newSubSkills = [...currentSubSkills, subSkillId];
+    }
+    
+    setEditSubSkills({ ...editSubSkills, [skillId]: newSubSkills });
+    
+    // Save to server
+    try {
+      await fetch(`/api/users/${editingStaff.id}/skills/${skillId}/sub-skills`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ subSkillIds: newSubSkills }),
+      });
+    } catch (error) {
+      console.error('Failed to update sub-skills:', error);
+    }
+  };
+
+  const getSubSkillsForSkill = (skillId: string): SubSkill[] => {
+    return allSubSkills.filter(sub => sub.skillId === skillId);
   };
 
   const fetchVehicles = async () => {
@@ -519,15 +581,25 @@ export default function Staff() {
       dayRate: member.dayRate?.toString() || "",
     });
     
-    // Refresh skills, works managers, and vehicles when opening edit dialog
+    // Refresh skills, sub-skills, works managers, and vehicles when opening edit dialog
     await Promise.all([
       fetchSkills(),
+      fetchSubSkills(),
       fetchWorksManagers(),
       fetchVehicles()
     ]);
     
     const skills = await fetchUserSkills(member.id);
     setEditSkills(skills);
+    
+    // Fetch user's sub-skills for each skill
+    const subSkillsMap: Record<string, string[]> = {};
+    await Promise.all(skills.map(async (skill) => {
+      const userSubSkillIds = await fetchUserSubSkills(member.id, skill.id);
+      subSkillsMap[skill.id] = userSubSkillIds;
+    }));
+    setEditSubSkills(subSkillsMap);
+    setExpandedSkillId(null);
     
     // Fetch user's assigned vehicle
     try {
@@ -1323,25 +1395,77 @@ export default function Staff() {
               </div>
 
               <div className="border-t pt-4">
-                <Label className="text-base font-medium mb-3 block">Skills</Label>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {editSkills.map(skill => (
-                    <Badge 
-                      key={skill.id} 
-                      variant="secondary"
-                      className="flex items-center gap-1 pr-1"
-                    >
-                      {skill.name}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveSkill(skill.id)}
-                        className="ml-1 hover:bg-destructive/20 rounded p-0.5"
-                        data-testid={`button-remove-skill-${skill.id}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
+                <Label className="text-base font-medium mb-3 block">Skills & Sub-Skills</Label>
+                <div className="space-y-2 mb-3">
+                  {editSkills.map(skill => {
+                    const skillSubSkills = getSubSkillsForSkill(skill.id);
+                    const selectedSubSkillIds = editSubSkills[skill.id] || [];
+                    const isExpanded = expandedSkillId === skill.id;
+                    
+                    return (
+                      <div key={skill.id} className="border rounded-lg p-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {skillSubSkills.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setExpandedSkillId(isExpanded ? null : skill.id)}
+                                className="hover:bg-muted rounded p-0.5"
+                                data-testid={`button-expand-skill-${skill.id}`}
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </button>
+                            )}
+                            <Badge variant="secondary" className="flex items-center gap-1">
+                              {skill.name}
+                              {selectedSubSkillIds.length > 0 && (
+                                <span className="ml-1 text-xs bg-primary/20 px-1.5 py-0.5 rounded-full">
+                                  {selectedSubSkillIds.length} sub-skill{selectedSubSkillIds.length > 1 ? 's' : ''}
+                                </span>
+                              )}
+                            </Badge>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSkill(skill.id)}
+                            className="hover:bg-destructive/20 rounded p-1"
+                            data-testid={`button-remove-skill-${skill.id}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                        
+                        {isExpanded && skillSubSkills.length > 0 && (
+                          <div className="mt-2 ml-6 pl-2 border-l-2 border-muted space-y-1">
+                            {skillSubSkills.map(subSkill => (
+                              <label
+                                key={subSkill.id}
+                                className="flex items-center gap-2 text-sm hover:bg-muted/50 p-1 rounded cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={selectedSubSkillIds.includes(subSkill.id)}
+                                  onCheckedChange={() => toggleSubSkill(skill.id, subSkill.id)}
+                                  data-testid={`checkbox-subskill-${subSkill.id}`}
+                                />
+                                <span>{subSkill.name}</span>
+                                {subSkill.description && (
+                                  <span className="text-muted-foreground">- {subSkill.description}</span>
+                                )}
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {skillSubSkills.length === 0 && (
+                          <p className="mt-1 ml-6 text-xs text-muted-foreground">No sub-skills available</p>
+                        )}
+                      </div>
+                    );
+                  })}
                   {editSkills.length === 0 && (
                     <span className="text-sm text-muted-foreground">No skills assigned</span>
                   )}

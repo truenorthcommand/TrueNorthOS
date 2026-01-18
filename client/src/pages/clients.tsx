@@ -10,7 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { AITextarea } from "@/components/ui/ai-assist";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search, User, Phone, Mail, Star, Edit2, ChevronRight, ChevronLeft, Check, Home, Save, Upload, ExternalLink, FolderOpen, Image, FileSpreadsheet, File, Loader2 } from "lucide-react";
+import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search, User, Phone, Mail, Star, Edit2, ChevronRight, ChevronLeft, Check, Home, Save, Upload, ExternalLink, FolderOpen, Image, FileSpreadsheet, File, Loader2, Sparkles, Briefcase, AlertCircle, Users } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
@@ -150,6 +151,78 @@ export default function Clients() {
   const [filesExpanded, setFilesExpanded] = useState<Record<string, boolean>>({});
   const [uploadingFileForClient, setUploadingFileForClient] = useState<string | null>(null);
   const [selectedFileForUpload, setSelectedFileForUpload] = useState<globalThis.File | null>(null);
+
+  // AI Engineer Suggestion state
+  interface EngineerSuggestion {
+    engineerId: string;
+    engineerName: string;
+    score: number;
+    reason: string;
+    currentWorkload: number;
+    skills: string[];
+    factors: { skills: number; workload: number; proximity: number };
+  }
+  const [suggestDialogOpen, setSuggestDialogOpen] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<EngineerSuggestion[]>([]);
+  const [suggestionsAiPowered, setSuggestionsAiPowered] = useState(false);
+
+  // Fetch AI engineer suggestions
+  const fetchEngineerSuggestions = async () => {
+    setSuggestDialogOpen(true);
+    setSuggestionsLoading(true);
+    setSuggestionsError(null);
+    setSuggestions([]);
+    
+    // Get property info for address/postcode
+    const selectedProperty = selectedPropertyId && clientProperties[selectedClientId]
+      ? clientProperties[selectedClientId].find(p => p.id === selectedPropertyId)
+      : null;
+    const selectedClient = clients.find(c => c.id === selectedClientId);
+    
+    try {
+      const response = await fetch('/api/ai/suggest-engineers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          description: jobForm.description || '',
+          address: selectedProperty?.address || selectedClient?.address || '',
+          postcode: selectedProperty?.postcode || selectedClient?.postcode || '',
+          requiredSkills: [],
+          urgency: 'normal',
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch suggestions');
+      }
+      
+      const data = await response.json();
+      setSuggestions(data.suggestions || []);
+      setSuggestionsAiPowered(data.aiPowered || false);
+    } catch (error) {
+      setSuggestionsError(error instanceof Error ? error.message : 'Failed to fetch suggestions');
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  };
+
+  // Handle selecting an engineer from suggestions
+  const handleSelectSuggestedEngineer = (engineerId: string) => {
+    if (!selectedEngineerIds.includes(engineerId)) {
+      setSelectedEngineerIds([...selectedEngineerIds, engineerId]);
+    }
+    setSuggestDialogOpen(false);
+    
+    const engineerName = suggestions.find(s => s.engineerId === engineerId)?.engineerName || 'engineer';
+    toast({
+      title: "Engineer Selected",
+      description: `${engineerName} has been added to this job.`
+    });
+  };
 
   const fetchClientContacts = async (clientId: string) => {
     try {
@@ -1092,7 +1165,20 @@ export default function Clients() {
 
             {assignOption === 'assign' && user?.role === 'admin' && engineers.length > 0 && (
               <div className="space-y-2">
-                <Label>Select Engineers</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Select Engineers</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchEngineerSuggestions}
+                    className="gap-2"
+                    data-testid="button-ai-suggest-engineer"
+                  >
+                    <Sparkles className="h-4 w-4 text-amber-500" />
+                    AI Suggest
+                  </Button>
+                </div>
                 <div 
                   className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto"
                   data-testid="engineer-checkbox-list"
@@ -1125,6 +1211,106 @@ export default function Clients() {
                     {selectedEngineerIds.length} engineer(s) selected
                   </p>
                 )}
+
+                {/* AI Engineer Suggestions Dialog */}
+                <Dialog open={suggestDialogOpen} onOpenChange={setSuggestDialogOpen}>
+                  <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-amber-500" />
+                        AI Engineer Suggestions
+                      </DialogTitle>
+                      <DialogDescription>
+                        {suggestionsAiPowered 
+                          ? "Recommendations based on skills, workload, and job requirements"
+                          : "Best matches based on availability and skills"
+                        }
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    {suggestionsLoading && (
+                      <div className="flex flex-col items-center justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
+                        <p className="text-sm text-muted-foreground">Analyzing job requirements...</p>
+                      </div>
+                    )}
+
+                    {suggestionsError && (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <AlertCircle className="h-8 w-8 text-destructive mb-3" />
+                        <p className="text-sm text-destructive font-medium">Failed to get suggestions</p>
+                        <p className="text-xs text-muted-foreground mt-1">{suggestionsError}</p>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="mt-4"
+                          onClick={fetchEngineerSuggestions}
+                        >
+                          Try Again
+                        </Button>
+                      </div>
+                    )}
+
+                    {!suggestionsLoading && !suggestionsError && suggestions.length === 0 && (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <Users className="h-8 w-8 text-muted-foreground mb-3" />
+                        <p className="text-sm text-muted-foreground">No engineers available for this job</p>
+                      </div>
+                    )}
+
+                    {!suggestionsLoading && !suggestionsError && suggestions.length > 0 && (
+                      <div className="space-y-3">
+                        {suggestions.map((suggestion, index) => (
+                          <button
+                            key={suggestion.engineerId}
+                            onClick={() => handleSelectSuggestedEngineer(suggestion.engineerId)}
+                            className="w-full text-left p-4 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors"
+                            data-testid={`suggestion-engineer-${suggestion.engineerId}`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm">
+                                  {index + 1}
+                                </div>
+                                <div>
+                                  <div className="font-medium flex items-center gap-2">
+                                    {suggestion.engineerName}
+                                    <Badge variant="outline" className="text-xs">
+                                      Score: {suggestion.score}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                                    <Briefcase className="h-3 w-3" />
+                                    {suggestion.currentWorkload} active job{suggestion.currentWorkload !== 1 ? 's' : ''}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <p className="text-sm text-muted-foreground mt-2 ml-11">
+                              {suggestion.reason}
+                            </p>
+
+                            {suggestion.skills.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2 ml-11">
+                                {suggestion.skills.slice(0, 5).map((skill) => (
+                                  <Badge key={skill} variant="secondary" className="text-xs">
+                                    {skill}
+                                  </Badge>
+                                ))}
+                                {suggestion.skills.length > 5 && (
+                                  <Badge variant="outline" className="text-xs">
+                                    +{suggestion.skills.length - 5} more
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
               </div>
             )}
 

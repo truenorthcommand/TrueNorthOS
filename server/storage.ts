@@ -24,7 +24,7 @@ import {
   type Timesheet, type InsertTimesheet, type TimesheetWithUser,
   type Expense, type InsertExpense, type ExpenseWithDetails,
   type Payment, type InsertPayment, type PaymentWithInvoice,
-  type Skill,
+  type Skill, type SubSkill,
   type Inspection, type InsertInspection, type InspectionWithDetails,
   type InspectionItem, type InsertInspectionItem,
   type SnaggingSheet, type InsertSnaggingSheet, type SnaggingSheetWithDetails,
@@ -42,7 +42,7 @@ import {
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
   timesheets, expenses, payments,
-  skills, userSkills,
+  skills, subSkills, userSkills,
   inspections, inspectionItems, snaggingSheets, snagItems,
   accountsReceipts, invoiceChaseLogs, fixedCosts, snippets, files,
   aiConversations, aiBusinessPatterns, aiUserPreferences
@@ -206,6 +206,15 @@ export interface IStorage {
   getUserSkills(userId: string): Promise<Skill[]>;
   addUserSkill(userId: string, skillId: string): Promise<void>;
   removeUserSkill(userId: string, skillId: string): Promise<void>;
+  
+  // Sub-Skills
+  getSubSkillsBySkill(skillId: string): Promise<SubSkill[]>;
+  getAllSubSkills(): Promise<SubSkill[]>;
+  createSubSkill(skillId: string, name: string, description?: string): Promise<SubSkill>;
+  updateSubSkill(id: string, updates: Partial<SubSkill>): Promise<SubSkill | undefined>;
+  deleteSubSkill(id: string): Promise<void>;
+  getUserSubSkills(userId: string, skillId: string): Promise<string[]>;
+  setUserSubSkills(userId: string, skillId: string, subSkillIds: string[]): Promise<void>;
   
   // Works Manager
   getTeamMembers(managerId: string): Promise<User[]>;
@@ -1501,6 +1510,55 @@ export class DatabaseStorage implements IStorage {
 
   async removeUserSkill(userId: string, skillId: string): Promise<void> {
     await db.delete(userSkills)
+      .where(and(eq(userSkills.userId, userId), eq(userSkills.skillId, skillId)));
+  }
+
+  // ==================== SUB-SKILLS ====================
+
+  async getSubSkillsBySkill(skillId: string): Promise<SubSkill[]> {
+    return db.select().from(subSkills).where(
+      and(eq(subSkills.skillId, skillId), eq(subSkills.isActive, true))
+    );
+  }
+
+  async getAllSubSkills(): Promise<SubSkill[]> {
+    return db.select().from(subSkills).where(eq(subSkills.isActive, true));
+  }
+
+  async createSubSkill(skillId: string, name: string, description?: string): Promise<SubSkill> {
+    const [created] = await db.insert(subSkills).values({
+      skillId,
+      name,
+      description: description || null,
+      isActive: true,
+    }).returning();
+    return created;
+  }
+
+  async updateSubSkill(id: string, updates: Partial<SubSkill>): Promise<SubSkill | undefined> {
+    const [updated] = await db.update(subSkills)
+      .set(updates)
+      .where(eq(subSkills.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSubSkill(id: string): Promise<void> {
+    await db.update(subSkills).set({ isActive: false }).where(eq(subSkills.id, id));
+  }
+
+  async getUserSubSkills(userId: string, skillId: string): Promise<string[]> {
+    const [userSkill] = await db.select()
+      .from(userSkills)
+      .where(and(eq(userSkills.userId, userId), eq(userSkills.skillId, skillId)));
+    
+    if (!userSkill) return [];
+    return (userSkill.subSkillIds as string[]) || [];
+  }
+
+  async setUserSubSkills(userId: string, skillId: string, subSkillIds: string[]): Promise<void> {
+    await db.update(userSkills)
+      .set({ subSkillIds })
       .where(and(eq(userSkills.userId, userId), eq(userSkills.skillId, skillId)));
   }
 

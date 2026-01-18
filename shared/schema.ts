@@ -46,10 +46,20 @@ export const skills = pgTable("skills", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const subSkills = pgTable("sub_skills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  skillId: varchar("skill_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const userSkills = pgTable("user_skills", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
   skillId: varchar("skill_id").notNull(),
+  subSkillIds: jsonb("sub_skill_ids").default([]),
   proficiencyLevel: text("proficiency_level").default("standard"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -227,6 +237,11 @@ export const insertSkillSchema = createInsertSchema(skills).omit({
   createdAt: true,
 });
 
+export const insertSubSkillSchema = createInsertSchema(subSkills).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertUserSkillSchema = createInsertSchema(userSkills).omit({
   id: true,
   createdAt: true,
@@ -234,6 +249,9 @@ export const insertUserSkillSchema = createInsertSchema(userSkills).omit({
 
 export type InsertSkill = z.infer<typeof insertSkillSchema>;
 export type Skill = typeof skills.$inferSelect;
+
+export type InsertSubSkill = z.infer<typeof insertSubSkillSchema>;
+export type SubSkill = typeof subSkills.$inferSelect;
 
 export type InsertUserSkill = z.infer<typeof insertUserSkillSchema>;
 export type UserSkill = typeof userSkills.$inferSelect;

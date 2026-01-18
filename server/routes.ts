@@ -1070,6 +1070,89 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== SUB-SKILLS ROUTES ====================
+
+  // Get all sub-skills
+  app.get("/api/sub-skills", requireAuth, async (req, res) => {
+    try {
+      const subSkillsList = await storage.getAllSubSkills();
+      res.json(subSkillsList);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch sub-skills" });
+    }
+  });
+
+  // Get sub-skills for a specific skill
+  app.get("/api/skills/:skillId/sub-skills", requireAuth, async (req, res) => {
+    try {
+      const subSkillsList = await storage.getSubSkillsBySkill(req.params.skillId);
+      res.json(subSkillsList);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch sub-skills" });
+    }
+  });
+
+  // Create a sub-skill
+  app.post("/api/skills/:skillId/sub-skills", requireAdmin, async (req, res) => {
+    try {
+      const { name, description } = req.body;
+      if (!name) {
+        return res.status(400).json({ error: "name is required" });
+      }
+      const subSkill = await storage.createSubSkill(req.params.skillId, name, description);
+      res.status(201).json(subSkill);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create sub-skill" });
+    }
+  });
+
+  // Update a sub-skill
+  app.patch("/api/sub-skills/:id", requireAdmin, async (req, res) => {
+    try {
+      const updated = await storage.updateSubSkill(req.params.id, req.body);
+      if (!updated) {
+        return res.status(404).json({ error: "Sub-skill not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update sub-skill" });
+    }
+  });
+
+  // Delete a sub-skill
+  app.delete("/api/sub-skills/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteSubSkill(req.params.id);
+      res.json({ message: "Sub-skill deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete sub-skill" });
+    }
+  });
+
+  // Get user's sub-skills for a specific skill
+  app.get("/api/users/:userId/skills/:skillId/sub-skills", requireAuth, async (req, res) => {
+    try {
+      const subSkillIds = await storage.getUserSubSkills(req.params.userId, req.params.skillId);
+      res.json(subSkillIds);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user sub-skills" });
+    }
+  });
+
+  // Set user's sub-skills for a specific skill
+  app.put("/api/users/:userId/skills/:skillId/sub-skills", requireAdmin, async (req, res) => {
+    try {
+      const { subSkillIds } = req.body;
+      if (!Array.isArray(subSkillIds)) {
+        return res.status(400).json({ error: "subSkillIds must be an array" });
+      }
+      await storage.setUserSubSkills(req.params.userId, req.params.skillId, subSkillIds);
+      res.json({ message: "User sub-skills updated" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update user sub-skills" });
+    }
+  });
+
   // ==================== JOB ROUTES (PROTECTED) ====================
 
   app.get("/api/jobs", requireAuth, async (req, res) => {
@@ -3098,6 +3181,166 @@ Please analyze and rank the engineers for this job. Return only valid JSON array
             skills: requiredSkills.length > 0 ? Math.round((eng.skills.length / 5) * 100) : 50,
             workload: Math.round(((maxWorkload - eng.currentWorkload) / maxWorkload) * 100),
             proximity: 50, // Unknown without geocoding
+          }
+        };
+      });
+
+      // Sort by score descending
+      scoredEngineers.sort((a, b) => b.score - a.score);
+
+      res.json({ 
+        suggestions: scoredEngineers.slice(0, 5),
+        aiPowered: false 
+      });
+    } catch (error: any) {
+      console.error("Engineer suggestion error:", error);
+      res.status(500).json({ error: error.message || "Failed to get suggestions" });
+    }
+  });
+
+  // POST endpoint for suggesting engineers for new job creation (no job ID required)
+  app.post("/api/ai/suggest-engineers", requireRoles('admin'), async (req, res) => {
+    try {
+      const { description, address, postcode, requiredSkills = [], urgency = 'normal' } = req.body;
+
+      // Get all engineers (users with 'engineer' role)
+      const allUsers = await storage.getAllUsers();
+      const engineers = allUsers.filter(u => {
+        const userRoles = (u.roles as string[]) || [u.role];
+        return userRoles.includes('engineer');
+      });
+
+      if (engineers.length === 0) {
+        return res.json({ suggestions: [], message: "No engineers available" });
+      }
+
+      // Get all jobs to calculate workload
+      const allJobs = await storage.getAllJobs();
+      const activeJobs = allJobs.filter(j => j.status !== 'Signed Off');
+
+      // Calculate workload per engineer
+      const workloadMap: Record<string, number> = {};
+      for (const j of activeJobs) {
+        const assignedIds = (j.assignedToIds as string[]) || (j.assignedToId ? [j.assignedToId] : []);
+        for (const id of assignedIds) {
+          workloadMap[id] = (workloadMap[id] || 0) + 1;
+        }
+      }
+
+      // Get skills for each engineer
+      const engineerData = await Promise.all(engineers.map(async (eng) => {
+        const skills = await storage.getUserSkills(eng.id);
+        return {
+          id: eng.id,
+          name: eng.name,
+          skills: skills.map(s => s.name),
+          currentWorkload: workloadMap[eng.id] || 0,
+          homePostcode: eng.homePostcode || null,
+          homeLat: eng.homeLat as number | null,
+          homeLng: eng.homeLng as number | null,
+          currentLat: eng.currentLat as number | null,
+          currentLng: eng.currentLng as number | null,
+        };
+      }));
+
+      // Build context for AI
+      const jobContext = {
+        description: description || 'No description',
+        address: address || 'No address specified',
+        postcode: postcode || null,
+        requiredSkills: requiredSkills,
+        urgency: urgency,
+      };
+
+      // Try AI-powered suggestions if available
+      const openai = getOpenAIClient();
+      if (openai) {
+        try {
+          const systemPrompt = `You are an AI assistant helping assign field engineers to jobs. Analyze the job requirements and engineer profiles to suggest the best matches.
+
+Consider these factors in order of importance:
+1. **Skills Match**: Engineers with relevant skills for the job type
+2. **Current Workload**: Prefer engineers with fewer active jobs
+3. **Location Proximity**: Engineers closer to the job site (use postcodes/coordinates if available)
+4. **Availability**: Balance workload across the team
+
+Return your response as a JSON array of engineer suggestions, ordered by suitability (best first). Each suggestion should include:
+- engineerId: the engineer's ID
+- score: a suitability score from 0-100
+- reason: a brief explanation of why this engineer is suitable
+- factors: { skills: number, workload: number, proximity: number } - individual factor scores 0-100`;
+
+          const userPrompt = `Job Details:
+${JSON.stringify(jobContext, null, 2)}
+
+Available Engineers:
+${JSON.stringify(engineerData, null, 2)}
+
+Please analyze and rank the engineers for this job. Return only valid JSON array.`;
+
+          const response = await openai.chat.completions.create({
+            model: "gpt-5",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt }
+            ],
+            max_completion_tokens: 1024,
+            response_format: { type: "json_object" },
+          });
+
+          const content = response.choices[0]?.message?.content;
+          if (content) {
+            const parsed = JSON.parse(content);
+            const suggestions = parsed.suggestions || parsed;
+            
+            // Enrich with engineer names
+            const enrichedSuggestions = (Array.isArray(suggestions) ? suggestions : []).map((s: any) => {
+              const eng = engineerData.find(e => e.id === s.engineerId);
+              return {
+                ...s,
+                engineerName: eng?.name || 'Unknown',
+                currentWorkload: eng?.currentWorkload || 0,
+                skills: eng?.skills || [],
+              };
+            });
+
+            return res.json({ 
+              suggestions: enrichedSuggestions.slice(0, 5),
+              aiPowered: true 
+            });
+          }
+        } catch (aiError) {
+          console.error("AI suggestion error, falling back to heuristic:", aiError);
+        }
+      }
+
+      // Fallback: Simple heuristic-based suggestions
+      const scoredEngineers = engineerData.map(eng => {
+        let score = 50; // Base score
+
+        // Skills match bonus
+        if (requiredSkills.length > 0) {
+          const matchCount = requiredSkills.filter((rs: string) => 
+            eng.skills.some(s => s.toLowerCase().includes(rs.toLowerCase()))
+          ).length;
+          score += (matchCount / requiredSkills.length) * 30;
+        }
+
+        // Workload penalty (fewer jobs = better)
+        const maxWorkload = Math.max(...engineerData.map(e => e.currentWorkload), 1);
+        score += ((maxWorkload - eng.currentWorkload) / maxWorkload) * 20;
+
+        return {
+          engineerId: eng.id,
+          engineerName: eng.name,
+          score: Math.round(score),
+          reason: `${eng.currentWorkload} active jobs, ${eng.skills.length} skills`,
+          currentWorkload: eng.currentWorkload,
+          skills: eng.skills,
+          factors: {
+            skills: requiredSkills.length > 0 ? Math.round((eng.skills.length / 5) * 100) : 50,
+            workload: Math.round(((maxWorkload - eng.currentWorkload) / maxWorkload) * 100),
+            proximity: 50,
           }
         };
       });
