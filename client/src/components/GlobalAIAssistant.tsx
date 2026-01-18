@@ -317,6 +317,34 @@ export function GlobalAIAssistant() {
     return icons[type] || "📄";
   };
 
+  const renderMessageContent = (content: string, isUser: boolean) => {
+    const urlRegex = /(https?:\/\/[^\s<>"\]]+)/g;
+    const parts = content.split(urlRegex);
+    
+    return parts.map((part, index) => {
+      if (urlRegex.test(part)) {
+        urlRegex.lastIndex = 0;
+        return (
+          <a
+            key={index}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              "underline hover:opacity-80 inline-flex items-center gap-1",
+              isUser ? "text-blue-100" : "text-blue-600"
+            )}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part.length > 50 ? part.slice(0, 50) + "..." : part}
+            <ExternalLink className="h-3 w-3 inline flex-shrink-0" />
+          </a>
+        );
+      }
+      return <span key={index}>{part}</span>;
+    });
+  };
+
   if (!isOpen) {
     return (
       <button
@@ -559,7 +587,9 @@ export function GlobalAIAssistant() {
                         : "bg-gray-100 text-gray-800"
                     )}
                   >
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    <p className="text-sm whitespace-pre-wrap">
+                      {renderMessageContent(message.content, message.role === "user")}
+                    </p>
                   </div>
                 </div>
               ))
