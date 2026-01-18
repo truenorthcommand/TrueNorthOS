@@ -67,6 +67,9 @@ import GlassDashboardDemo from "@/pages/glass-dashboard-demo";
 import IconStylesDemo from "@/pages/icon-styles-demo";
 import GlowDashboardDemo from "@/pages/glow-dashboard-demo";
 import BigChangeDashboardDemo from "@/pages/bigchange-dashboard-demo";
+import PitchInvestor from "@/pages/pitch-investor";
+import PitchSales from "@/pages/pitch-sales";
+import PitchOnePager from "@/pages/pitch-onepager";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -114,6 +117,9 @@ function Router() {
       <Route path="/icon-styles" component={IconStylesDemo} />
       <Route path="/glow-dashboard" component={GlowDashboardDemo} />
       <Route path="/bigchange-dashboard" component={BigChangeDashboardDemo} />
+      <Route path="/pitch/investor" component={PitchInvestor} />
+      <Route path="/pitch/sales" component={PitchSales} />
+      <Route path="/pitch/onepager" component={PitchOnePager} />
       <Route path="/clients">
         <PrivateRoute component={Clients} />
       </Route>
