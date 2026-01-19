@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { hasRole } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Home, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, Bell, Shield, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw, Mic, BookOpen, Scan, Mail, LayoutGrid, FolderOpen } from "lucide-react";
+import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw, Mic, BookOpen, Scan, Mail, LayoutGrid, FolderOpen, Shield } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -11,13 +11,15 @@ import { cn } from "@/lib/utils";
 import { useNotifications, Notification } from "@/hooks/use-notifications";
 import { useOffline } from "@/hooks/use-offline";
 import { useQuery } from "@tanstack/react-query";
-import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/lib/store";
 import { SnippetWidget } from "@/components/snippet-widget";
 import { GlobalAIAssistant } from "@/components/GlobalAIAssistant";
 
 type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools' | 'fleet' | 'finance' | 'clients';
-import { LayoutDashboard as DashboardIcon } from "lucide-react";
+
+const NAVY_PRIMARY = "#0F2B4C";
+const NAVY_LIGHT = "#1a3a5c";
+const NAVY_HOVER = "#163352";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
@@ -82,8 +84,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 className={cn(
                   "w-10 h-10 flex items-center justify-center rounded-lg transition-colors",
                   isActive 
-                    ? "bg-blue-600 text-white" 
-                    : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                    ? "bg-white/15 text-white" 
+                    : "text-slate-300 hover:bg-white/10 hover:text-white"
                 )}
                 onClick={onClick}
                 data-testid={`nav-link-${href.replace(/\//g, '-').slice(1) || 'home'}`}
@@ -105,8 +107,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           className={cn(
             "w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors pl-10",
             isActive 
-              ? "bg-blue-600 text-white" 
-              : "text-slate-300 hover:bg-slate-700 hover:text-white"
+              ? "bg-white/15 text-white" 
+              : "text-slate-300 hover:bg-white/10 hover:text-white"
           )}
           onClick={() => {
             setIsOpen(false);
@@ -137,7 +139,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+              className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
               onClick={() => setSidebarCollapsed(false)}
               data-testid={`menu-group-${section}`}
             >
@@ -155,7 +157,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <Collapsible open={isExpanded(section)} onOpenChange={() => toggleSection(section)}>
         <CollapsibleTrigger asChild>
           <button
-            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-200 hover:bg-slate-700 hover:text-white rounded-lg transition-colors"
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-200 hover:bg-white/10 hover:text-white rounded-lg transition-colors"
             data-testid={`menu-group-${section}`}
           >
             <Icon className="h-5 w-5" />
@@ -166,7 +168,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             )} />
           </button>
         </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-1 ml-2 border-l-2 border-slate-600 pl-2">
+        <CollapsibleContent className="space-y-1 ml-2 border-l-2 border-white/20 pl-2">
           {groupChildren}
         </CollapsibleContent>
       </Collapsible>
@@ -176,7 +178,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const NavContent = ({ collapsed = false }: { collapsed?: boolean }) => (
     <div className="flex flex-col gap-2 h-full">
       <div className={cn(
-        "flex items-center gap-2 mb-6 pb-4 border-b border-slate-700",
+        "flex items-center gap-2 mb-6 pb-4 border-b border-white/20",
         collapsed ? "justify-center" : "px-2"
       )}>
         {!collapsed && (
@@ -202,8 +204,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   className={cn(
                     "w-10 h-10 flex items-center justify-center rounded-lg transition-colors",
                     location === "/" 
-                      ? "bg-blue-600 text-white" 
-                      : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                      ? "bg-white/15 text-white" 
+                      : "text-slate-300 hover:bg-white/10 hover:text-white"
                   )}
                   data-testid="nav-dashboard"
                 >
@@ -219,8 +221,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors",
                 location === "/" 
-                  ? "bg-blue-600 text-white" 
-                  : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                  ? "bg-white/15 text-white" 
+                  : "text-slate-300 hover:bg-white/10 hover:text-white"
               )}
               onClick={() => setIsOpen(false)}
               data-testid="nav-dashboard"
@@ -241,8 +243,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     className={cn(
                       "w-10 h-10 flex items-center justify-center rounded-lg transition-colors",
                       location === "/clients" 
-                        ? "bg-blue-600 text-white" 
-                        : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                        ? "bg-white/15 text-white" 
+                        : "text-slate-300 hover:bg-white/10 hover:text-white"
                     )}
                     data-testid="nav-clients"
                   >
@@ -258,8 +260,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 className={cn(
                   "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors",
                   location === "/clients" 
-                    ? "bg-blue-600 text-white" 
-                    : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                    ? "bg-white/15 text-white" 
+                    : "text-slate-300 hover:bg-white/10 hover:text-white"
                 )}
                 onClick={() => setIsOpen(false)}
                 data-testid="nav-clients"
@@ -281,8 +283,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     className={cn(
                       "w-10 h-10 flex items-center justify-center rounded-lg transition-colors",
                       location === "/outlook-inbox" 
-                        ? "bg-blue-600 text-white" 
-                        : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                        ? "bg-white/15 text-white" 
+                        : "text-slate-300 hover:bg-white/10 hover:text-white"
                     )}
                     data-testid="nav-email"
                   >
@@ -298,8 +300,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 className={cn(
                   "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors",
                   location === "/outlook-inbox" 
-                    ? "bg-blue-600 text-white" 
-                    : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                    ? "bg-white/15 text-white" 
+                    : "text-slate-300 hover:bg-white/10 hover:text-white"
                 )}
                 onClick={() => setIsOpen(false)}
                 data-testid="nav-email"
@@ -358,8 +360,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   className={cn(
                     "w-10 h-10 flex items-center justify-center rounded-lg transition-colors relative",
                     location === "/messages" 
-                      ? "bg-blue-600 text-white" 
-                      : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                      ? "bg-white/15 text-white" 
+                      : "text-slate-300 hover:bg-white/10 hover:text-white"
                   )}
                   data-testid="nav-messages"
                 >
@@ -380,8 +382,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors",
                 location === "/messages" 
-                  ? "bg-blue-600 text-white" 
-                  : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                  ? "bg-white/15 text-white" 
+                  : "text-slate-300 hover:bg-white/10 hover:text-white"
               )}
               onClick={() => setIsOpen(false)}
               data-testid="nav-messages"
@@ -435,10 +437,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </MenuGroup>
       </nav>
 
-      <div className={cn("border-t border-slate-700 pt-4 mt-auto", collapsed && "flex flex-col items-center")}>
+      <div className={cn("border-t border-white/20 pt-4 mt-auto", collapsed && "flex flex-col items-center")}>
         {!collapsed && (
           <div className="px-4 py-2 mb-2 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium">
+            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-sm font-medium">
               {user.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U'}
             </div>
             <div className="flex-1">
@@ -485,11 +487,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <TooltipProvider delayDuration={0}>
       <div className="min-h-screen flex bg-gray-100">
-        {/* Desktop Sidebar - BigChange Navy Style */}
-        <aside className={cn(
-          "hidden md:flex flex-col bg-slate-800 h-screen sticky top-0 transition-all duration-300 print:hidden",
-          sidebarCollapsed ? "w-16" : "w-64"
-        )}>
+        {/* Desktop Sidebar - Navy Theme */}
+        <aside 
+          className={cn(
+            "hidden md:flex flex-col h-screen sticky top-0 transition-all duration-300 print:hidden",
+            sidebarCollapsed ? "w-16" : "w-64"
+          )}
+          style={{ backgroundColor: NAVY_PRIMARY }}
+        >
           {/* Collapse Toggle Button */}
           <button
             className="absolute -right-3 top-6 z-10 h-6 w-6 rounded-full border border-slate-300 bg-white shadow-md hover:bg-gray-50 flex items-center justify-center"
@@ -513,16 +518,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-h-screen bg-gray-100">
-          {/* Mobile Header - BigChange Style */}
-          <header className="sticky top-0 z-30 flex h-16 items-center gap-4 bg-slate-800 px-4 shadow-md md:hidden print:hidden">
+          {/* Mobile Header - Navy Theme */}
+          <header className="sticky top-0 z-30 flex h-16 items-center gap-4 px-4 shadow-md md:hidden print:hidden" style={{ backgroundColor: NAVY_PRIMARY }}>
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
               <SheetTrigger asChild>
-                <button className="p-2 text-white hover:bg-slate-700 rounded-lg">
+                <button className="p-2 text-white hover:bg-white/10 rounded-lg">
                   <Menu className="h-6 w-6" />
                   <span className="sr-only">Toggle menu</span>
                 </button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[300px] sm:w-[350px] p-6 bg-slate-800 border-slate-700">
+              <SheetContent side="left" className="w-[300px] sm:w-[350px] p-6 border-white/20" style={{ backgroundColor: NAVY_PRIMARY }}>
                 <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                 <NavContent collapsed={false} />
               </SheetContent>
@@ -535,7 +540,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
             <div className="ml-auto flex items-center gap-2">
               <button 
-                className="p-2 text-white hover:bg-slate-700 rounded-lg"
+                className="p-2 text-white hover:bg-white/10 rounded-lg"
                 onClick={() => window.location.reload()}
                 data-testid="button-refresh-app-mobile"
               >
