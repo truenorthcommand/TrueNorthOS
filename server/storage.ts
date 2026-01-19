@@ -107,6 +107,10 @@ export interface IStorage {
   
   getClient(id: string): Promise<Client | undefined>;
   getClientByEmail(email: string): Promise<Client | undefined>;
+  getClientByPortalToken(token: string): Promise<Client | undefined>;
+  getClientQuotes(clientId: string): Promise<Quote[]>;
+  getClientInvoices(clientId: string): Promise<Invoice[]>;
+  getClientJobs(clientId: string): Promise<Job[]>;
   getAllClients(): Promise<Client[]>;
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: string, updates: Partial<Client>): Promise<Client | undefined>;
@@ -607,6 +611,23 @@ export class DatabaseStorage implements IStorage {
   async getClientByEmail(email: string): Promise<Client | undefined> {
     const [client] = await db.select().from(clients).where(eq(clients.email, email));
     return client;
+  }
+
+  async getClientByPortalToken(token: string): Promise<Client | undefined> {
+    const [client] = await db.select().from(clients).where(eq(clients.portalToken, token));
+    return client;
+  }
+
+  async getClientQuotes(clientId: string): Promise<Quote[]> {
+    return db.select().from(quotes).where(eq(quotes.customerId, clientId)).orderBy(desc(quotes.createdAt));
+  }
+
+  async getClientInvoices(clientId: string): Promise<Invoice[]> {
+    return db.select().from(invoices).where(eq(invoices.customerId, clientId)).orderBy(desc(invoices.createdAt));
+  }
+
+  async getClientJobs(clientId: string): Promise<Job[]> {
+    return db.select().from(jobs).where(eq(jobs.client, clientId)).orderBy(desc(jobs.createdAt));
   }
 
   async getAllClients(): Promise<Client[]> {

@@ -5124,6 +5124,83 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
+  // ==================== CUSTOMER PORTAL ROUTES ====================
+
+  app.get("/api/portal/:token", async (req, res) => {
+    try {
+      const client = await storage.getClientByPortalToken(req.params.token);
+      if (!client) {
+        return res.status(404).json({ error: "Portal not found or has expired" });
+      }
+      
+      const [quotes, invoices, jobs, companySettings] = await Promise.all([
+        storage.getClientQuotes(client.id),
+        storage.getClientInvoices(client.id),
+        storage.getClientJobs(client.id),
+        storage.getCompanySettings(),
+      ]);
+      
+      res.json({
+        client: {
+          id: client.id,
+          name: client.name,
+          email: client.email,
+        },
+        quotes: quotes.map(q => ({
+          id: q.id,
+          quoteNo: q.quoteNo,
+          accessToken: q.accessToken,
+          total: q.total,
+          status: q.status,
+          quoteDate: q.quoteDate,
+          expiryDate: q.expiryDate,
+          description: q.description,
+        })),
+        invoices: invoices.map(i => ({
+          id: i.id,
+          invoiceNo: i.invoiceNo,
+          accessToken: i.accessToken,
+          total: i.total,
+          status: i.status,
+          invoiceDate: i.invoiceDate,
+          dueDate: i.dueDate,
+        })),
+        jobs: jobs.map(j => ({
+          id: j.id,
+          jobNo: j.jobNo,
+          status: j.status,
+          description: j.description,
+          address: j.address,
+          date: j.date,
+        })),
+        companySettings,
+      });
+    } catch (error) {
+      console.error("Portal access error:", error);
+      res.status(500).json({ error: "Failed to load portal" });
+    }
+  });
+
+  app.post("/api/clients/:id/generate-portal-token", requireAdmin, async (req, res) => {
+    try {
+      const client = await storage.getClient(req.params.id);
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      const portalToken = crypto.randomUUID();
+      const updated = await storage.updateClient(req.params.id, { portalToken });
+      
+      res.json({ 
+        portalToken,
+        portalUrl: `/portal/${portalToken}`,
+      });
+    } catch (error) {
+      console.error("Generate portal token error:", error);
+      res.status(500).json({ error: "Failed to generate portal token" });
+    }
+  });
+
   // ==================== STRIPE PAYMENT ROUTES ====================
 
   app.post("/api/stripe/create-payment-intent", async (req, res) => {

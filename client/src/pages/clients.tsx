@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AITextarea } from "@/components/ui/ai-assist";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search, User, Phone, Mail, Star, Edit2, ChevronRight, ChevronLeft, Check, Home, Save, Upload, ExternalLink, FolderOpen, Image, FileSpreadsheet, File, Loader2, Sparkles, Briefcase, AlertCircle, Users, Calendar } from "lucide-react";
+import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search, User, Phone, Mail, Star, Edit2, ChevronRight, ChevronLeft, Check, Home, Save, Upload, ExternalLink, FolderOpen, Image, FileSpreadsheet, File, Loader2, Sparkles, Briefcase, AlertCircle, Users, Calendar, Link2, Copy } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
@@ -151,6 +151,60 @@ export default function Clients() {
   const [filesExpanded, setFilesExpanded] = useState<Record<string, boolean>>({});
   const [uploadingFileForClient, setUploadingFileForClient] = useState<string | null>(null);
   const [selectedFileForUpload, setSelectedFileForUpload] = useState<globalThis.File | null>(null);
+
+  // Portal link state
+  const [generatingPortalLink, setGeneratingPortalLink] = useState<string | null>(null);
+  const [portalDialogOpen, setPortalDialogOpen] = useState(false);
+  const [portalLink, setPortalLink] = useState<string>("");
+  const [portalClientName, setPortalClientName] = useState<string>("");
+
+  // Generate portal link for client
+  const generatePortalLink = async (clientId: string, clientName: string) => {
+    setGeneratingPortalLink(clientId);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/generate-portal-token`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const link = `${window.location.origin}/portal/${data.portalToken}`;
+        setPortalLink(link);
+        setPortalClientName(clientName);
+        setPortalDialogOpen(true);
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to generate portal link",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to generate portal link",
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingPortalLink(null);
+    }
+  };
+
+  const copyPortalLink = async () => {
+    try {
+      await navigator.clipboard.writeText(portalLink);
+      toast({
+        title: "Copied!",
+        description: "Portal link copied to clipboard",
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to copy link",
+        variant: "destructive",
+      });
+    }
+  };
 
   // AI Engineer Suggestion state
   interface EngineerSuggestion {
@@ -1672,18 +1726,38 @@ export default function Clients() {
                       </div>
                     </div>
                     {user.role === 'admin' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingClient(client);
-                        }}
-                        className="h-8 w-8 p-0 shrink-0"
-                        data-testid={`button-edit-client-${client.id}`}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingClient(client);
+                          }}
+                          className="h-8 w-8 p-0 shrink-0"
+                          data-testid={`button-edit-client-${client.id}`}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            generatePortalLink(client.id, client.name);
+                          }}
+                          disabled={generatingPortalLink === client.id}
+                          className="h-8 w-8 p-0 shrink-0 text-[#0F2B4C] hover:text-[#0F2B4C] hover:bg-[#0F2B4C]/10"
+                          data-testid={`button-portal-link-${client.id}`}
+                          title="Generate Customer Portal Link"
+                        >
+                          {generatingPortalLink === client.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Link2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </>
                     )}
                     <Button
                       variant="ghost"
@@ -2170,6 +2244,50 @@ export default function Clients() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Portal Link Dialog */}
+      <Dialog open={portalDialogOpen} onOpenChange={setPortalDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="h-5 w-5 text-[#0F2B4C]" />
+              Customer Portal Link
+            </DialogTitle>
+            <DialogDescription>
+              Share this link with <strong>{portalClientName}</strong> to give them access to their customer portal.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Input
+                value={portalLink}
+                readOnly
+                className="flex-1 font-mono text-sm"
+                data-testid="input-portal-link"
+              />
+              <Button
+                onClick={copyPortalLink}
+                className="bg-[#0F2B4C] hover:bg-[#1a3d63]"
+                data-testid="button-copy-portal-link"
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Copy
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              This link provides secure access to view quotes, invoices, and job status without requiring a login.
+            </p>
+            <div className="flex justify-end gap-2">
+              <a href={portalLink} target="_blank" rel="noopener noreferrer">
+                <Button variant="outline" data-testid="button-open-portal">
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Open Portal
+                </Button>
+              </a>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

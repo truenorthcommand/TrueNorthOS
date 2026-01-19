@@ -29,6 +29,7 @@ import TimeLogs from "@/pages/time-logs";
 import Quotes from "@/pages/quotes";
 import QuoteDetail from "@/pages/quote-detail";
 import ClientQuote from "@/pages/client-quote";
+import CustomerPortal from "@/pages/customer-portal";
 import Invoices from "@/pages/invoices";
 import InvoiceDetail from "@/pages/invoice-detail";
 import ClientInvoice from "@/pages/client-invoice";
@@ -166,6 +167,7 @@ function Router() {
         <PrivateRoute component={QuoteDetail} />
       </Route>
       <Route path="/quote/:token" component={ClientQuote} />
+      <Route path="/portal/:token" component={CustomerPortal} />
       <Route path="/invoices">
         <PrivateRoute component={Invoices} />
       </Route>
