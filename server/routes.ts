@@ -3821,6 +3821,135 @@ Return ONLY valid JSON.`;
     }
   });
 
+  // ==================== GEMINI AI FEATURES ====================
+
+  // Import Gemini AI service functions
+  const geminiAI = await import("./services/gemini-ai");
+
+  // AI Receipt Scanner (Gemini-powered)
+  app.post("/api/ai/gemini/scan-receipt", requireAuth, async (req, res) => {
+    try {
+      const { image } = req.body;
+      if (!image) {
+        return res.status(400).json({ error: "Image is required" });
+      }
+      const result = await geminiAI.scanReceipt(image);
+      res.json({ success: true, data: result, aiPowered: true, model: "gemini" });
+    } catch (error: any) {
+      console.error("Gemini receipt scan error:", error);
+      res.status(500).json({ error: error.message || "Failed to scan receipt" });
+    }
+  });
+
+  // AI Site Photo Analysis (Gemini-powered)
+  app.post("/api/ai/gemini/analyze-photo", requireAuth, async (req, res) => {
+    try {
+      const { image, jobContext } = req.body;
+      if (!image) {
+        return res.status(400).json({ error: "Image is required" });
+      }
+      const result = await geminiAI.analyzeSitePhoto(image, jobContext);
+      res.json({ success: true, data: result, aiPowered: true, model: "gemini" });
+    } catch (error: any) {
+      console.error("Gemini photo analysis error:", error);
+      res.status(500).json({ error: error.message || "Failed to analyze photo" });
+    }
+  });
+
+  // AI Job Summary Generator (Gemini-powered)
+  app.post("/api/ai/gemini/generate-job-summary", requireAuth, async (req, res) => {
+    try {
+      const { engineerNotes, jobDetails } = req.body;
+      if (!engineerNotes) {
+        return res.status(400).json({ error: "Engineer notes are required" });
+      }
+      const result = await geminiAI.generateJobSummary(engineerNotes, jobDetails || {});
+      res.json({ success: true, data: result, aiPowered: true, model: "gemini" });
+    } catch (error: any) {
+      console.error("Gemini job summary error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate job summary" });
+    }
+  });
+
+  // AI Quote Description Generator (Gemini-powered)
+  app.post("/api/ai/gemini/generate-quote", requireAuth, async (req, res) => {
+    try {
+      const { jobDetails, services } = req.body;
+      if (!services || !Array.isArray(services)) {
+        return res.status(400).json({ error: "Services array is required" });
+      }
+      const result = await geminiAI.generateQuoteDescription(jobDetails || {}, services);
+      res.json({ success: true, data: result, aiPowered: true, model: "gemini" });
+    } catch (error: any) {
+      console.error("Gemini quote generation error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate quote" });
+    }
+  });
+
+  // AI Customer Message Generator (Gemini-powered)
+  app.post("/api/ai/gemini/generate-message", requireAuth, async (req, res) => {
+    try {
+      const { messageType, customerName, details } = req.body;
+      const validTypes = ["appointment_confirmation", "job_complete", "follow_up", "quote_sent", "invoice_reminder"];
+      if (!validTypes.includes(messageType)) {
+        return res.status(400).json({ error: "Invalid message type" });
+      }
+      if (!customerName) {
+        return res.status(400).json({ error: "Customer name is required" });
+      }
+      const result = await geminiAI.generateCustomerMessage(messageType, customerName, details || {});
+      res.json({ success: true, data: result, aiPowered: true, model: "gemini" });
+    } catch (error: any) {
+      console.error("Gemini message generation error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate message" });
+    }
+  });
+
+  // AI Inspection Report Generator (Gemini-powered)
+  app.post("/api/ai/gemini/generate-inspection-report", requireAuth, async (req, res) => {
+    try {
+      const { checklistData, inspectionType } = req.body;
+      if (!checklistData || !Array.isArray(checklistData)) {
+        return res.status(400).json({ error: "Checklist data is required" });
+      }
+      const result = await geminiAI.generateInspectionReport(checklistData, inspectionType || "General Inspection");
+      res.json({ success: true, data: result, aiPowered: true, model: "gemini" });
+    } catch (error: any) {
+      console.error("Gemini inspection report error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate inspection report" });
+    }
+  });
+
+  // AI Voice Transcription (Gemini-powered)
+  app.post("/api/ai/gemini/transcribe-voice", requireAuth, async (req, res) => {
+    try {
+      const { audio, mimeType } = req.body;
+      if (!audio) {
+        return res.status(400).json({ error: "Audio data is required" });
+      }
+      const result = await geminiAI.transcribeVoiceNote(audio, mimeType || "audio/webm");
+      res.json({ success: true, data: result, aiPowered: true, model: "gemini" });
+    } catch (error: any) {
+      console.error("Gemini transcription error:", error);
+      res.status(500).json({ error: error.message || "Failed to transcribe audio" });
+    }
+  });
+
+  // AI Image Generation (Gemini-powered)
+  app.post("/api/ai/gemini/generate-image", requireAuth, async (req, res) => {
+    try {
+      const { prompt } = req.body;
+      if (!prompt) {
+        return res.status(400).json({ error: "Prompt is required" });
+      }
+      const imageDataUrl = await geminiAI.generateImage(prompt);
+      res.json({ success: true, data: { image: imageDataUrl }, aiPowered: true, model: "gemini" });
+    } catch (error: any) {
+      console.error("Gemini image generation error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate image" });
+    }
+  });
+
   // ==================== FLEET MAINTENANCE ====================
 
   // Get fleet dashboard stats

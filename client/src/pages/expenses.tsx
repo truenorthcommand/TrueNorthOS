@@ -16,7 +16,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { Plus, CalendarIcon, Car, Package, Wrench, Fuel, Utensils, MoreHorizontal, Check, X, Loader2, Wallet, Camera, FileText, Image, FileSpreadsheet, File, Upload, ExternalLink, Trash2 } from "lucide-react";
+import { Plus, CalendarIcon, Car, Package, Wrench, Fuel, Utensils, MoreHorizontal, Check, X, Loader2, Wallet, Camera, FileText, Image, FileSpreadsheet, File, Upload, ExternalLink, Trash2, Sparkles, Wand2 } from "lucide-react";
 import { ReceiptPhotoCapture } from "@/components/receipt-photo-capture";
 import { useUpload } from "@/hooks/use-upload";
 import { format, startOfMonth, endOfMonth } from "date-fns";
@@ -114,6 +114,7 @@ export default function Expenses() {
   const [fromLocation, setFromLocation] = useState("");
   const [toLocation, setToLocation] = useState("");
   const [uploadingExpenseFile, setUploadingExpenseFile] = useState<File | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
 
   const { data: expenses = [], isLoading: expensesLoading } = useQuery<ExpenseWithDetails[]>({
     queryKey: ["/api/expenses"],
@@ -300,6 +301,60 @@ export default function Expenses() {
     setNoReceipt(false);
     setFromLocation("");
     setToLocation("");
+  };
+
+  const handleAIScan = async () => {
+    if (!receiptUrl) {
+      toast.error("Please capture a receipt photo first");
+      return;
+    }
+    
+    setIsScanning(true);
+    try {
+      const response = await fetch("/api/ai/gemini/scan-receipt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: receiptUrl }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to scan receipt");
+      }
+      
+      const result = await response.json();
+      if (result.success && result.data) {
+        const data = result.data;
+        
+        if (data.vendorName) {
+          setDescription(data.vendorName + (data.items?.[0]?.description ? ` - ${data.items[0].description}` : ""));
+        }
+        if (data.total) {
+          setAmount(data.total.toString());
+        }
+        if (data.vatAmount) {
+          setVatAmount(data.vatAmount.toString());
+        }
+        if (data.receiptDate) {
+          const parts = data.receiptDate.split("/");
+          if (parts.length === 3) {
+            const date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+            if (!isNaN(date.getTime())) {
+              setExpenseDate(date);
+            }
+          }
+        }
+        if (data.suggestedCategory && ["mileage", "materials", "tools", "fuel", "subsistence", "other"].includes(data.suggestedCategory)) {
+          setCategory(data.suggestedCategory as ExpenseCategory);
+        }
+        
+        toast.success("Receipt scanned successfully! Fields auto-filled.");
+      }
+    } catch (error: any) {
+      console.error("AI scan error:", error);
+      toast.error(error.message || "Failed to scan receipt with AI");
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   const handleSubmit = () => {
@@ -552,11 +607,36 @@ export default function Expenses() {
                   </Label>
                 </div>
                 {!noReceipt && (
-                  <ReceiptPhotoCapture
-                    value={receiptUrl}
-                    onChange={setReceiptUrl}
-                    label="Receipt Photo *"
-                  />
+                  <div className="space-y-3">
+                    <ReceiptPhotoCapture
+                      value={receiptUrl}
+                      onChange={setReceiptUrl}
+                      label="Receipt Photo *"
+                    />
+                    {receiptUrl && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full bg-gradient-to-r from-purple-50 to-blue-50 hover:from-purple-100 hover:to-blue-100 border-purple-200"
+                        onClick={handleAIScan}
+                        disabled={isScanning}
+                        data-testid="button-ai-scan-receipt"
+                      >
+                        {isScanning ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Scanning with AI...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4 mr-2 text-purple-600" />
+                            <span className="text-purple-700">Auto-fill with AI</span>
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
 

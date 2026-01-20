@@ -23,6 +23,7 @@ import MapPage from "@/pages/map";
 import Pricing from "@/pages/pricing";
 import AiAdvisors from "@/pages/ai-advisors";
 import AdminAdvisors from "@/pages/admin-advisors";
+import AITools from "@/pages/ai-tools";
 import UserGuides from "@/pages/user-guides";
 import Setup from "@/pages/setup";
 import TimeLogs from "@/pages/time-logs";
@@ -224,6 +225,9 @@ function Router() {
       </Route>
       <Route path="/ai-advisors">
         <PrivateRoute component={AiAdvisors} />
+      </Route>
+      <Route path="/ai-tools">
+        <PrivateRoute component={AITools} />
       </Route>
       <Route path="/voice-notes">
         <PrivateRoute component={VoiceNotes} />
