@@ -7519,5 +7519,222 @@ Be concise and practical. Focus on real issues that affect the business.`;
     }
   });
 
+  // ==================== SUBSCRIPTION BILLING ====================
+
+  // Get all subscription plans
+  app.get("/api/subscription/plans", async (req, res) => {
+    try {
+      const plans = await pool.query(`
+        SELECT id, name, slug, description, monthly_price as "monthlyPrice", 
+               yearly_price as "yearlyPrice", features, limits, display_order as "displayOrder"
+        FROM subscription_plans
+        WHERE is_active = true
+        ORDER BY display_order ASC
+      `);
+      res.json(plans.rows);
+    } catch (error) {
+      console.error("Error fetching subscription plans:", error);
+      res.status(500).json({ error: "Failed to fetch plans" });
+    }
+  });
+
+  // Get current subscription
+  app.get("/api/subscription/current", requireAuth, async (req, res) => {
+    try {
+      const subscription = await pool.query(`
+        SELECT s.*, p.name as plan_name
+        FROM subscriptions s
+        LEFT JOIN subscription_plans p ON s.plan_id = p.id
+        ORDER BY s.created_at DESC
+        LIMIT 1
+      `);
+
+      if (subscription.rows.length === 0) {
+        // Return default trial subscription
+        const starterPlan = await pool.query(`SELECT id, name FROM subscription_plans WHERE slug = 'starter' LIMIT 1`);
+        const now = new Date();
+        const trialEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // 14 days trial
+        
+        res.json({
+          id: null,
+          planId: starterPlan.rows[0]?.id || null,
+          planName: starterPlan.rows[0]?.name || 'Starter',
+          status: 'trial',
+          billingCycle: 'monthly',
+          trialEndDate: trialEnd.toISOString(),
+          currentPeriodEnd: null,
+          cancelAtPeriodEnd: false,
+        });
+      } else {
+        const sub = subscription.rows[0];
+        res.json({
+          id: sub.id,
+          planId: sub.plan_id,
+          planName: sub.plan_name,
+          status: sub.status,
+          billingCycle: sub.billing_cycle,
+          trialEndDate: sub.trial_end_date,
+          currentPeriodEnd: sub.current_period_end,
+          cancelAtPeriodEnd: sub.cancel_at_period_end,
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching current subscription:", error);
+      res.status(500).json({ error: "Failed to fetch subscription" });
+    }
+  });
+
+  // Get usage stats
+  app.get("/api/subscription/usage", requireAuth, async (req, res) => {
+    try {
+      // Get current counts
+      const [usersResult, jobsResult, clientsResult] = await Promise.all([
+        pool.query(`SELECT COUNT(*) as count FROM users WHERE status = 'active'`),
+        pool.query(`SELECT COUNT(*) as count FROM jobs WHERE created_at >= date_trunc('month', CURRENT_DATE)`),
+        pool.query(`SELECT COUNT(*) as count FROM clients`),
+      ]);
+
+      // Get current plan limits (default to starter limits)
+      const limits = {
+        maxUsers: 3,
+        maxJobs: 100,
+        maxClients: 50,
+        maxStorageGb: 5,
+      };
+
+      res.json({
+        users: { current: parseInt(usersResult.rows[0]?.count) || 0, limit: limits.maxUsers },
+        jobs: { current: parseInt(jobsResult.rows[0]?.count) || 0, limit: limits.maxJobs },
+        clients: { current: parseInt(clientsResult.rows[0]?.count) || 0, limit: limits.maxClients },
+        storage: { current: 0.5, limit: limits.maxStorageGb },
+      });
+    } catch (error) {
+      console.error("Error fetching usage stats:", error);
+      res.status(500).json({ error: "Failed to fetch usage" });
+    }
+  });
+
+  // Upgrade subscription
+  app.post("/api/subscription/upgrade", requireAdmin, async (req, res) => {
+    try {
+      const { planId, billingCycle } = req.body;
+
+      // Check if Stripe is configured
+      if (!process.env.STRIPE_SECRET_KEY) {
+        return res.status(400).json({ 
+          error: "Stripe not configured. Add your Stripe API keys to enable billing." 
+        });
+      }
+
+      // In production, this would create a Stripe checkout session
+      res.json({ 
+        success: true, 
+        message: "Upgrade initiated. Please complete payment.",
+        checkoutUrl: null, // Would be Stripe checkout URL
+      });
+    } catch (error) {
+      console.error("Error upgrading subscription:", error);
+      res.status(500).json({ error: "Failed to upgrade subscription" });
+    }
+  });
+
+  // ==================== WORKFLOW AUTOMATION ====================
+
+  // Get all workflow rules
+  app.get("/api/workflows/rules", requireAuth, async (req, res) => {
+    try {
+      const rules = await pool.query(`
+        SELECT id, name, description, trigger_type as "triggerType", 
+               trigger_conditions as "triggerConditions", actions, 
+               is_active as "isActive", priority, created_at as "createdAt"
+        FROM workflow_rules
+        ORDER BY priority DESC, created_at DESC
+      `);
+      res.json(rules.rows);
+    } catch (error) {
+      console.error("Error fetching workflow rules:", error);
+      res.status(500).json({ error: "Failed to fetch workflow rules" });
+    }
+  });
+
+  // Create workflow rule
+  app.post("/api/workflows/rules", requireAdmin, async (req, res) => {
+    try {
+      const { name, description, triggerType, triggerConditions, actions, isActive, priority } = req.body;
+      const userId = req.session?.userId;
+
+      const result = await pool.query(`
+        INSERT INTO workflow_rules (name, description, trigger_type, trigger_conditions, actions, is_active, priority, created_by_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING id, name, description, trigger_type as "triggerType", 
+                  trigger_conditions as "triggerConditions", actions, 
+                  is_active as "isActive", priority, created_at as "createdAt"
+      `, [name, description, triggerType, JSON.stringify(triggerConditions), JSON.stringify(actions), isActive, priority || 0, userId]);
+
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Error creating workflow rule:", error);
+      res.status(500).json({ error: "Failed to create workflow rule" });
+    }
+  });
+
+  // Update workflow rule
+  app.put("/api/workflows/rules/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, description, triggerType, triggerConditions, actions, isActive, priority } = req.body;
+
+      const result = await pool.query(`
+        UPDATE workflow_rules
+        SET name = $1, description = $2, trigger_type = $3, trigger_conditions = $4, 
+            actions = $5, is_active = $6, priority = $7, updated_at = NOW()
+        WHERE id = $8
+        RETURNING id, name, description, trigger_type as "triggerType", 
+                  trigger_conditions as "triggerConditions", actions, 
+                  is_active as "isActive", priority, created_at as "createdAt"
+      `, [name, description, triggerType, JSON.stringify(triggerConditions), JSON.stringify(actions), isActive, priority || 0, id]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Rule not found" });
+      }
+
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Error updating workflow rule:", error);
+      res.status(500).json({ error: "Failed to update workflow rule" });
+    }
+  });
+
+  // Delete workflow rule
+  app.delete("/api/workflows/rules/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await pool.query(`DELETE FROM workflow_rules WHERE id = $1`, [id]);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting workflow rule:", error);
+      res.status(500).json({ error: "Failed to delete workflow rule" });
+    }
+  });
+
+  // Get workflow executions
+  app.get("/api/workflows/executions", requireAuth, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 10;
+      const executions = await pool.query(`
+        SELECT e.id, e.rule_id as "ruleId", r.name as "ruleName", e.status, 
+               e.executed_at as "executedAt", e.completed_at as "completedAt"
+        FROM workflow_executions e
+        LEFT JOIN workflow_rules r ON e.rule_id = r.id
+        ORDER BY e.executed_at DESC
+        LIMIT $1
+      `, [limit]);
+      res.json(executions.rows);
+    } catch (error) {
+      console.error("Error fetching workflow executions:", error);
+      res.status(500).json({ error: "Failed to fetch executions" });
+    }
+  });
+
   return httpServer;
 }

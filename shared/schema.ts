@@ -1212,3 +1212,153 @@ export type UserShortcut = {
   action: string;
   description: string;
 };
+
+// ==================== SUBSCRIPTION BILLING ====================
+
+export const subscriptionPlans = pgTable("subscription_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description"),
+  monthlyPrice: doublePrecision("monthly_price").notNull(),
+  yearlyPrice: doublePrecision("yearly_price"),
+  features: jsonb("features").default([]),
+  limits: jsonb("limits").default({}),
+  isActive: boolean("is_active").notNull().default(true),
+  stripePriceIdMonthly: text("stripe_price_id_monthly"),
+  stripePriceIdYearly: text("stripe_price_id_yearly"),
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSubscriptionPlan = z.infer<typeof insertSubscriptionPlanSchema>;
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+
+export const subscriptions = pgTable("subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  planId: varchar("plan_id").notNull(),
+  status: text("status").notNull().default("trial"),
+  billingCycle: text("billing_cycle").default("monthly"),
+  trialStartDate: timestamp("trial_start_date"),
+  trialEndDate: timestamp("trial_end_date"),
+  currentPeriodStart: timestamp("current_period_start"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
+  cancelledAt: timestamp("cancelled_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
+export type Subscription = typeof subscriptions.$inferSelect;
+
+export const usageRecords = pgTable("usage_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subscriptionId: varchar("subscription_id").notNull(),
+  metricType: text("metric_type").notNull(),
+  count: integer("count").notNull().default(0),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertUsageRecordSchema = createInsertSchema(usageRecords).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertUsageRecord = z.infer<typeof insertUsageRecordSchema>;
+export type UsageRecord = typeof usageRecords.$inferSelect;
+
+export type PlanLimits = {
+  maxUsers: number;
+  maxJobs: number;
+  maxClients: number;
+  maxStorageGb: number;
+  aiAssistantEnabled: boolean;
+  apiAccess: boolean;
+  customBranding: boolean;
+  prioritySupport: boolean;
+};
+
+// ==================== WORKFLOW AUTOMATION ====================
+
+export const workflowRules = pgTable("workflow_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  triggerType: text("trigger_type").notNull(),
+  triggerConditions: jsonb("trigger_conditions").default({}),
+  actions: jsonb("actions").default([]),
+  isActive: boolean("is_active").notNull().default(true),
+  priority: integer("priority").default(0),
+  createdById: varchar("created_by_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertWorkflowRuleSchema = createInsertSchema(workflowRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertWorkflowRule = z.infer<typeof insertWorkflowRuleSchema>;
+export type WorkflowRule = typeof workflowRules.$inferSelect;
+
+export const workflowExecutions = pgTable("workflow_executions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ruleId: varchar("rule_id").notNull(),
+  triggeredById: varchar("triggered_by_id"),
+  triggerData: jsonb("trigger_data").default({}),
+  status: text("status").notNull().default("pending"),
+  result: jsonb("result").default({}),
+  errorMessage: text("error_message"),
+  executedAt: timestamp("executed_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertWorkflowExecutionSchema = createInsertSchema(workflowExecutions).omit({
+  id: true,
+  executedAt: true,
+});
+
+export type InsertWorkflowExecution = z.infer<typeof insertWorkflowExecutionSchema>;
+export type WorkflowExecution = typeof workflowExecutions.$inferSelect;
+
+export type TriggerType = 
+  | "job_created"
+  | "job_status_changed"
+  | "job_completed"
+  | "invoice_created"
+  | "invoice_overdue"
+  | "quote_created"
+  | "quote_accepted"
+  | "payment_received"
+  | "client_created"
+  | "scheduled";
+
+export type ActionType = 
+  | "send_email"
+  | "send_sms"
+  | "create_task"
+  | "update_status"
+  | "assign_user"
+  | "create_invoice"
+  | "notify_admin"
+  | "webhook";
