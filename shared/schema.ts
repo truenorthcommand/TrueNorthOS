@@ -36,6 +36,8 @@ export const users = pgTable("users", {
   deletionRequestedAt: timestamp("deletion_requested_at"),
   workingAtHeight: boolean("working_at_height").notNull().default(false),
   negativeSkillIds: jsonb("negative_skill_ids").default([]),
+  googleId: text("google_id"),
+  profileImageUrl: text("profile_image_url"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1497,3 +1499,6 @@ export type RewardType =
   | "free_addon"
   | "tier_upgrade"
   | "commission";
+
+// Export OAuth sessions table from auth module
+export * from "./models/auth";

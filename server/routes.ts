@@ -16,6 +16,7 @@ import * as outlook from "./outlook";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerGlobalAssistantRoutes } from "./globalAssistant";
 import { insertFileSchema } from "@shared/schema";
+import { setupAuth } from "./replit_integrations/auth";
 
 function getStripeClient(): Stripe | null {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -115,6 +116,9 @@ export async function registerRoutes(
   
   // Use shared session middleware (also used by WebSocket notifications)
   app.use(sessionMiddleware);
+  
+  // Setup OAuth authentication (Google via Replit OIDC)
+  await setupAuth(app);
 
   // ==================== VERSION ENDPOINT (PUBLIC) ====================
   // Used to verify which code version is running in production
