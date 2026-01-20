@@ -182,13 +182,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
         collapsed ? "justify-center" : "px-2"
       )}>
         {!collapsed && (
-          <div className="flex flex-col">
-            <span className="text-xl font-bold text-white tracking-tight leading-tight">TrueNorth</span>
-            <span className="text-xs text-slate-400 leading-tight">Trade OS</span>
+          <div className="flex items-center gap-3">
+            <img 
+              src="/logo-truenorth.png" 
+              alt="TrueNorth Operations Group" 
+              className="h-10 w-10 object-contain"
+            />
+            <div className="flex flex-col">
+              <span className="text-xl font-bold text-white tracking-tight leading-tight">TrueNorth</span>
+              <span className="text-xs text-slate-400 leading-tight">Trade OS</span>
+            </div>
           </div>
         )}
         {collapsed && (
-          <span className="text-xl font-bold text-white">TN</span>
+          <img 
+            src="/logo-truenorth.png" 
+            alt="TrueNorth" 
+            className="h-8 w-8 object-contain"
+          />
         )}
       </div>
 
@@ -543,6 +554,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </Sheet>
             
             <div className="flex items-center gap-2">
+              <img 
+                src="/logo-truenorth.png" 
+                alt="TrueNorth Operations Group" 
+                className="h-8 w-8 object-contain"
+              />
               <span className="text-lg font-bold text-white leading-tight">TrueNorth</span>
               <span className="text-xs text-slate-400">Trade OS</span>
             </div>

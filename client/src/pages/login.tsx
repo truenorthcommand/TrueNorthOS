@@ -47,9 +47,16 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Pro Main Solutions</CardTitle>
+          <div className="flex justify-center mb-4">
+            <img 
+              src="/logo-truenorth.png" 
+              alt="TrueNorth Operations Group" 
+              className="h-16 w-auto object-contain"
+            />
+          </div>
+          <CardTitle className="text-2xl font-bold">TrueNorth Trade OS</CardTitle>
           <CardDescription>
-            {requires2FA ? "Enter your authentication code" : "Powered By TrueNorth Operations Group"}
+            {requires2FA ? "Enter your authentication code" : "TrueNorth Operations Group"}
           </CardDescription>
         </CardHeader>
         <CardContent>
