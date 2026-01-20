@@ -7736,5 +7736,368 @@ Be concise and practical. Focus on real issues that affect the business.`;
     }
   });
 
+  // ==================== ADD-ONS (BOLT-ON FEATURES) ====================
+
+  // Get all available add-ons
+  app.get("/api/addons", async (req, res) => {
+    try {
+      const result = await pool.query(`
+        SELECT id, name, slug, description, monthly_price as "monthlyPrice", 
+               icon, category, features, is_active as "isActive", display_order as "displayOrder"
+        FROM add_ons
+        WHERE is_active = true
+        ORDER BY display_order ASC
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching add-ons:", error);
+      res.status(500).json({ error: "Failed to fetch add-ons" });
+    }
+  });
+
+  // Get current subscription's active add-ons
+  app.get("/api/addons/subscribed", requireAuth, async (req, res) => {
+    try {
+      const result = await pool.query(`
+        SELECT sa.id, a.name, a.slug, a.monthly_price as "monthlyPrice", 
+               a.icon, sa.status, sa.start_date as "startDate"
+        FROM subscription_add_ons sa
+        JOIN add_ons a ON sa.add_on_id = a.id
+        WHERE sa.status = 'active'
+        ORDER BY sa.start_date DESC
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching subscribed add-ons:", error);
+      res.status(500).json({ error: "Failed to fetch subscribed add-ons" });
+    }
+  });
+
+  // Subscribe to an add-on
+  app.post("/api/addons/subscribe", requireAdmin, async (req, res) => {
+    try {
+      const { addOnId } = req.body;
+      
+      // Check if already subscribed
+      const existing = await pool.query(
+        `SELECT id FROM subscription_add_ons WHERE add_on_id = $1 AND status = 'active'`,
+        [addOnId]
+      );
+      
+      if (existing.rows.length > 0) {
+        return res.status(400).json({ error: "Already subscribed to this add-on" });
+      }
+      
+      const result = await pool.query(`
+        INSERT INTO subscription_add_ons (add_on_id, status, start_date)
+        VALUES ($1, 'active', NOW())
+        RETURNING id
+      `, [addOnId]);
+      
+      res.json({ success: true, id: result.rows[0].id });
+    } catch (error) {
+      console.error("Error subscribing to add-on:", error);
+      res.status(500).json({ error: "Failed to subscribe to add-on" });
+    }
+  });
+
+  // Unsubscribe from an add-on
+  app.post("/api/addons/unsubscribe", requireAdmin, async (req, res) => {
+    try {
+      const { addOnId } = req.body;
+      
+      await pool.query(`
+        UPDATE subscription_add_ons 
+        SET status = 'cancelled', end_date = NOW()
+        WHERE add_on_id = $1 AND status = 'active'
+      `, [addOnId]);
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error unsubscribing from add-on:", error);
+      res.status(500).json({ error: "Failed to unsubscribe from add-on" });
+    }
+  });
+
+  // ==================== REFERRAL SYSTEM ====================
+
+  // Get or create referral code for current user
+  app.get("/api/referrals/code", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      
+      // Check if user already has a referral code
+      let code = await pool.query(
+        `SELECT * FROM referral_codes WHERE owner_id = $1`,
+        [userId]
+      );
+      
+      if (code.rows.length === 0) {
+        // Get user/company info to create code
+        const user = await pool.query(`SELECT name FROM users WHERE id = $1`, [userId]);
+        const companyName = user.rows[0]?.name || 'User';
+        
+        // Generate unique code
+        const codeStr = companyName.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10).toUpperCase() + 
+                        '-' + Date.now().toString(36).toUpperCase();
+        
+        code = await pool.query(`
+          INSERT INTO referral_codes (code, owner_id, company_name, is_active)
+          VALUES ($1, $2, $3, true)
+          RETURNING *
+        `, [codeStr, userId, companyName]);
+      }
+      
+      res.json(code.rows[0]);
+    } catch (error) {
+      console.error("Error getting referral code:", error);
+      res.status(500).json({ error: "Failed to get referral code" });
+    }
+  });
+
+  // Get referral dashboard stats
+  app.get("/api/referrals/dashboard", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      
+      // Get referral code
+      const codeResult = await pool.query(
+        `SELECT * FROM referral_codes WHERE owner_id = $1`,
+        [userId]
+      );
+      
+      if (codeResult.rows.length === 0) {
+        return res.json({
+          code: null,
+          totalReferrals: 0,
+          successfulReferrals: 0,
+          pendingReferrals: 0,
+          totalEarnings: 0,
+          referrals: [],
+          rewards: [],
+          nextTier: null,
+        });
+      }
+      
+      const code = codeResult.rows[0];
+      
+      // Get referrals
+      const referrals = await pool.query(`
+        SELECT id, referred_email as "referredEmail", status, 
+               converted_at as "convertedAt", commission_earned as "commissionEarned",
+               created_at as "createdAt"
+        FROM referrals
+        WHERE referral_code_id = $1
+        ORDER BY created_at DESC
+        LIMIT 20
+      `, [code.id]);
+      
+      // Get rewards
+      const rewards = await pool.query(`
+        SELECT id, reward_type as "rewardType", reward_value as "rewardValue",
+               description, status, expires_at as "expiresAt", claimed_at as "claimedAt"
+        FROM referral_rewards
+        WHERE referral_code_id = $1
+        ORDER BY created_at DESC
+        LIMIT 10
+      `, [code.id]);
+      
+      // Get next tier
+      const successfulCount = code.successful_referrals || 0;
+      const nextTier = await pool.query(`
+        SELECT name, required_referrals as "requiredReferrals", 
+               reward_type as "rewardType", reward_description as "rewardDescription"
+        FROM referral_tiers
+        WHERE required_referrals > $1 AND is_active = true
+        ORDER BY required_referrals ASC
+        LIMIT 1
+      `, [successfulCount]);
+      
+      // Get all tiers for progress display
+      const allTiers = await pool.query(`
+        SELECT name, required_referrals as "requiredReferrals", 
+               reward_type as "rewardType", reward_description as "rewardDescription"
+        FROM referral_tiers
+        WHERE is_active = true
+        ORDER BY required_referrals ASC
+      `);
+      
+      res.json({
+        code: code.code,
+        qrCodeUrl: code.qr_code_url,
+        companyName: code.company_name,
+        totalReferrals: code.total_referrals || 0,
+        successfulReferrals: code.successful_referrals || 0,
+        pendingReferrals: referrals.rows.filter(r => r.status === 'pending').length,
+        totalEarnings: code.total_earnings || 0,
+        referrals: referrals.rows,
+        rewards: rewards.rows,
+        nextTier: nextTier.rows[0] || null,
+        allTiers: allTiers.rows,
+      });
+    } catch (error) {
+      console.error("Error fetching referral dashboard:", error);
+      res.status(500).json({ error: "Failed to fetch referral dashboard" });
+    }
+  });
+
+  // Track a referral (called when someone signs up with a referral code)
+  app.post("/api/referrals/track", async (req, res) => {
+    try {
+      const { code, email } = req.body;
+      
+      // Find the referral code
+      const codeResult = await pool.query(
+        `SELECT id, owner_id FROM referral_codes WHERE code = $1 AND is_active = true`,
+        [code]
+      );
+      
+      if (codeResult.rows.length === 0) {
+        return res.status(404).json({ error: "Invalid referral code" });
+      }
+      
+      const referralCode = codeResult.rows[0];
+      
+      // Create pending referral
+      await pool.query(`
+        INSERT INTO referrals (referral_code_id, referrer_id, referred_email, status)
+        VALUES ($1, $2, $3, 'pending')
+      `, [referralCode.id, referralCode.owner_id, email]);
+      
+      // Update total referrals count
+      await pool.query(`
+        UPDATE referral_codes SET total_referrals = total_referrals + 1 WHERE id = $1
+      `, [referralCode.id]);
+      
+      res.json({ success: true, message: "Referral tracked successfully" });
+    } catch (error) {
+      console.error("Error tracking referral:", error);
+      res.status(500).json({ error: "Failed to track referral" });
+    }
+  });
+
+  // Convert a referral (called when a referred user subscribes)
+  app.post("/api/referrals/convert", requireAdmin, async (req, res) => {
+    try {
+      const { referralId, subscriptionValue } = req.body;
+      
+      // Get referral
+      const referral = await pool.query(
+        `SELECT * FROM referrals WHERE id = $1`,
+        [referralId]
+      );
+      
+      if (referral.rows.length === 0) {
+        return res.status(404).json({ error: "Referral not found" });
+      }
+      
+      const ref = referral.rows[0];
+      
+      // Calculate commission (5% default)
+      const commissionRate = 0.05;
+      const commission = subscriptionValue * commissionRate;
+      
+      // Update referral
+      await pool.query(`
+        UPDATE referrals 
+        SET status = 'converted', converted_at = NOW(), 
+            subscription_value = $1, commission_earned = $2
+        WHERE id = $3
+      `, [subscriptionValue, commission, referralId]);
+      
+      // Update referral code stats
+      await pool.query(`
+        UPDATE referral_codes 
+        SET successful_referrals = successful_referrals + 1,
+            total_earnings = total_earnings + $1
+        WHERE id = $2
+      `, [commission, ref.referral_code_id]);
+      
+      // Check for tier rewards
+      const codeStats = await pool.query(
+        `SELECT successful_referrals FROM referral_codes WHERE id = $1`,
+        [ref.referral_code_id]
+      );
+      
+      const successCount = codeStats.rows[0]?.successful_referrals || 0;
+      
+      // Check if user hit a new tier
+      const newTier = await pool.query(`
+        SELECT * FROM referral_tiers 
+        WHERE required_referrals = $1 AND is_active = true
+      `, [successCount]);
+      
+      if (newTier.rows.length > 0) {
+        const tier = newTier.rows[0];
+        // Create reward
+        await pool.query(`
+          INSERT INTO referral_rewards (referral_code_id, reward_type, reward_value, description, status)
+          VALUES ($1, $2, $3, $4, 'pending')
+        `, [ref.referral_code_id, tier.reward_type, tier.reward_value, tier.reward_description]);
+      }
+      
+      res.json({ success: true, commission });
+    } catch (error) {
+      console.error("Error converting referral:", error);
+      res.status(500).json({ error: "Failed to convert referral" });
+    }
+  });
+
+  // Claim a referral reward
+  app.post("/api/referrals/rewards/:id/claim", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.session?.userId;
+      
+      // Verify ownership
+      const reward = await pool.query(`
+        SELECT rr.*, rc.owner_id
+        FROM referral_rewards rr
+        JOIN referral_codes rc ON rr.referral_code_id = rc.id
+        WHERE rr.id = $1
+      `, [id]);
+      
+      if (reward.rows.length === 0) {
+        return res.status(404).json({ error: "Reward not found" });
+      }
+      
+      if (reward.rows[0].owner_id !== userId) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+      
+      if (reward.rows[0].status !== 'pending') {
+        return res.status(400).json({ error: "Reward already claimed or expired" });
+      }
+      
+      // Mark as claimed
+      await pool.query(`
+        UPDATE referral_rewards SET status = 'claimed', claimed_at = NOW() WHERE id = $1
+      `, [id]);
+      
+      res.json({ success: true, message: "Reward claimed successfully" });
+    } catch (error) {
+      console.error("Error claiming reward:", error);
+      res.status(500).json({ error: "Failed to claim reward" });
+    }
+  });
+
+  // Get referral tiers
+  app.get("/api/referrals/tiers", async (req, res) => {
+    try {
+      const result = await pool.query(`
+        SELECT id, name, required_referrals as "requiredReferrals", 
+               reward_type as "rewardType", reward_value as "rewardValue",
+               reward_description as "rewardDescription"
+        FROM referral_tiers
+        WHERE is_active = true
+        ORDER BY required_referrals ASC
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching referral tiers:", error);
+      res.status(500).json({ error: "Failed to fetch referral tiers" });
+    }
+  });
+
   return httpServer;
 }
