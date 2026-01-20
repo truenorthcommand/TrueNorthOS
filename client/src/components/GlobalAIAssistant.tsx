@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MessageSquare, X, Send, Sparkles, Search, Loader2, ExternalLink, Minimize2, Maximize2, History, Plus, Trash2, ChevronLeft, Globe } from "lucide-react";
+import { MessageSquare, X, Send, Sparkles, Search, Loader2, ExternalLink, Minimize2, Maximize2, History, Plus, Trash2, ChevronLeft, Globe, AlertTriangle, TrendingUp, Info, ArrowRight, Lightbulb } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
 
@@ -7,6 +7,15 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp?: string;
+}
+
+interface SmartInsight {
+  type: 'alert' | 'opportunity' | 'info';
+  title: string;
+  description: string;
+  action?: string;
+  actionPath?: string;
+  priority: 'high' | 'medium' | 'low';
 }
 
 interface SearchResult {
@@ -39,6 +48,8 @@ export function GlobalAIAssistant() {
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [isSearchingWeb, setIsSearchingWeb] = useState(false);
+  const [insights, setInsights] = useState<SmartInsight[]>([]);
+  const [showInsights, setShowInsights] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [location, navigate] = useLocation();
@@ -75,6 +86,7 @@ export function GlobalAIAssistant() {
   useEffect(() => {
     if (isOpen && messages.length === 0) {
       fetchSuggestions();
+      fetchInsights();
     }
   }, [isOpen, currentPage, messages.length]);
 
@@ -88,6 +100,35 @@ export function GlobalAIAssistant() {
     } catch (error) {
       console.error("Error fetching suggestions:", error);
     }
+  };
+
+  const fetchInsights = async () => {
+    try {
+      const response = await fetch("/api/global-assistant/insights");
+      if (response.ok) {
+        const data = await response.json();
+        setInsights(data.insights || []);
+      }
+    } catch (error) {
+      console.error("Error fetching insights:", error);
+    }
+  };
+
+  const getInsightIcon = (type: string) => {
+    switch (type) {
+      case 'alert': return <AlertTriangle className="h-4 w-4" />;
+      case 'opportunity': return <TrendingUp className="h-4 w-4" />;
+      default: return <Info className="h-4 w-4" />;
+    }
+  };
+
+  const getInsightStyle = (type: string, priority: string) => {
+    if (type === 'alert' && priority === 'high') {
+      return 'bg-red-50 border-red-200 text-red-800';
+    } else if (type === 'opportunity') {
+      return 'bg-amber-50 border-amber-200 text-amber-800';
+    }
+    return 'bg-blue-50 border-blue-200 text-blue-800';
   };
 
   const fetchConversations = async () => {
@@ -547,16 +588,68 @@ export function GlobalAIAssistant() {
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.length === 0 ? (
-              <div className="text-center py-6">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center">
-                  <MessageSquare className="h-8 w-8 text-blue-600" />
+              <div className="space-y-4">
+                {insights.length > 0 && showInsights && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                        <Lightbulb className="h-4 w-4 text-amber-500" />
+                        Smart Insights
+                      </div>
+                      <button
+                        onClick={() => setShowInsights(false)}
+                        className="text-xs text-gray-400 hover:text-gray-600"
+                        data-testid="button-hide-insights"
+                      >
+                        Hide
+                      </button>
+                    </div>
+                    {insights.slice(0, 3).map((insight, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          if (insight.actionPath) {
+                            navigate(insight.actionPath);
+                            setIsOpen(false);
+                          }
+                        }}
+                        className={cn(
+                          "w-full text-left p-3 rounded-lg border transition-all hover:shadow-sm",
+                          getInsightStyle(insight.type, insight.priority)
+                        )}
+                        data-testid={`insight-${idx}`}
+                      >
+                        <div className="flex items-start gap-2">
+                          {getInsightIcon(insight.type)}
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">{insight.title}</p>
+                            <p className="text-xs opacity-80 mt-0.5">{insight.description}</p>
+                          </div>
+                          {insight.action && (
+                            <ArrowRight className="h-4 w-4 opacity-50 flex-shrink-0" />
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                
+                <div className="text-center py-4">
+                  <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center">
+                    <MessageSquare className="h-7 w-7 text-blue-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-800 mb-1">How can I help you?</h3>
+                  <p className="text-sm text-gray-500 mb-3">
+                    Ask me anything about your business
+                  </p>
                 </div>
-                <h3 className="font-semibold text-gray-800 mb-1">How can I help you?</h3>
-                <p className="text-sm text-gray-500 mb-4">
-                  Ask me anything about your business
-                </p>
+
                 {suggestions.length > 0 && (
                   <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-medium text-gray-500 px-1">
+                      <Sparkles className="h-3 w-3" />
+                      Suggested for you
+                    </div>
                     {suggestions.map((suggestion, idx) => (
                       <button
                         key={idx}

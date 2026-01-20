@@ -7455,5 +7455,69 @@ Be concise and practical. Focus on real issues that affect the business.`;
     }
   });
 
+  // ==================== INTEGRATIONS (XERO) ====================
+
+  // Xero integration status
+  app.get("/api/integrations/xero/status", requireAuth, async (req, res) => {
+    try {
+      // For now, return a mock status - would need Xero OAuth in production
+      const config = {
+        isConnected: false,
+        syncInvoices: true,
+        syncContacts: true,
+        syncPayments: true,
+        autoSync: false,
+      };
+
+      const syncStatuses = [
+        { type: 'Invoices', lastSync: null, itemsSynced: 0, status: 'never' },
+        { type: 'Contacts', lastSync: null, itemsSynced: 0, status: 'never' },
+        { type: 'Payments', lastSync: null, itemsSynced: 0, status: 'never' },
+      ];
+
+      res.json({ config, syncStatuses });
+    } catch (error) {
+      console.error("Error fetching Xero status:", error);
+      res.status(500).json({ error: "Failed to fetch Xero status" });
+    }
+  });
+
+  // Update Xero config
+  app.put("/api/integrations/xero/config", requireAdmin, async (req, res) => {
+    try {
+      const config = req.body;
+      // In production, this would save to database
+      res.json({ success: true, config });
+    } catch (error) {
+      console.error("Error saving Xero config:", error);
+      res.status(500).json({ error: "Failed to save Xero config" });
+    }
+  });
+
+  // Sync with Xero
+  app.post("/api/integrations/xero/sync", requireAdmin, async (req, res) => {
+    try {
+      // In production, this would trigger actual Xero API sync
+      res.json({ 
+        success: true, 
+        message: "Xero integration not yet configured. Please connect your Xero account first." 
+      });
+    } catch (error) {
+      console.error("Error syncing with Xero:", error);
+      res.status(500).json({ error: "Failed to sync with Xero" });
+    }
+  });
+
+  // Disconnect Xero
+  app.post("/api/integrations/xero/disconnect", requireAdmin, async (req, res) => {
+    try {
+      // In production, this would revoke OAuth tokens
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error disconnecting Xero:", error);
+      res.status(500).json({ error: "Failed to disconnect Xero" });
+    }
+  });
+
   return httpServer;
 }

@@ -34,6 +34,7 @@ import Invoices from "@/pages/invoices";
 import InvoiceDetail from "@/pages/invoice-detail";
 import ClientInvoice from "@/pages/client-invoice";
 import Settings from "@/pages/settings";
+import Integrations from "@/pages/integrations";
 import Security from "@/pages/security";
 import Messages from "@/pages/messages";
 import Privacy from "@/pages/privacy";
@@ -181,6 +182,9 @@ function Router() {
       <Route path="/invoice/:token" component={ClientInvoice} />
       <Route path="/settings">
         <PrivateRoute component={Settings} />
+      </Route>
+      <Route path="/integrations">
+        <PrivateRoute component={Integrations} />
       </Route>
       <Route path="/security">
         <PrivateRoute component={Security} />
