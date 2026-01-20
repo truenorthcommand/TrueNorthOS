@@ -12,7 +12,6 @@ import { useNotifications, Notification } from "@/hooks/use-notifications";
 import { useOffline } from "@/hooks/use-offline";
 import { useQuery } from "@tanstack/react-query";
 import { useStore } from "@/lib/store";
-import { SnippetWidget } from "@/components/snippet-widget";
 import { GlobalAIAssistant } from "@/components/GlobalAIAssistant";
 
 type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools' | 'fleet' | 'finance' | 'clients';
@@ -615,7 +614,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </main>
           
-          <SnippetWidget />
           <GlobalAIAssistant />
           
           {/* Floating Refresh Button - Desktop */}
