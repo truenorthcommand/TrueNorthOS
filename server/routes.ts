@@ -7860,23 +7860,26 @@ Be concise and practical. Focus on real issues that affect the business.`;
     try {
       const userId = req.session?.userId;
       
-      // Get referral code
-      const codeResult = await pool.query(
+      // Get referral code or create one if it doesn't exist
+      let codeResult = await pool.query(
         `SELECT * FROM referral_codes WHERE owner_id = $1`,
         [userId]
       );
       
       if (codeResult.rows.length === 0) {
-        return res.json({
-          code: null,
-          totalReferrals: 0,
-          successfulReferrals: 0,
-          pendingReferrals: 0,
-          totalEarnings: 0,
-          referrals: [],
-          rewards: [],
-          nextTier: null,
-        });
+        // Auto-generate referral code for user
+        const user = await pool.query(`SELECT name FROM users WHERE id = $1`, [userId]);
+        const companyName = user.rows[0]?.name || 'User';
+        
+        // Generate unique code
+        const codeStr = companyName.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10).toUpperCase() + 
+                        '-' + Date.now().toString(36).toUpperCase();
+        
+        codeResult = await pool.query(`
+          INSERT INTO referral_codes (code, owner_id, company_name, is_active)
+          VALUES ($1, $2, $3, true)
+          RETURNING *
+        `, [codeStr, userId, companyName]);
       }
       
       const code = codeResult.rows[0];

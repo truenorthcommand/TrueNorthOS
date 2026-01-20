@@ -222,7 +222,7 @@ export default function SubscriptionPage() {
 
   const calculateMonthlyTotal = () => {
     const corePlan = plans.find(p => p.slug === "starter");
-    const basePrice = corePlan?.monthlyPrice || 50;
+    const basePrice = corePlan?.monthlyPrice || 99;
     const addOnsTotal = subscribedAddOns.reduce((sum, a) => sum + a.monthlyPrice, 0);
     return basePrice + addOnsTotal;
   };
