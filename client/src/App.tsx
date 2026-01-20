@@ -48,6 +48,7 @@ import Timesheets from "@/pages/timesheets";
 import Expenses from "@/pages/expenses";
 import Payments from "@/pages/payments";
 import Analytics from "@/pages/analytics";
+import DirectorsSuite from "@/pages/directors-suite";
 import VoiceNotes from "@/pages/voice-notes";
 import DocumentScanner from "@/pages/document-scanner";
 import Proposal from "@/pages/proposal";
@@ -159,6 +160,9 @@ function Router() {
       </Route>
       <Route path="/analytics">
         <PrivateRoute component={Analytics} />
+      </Route>
+      <Route path="/directors">
+        <PrivateRoute component={DirectorsSuite} />
       </Route>
       <Route path="/quotes">
         <PrivateRoute component={Quotes} />

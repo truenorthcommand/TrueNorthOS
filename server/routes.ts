@@ -6463,6 +6463,256 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
     }
   });
 
+  // ==================== DIRECTORS SUITE ====================
+
+  app.get("/api/directors/dashboard", requireAdmin, async (req, res) => {
+    try {
+      const now = new Date();
+      const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      
+      const allInvoices = await storage.getAllInvoices();
+      const allJobs = await storage.getAllJobs();
+      const allExpenses = await storage.getAllExpenses();
+      const allEngineers = await storage.getAllEngineers();
+      const allClients = await storage.getAllClients();
+      const allQuotes = await storage.getAllQuotes();
+
+      // Revenue calculations
+      const paidInvoices = allInvoices.filter(inv => inv.status === 'Paid');
+      const totalRevenue = paidInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+      
+      const lastMonthRevenue = paidInvoices
+        .filter(inv => {
+          const paidDate = inv.paidAt ? new Date(inv.paidAt) : null;
+          return paidDate && paidDate >= startOfLastMonth && paidDate < startOfCurrentMonth;
+        })
+        .reduce((sum, inv) => sum + (inv.total || 0), 0);
+      
+      const thisMonthRevenue = paidInvoices
+        .filter(inv => {
+          const paidDate = inv.paidAt ? new Date(inv.paidAt) : null;
+          return paidDate && paidDate >= startOfCurrentMonth;
+        })
+        .reduce((sum, inv) => sum + (inv.total || 0), 0);
+      
+      const revenueGrowth = lastMonthRevenue > 0 
+        ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 
+        : 0;
+
+      // Expenses and profit
+      const totalExpenses = allExpenses
+        .filter(exp => exp.status === 'approved')
+        .reduce((sum, exp) => sum + (exp.amount || 0), 0);
+      const totalProfit = totalRevenue - totalExpenses;
+      const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+
+      // Outstanding invoices
+      const unpaidInvoices = allInvoices.filter(inv => inv.status !== 'Paid' && inv.status !== 'Draft');
+      const outstandingInvoices = unpaidInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+      const overdueInvoices = unpaidInvoices.filter(inv => {
+        if (!inv.dueDate) return false;
+        return new Date(inv.dueDate) < now;
+      }).length;
+
+      // Jobs metrics
+      const activeJobs = allJobs.filter(j => j.status !== 'Signed Off' && j.status !== 'Draft').length;
+      const completedJobsThisMonth = allJobs.filter(j => {
+        if (j.status !== 'Signed Off' || !j.signOffTimestamp) return false;
+        return new Date(j.signOffTimestamp) >= startOfCurrentMonth;
+      }).length;
+      
+      const completedJobs = allJobs.filter(j => j.status === 'Signed Off');
+      const avgJobValue = completedJobs.length > 0 
+        ? totalRevenue / completedJobs.length 
+        : 0;
+
+      // Clients
+      const totalClients = allClients.length;
+      const newClientsThisMonth = allClients.filter(c => {
+        if (!c.createdAt) return false;
+        return new Date(c.createdAt) >= startOfCurrentMonth;
+      }).length;
+
+      // Monthly trends (12 months)
+      const monthlyTrends = [];
+      for (let i = 11; i >= 0; i--) {
+        const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+        const monthName = monthDate.toLocaleDateString('en-GB', { month: 'short' });
+        
+        const revenue = paidInvoices
+          .filter(inv => {
+            const paidDate = inv.paidAt ? new Date(inv.paidAt) : null;
+            return paidDate && paidDate >= monthDate && paidDate <= monthEnd;
+          })
+          .reduce((sum, inv) => sum + (inv.total || 0), 0);
+        
+        const expenses = allExpenses
+          .filter(exp => {
+            const expDate = new Date(exp.date);
+            return expDate >= monthDate && expDate <= monthEnd && exp.status === 'approved';
+          })
+          .reduce((sum, exp) => sum + (exp.amount || 0), 0);
+        
+        monthlyTrends.push({
+          month: monthName,
+          revenue,
+          expenses,
+          profit: revenue - expenses,
+        });
+      }
+
+      // Job metrics
+      const jobsByStatus = [
+        { status: 'Draft', count: allJobs.filter(j => j.status === 'Draft').length, color: '#94a3b8' },
+        { status: 'Ready', count: allJobs.filter(j => j.status === 'Ready').length, color: '#8b5cf6' },
+        { status: 'In Progress', count: allJobs.filter(j => j.status === 'In Progress').length, color: '#3b82f6' },
+        { status: 'Awaiting Sign-off', count: allJobs.filter(j => j.status === 'Awaiting Signatures').length, color: '#f59e0b' },
+        { status: 'Completed', count: allJobs.filter(j => j.status === 'Signed Off').length, color: '#22c55e' },
+      ];
+      
+      const totalJobsCount = allJobs.length;
+      const completionRate = totalJobsCount > 0 
+        ? Math.round((completedJobs.length / totalJobsCount) * 100) 
+        : 0;
+
+      // Financial health
+      const receivables = outstandingInvoices;
+      const payables = allExpenses
+        .filter(exp => exp.status === 'pending')
+        .reduce((sum, exp) => sum + (exp.amount || 0), 0);
+      const cashFlow = totalRevenue - totalExpenses - payables;
+
+      const invoiceAgeing = [
+        { 
+          range: '0-30 days', 
+          amount: unpaidInvoices
+            .filter(inv => {
+              const daysPast = inv.invoiceDate ? Math.floor((now.getTime() - new Date(inv.invoiceDate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+              return daysPast <= 30;
+            })
+            .reduce((sum, inv) => sum + (inv.total || 0), 0),
+          color: '#22c55e'
+        },
+        { 
+          range: '31-60 days', 
+          amount: unpaidInvoices
+            .filter(inv => {
+              const daysPast = inv.invoiceDate ? Math.floor((now.getTime() - new Date(inv.invoiceDate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+              return daysPast > 30 && daysPast <= 60;
+            })
+            .reduce((sum, inv) => sum + (inv.total || 0), 0),
+          color: '#f59e0b'
+        },
+        { 
+          range: '61-90 days', 
+          amount: unpaidInvoices
+            .filter(inv => {
+              const daysPast = inv.invoiceDate ? Math.floor((now.getTime() - new Date(inv.invoiceDate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+              return daysPast > 60 && daysPast <= 90;
+            })
+            .reduce((sum, inv) => sum + (inv.total || 0), 0),
+          color: '#f97316'
+        },
+        { 
+          range: '90+ days', 
+          amount: unpaidInvoices
+            .filter(inv => {
+              const daysPast = inv.invoiceDate ? Math.floor((now.getTime() - new Date(inv.invoiceDate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+              return daysPast > 90;
+            })
+            .reduce((sum, inv) => sum + (inv.total || 0), 0),
+          color: '#ef4444'
+        },
+      ];
+
+      // Top clients by revenue (from paid invoices)
+      const clientRevenueMap = new Map<string, { name: string; revenue: number; jobCount: number }>();
+      for (const invoice of paidInvoices) {
+        if (invoice.customerId) {
+          const client = allClients.find(c => c.id === invoice.customerId);
+          const existing = clientRevenueMap.get(invoice.customerId) || { 
+            name: client?.name || invoice.customerName || 'Unknown', 
+            revenue: 0, 
+            jobCount: 0 
+          };
+          existing.revenue += invoice.total || 0;
+          clientRevenueMap.set(invoice.customerId, existing);
+        }
+      }
+      for (const job of completedJobs) {
+        const jobClientId = (job as any).client || (job as any).customerId;
+        if (jobClientId && clientRevenueMap.has(jobClientId)) {
+          const existing = clientRevenueMap.get(jobClientId)!;
+          existing.jobCount++;
+        }
+      }
+      const topClients = Array.from(clientRevenueMap.entries())
+        .map(([id, data]) => ({ id, ...data }))
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5);
+
+      // Engineer performance
+      const engineerPerformance = allEngineers
+        .map(engineer => {
+          const engineerJobs = completedJobs.filter(job => {
+            if (job.assignedToId === engineer.id) return true;
+            if (Array.isArray(job.assignedToIds) && job.assignedToIds.includes(engineer.id)) return true;
+            return false;
+          });
+          
+          // Calculate revenue from jobs (simplified - using avg job value)
+          const revenue = engineerJobs.length * avgJobValue;
+          
+          return {
+            id: engineer.id,
+            name: engineer.name,
+            completedJobs: engineerJobs.length,
+            revenue,
+            rating: Math.min(5, Math.max(1, Math.round(engineerJobs.length / 2))),
+          };
+        })
+        .filter(e => e.completedJobs > 0)
+        .sort((a, b) => b.completedJobs - a.completedJobs)
+        .slice(0, 5);
+
+      res.json({
+        summary: {
+          totalRevenue,
+          revenueGrowth,
+          totalProfit,
+          profitMargin,
+          outstandingInvoices,
+          overdueInvoices,
+          activeJobs,
+          completedJobsThisMonth,
+          totalClients,
+          newClientsThisMonth,
+          totalEngineers: allEngineers.length,
+          avgJobValue,
+        },
+        monthlyTrends,
+        jobMetrics: {
+          completionRate,
+          avgCompletionTime: 5, // Placeholder - would need job timestamps to calculate
+          jobsByStatus,
+        },
+        financialHealth: {
+          cashFlow,
+          receivables,
+          payables,
+          invoiceAgeing,
+        },
+        topClients,
+        engineerPerformance,
+      });
+    } catch (error) {
+      console.error("Directors dashboard error:", error);
+      res.status(500).json({ error: "Failed to fetch directors dashboard data" });
+    }
+  });
+
   // ==================== INSPECTIONS ====================
 
   app.get("/api/inspections", requireRoles('admin', 'surveyor', 'works_manager'), async (req, res) => {
