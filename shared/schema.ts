@@ -1362,3 +1362,138 @@ export type ActionType =
   | "create_invoice"
   | "notify_admin"
   | "webhook";
+
+// ==================== MODULAR PRICING - ADD-ONS ====================
+
+export const addOns = pgTable("add_ons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description"),
+  monthlyPrice: doublePrecision("monthly_price").notNull(),
+  icon: text("icon"),
+  category: text("category").default("feature"),
+  features: jsonb("features").default([]),
+  isActive: boolean("is_active").notNull().default(true),
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAddOnSchema = createInsertSchema(addOns).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAddOn = z.infer<typeof insertAddOnSchema>;
+export type AddOn = typeof addOns.$inferSelect;
+
+export const subscriptionAddOns = pgTable("subscription_add_ons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subscriptionId: varchar("subscription_id"),
+  addOnId: varchar("add_on_id").notNull(),
+  status: text("status").notNull().default("active"),
+  startDate: timestamp("start_date").defaultNow(),
+  endDate: timestamp("end_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSubscriptionAddOnSchema = createInsertSchema(subscriptionAddOns).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSubscriptionAddOn = z.infer<typeof insertSubscriptionAddOnSchema>;
+export type SubscriptionAddOn = typeof subscriptionAddOns.$inferSelect;
+
+// ==================== REFERRAL SYSTEM ====================
+
+export const referralCodes = pgTable("referral_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  ownerId: varchar("owner_id"),
+  companyName: text("company_name"),
+  qrCodeUrl: text("qr_code_url"),
+  isActive: boolean("is_active").notNull().default(true),
+  totalReferrals: integer("total_referrals").default(0),
+  successfulReferrals: integer("successful_referrals").default(0),
+  totalEarnings: doublePrecision("total_earnings").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertReferralCodeSchema = createInsertSchema(referralCodes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertReferralCode = z.infer<typeof insertReferralCodeSchema>;
+export type ReferralCode = typeof referralCodes.$inferSelect;
+
+export const referrals = pgTable("referrals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  referralCodeId: varchar("referral_code_id").notNull(),
+  referrerId: varchar("referrer_id"),
+  referredEmail: text("referred_email"),
+  referredUserId: varchar("referred_user_id"),
+  status: text("status").notNull().default("pending"),
+  convertedAt: timestamp("converted_at"),
+  subscriptionValue: doublePrecision("subscription_value"),
+  commissionEarned: doublePrecision("commission_earned"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertReferralSchema = createInsertSchema(referrals).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertReferral = z.infer<typeof insertReferralSchema>;
+export type Referral = typeof referrals.$inferSelect;
+
+export const referralRewards = pgTable("referral_rewards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  referralCodeId: varchar("referral_code_id").notNull(),
+  rewardType: text("reward_type").notNull(),
+  rewardValue: doublePrecision("reward_value"),
+  description: text("description"),
+  status: text("status").notNull().default("pending"),
+  expiresAt: timestamp("expires_at"),
+  claimedAt: timestamp("claimed_at"),
+  appliedToSubscriptionId: varchar("applied_to_subscription_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertReferralRewardSchema = createInsertSchema(referralRewards).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertReferralReward = z.infer<typeof insertReferralRewardSchema>;
+export type ReferralReward = typeof referralRewards.$inferSelect;
+
+export const referralTiers = pgTable("referral_tiers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  requiredReferrals: integer("required_referrals").notNull(),
+  rewardType: text("reward_type").notNull(),
+  rewardValue: doublePrecision("reward_value").notNull(),
+  rewardDescription: text("reward_description"),
+  isActive: boolean("is_active").notNull().default(true),
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertReferralTierSchema = createInsertSchema(referralTiers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertReferralTier = z.infer<typeof insertReferralTierSchema>;
+export type ReferralTier = typeof referralTiers.$inferSelect;
+
+export type RewardType = 
+  | "percentage_discount"
+  | "fixed_discount"
+  | "free_month"
+  | "free_addon"
+  | "tier_upgrade"
+  | "commission";
