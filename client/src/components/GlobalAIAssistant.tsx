@@ -390,7 +390,7 @@ export function GlobalAIAssistant() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-24 right-6 z-50 h-14 w-14 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 text-white shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center group"
+        className="fixed bottom-24 right-6 z-50 h-14 w-14 rounded-full bg-[#0F2B4C] hover:bg-[#1a3a5c] text-white shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center group"
         data-testid="button-open-global-ai"
       >
         <Sparkles className="h-6 w-6 group-hover:animate-pulse" />
@@ -409,7 +409,7 @@ export function GlobalAIAssistant() {
       )}
       data-testid="global-ai-panel"
     >
-      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-t-2xl">
+      <div className="flex items-center justify-between px-4 py-3 bg-[#0F2B4C] rounded-t-2xl">
         <div className="flex items-center gap-2">
           {showHistory ? (
             <button
