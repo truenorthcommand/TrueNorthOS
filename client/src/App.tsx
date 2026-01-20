@@ -51,6 +51,7 @@ import Payments from "@/pages/payments";
 import Analytics from "@/pages/analytics";
 import DirectorsSuite from "@/pages/directors-suite";
 import Subscription from "@/pages/subscription";
+import Referrals from "@/pages/referrals";
 import Workflows from "@/pages/workflows";
 import VoiceNotes from "@/pages/voice-notes";
 import DocumentScanner from "@/pages/document-scanner";
@@ -169,6 +170,9 @@ function Router() {
       </Route>
       <Route path="/subscription">
         <PrivateRoute component={Subscription} />
+      </Route>
+      <Route path="/referrals">
+        <PrivateRoute component={Referrals} />
       </Route>
       <Route path="/workflows">
         <PrivateRoute component={Workflows} />

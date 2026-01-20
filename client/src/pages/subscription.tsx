@@ -5,7 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Check, Crown, Zap, Building2, Loader2, AlertCircle, Calendar, Users, Briefcase, HardDrive } from "lucide-react";
+import { 
+  Check, Crown, Zap, Building2, Loader2, AlertCircle, Calendar, Users, 
+  Briefcase, HardDrive, Truck, BarChart3, Brain, Link, MessageSquare,
+  Plus, Minus, Sparkles, Gift
+} from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 
 type SubscriptionPlan = {
@@ -25,7 +29,30 @@ type SubscriptionPlan = {
     apiAccess: boolean;
     customBranding: boolean;
     prioritySupport: boolean;
+    additionalUserPrice?: number;
+    upgradeDiscount?: number;
   };
+};
+
+type AddOn = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  monthlyPrice: number;
+  icon: string;
+  category: string;
+  features: string[];
+};
+
+type SubscribedAddOn = {
+  id: string;
+  name: string;
+  slug: string;
+  monthlyPrice: number;
+  icon: string;
+  status: string;
+  startDate: string;
 };
 
 type CurrentSubscription = {
@@ -46,14 +73,28 @@ type UsageData = {
   storage: { current: number; limit: number };
 };
 
+const iconMap: Record<string, React.ReactNode> = {
+  Truck: <Truck className="h-5 w-5" />,
+  Zap: <Zap className="h-5 w-5" />,
+  BarChart3: <BarChart3 className="h-5 w-5" />,
+  Brain: <Brain className="h-5 w-5" />,
+  Link: <Link className="h-5 w-5" />,
+  HardDrive: <HardDrive className="h-5 w-5" />,
+  MessageSquare: <MessageSquare className="h-5 w-5" />,
+  Users: <Users className="h-5 w-5" />,
+};
+
 export default function SubscriptionPage() {
   const { toast } = useToast();
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [addOns, setAddOns] = useState<AddOn[]>([]);
+  const [subscribedAddOns, setSubscribedAddOns] = useState<SubscribedAddOn[]>([]);
   const [subscription, setSubscription] = useState<CurrentSubscription | null>(null);
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [isLoading, setIsLoading] = useState(true);
   const [isUpgrading, setIsUpgrading] = useState(false);
+  const [processingAddOn, setProcessingAddOn] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -61,26 +102,19 @@ export default function SubscriptionPage() {
 
   const fetchData = async () => {
     try {
-      const [plansRes, subRes, usageRes] = await Promise.all([
+      const [plansRes, subRes, usageRes, addOnsRes, subscribedRes] = await Promise.all([
         fetch("/api/subscription/plans"),
         fetch("/api/subscription/current"),
         fetch("/api/subscription/usage"),
+        fetch("/api/addons"),
+        fetch("/api/addons/subscribed", { credentials: "include" }),
       ]);
 
-      if (plansRes.ok) {
-        const plansData = await plansRes.json();
-        setPlans(plansData);
-      }
-
-      if (subRes.ok) {
-        const subData = await subRes.json();
-        setSubscription(subData);
-      }
-
-      if (usageRes.ok) {
-        const usageData = await usageRes.json();
-        setUsage(usageData);
-      }
+      if (plansRes.ok) setPlans(await plansRes.json());
+      if (subRes.ok) setSubscription(await subRes.json());
+      if (usageRes.ok) setUsage(await usageRes.json());
+      if (addOnsRes.ok) setAddOns(await addOnsRes.json());
+      if (subscribedRes.ok) setSubscribedAddOns(await subscribedRes.json());
     } catch (error) {
       console.error("Failed to fetch subscription data:", error);
     } finally {
@@ -122,6 +156,44 @@ export default function SubscriptionPage() {
     }
   };
 
+  const handleAddOnToggle = async (addOnId: string, isSubscribed: boolean) => {
+    setProcessingAddOn(addOnId);
+    try {
+      const endpoint = isSubscribed ? "/api/addons/unsubscribe" : "/api/addons/subscribe";
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ addOnId }),
+      });
+
+      if (res.ok) {
+        toast({
+          title: isSubscribed ? "Add-on Removed" : "Add-on Added",
+          description: isSubscribed 
+            ? "The add-on has been removed from your subscription." 
+            : "The add-on has been added to your subscription.",
+        });
+        fetchData();
+      } else {
+        const data = await res.json();
+        toast({
+          title: "Error",
+          description: data.error || "Failed to update add-on.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update add-on. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingAddOn(null);
+    }
+  };
+
   const getPlanIcon = (slug: string) => {
     switch (slug) {
       case "starter":
@@ -144,6 +216,17 @@ export default function SubscriptionPage() {
     return value === -1 ? "Unlimited" : value.toLocaleString();
   };
 
+  const isAddOnSubscribed = (addOnId: string) => {
+    return subscribedAddOns.some(a => a.id === addOnId || subscribedAddOns.some(s => s.slug === addOns.find(ao => ao.id === addOnId)?.slug));
+  };
+
+  const calculateMonthlyTotal = () => {
+    const corePlan = plans.find(p => p.slug === "starter");
+    const basePrice = corePlan?.monthlyPrice || 50;
+    const addOnsTotal = subscribedAddOns.reduce((sum, a) => sum + a.monthlyPrice, 0);
+    return basePrice + addOnsTotal;
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -152,11 +235,14 @@ export default function SubscriptionPage() {
     );
   }
 
+  const corePlan = plans.find(p => p.slug === "starter");
+  const upgradePlans = plans.filter(p => p.slug !== "starter");
+
   return (
     <div className="space-y-6 p-6">
       <div>
         <h1 className="text-3xl font-bold text-[#0F2B4C]" data-testid="text-page-title">Subscription & Billing</h1>
-        <p className="text-muted-foreground mt-1">Manage your subscription plan and billing</p>
+        <p className="text-muted-foreground mt-1">Build your perfect plan with Core CRM + bolt-ons</p>
       </div>
 
       {subscription && (
@@ -171,7 +257,7 @@ export default function SubscriptionPage() {
                 variant={subscription.status === "active" ? "default" : "secondary"}
                 className={subscription.status === "active" ? "bg-green-500" : subscription.status === "trial" ? "bg-amber-500" : ""}
               >
-                {subscription.status === "trial" ? "Trial" : subscription.status}
+                {subscription.status === "trial" ? "14-Day Trial" : subscription.status}
               </Badge>
             </div>
           </CardHeader>
@@ -189,11 +275,21 @@ export default function SubscriptionPage() {
               
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-[#0F2B4C]/10">
+                  <Sparkles className="h-5 w-5 text-[#0F2B4C]" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Active Add-ons</p>
+                  <p className="font-semibold text-[#0F2B4C]">{subscribedAddOns.length}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-[#0F2B4C]/10">
                   <Calendar className="h-5 w-5 text-[#0F2B4C]" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Billing Cycle</p>
-                  <p className="font-semibold text-[#0F2B4C] capitalize">{subscription.billingCycle}</p>
+                  <p className="text-sm text-muted-foreground">Monthly Total</p>
+                  <p className="font-semibold text-[#0F2B4C]">£{calculateMonthlyTotal()}</p>
                 </div>
               </div>
 
@@ -206,20 +302,6 @@ export default function SubscriptionPage() {
                     <p className="text-sm text-muted-foreground">Trial Ends</p>
                     <p className="font-semibold text-amber-600">
                       {differenceInDays(new Date(subscription.trialEndDate), new Date())} days left
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {subscription.currentPeriodEnd && subscription.status === "active" && (
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-[#0F2B4C]/10">
-                    <Calendar className="h-5 w-5 text-[#0F2B4C]" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Next Billing</p>
-                    <p className="font-semibold text-[#0F2B4C]">
-                      {format(new Date(subscription.currentPeriodEnd), "d MMM yyyy")}
                     </p>
                   </div>
                 </div>
@@ -248,6 +330,7 @@ export default function SubscriptionPage() {
                   </span>
                 </div>
                 <Progress value={getUsagePercent(usage.users.current, usage.users.limit)} className="h-2" />
+                <p className="text-xs text-muted-foreground">+£10/user after limit</p>
               </div>
 
               <div className="space-y-2">
@@ -293,9 +376,116 @@ export default function SubscriptionPage() {
         </Card>
       )}
 
+      {corePlan && (
+        <Card className="border-[#0F2B4C] border-2">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-full bg-[#0F2B4C]/10">
+                  <Zap className="h-6 w-6 text-[#0F2B4C]" />
+                </div>
+                <div>
+                  <CardTitle className="text-[#0F2B4C]">{corePlan.name}</CardTitle>
+                  <CardDescription>{corePlan.description}</CardDescription>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-3xl font-bold text-[#0F2B4C]">£{corePlan.monthlyPrice}</span>
+                <span className="text-muted-foreground">/mo</span>
+                <p className="text-xs text-muted-foreground">Up to {corePlan.limits.maxUsers} users included</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-2 md:grid-cols-3">
+              {corePlan.features.map((feature, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-500 shrink-0" />
+                  <span className="text-sm">{feature}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-[#0F2B4C]">Available Plans</h2>
+          <div>
+            <h2 className="text-xl font-semibold text-[#0F2B4C]">Bolt-On Features</h2>
+            <p className="text-sm text-muted-foreground">Add extra capabilities to your Core CRM</p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {addOns.map((addOn) => {
+            const isSubscribed = subscribedAddOns.some(s => s.slug === addOn.slug);
+            const isProcessing = processingAddOn === addOn.id;
+            
+            return (
+              <Card 
+                key={addOn.id} 
+                className={`relative transition-all ${isSubscribed ? "border-green-500 border-2 bg-green-50/50" : "border-[#0F2B4C]/20 hover:border-[#0F2B4C]/40"}`}
+                data-testid={`card-addon-${addOn.slug}`}
+              >
+                {isSubscribed && (
+                  <div className="absolute -top-2 -right-2">
+                    <Badge className="bg-green-500">Active</Badge>
+                  </div>
+                )}
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${isSubscribed ? "bg-green-100" : "bg-[#0F2B4C]/10"}`}>
+                      {iconMap[addOn.icon] || <Sparkles className="h-5 w-5" />}
+                    </div>
+                    <div className="flex-1">
+                      <CardTitle className="text-base">{addOn.name}</CardTitle>
+                      <p className="text-lg font-bold text-[#0F2B4C]">+£{addOn.monthlyPrice}/mo</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pb-2">
+                  <p className="text-sm text-muted-foreground mb-3">{addOn.description}</p>
+                  <ul className="space-y-1">
+                    {(addOn.features as string[]).slice(0, 3).map((feature, idx) => (
+                      <li key={idx} className="flex items-center gap-1.5 text-xs">
+                        <Check className="h-3 w-3 text-green-500" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+                <CardFooter>
+                  <Button
+                    className="w-full"
+                    variant={isSubscribed ? "outline" : "default"}
+                    size="sm"
+                    disabled={isProcessing}
+                    onClick={() => handleAddOnToggle(addOn.id, isSubscribed)}
+                    data-testid={`button-addon-${addOn.slug}`}
+                  >
+                    {isProcessing ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : isSubscribed ? (
+                      <Minus className="h-4 w-4 mr-2" />
+                    ) : (
+                      <Plus className="h-4 w-4 mr-2" />
+                    )}
+                    {isSubscribed ? "Remove" : "Add"}
+                  </Button>
+                </CardFooter>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-[#0F2B4C]">Full Plans</h2>
+            <p className="text-sm text-muted-foreground">Upgrade to get everything included</p>
+          </div>
           <Tabs value={billingCycle} onValueChange={(v) => setBillingCycle(v as "monthly" | "yearly")}>
             <TabsList>
               <TabsTrigger value="monthly" data-testid="tab-monthly">Monthly</TabsTrigger>
@@ -306,10 +496,13 @@ export default function SubscriptionPage() {
           </Tabs>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
-          {plans.map((plan) => {
+        <div className="grid gap-6 md:grid-cols-2">
+          {upgradePlans.map((plan) => {
             const isCurrentPlan = subscription?.planId === plan.id;
             const price = billingCycle === "monthly" ? plan.monthlyPrice : plan.yearlyPrice;
+            const discountedPrice = plan.limits.upgradeDiscount 
+              ? Math.round(price * (1 - plan.limits.upgradeDiscount / 100))
+              : null;
             
             return (
               <Card 
@@ -327,26 +520,41 @@ export default function SubscriptionPage() {
                     <Badge className="bg-green-500">Current Plan</Badge>
                   </div>
                 )}
-                <CardHeader className="text-center pb-2">
-                  <div className="mx-auto mb-2 p-3 rounded-full bg-[#0F2B4C]/10 w-fit">
-                    {getPlanIcon(plan.slug)}
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-full bg-[#0F2B4C]/10">
+                      {getPlanIcon(plan.slug)}
+                    </div>
+                    <div className="flex-1">
+                      <CardTitle className="text-[#0F2B4C]">{plan.name}</CardTitle>
+                      <CardDescription>{plan.description}</CardDescription>
+                    </div>
+                    <div className="text-right">
+                      {discountedPrice && !isCurrentPlan && (
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline" className="text-green-600 border-green-600">
+                            <Gift className="h-3 w-3 mr-1" />
+                            30% off first month
+                          </Badge>
+                        </div>
+                      )}
+                      <span className="text-3xl font-bold text-[#0F2B4C]">£{price}</span>
+                      <span className="text-muted-foreground">/{billingCycle === "monthly" ? "mo" : "yr"}</span>
+                      <p className="text-xs text-muted-foreground">
+                        Up to {plan.limits.maxUsers} users • +£10/user after
+                      </p>
+                    </div>
                   </div>
-                  <CardTitle className="text-[#0F2B4C]">{plan.name}</CardTitle>
-                  <CardDescription>{plan.description}</CardDescription>
                 </CardHeader>
-                <CardContent className="text-center">
-                  <div className="mb-4">
-                    <span className="text-4xl font-bold text-[#0F2B4C]">£{price}</span>
-                    <span className="text-muted-foreground">/{billingCycle === "monthly" ? "mo" : "yr"}</span>
-                  </div>
-                  <ul className="space-y-2 text-sm text-left">
+                <CardContent>
+                  <div className="grid gap-2 md:grid-cols-2">
                     {plan.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-                        <span>{feature}</span>
-                      </li>
+                      <div key={idx} className="flex items-center gap-2">
+                        <Check className="h-4 w-4 text-green-500 shrink-0" />
+                        <span className="text-sm">{feature}</span>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </CardContent>
                 <CardFooter>
                   <Button
@@ -359,7 +567,7 @@ export default function SubscriptionPage() {
                     {isUpgrading ? (
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     ) : null}
-                    {isCurrentPlan ? "Current Plan" : plan.slug === "enterprise" ? "Contact Sales" : "Upgrade"}
+                    {isCurrentPlan ? "Current Plan" : plan.slug === "enterprise" ? "Contact Sales" : "Upgrade Now"}
                   </Button>
                 </CardFooter>
               </Card>
@@ -368,18 +576,19 @@ export default function SubscriptionPage() {
         </div>
       </div>
 
-      <Card className="border-[#0F2B4C]/20 bg-[#0F2B4C]/5">
+      <Card className="border-[#0F2B4C]/20 bg-gradient-to-r from-[#0F2B4C]/5 to-transparent">
         <CardContent className="pt-6">
           <div className="flex items-start gap-4">
-            <AlertCircle className="h-5 w-5 text-[#0F2B4C] mt-0.5" />
+            <div className="p-2 rounded-lg bg-[#0F2B4C]/10">
+              <Gift className="h-5 w-5 text-[#0F2B4C]" />
+            </div>
             <div>
-              <h3 className="font-semibold text-[#0F2B4C]">Need help choosing?</h3>
+              <h3 className="font-semibold text-[#0F2B4C]">Refer & Earn</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Contact our sales team for a personalised recommendation based on your business needs.
-                We offer custom Enterprise plans with dedicated support, custom integrations, and volume discounts.
+                Earn rewards by referring other trade businesses. Get discounts, free upgrades, and even recurring commissions.
               </p>
-              <Button variant="link" className="px-0 mt-2 text-[#0F2B4C]">
-                Contact Sales →
+              <Button variant="link" className="px-0 mt-2 text-[#0F2B4C]" onClick={() => window.location.href = '/referrals'}>
+                View Referral Programme →
               </Button>
             </div>
           </div>

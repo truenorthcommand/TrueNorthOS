@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { hasRole } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw, Mic, BookOpen, Scan, Mail, LayoutGrid, FolderOpen, Shield, Crown, Link2, Zap } from "lucide-react";
+import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw, Mic, BookOpen, Scan, Mail, LayoutGrid, FolderOpen, Shield, Crown, Link2, Zap, Gift } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -435,6 +435,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <NavLink href="/integrations" icon={Link2}>Integrations</NavLink>
               <NavLink href="/workflows" icon={Zap}>Workflows</NavLink>
               <NavLink href="/subscription" icon={CreditCard}>Subscription</NavLink>
+              <NavLink href="/referrals" icon={Gift}>Referrals</NavLink>
               <NavLink href="/admin/advisors" icon={Bot}>Advisor Settings</NavLink>
             </>
           )}
