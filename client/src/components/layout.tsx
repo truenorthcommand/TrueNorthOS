@@ -434,9 +434,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <NavLink href="/settings" icon={Settings}>Settings</NavLink>
               <NavLink href="/integrations" icon={Link2}>Integrations</NavLink>
               <NavLink href="/workflows" icon={Zap}>Workflows</NavLink>
+              <NavLink href="/admin/advisors" icon={Bot}>Advisor Settings</NavLink>
+            </>
+          )}
+          {hasRole(user, 'super_admin') && (
+            <>
               <NavLink href="/subscription" icon={CreditCard}>Subscription</NavLink>
               <NavLink href="/referrals" icon={Gift}>Referrals</NavLink>
-              <NavLink href="/admin/advisors" icon={Bot}>Advisor Settings</NavLink>
             </>
           )}
         </MenuGroup>
