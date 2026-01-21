@@ -435,15 +435,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </MenuGroup>
       </nav>
 
-      <div className={cn("border-t border-white/20 pt-4 mt-auto", collapsed && "flex flex-col items-center")}>
+      <div className={cn("border-t border-white/20 pt-2 mt-auto", collapsed && "flex flex-col items-center")}>
         {!collapsed && (
-          <div className="px-4 py-2 mb-2 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-sm font-medium">
+          <div className="px-4 py-1 mb-1 flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-medium shrink-0">
               {user.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U'}
             </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-white">{user.name}</p>
-              <p className="text-xs text-slate-400 capitalize">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-white truncate">{user.name}</p>
+              <p className="text-[10px] text-slate-400 capitalize truncate">
                 {(user.roles && user.roles.length > 0 ? user.roles : [user.role]).join(' • ')}
               </p>
             </div>
@@ -467,14 +467,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Tooltip>
         ) : (
           <button 
-            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-300 hover:bg-red-600 hover:text-white rounded-lg transition-colors" 
+            className="w-full flex items-center gap-2 px-4 py-2 text-xs font-medium text-slate-300 hover:bg-red-600 hover:text-white rounded-lg transition-colors" 
             onClick={() => {
               setIsOpen(false);
               logout();
             }}
             data-testid="button-logout"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-3.5 w-3.5" />
             Sign Out
           </button>
         )}
