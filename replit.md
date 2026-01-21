@@ -1,10 +1,10 @@
-# TradeHub Pro
+# Foreman
 
-*Powered by TrueNorth OS*
+*Keeping operations on track - Powered by TrueNorth OS*
 
 ## Overview
 
-TradeHub Pro is a comprehensive business management platform designed for UK trade and field service companies. It aims to digitise and streamline all operational aspects, from job management, quoting, and invoicing to financial tracking, fleet management, workforce coordination, quality control, and compliance. The platform integrates seven core modules and leverages AI-powered tools to enhance efficiency, reduce costs, and improve customer experience, providing an all-in-one ERP solution tailored for the UK market.
+Foreman is a comprehensive business management platform designed for UK trade and field service companies. It aims to digitise and streamline all operational aspects, from job management, quoting, and invoicing to financial tracking, fleet management, workforce coordination, quality control, and compliance. The platform integrates seven core modules and leverages AI-powered tools to enhance efficiency, reduce costs, and improve customer experience, providing an all-in-one ERP solution tailored for the UK market.
 
 ## User Preferences
 
@@ -16,7 +16,7 @@ TradeHub Pro is a comprehensive business management platform designed for UK tra
 
 ## System Architecture
 
-TradeHub Pro is built with a modern web stack.
+Foreman is built with a modern web stack.
 
 ### Frontend
 -   **Technology**: React with TypeScript.

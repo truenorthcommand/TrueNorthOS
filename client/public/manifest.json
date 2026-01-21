@@ -1,7 +1,7 @@
 {
-  "name": "TradeHub Pro",
-  "short_name": "TradeHub",
-  "description": "Complete field service management platform. Powered by TrueNorth OS.",
+  "name": "Foreman - Keeping operations on track",
+  "short_name": "Foreman",
+  "description": "Complete field service management platform for UK trade businesses. Powered by TrueNorth OS.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

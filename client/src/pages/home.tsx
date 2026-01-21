@@ -185,7 +185,7 @@ export default function Home() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
               <div>
-                <h1 className="text-xl font-bold tracking-tight">TradeHub Pro</h1>
+                <h1 className="text-xl font-bold tracking-tight">Foreman</h1>
                 <p className="text-xs text-muted-foreground">Powered by TrueNorth OS</p>
               </div>
             </div>
@@ -472,7 +472,7 @@ export default function Home() {
             </h3>
             <p className="text-lg opacity-90 mb-8">
               Join field service companies across the UK who are saving hours every week 
-              with TradeHub Pro.
+              with Foreman.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               {user ? (

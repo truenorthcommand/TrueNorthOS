@@ -6,7 +6,7 @@ import { ArrowLeft, Printer, Download, Shield, Wrench } from "lucide-react";
 import { Link } from "wouter";
 
 const adminGuideContent = `
-<h1>TradeHub Pro - Admin User Guide</h1>
+<h1>Foreman - Admin User Guide</h1>
 
 <h2>Getting Started</h2>
 
@@ -200,7 +200,7 @@ const adminGuideContent = `
 `;
 
 const engineerGuideContent = `
-<h1>TradeHub Pro - Engineer User Guide</h1>
+<h1>Foreman - Engineer User Guide</h1>
 
 <h2>Getting Started</h2>
 
