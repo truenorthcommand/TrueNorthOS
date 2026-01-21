@@ -39,7 +39,7 @@ function SignaturePad({ value, onChange }: SignaturePadProps) {
       img.onload = () => ctx.drawImage(img, 0, 0);
       img.src = value;
     }
-  }, []);
+  }, [value]);
 
   const getCoords = (e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current;

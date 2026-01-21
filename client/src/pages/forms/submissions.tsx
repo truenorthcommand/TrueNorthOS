@@ -83,7 +83,10 @@ export default function FormSubmissions() {
   };
 
   const generatePDF = async (submission: FormSubmission) => {
-    if (!version) return;
+    const schemaRes = await fetch(`/api/forms/versions/${submission.templateVersionId}/schema`, { credentials: "include" });
+    if (!schemaRes.ok) return;
+    const schema = await schemaRes.json() as FormSchemaDefinition;
+    if (!schema) return;
 
     const { jsPDF } = await import("jspdf");
     const doc = new jsPDF();
@@ -95,7 +98,7 @@ export default function FormSubmissions() {
     y += 10;
 
     doc.setFontSize(14);
-    doc.text(version.name, 20, y);
+    doc.text(schema.name, 20, y);
     y += 8;
 
     doc.setFontSize(10);
@@ -105,7 +108,7 @@ export default function FormSubmissions() {
     doc.text(`Entity: ${entityTypeLabels[submission.entityType]} - ${submission.entityId}`, 20, y);
     y += 15;
 
-    version.fields.forEach((field) => {
+    schema.fields.forEach((field) => {
       if (y > 270) {
         doc.addPage();
         y = 20;
