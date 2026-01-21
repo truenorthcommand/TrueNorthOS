@@ -177,15 +177,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const NavContent = ({ collapsed = false }: { collapsed?: boolean }) => (
     <div className="flex flex-col gap-2 h-full">
       <div className={cn(
-        "flex items-center gap-2 mb-6 pb-4 border-b border-white/20",
+        "flex flex-col items-center gap-1 mb-6 pb-4 border-b border-white/20",
         collapsed ? "justify-center" : "px-2"
       )}>
         {!collapsed && (
-          <img 
-            src="/logo-foreman.png" 
-            alt="FOREMAN - Keeping operations on track" 
-            className="w-full max-w-[180px] h-auto object-contain mx-auto"
-          />
+          <>
+            <img 
+              src="/logo-foreman.png" 
+              alt="FOREMAN - Keeping operations on track" 
+              className="w-full max-w-[180px] h-auto object-contain mx-auto"
+            />
+            <span className="text-[10px] text-slate-400 tracking-wide">Powered By TrueNorth OS</span>
+          </>
         )}
         {collapsed && (
           <img 
