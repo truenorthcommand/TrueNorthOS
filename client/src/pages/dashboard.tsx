@@ -60,7 +60,7 @@ const PORTAL_CONFIGS: PortalConfig[] = [
     role: 'director',
     title: "Director's Suite",
     description: 'Executive dashboards and business analytics',
-    path: '/directors-suite',
+    path: '/directors',
     icon: Crown,
     gradient: 'from-amber-500 to-amber-700',
   },
