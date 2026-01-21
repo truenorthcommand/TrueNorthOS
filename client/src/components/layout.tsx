@@ -181,23 +181,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
         collapsed ? "justify-center" : "px-2"
       )}>
         {!collapsed && (
-          <div className="flex items-center gap-3">
-            <img 
-              src="/logo-tradehub.png" 
-              alt="TradeHub Pro" 
-              className="h-10 w-10 object-contain"
-            />
-            <div className="flex flex-col">
-              <span className="text-xl font-bold text-white tracking-tight leading-tight">TradeHub Pro</span>
-              <span className="text-xs text-slate-400 leading-tight">Powered by TrueNorth OS</span>
-            </div>
-          </div>
+          <img 
+            src="/logo-foreman.png" 
+            alt="FOREMAN - Keeping operations on track" 
+            className="h-12 w-auto object-contain"
+          />
         )}
         {collapsed && (
           <img 
-            src="/logo-tradehub.png" 
-            alt="TradeHub Pro" 
-            className="h-8 w-8 object-contain"
+            src="/logo-foreman.png" 
+            alt="FOREMAN" 
+            className="h-8 w-auto object-contain"
           />
         )}
       </div>
@@ -531,17 +525,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </SheetContent>
             </Sheet>
             
-            <div className="flex items-center gap-2">
-              <img 
-                src="/logo-tradehub.png" 
-                alt="TradeHub Pro" 
-                className="h-8 w-8 object-contain"
-              />
-              <div className="flex flex-col">
-                <span className="text-lg font-bold text-white leading-tight">TradeHub Pro</span>
-                <span className="text-[10px] text-slate-400 leading-tight">Powered by TrueNorth OS</span>
-              </div>
-            </div>
+            <img 
+              src="/logo-foreman.png" 
+              alt="FOREMAN - Keeping operations on track" 
+              className="h-10 w-auto object-contain"
+            />
 
             <div className="ml-auto flex items-center gap-2">
               <button 
