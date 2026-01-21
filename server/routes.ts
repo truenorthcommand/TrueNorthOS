@@ -8584,6 +8584,123 @@ Be concise and practical. Focus on real issues that affect the business.`;
     }
   });
 
+  // Seed default form templates
+  app.post("/api/forms/seed-templates", requireAuth, async (req, res) => {
+    try {
+      const existingTemplates = await storage.getFormTemplates();
+      if (existingTemplates.length > 0) {
+        return res.json({ message: "Templates already exist", count: existingTemplates.length });
+      }
+
+      const defaultTemplates = [
+        {
+          name: "Job Sheet",
+          type: "job_sheet" as const,
+          schema: {
+            name: "Job Sheet",
+            style: "clean",
+            fields: [
+              { type: "text" as const, key: "job_ref", label: "Job Reference", required: true, prefill: "job.ref" },
+              { type: "text" as const, key: "customer_name", label: "Customer Name", required: true, prefill: "client.name" },
+              { type: "text" as const, key: "address", label: "Site Address", required: true, prefill: "job.address" },
+              { type: "date" as const, key: "date", label: "Date", required: true },
+              { type: "textarea" as const, key: "work_description", label: "Work Description", required: true },
+              { type: "textarea" as const, key: "materials_used", label: "Materials Used", required: false },
+              { type: "number" as const, key: "time_spent", label: "Time Spent (hours)", required: true },
+              { type: "textarea" as const, key: "notes", label: "Additional Notes", required: false },
+              { type: "photo" as const, key: "photos", label: "Site Photos", required: false, multiple: true },
+            ]
+          }
+        },
+        {
+          name: "Client Creation Form",
+          type: "client_form" as const,
+          schema: {
+            name: "Client Creation Form",
+            style: "clean",
+            fields: [
+              { type: "text" as const, key: "company_name", label: "Company/Client Name", required: true },
+              { type: "text" as const, key: "contact_name", label: "Primary Contact Name", required: true },
+              { type: "text" as const, key: "email", label: "Email Address", required: true },
+              { type: "text" as const, key: "phone", label: "Phone Number", required: true },
+              { type: "textarea" as const, key: "address", label: "Address", required: true },
+              { type: "text" as const, key: "postcode", label: "Postcode", required: true },
+              { type: "select" as const, key: "client_type", label: "Client Type", required: true, options: [
+                { label: "Domestic", value: "domestic" },
+                { label: "Commercial", value: "commercial" },
+                { label: "Industrial", value: "industrial" }
+              ]},
+              { type: "textarea" as const, key: "notes", label: "Notes", required: false },
+            ]
+          }
+        },
+        {
+          name: "Quote Sheet",
+          type: "quote_sheet" as const,
+          schema: {
+            name: "Quote Sheet",
+            style: "clean",
+            fields: [
+              { type: "text" as const, key: "quote_ref", label: "Quote Reference", required: true, prefill: "quote.number" },
+              { type: "text" as const, key: "client_name", label: "Client Name", required: true, prefill: "client.name" },
+              { type: "date" as const, key: "date", label: "Quote Date", required: true },
+              { type: "date" as const, key: "valid_until", label: "Valid Until", required: true },
+              { type: "textarea" as const, key: "scope_of_work", label: "Scope of Work", required: true },
+              { type: "number" as const, key: "labour_cost", label: "Labour Cost (£)", required: true },
+              { type: "number" as const, key: "materials_cost", label: "Materials Cost (£)", required: true },
+              { type: "number" as const, key: "total", label: "Total (£)", required: true },
+              { type: "textarea" as const, key: "terms", label: "Terms & Conditions", required: false },
+            ]
+          }
+        },
+        {
+          name: "Job Sign-off Form",
+          type: "signoff" as const,
+          schema: {
+            name: "Job Sign-off Form",
+            style: "clean",
+            fields: [
+              { type: "text" as const, key: "job_ref", label: "Job Reference", required: true, prefill: "job.ref" },
+              { type: "text" as const, key: "customer_name", label: "Customer Name", required: true, prefill: "client.name" },
+              { type: "date" as const, key: "completion_date", label: "Completion Date", required: true },
+              { type: "yesno" as const, key: "work_completed", label: "All work completed satisfactorily?", required: true },
+              { type: "yesno" as const, key: "site_clean", label: "Site left clean and tidy?", required: true },
+              { type: "textarea" as const, key: "customer_comments", label: "Customer Comments", required: false },
+              { type: "photo" as const, key: "completion_photos", label: "Completion Photos", required: true, multiple: true },
+              { type: "signature" as const, key: "engineer_signature", label: "Engineer Signature", required: true },
+              { type: "signature" as const, key: "customer_signature", label: "Customer Signature", required: true },
+            ]
+          }
+        }
+      ];
+
+      const createdTemplates = [];
+      for (const template of defaultTemplates) {
+        const created = await storage.createFormTemplate({
+          name: template.name,
+          type: template.type,
+          status: 'published',
+          createdBy: req.session.userId || null,
+        });
+        
+        await storage.createFormTemplateVersion({
+          templateId: created.id,
+          version: 1,
+          schema: template.schema,
+          status: 'published',
+          publishedAt: new Date().toISOString(),
+        });
+        
+        createdTemplates.push(created);
+      }
+
+      res.status(201).json({ message: "Templates seeded", templates: createdTemplates });
+    } catch (error) {
+      console.error("Error seeding form templates:", error);
+      res.status(500).json({ error: "Failed to seed form templates" });
+    }
+  });
+
   // Get published templates for filling (available to all authenticated users)
   app.get("/api/forms/published-templates", requireAuth, async (req, res) => {
     try {
