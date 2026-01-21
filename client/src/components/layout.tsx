@@ -417,7 +417,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <>
               <NavLink href="/payments" icon={CreditCard}>Payments</NavLink>
               <NavLink href="/analytics" icon={PieChart}>Analytics</NavLink>
-              <NavLink href="/directors" icon={Crown}>Directors Suite</NavLink>
+              {(user?.superAdmin || user?.hasDirectorsSuite) && (
+                <NavLink href="/directors" icon={Crown}>Directors Suite</NavLink>
+              )}
             </>
           )}
         </MenuGroup>

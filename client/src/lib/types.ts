@@ -15,6 +15,7 @@ export type User = {
   roles?: Role[];
   username?: string;
   superAdmin?: boolean;
+  hasDirectorsSuite?: boolean;
   twoFactorEnabled?: boolean;
   currentLat?: number;
   currentLng?: number;

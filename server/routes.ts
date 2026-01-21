@@ -106,6 +106,20 @@ const requireSuperAdmin = async (req: Request, res: Response, next: NextFunction
   next();
 };
 
+const requireDirectorsSuite = async (req: Request, res: Response, next: NextFunction) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  const user = await storage.getUser(req.session.userId);
+  if (!user) {
+    return res.status(401).json({ error: "User not found" });
+  }
+  if (user.superAdmin || user.hasDirectorsSuite) {
+    return next();
+  }
+  return res.status(403).json({ error: "Directors Suite access required" });
+};
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -276,6 +290,7 @@ export async function registerRoutes(
         skills: userSkills,
         username: user.username,
         superAdmin: user.superAdmin,
+        hasDirectorsSuite: user.hasDirectorsSuite,
         twoFactorEnabled: user.twoFactorEnabled,
       });
     } catch (error) {
@@ -6600,7 +6615,7 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
 
   // ==================== DIRECTORS SUITE ====================
 
-  app.get("/api/directors/dashboard", requireAdmin, async (req, res) => {
+  app.get("/api/directors/dashboard", requireDirectorsSuite, async (req, res) => {
     try {
       const now = new Date();
       const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
