@@ -120,6 +120,7 @@ export default function SetupPage() {
               <Settings className="h-8 w-8 text-primary" />
             </div>
             <CardTitle className="text-2xl">TradeHub Pro Setup</CardTitle>
+            <p className="text-xs text-muted-foreground mb-2">Powered by TrueNorth OS</p>
             <CardDescription>
               Choose how to set up your admin access
             </CardDescription>

@@ -559,7 +559,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 alt="TradeHub Pro" 
                 className="h-8 w-8 object-contain"
               />
-              <span className="text-lg font-bold text-white leading-tight">TradeHub Pro</span>
+              <div className="flex flex-col">
+                <span className="text-lg font-bold text-white leading-tight">TradeHub Pro</span>
+                <span className="text-[10px] text-slate-400 leading-tight">Powered by TrueNorth OS</span>
+              </div>
             </div>
 
             <div className="ml-auto flex items-center gap-2">
