@@ -1,11 +1,11 @@
 {
-  "name": "Pro Main Solutions",
-  "short_name": "Pro Main",
-  "description": "Professional field service management. Powered By TrueNorth Operations Group.",
+  "name": "TradeHub Pro",
+  "short_name": "TradeHub",
+  "description": "Complete field service management platform. Powered by TrueNorth OS.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#1e40af",
+  "theme_color": "#0F2B4C",
   "orientation": "portrait-primary",
   "icons": [
     {

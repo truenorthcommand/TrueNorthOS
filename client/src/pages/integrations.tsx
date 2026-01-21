@@ -179,7 +179,7 @@ export default function Integrations() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: NAVY_PRIMARY }}>Integrations</h1>
-          <p className="text-gray-500 mt-1">Connect TrueNorth Trade OS with external services</p>
+          <p className="text-gray-500 mt-1">Connect TradeHub Pro with external services</p>
         </div>
       </div>
 

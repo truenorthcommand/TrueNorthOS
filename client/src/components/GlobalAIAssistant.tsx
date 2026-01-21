@@ -422,10 +422,10 @@ export function GlobalAIAssistant() {
             <Sparkles className="h-5 w-5 text-white" />
           )}
           <span className="font-semibold text-white">
-            {showHistory ? "Chat History" : "TrueNorth AI"}
+            {showHistory ? "Chat History" : "TradeHub AI"}
           </span>
           {!showHistory && (
-            <span className="text-xs text-blue-200 hidden sm:inline">
+            <span className="text-xs text-white/70 hidden sm:inline">
               {currentConversationId ? "Remembers your chats" : "Your intelligent assistant"}
             </span>
           )}

@@ -183,20 +183,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {!collapsed && (
           <div className="flex items-center gap-3">
             <img 
-              src="/logo-truenorth.png" 
-              alt="TrueNorth Operations Group" 
+              src="/logo-tradehub.png" 
+              alt="TradeHub Pro" 
               className="h-10 w-10 object-contain"
             />
             <div className="flex flex-col">
-              <span className="text-xl font-bold text-white tracking-tight leading-tight">TrueNorth</span>
-              <span className="text-xs text-slate-400 leading-tight">Trade OS</span>
+              <span className="text-xl font-bold text-white tracking-tight leading-tight">TradeHub Pro</span>
+              <span className="text-xs text-slate-400 leading-tight">Powered by TrueNorth OS</span>
             </div>
           </div>
         )}
         {collapsed && (
           <img 
-            src="/logo-truenorth.png" 
-            alt="TrueNorth" 
+            src="/logo-tradehub.png" 
+            alt="TradeHub Pro" 
             className="h-8 w-8 object-contain"
           />
         )}
@@ -555,12 +555,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
             
             <div className="flex items-center gap-2">
               <img 
-                src="/logo-truenorth.png" 
-                alt="TrueNorth Operations Group" 
+                src="/logo-tradehub.png" 
+                alt="TradeHub Pro" 
                 className="h-8 w-8 object-contain"
               />
-              <span className="text-lg font-bold text-white leading-tight">TrueNorth</span>
-              <span className="text-xs text-slate-400">Trade OS</span>
+              <span className="text-lg font-bold text-white leading-tight">TradeHub Pro</span>
             </div>
 
             <div className="ml-auto flex items-center gap-2">

@@ -49,14 +49,14 @@ export default function Login() {
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <img 
-              src="/logo-truenorth.png" 
-              alt="TrueNorth Operations Group" 
+              src="/logo-tradehub.png" 
+              alt="TradeHub Pro" 
               className="h-16 w-auto object-contain"
             />
           </div>
-          <CardTitle className="text-2xl font-bold">TrueNorth Trade OS</CardTitle>
+          <CardTitle className="text-2xl font-bold">TradeHub Pro</CardTitle>
           <CardDescription>
-            {requires2FA ? "Enter your authentication code" : "TrueNorth Operations Group"}
+            {requires2FA ? "Enter your authentication code" : "Powered by TrueNorth OS"}
           </CardDescription>
         </CardHeader>
         <CardContent>
