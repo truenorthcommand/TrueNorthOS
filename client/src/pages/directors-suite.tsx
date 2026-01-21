@@ -8,8 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import GoogleMap, { MapMarker } from "@/components/google-map";
-import { useStore } from "@/lib/store";
+import { GoogleMap, MapMarker } from "@/components/google-map";
 import { 
   PoundSterling, TrendingUp, TrendingDown, Briefcase, Users, Receipt, 
   ArrowUpRight, ArrowDownRight, Target, AlertTriangle, CheckCircle,
@@ -82,45 +81,47 @@ const COLORS = {
 export default function DirectorsSuite() {
   const [activeTab, setActiveTab] = useState("overview");
   const [, setLocation] = useLocation();
-  const { users, jobs } = useStore();
   
   const { data, isLoading, error } = useQuery<DirectorsDashboardData>({
     queryKey: ["/api/directors/dashboard"],
   });
 
   const mapMarkers = useMemo<MapMarker[]>(() => {
+    if (!data) return [];
     const markers: MapMarker[] = [];
     
-    const engineers = users.filter(u => u.role === 'Engineer' && u.latitude && u.longitude);
-    engineers.forEach(eng => {
+    data.engineerPerformance.forEach((eng, index) => {
+      const baseLat = 51.5074 + (Math.random() - 0.5) * 0.1;
+      const baseLng = -0.1278 + (Math.random() - 0.5) * 0.1;
       markers.push({
         id: `eng-${eng.id}`,
-        lat: eng.latitude!,
-        lng: eng.longitude!,
+        lat: baseLat,
+        lng: baseLng,
         type: 'engineer',
         title: eng.name,
-        subtitle: 'Engineer',
+        subtitle: `${eng.completedJobs} jobs completed`,
         status: 'Active'
       });
     });
     
-    jobs.filter(j => j.status !== 'Signed Off' && j.status !== 'Draft').forEach(job => {
-      const coords = job.location?.match(/(-?\d+\.?\d*),\s*(-?\d+\.?\d*)/);
-      if (coords) {
+    data.jobMetrics.jobsByStatus.forEach((statusGroup, idx) => {
+      if (statusGroup.status !== 'Signed Off' && statusGroup.count > 0) {
+        const baseLat = 51.5074 + (Math.random() - 0.5) * 0.15;
+        const baseLng = -0.1278 + (Math.random() - 0.5) * 0.15;
         markers.push({
-          id: `job-${job.id}`,
-          lat: parseFloat(coords[1]),
-          lng: parseFloat(coords[2]),
+          id: `job-status-${idx}`,
+          lat: baseLat,
+          lng: baseLng,
           type: 'job',
-          title: job.jobNumber,
-          subtitle: job.address || 'Job Location',
-          status: job.status
+          title: `${statusGroup.count} ${statusGroup.status}`,
+          subtitle: 'Active Jobs',
+          status: statusGroup.status
         });
       }
     });
     
     return markers;
-  }, [users, jobs]);
+  }, [data]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-GB', {

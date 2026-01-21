@@ -2,12 +2,13 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 
-interface BackButtonProps {
+export interface BackButtonProps {
   fallbackPath?: string;
   label?: string;
+  className?: string;
 }
 
-export function BackButton({ fallbackPath = "/", label }: BackButtonProps) {
+export function BackButton({ fallbackPath = "/", label, className }: BackButtonProps) {
   const [, setLocation] = useLocation();
   
   const handleBack = () => {
@@ -24,6 +25,7 @@ export function BackButton({ fallbackPath = "/", label }: BackButtonProps) {
       size={label ? "sm" : "icon"}
       onClick={handleBack}
       data-testid="button-back"
+      className={className}
     >
       <ArrowLeft className="h-4 w-4" />
       {label && <span className="ml-2">{label}</span>}
