@@ -62,7 +62,7 @@ const PORTAL_CONFIGS: PortalConfig[] = [
     description: 'Executive dashboards and business analytics',
     path: '/directors',
     icon: Crown,
-    gradient: 'from-amber-500 to-amber-700',
+    gradient: 'from-slate-900 via-slate-800 to-amber-900',
   },
 ];
 
