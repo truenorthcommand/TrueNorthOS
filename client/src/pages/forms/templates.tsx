@@ -254,7 +254,18 @@ export default function FormTemplates() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredTemplates.map((template) => (
-            <Card key={template.id} className="hover:shadow-md transition-shadow" data-testid={`card-template-${template.id}`}>
+            <Card 
+              key={template.id} 
+              className="hover:shadow-md transition-shadow cursor-pointer" 
+              data-testid={`card-template-${template.id}`}
+              onClick={() => {
+                if (template.status === "draft") {
+                  setLocation(`/forms/builder/${template.id}`);
+                } else if (template.latestVersion) {
+                  setLocation(`/forms/fill/${template.latestVersion.id}`);
+                }
+              }}
+            >
               <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                 <div className="space-y-1">
                   <CardTitle className="text-base font-semibold">{template.name}</CardTitle>
@@ -262,7 +273,13 @@ export default function FormTemplates() {
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" data-testid={`button-menu-${template.id}`}>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8" 
+                      data-testid={`button-menu-${template.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
