@@ -184,14 +184,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <img 
             src="/logo-foreman.png" 
             alt="FOREMAN - Keeping operations on track" 
-            className="h-12 w-auto object-contain"
+            className="w-full max-w-[180px] h-auto object-contain mx-auto"
           />
         )}
         {collapsed && (
           <img 
             src="/logo-foreman.png" 
             alt="FOREMAN" 
-            className="h-8 w-auto object-contain"
+            className="w-10 h-10 object-cover mx-auto"
           />
         )}
       </div>
@@ -534,7 +534,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <img 
               src="/logo-foreman.png" 
               alt="FOREMAN - Keeping operations on track" 
-              className="h-10 w-auto object-contain"
+              className="h-10 max-w-[140px] w-auto object-contain"
             />
 
             <div className="ml-auto flex items-center gap-2">
