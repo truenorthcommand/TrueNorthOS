@@ -926,7 +926,7 @@ export async function registerRoutes(
         return res.status(403).json({ error: "Cannot demote a super admin" });
       }
 
-      const { name, email, phone, tabletNumber, username, password, role, roles, addressLine1, addressLine2, city, county, homePostcode, dayRate } = req.body;
+      const { name, email, phone, tabletNumber, username, password, role, roles, addressLine1, addressLine2, city, county, homePostcode, dayRate, hasDirectorsSuite } = req.body;
       const updates: Record<string, any> = {};
 
       if (name) updates.name = name;
@@ -958,6 +958,7 @@ export async function registerRoutes(
       if (county !== undefined) updates.county = county || null;
       if (homePostcode !== undefined) updates.homePostcode = homePostcode || null;
       if (dayRate !== undefined) updates.dayRate = dayRate || null;
+      if (hasDirectorsSuite !== undefined) updates.hasDirectorsSuite = !!hasDirectorsSuite;
 
       const updatedUser = await storage.updateUser(req.params.id, updates);
       res.json({
@@ -970,6 +971,7 @@ export async function registerRoutes(
         roles: updatedUser!.roles,
         username: updatedUser!.username,
         dayRate: updatedUser!.dayRate,
+        hasDirectorsSuite: updatedUser!.hasDirectorsSuite,
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to update user" });

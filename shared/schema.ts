@@ -14,6 +14,7 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("engineer"),
   roles: jsonb("roles").default(["engineer"]),
   superAdmin: boolean("super_admin").notNull().default(false),
+  hasDirectorsSuite: boolean("has_directors_suite").notNull().default(false),
   status: text("status").notNull().default("active"),
   managerId: varchar("manager_id"),
   addressLine1: text("address_line_1"),
