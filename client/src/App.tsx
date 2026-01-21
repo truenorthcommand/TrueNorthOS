@@ -77,6 +77,10 @@ import BigChangeDashboardDemo from "@/pages/bigchange-dashboard-demo";
 import PitchInvestor from "@/pages/pitch-investor";
 import PitchSales from "@/pages/pitch-sales";
 import PitchOnePager from "@/pages/pitch-onepager";
+import FormTemplates from "@/pages/forms/templates";
+import FormBuilder from "@/pages/forms/builder";
+import FormFill from "@/pages/forms/fill";
+import FormSubmissions from "@/pages/forms/submissions";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -276,6 +280,18 @@ function Router() {
       </Route>
       <Route path="/outlook-inbox">
         <PrivateRoute component={OutlookInbox} />
+      </Route>
+      <Route path="/forms/templates">
+        <PrivateRoute component={FormTemplates} />
+      </Route>
+      <Route path="/forms/builder/:id">
+        <PrivateRoute component={FormBuilder} />
+      </Route>
+      <Route path="/forms/fill/:versionId">
+        <PrivateRoute component={FormFill} />
+      </Route>
+      <Route path="/forms/submissions">
+        <PrivateRoute component={FormSubmissions} />
       </Route>
       <Route path="/">
         <PrivateRoute component={Dashboard} />

@@ -8363,7 +8363,7 @@ Be concise and practical. Focus on real issues that affect the business.`;
         await storage.createFormTemplateVersion({
           templateId: duplicate.id,
           version: 1,
-          schema: latestVersion.schema,
+          schema: latestVersion.schema as Record<string, unknown>,
         });
       }
       
