@@ -130,6 +130,9 @@ function Router() {
       <Route path="/clients">
         <PrivateRoute component={Clients} />
       </Route>
+      <Route path="/create-job-sheet">
+        <PrivateRoute component={Clients} />
+      </Route>
       <Route path="/engineers">
         <PrivateRoute component={Engineers} />
       </Route>

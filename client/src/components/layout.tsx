@@ -245,42 +245,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Clients - Admin & Surveyor */}
         {hasRole(user, 'admin', 'surveyor') && (
-          collapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link href="/clients">
-                  <button
-                    className={cn(
-                      "w-10 h-10 flex items-center justify-center rounded-lg transition-colors",
-                      location === "/clients" 
-                        ? "bg-white/15 text-white" 
-                        : "text-slate-300 hover:bg-white/10 hover:text-white"
-                    )}
-                    data-testid="nav-clients"
-                  >
-                    <Building2Icon className="h-5 w-5" />
-                  </button>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">Clients</TooltipContent>
-            </Tooltip>
-          ) : (
-            <Link href="/clients">
-              <button
-                className={cn(
-                  "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors",
-                  location === "/clients" 
-                    ? "bg-white/15 text-white" 
-                    : "text-slate-300 hover:bg-white/10 hover:text-white"
-                )}
-                onClick={() => setIsOpen(false)}
-                data-testid="nav-clients"
-              >
-                <Building2Icon className="h-5 w-5" />
-                Clients
-              </button>
-            </Link>
-          )
+          <MenuGroup title="Clients" icon={Building2Icon} section="clients">
+            <NavLink href="/clients" icon={Building2Icon}>Manage Clients</NavLink>
+          </MenuGroup>
         )}
 
         {/* Email - Admin Only */}
@@ -335,6 +302,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Jobs Section (Quotes convert to Jobs) */}
         <MenuGroup title="Jobs" icon={Briefcase} section="jobs">
+          {hasRole(user, 'admin', 'surveyor') && (
+            <NavLink href="/create-job-sheet" icon={FileText}>Create Job Sheet</NavLink>
+          )}
           <NavLink href="/jobs" icon={Briefcase}>Jobs List</NavLink>
           {hasRole(user, 'admin') && (
             <NavLink href="/completed-jobs" icon={CheckCircle2}>Completed Jobs</NavLink>

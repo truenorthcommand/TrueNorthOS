@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AITextarea } from "@/components/ui/ai-assist";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search, User, Phone, Mail, Star, Edit2, ChevronRight, ChevronLeft, Check, Home, Save, Upload, ExternalLink, FolderOpen, Image, FileSpreadsheet, File, Loader2, Sparkles, Briefcase, AlertCircle, Users, Calendar, Link2, Copy } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -75,7 +74,8 @@ const STEP_TITLES = [
 export default function Clients() {
   const { user } = useAuth();
   const { addJob } = useStore();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  const isCreateJobSheetRoute = location === "/create-job-sheet";
   const { toast } = useToast();
   
   const [clients, setClients] = useState<Client[]>([]);
@@ -1439,19 +1439,18 @@ export default function Clients() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Clients</h1>
+        <h1 className="text-3xl font-bold tracking-tight">
+          {isCreateJobSheetRoute ? "Create Job Sheet" : "Manage Clients"}
+        </h1>
         <p className="text-muted-foreground">
-          Manage service providers and create job sheets
+          {isCreateJobSheetRoute 
+            ? "Create a new job sheet for a client" 
+            : "Manage your client database and contacts"}
         </p>
       </div>
 
-      <Tabs defaultValue="create-job" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
-          <TabsTrigger value="create-job" data-testid="tab-create-job">Create Job Sheet</TabsTrigger>
-          <TabsTrigger value="manage" data-testid="tab-manage-clients">Manage Clients</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="create-job" className="space-y-6 mt-6">
+      {isCreateJobSheetRoute ? (
+        <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1517,9 +1516,9 @@ export default function Clients() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="manage" className="space-y-6 mt-6">
+        </div>
+      ) : (
+        <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Add New Client</CardTitle>
@@ -2338,8 +2337,8 @@ export default function Clients() {
               <p>No clients match your search.</p>
             </div>
           )}
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
 
       {/* Portal Link Dialog */}
       <Dialog open={portalDialogOpen} onOpenChange={setPortalDialogOpen}>
