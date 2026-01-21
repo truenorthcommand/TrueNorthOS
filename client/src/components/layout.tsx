@@ -435,6 +435,47 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <NavLink href="/settings" icon={Settings}>Business Settings</NavLink>
           )}
           <NavLink href="/user-guide" icon={BookOpen}>Help Guide</NavLink>
+          {!collapsed ? (
+            <button
+              onClick={async () => {
+                try {
+                  const cacheNames = await caches.keys();
+                  await Promise.all(cacheNames.map(name => caches.delete(name)));
+                  localStorage.setItem('appVersion', '');
+                  window.location.reload();
+                } catch (error) {
+                  window.location.reload();
+                }
+              }}
+              className="flex items-center gap-3 px-3 py-2 text-sm rounded-lg text-slate-300 hover:bg-white/10 hover:text-white transition-colors w-full"
+              data-testid="button-clear-cache-sidebar"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Clear Cache
+            </button>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={async () => {
+                    try {
+                      const cacheNames = await caches.keys();
+                      await Promise.all(cacheNames.map(name => caches.delete(name)));
+                      localStorage.setItem('appVersion', '');
+                      window.location.reload();
+                    } catch (error) {
+                      window.location.reload();
+                    }
+                  }}
+                  className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+                  data-testid="button-clear-cache-sidebar-collapsed"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Clear Cache</TooltipContent>
+            </Tooltip>
+          )}
         </MenuGroup>
       </nav>
 
