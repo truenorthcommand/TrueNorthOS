@@ -8258,7 +8258,14 @@ Be concise and practical. Focus on real issues that affect the business.`;
   app.get("/api/forms/templates", requireAdmin, async (req, res) => {
     try {
       const templates = await storage.getFormTemplates();
-      res.json(templates);
+      // Include latest version for each template
+      const templatesWithVersions = await Promise.all(
+        templates.map(async (template) => {
+          const latestVersion = await storage.getLatestPublishedVersion(template.id);
+          return { ...template, latestVersion };
+        })
+      );
+      res.json(templatesWithVersions);
     } catch (error) {
       console.error("Error fetching form templates:", error);
       res.status(500).json({ error: "Failed to fetch form templates" });
