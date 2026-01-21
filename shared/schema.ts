@@ -1503,3 +1503,115 @@ export type RewardType =
 
 // Export OAuth sessions table from auth module
 export * from "./models/auth";
+
+// ===== FORMS SYSTEM =====
+
+export const formTemplates = pgTable("form_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  type: text("type").notNull().default("job_sheet"), // job_sheet | client_form | quote_sheet | signoff
+  status: text("status").notNull().default("draft"), // draft | published | archived
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFormTemplateSchema = createInsertSchema(formTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFormTemplate = z.infer<typeof insertFormTemplateSchema>;
+export type FormTemplate = typeof formTemplates.$inferSelect;
+
+export const formTemplateVersions = pgTable("form_template_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: varchar("template_id").notNull(),
+  version: integer("version").notNull().default(1),
+  schema: jsonb("schema").notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  publishedAt: timestamp("published_at"),
+});
+
+export const insertFormTemplateVersionSchema = createInsertSchema(formTemplateVersions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFormTemplateVersion = z.infer<typeof insertFormTemplateVersionSchema>;
+export type FormTemplateVersion = typeof formTemplateVersions.$inferSelect;
+
+export const formSubmissions = pgTable("form_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateVersionId: varchar("template_version_id").notNull(),
+  entityType: text("entity_type").notNull(), // job | client | quote
+  entityId: varchar("entity_id").notNull(),
+  submittedBy: varchar("submitted_by"),
+  status: text("status").notNull().default("draft"), // draft | submitted
+  data: jsonb("data").notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  submittedAt: timestamp("submitted_at"),
+});
+
+export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFormSubmission = z.infer<typeof insertFormSubmissionSchema>;
+export type FormSubmission = typeof formSubmissions.$inferSelect;
+
+export const formAssets = pgTable("form_assets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  submissionId: varchar("submission_id").notNull(),
+  fieldKey: text("field_key").notNull(),
+  assetType: text("asset_type").notNull(), // photo | signature
+  filePath: text("file_path").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFormAssetSchema = createInsertSchema(formAssets).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFormAsset = z.infer<typeof insertFormAssetSchema>;
+export type FormAsset = typeof formAssets.$inferSelect;
+
+// Form field schema for template builder
+export interface FormField {
+  type: "text" | "textarea" | "number" | "date" | "select" | "multiselect" | "checkbox" | "yesno" | "photo" | "signature" | "repeatable_group";
+  key: string;
+  label: string;
+  required?: boolean;
+  prefill?: string;
+  multiple?: boolean;
+  options?: { label: string; value: string }[];
+  fields?: FormField[]; // For repeatable_group
+}
+
+export const formFieldSchema: z.ZodType<FormField> = z.object({
+  type: z.enum([
+    "text", "textarea", "number", "date", "select", "multiselect",
+    "checkbox", "yesno", "photo", "signature", "repeatable_group"
+  ]),
+  key: z.string(),
+  label: z.string(),
+  required: z.boolean().optional().default(false),
+  prefill: z.string().optional(),
+  multiple: z.boolean().optional(),
+  options: z.array(z.object({
+    label: z.string(),
+    value: z.string(),
+  })).optional(),
+  fields: z.lazy(() => z.array(formFieldSchema)).optional(),
+});
+
+export const formSchemaDefinition = z.object({
+  name: z.string(),
+  style: z.string().optional().default("clean"),
+  fields: z.array(formFieldSchema),
+});
+
+export type FormSchemaDefinition = z.infer<typeof formSchemaDefinition>;

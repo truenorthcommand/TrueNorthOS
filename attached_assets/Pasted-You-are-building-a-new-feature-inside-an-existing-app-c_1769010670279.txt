@@ -1,0 +1,249 @@
+You are building a new feature inside an existing app called “Foreman”.
+
+The app already exists. You are adding a module.
+
+STACK (DO NOT CHANGE)
+Frontend:
+- React 19
+- TypeScript
+- Vite
+- Tailwind CSS
+- shadcn/ui
+- Wouter for routing
+- TanStack Query
+- @dnd-kit for drag & drop
+- Framer Motion
+
+Backend:
+- Node.js
+- Express
+- TypeScript
+
+Database:
+- PostgreSQL
+- Drizzle ORM
+
+Validation:
+- Zod
+
+GOAL
+Build a “Forms” system that allows admins to create customisable templates (job sheets, client forms, quote sheets, sign-off forms), and engineers to fill them in against Jobs, Clients, or Quotes.
+
+This must feel enterprise-grade, calm, and operational — not like a survey builder.
+
+---
+
+FEATURE SCOPE (MVP)
+
+1. Sidebar
+Add a new top-level nav item:
+- Forms
+  - Templates
+  - Submissions
+
+---
+
+2. Database Schema (Drizzle)
+
+Create the following tables using Drizzle ORM:
+
+form_templates
+- id (uuid, pk)
+- name (text)
+- type (enum: job_sheet | client_form | quote_sheet | signoff)
+- status (enum: draft | published | archived)
+- created_by (uuid)
+- created_at (timestamp)
+- updated_at (timestamp)
+
+form_template_versions
+- id (uuid, pk)
+- template_id (uuid, fk)
+- version (int)
+- schema (jsonb)
+- created_at (timestamp)
+- published_at (timestamp, nullable)
+
+form_submissions
+- id (uuid, pk)
+- template_version_id (uuid, fk)
+- entity_type (enum: job | client | quote)
+- entity_id (uuid)
+- submitted_by (uuid)
+- status (enum: draft | submitted)
+- data (jsonb)
+- created_at (timestamp)
+- submitted_at (timestamp, nullable)
+
+form_assets
+- id (uuid, pk)
+- submission_id (uuid, fk)
+- field_key (text)
+- asset_type (enum: photo | signature)
+- file_path (text)
+- created_at (timestamp)
+
+IMPORTANT:
+- Submissions MUST reference template_version_id, never template_id
+- Old submissions must never change if templates are edited
+
+---
+
+3. Template Schema Format (JSON)
+
+Each template version stores a JSON schema like:
+
+{
+  "name": "Job Sheet – Standard",
+  "style": "clean",
+  "fields": [
+    {
+      "type": "text",
+      "key": "job_ref",
+      "label": "Job Reference",
+      "required": true,
+      "prefill": "job.ref"
+    },
+    {
+      "type": "textarea",
+      "key": "work_done",
+      "label": "Work Completed",
+      "required": true
+    },
+    {
+      "type": "photo",
+      "key": "before_photos",
+      "label": "Before Photos",
+      "multiple": true
+    },
+    {
+      "type": "signature",
+      "key": "customer_signature",
+      "label": "Customer Signature",
+      "required": true
+    }
+  ]
+}
+
+Supported field types:
+- text
+- textarea
+- number
+- date
+- select
+- multiselect
+- checkbox
+- yesno
+- photo
+- signature
+- repeatable_group
+
+---
+
+4. Backend (Express)
+
+Create routes:
+
+GET /forms/templates
+GET /forms/templates/:id
+POST /forms/templates
+POST /forms/templates/:id/publish
+
+GET /forms/templates/:versionId/schema
+
+POST /forms/submissions
+GET /forms/submissions
+GET /forms/submissions/:id
+
+POST /forms/assets/upload
+
+Rules:
+- Publishing creates a new immutable template_version
+- Editing a template creates a new draft version
+- Only published versions are fillable
+
+Use Zod to validate:
+- Template schema
+- Submission payloads
+
+---
+
+5. Frontend Pages
+
+A) Templates List (Admin)
+- List templates
+- Show status
+- Buttons:
+  - New Template
+  - Duplicate
+  - Edit (draft only)
+  - Publish
+  - Archive
+
+B) Form Builder (Admin)
+- Drag & drop fields using @dnd-kit
+- Add / remove / reorder fields
+- Edit field settings in a side panel
+- Save as draft
+- Publish version
+
+C) Form Fill Page (Engineer)
+Route:
+- /forms/fill/:templateVersionId?entityType=job&entityId=UUID
+
+Behaviour:
+- Prefill from entity data (job/client/quote)
+- Mobile-first layout
+- Save draft
+- Submit
+- Upload photos
+- Capture signature (canvas)
+
+D) Submissions List
+- Filter by entity type
+- Open read-only view
+- Export PDF
+
+---
+
+6. PDF Export
+
+Generate a PDF for submitted forms:
+- Header: FOREMAN
+- Template name + version
+- Entity reference
+- Render all fields cleanly
+- Embed photos + signature
+
+Use client-side PDF generation unless server-side is easier.
+
+---
+
+7. UI Rules
+
+- Use shadcn/ui components
+- Match existing dashboard spacing and cards
+- No playful colours
+- No gimmicks
+- Everything calm and functional
+
+---
+
+8. Seed Data
+
+Create 4 default templates:
+- Job Sheet – Standard
+- Client Creation – Standard
+- Quote Sheet – Standard
+- Completion / Sign-off – Standard
+
+---
+
+OUTPUT REQUIRED
+- Full backend routes
+- Drizzle schema + migrations
+- React components
+- Folder structure
+- Minimal README
+
+Build the MVP now.
