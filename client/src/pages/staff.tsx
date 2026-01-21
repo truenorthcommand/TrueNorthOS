@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, User, Shield, Wrench, AlertCircle, Eye, EyeOff, Lock, KeyRound, Pencil, MapPin, Truck, X, Search, ChevronDown, ChevronRight, AlertTriangle, Mountain } from "lucide-react";
+import { Plus, Trash2, User, Shield, Wrench, AlertCircle, Eye, EyeOff, Lock, KeyRound, Pencil, MapPin, Truck, X, Search, ChevronDown, ChevronRight, AlertTriangle, Mountain, Crown } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -37,6 +37,7 @@ interface StaffMember {
   managerId?: string | null;
   workingAtHeight?: boolean;
   negativeSkillIds?: string[];
+  hasDirectorsSuite?: boolean;
 }
 
 interface WorksManager {
@@ -110,6 +111,7 @@ export default function Staff() {
     homePostcode: "",
     managerId: "" as string | null,
     dayRate: "" as string,
+    hasDirectorsSuite: false,
   });
   const [editSkills, setEditSkills] = useState<Skill[]>([]);
   const [newStaffSkills, setNewStaffSkills] = useState<Skill[]>([]);
@@ -586,6 +588,7 @@ export default function Staff() {
       homePostcode: member.homePostcode || "",
       managerId: member.managerId || null,
       dayRate: member.dayRate?.toString() || "",
+      hasDirectorsSuite: member.hasDirectorsSuite || false,
     });
     
     // Refresh skills, sub-skills, works managers, and vehicles when opening edit dialog
@@ -744,6 +747,7 @@ export default function Staff() {
         county: editForm.county || null,
         homePostcode: editForm.homePostcode || null,
         dayRate: editForm.dayRate ? parseFloat(editForm.dayRate) : null,
+        hasDirectorsSuite: editForm.hasDirectorsSuite,
       };
       
       if (editForm.password) {
@@ -1617,6 +1621,30 @@ export default function Staff() {
                   </p>
                 </div>
               )}
+
+              {/* Directors Suite Access - Only show for Super Admins */}
+              <div className="border-t pt-4">
+                <Label className="text-base font-medium mb-3 block flex items-center gap-2">
+                  <Crown className="h-4 w-4 text-amber-500" />
+                  Directors Suite Access
+                </Label>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="directors-suite"
+                    checked={editForm.hasDirectorsSuite}
+                    onCheckedChange={(checked) => {
+                      setEditForm({ ...editForm, hasDirectorsSuite: !!checked });
+                    }}
+                    data-testid="checkbox-directors-suite"
+                  />
+                  <Label htmlFor="directors-suite" className="cursor-pointer">
+                    Grant access to Directors Suite
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enable this to give the user access to executive dashboards and business analytics
+                </p>
+              </div>
 
               {/* Negative Skills - Only show for Super Admins */}
               {showNegativeSkillsSection && (
