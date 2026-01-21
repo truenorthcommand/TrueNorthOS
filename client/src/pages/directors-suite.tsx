@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -77,6 +78,7 @@ const COLORS = {
 
 export default function DirectorsSuite() {
   const [activeTab, setActiveTab] = useState("overview");
+  const [, setLocation] = useLocation();
   
   const { data, isLoading, error } = useQuery<DirectorsDashboardData>({
     queryKey: ["/api/directors/dashboard"],
@@ -137,6 +139,7 @@ export default function DirectorsSuite() {
           icon={PoundSterling}
           color={COLORS.success}
           testId="metric-revenue"
+          onClick={() => setLocation('/invoices')}
         />
         <MetricCard
           title="Profit Margin"
@@ -145,6 +148,7 @@ export default function DirectorsSuite() {
           icon={Percent}
           color={COLORS.primary}
           testId="metric-profit"
+          onClick={() => setLocation('/invoices')}
         />
         <MetricCard
           title="Outstanding Invoices"
@@ -153,6 +157,7 @@ export default function DirectorsSuite() {
           icon={Receipt}
           color={data.summary.overdueInvoices > 0 ? COLORS.warning : COLORS.info}
           testId="metric-outstanding"
+          onClick={() => setLocation('/invoices')}
         />
         <MetricCard
           title="Active Jobs"
@@ -161,6 +166,7 @@ export default function DirectorsSuite() {
           icon={Briefcase}
           color={COLORS.info}
           testId="metric-jobs"
+          onClick={() => setLocation('/jobs')}
         />
       </div>
 
@@ -186,7 +192,13 @@ export default function DirectorsSuite() {
 
         <TabsContent value="overview" className="space-y-6">
           <div className="grid lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2">
+            <Card 
+              className="lg:col-span-2 cursor-pointer hover:shadow-md transition-shadow" 
+              onClick={() => setLocation('/invoices')}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && setLocation('/invoices')}
+            >
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <TrendingUp className="w-5 h-5 text-[#0F2B4C]" />
@@ -215,7 +227,7 @@ export default function DirectorsSuite() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation('/jobs')}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <PieChart className="w-5 h-5 text-[#0F2B4C]" />
@@ -266,31 +278,35 @@ export default function DirectorsSuite() {
               value={data.summary.totalClients}
               subtitle={`+${data.summary.newClientsThisMonth} this month`}
               icon={Building2}
+              onClick={() => setLocation('/clients')}
             />
             <QuickStatCard
               title="Team Size"
               value={data.summary.totalEngineers}
               subtitle="Active engineers"
               icon={Users}
+              onClick={() => setLocation('/staff')}
             />
             <QuickStatCard
               title="Avg Job Value"
               value={formatCurrency(data.summary.avgJobValue)}
               subtitle="Per completed job"
               icon={Target}
+              onClick={() => setLocation('/jobs')}
             />
             <QuickStatCard
               title="Completion Rate"
               value={`${data.jobMetrics.completionRate}%`}
               subtitle="Jobs completed on time"
               icon={CheckCircle}
+              onClick={() => setLocation('/jobs')}
             />
           </div>
         </TabsContent>
 
         <TabsContent value="financial" className="space-y-6">
           <div className="grid md:grid-cols-3 gap-4">
-            <Card className="border-l-4 border-l-green-500">
+            <Card className="border-l-4 border-l-green-500 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation('/invoices')}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -303,7 +319,7 @@ export default function DirectorsSuite() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-l-4 border-l-blue-500">
+            <Card className="border-l-4 border-l-blue-500 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation('/invoices')}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -316,7 +332,7 @@ export default function DirectorsSuite() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-l-4 border-l-amber-500">
+            <Card className="border-l-4 border-l-amber-500 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation('/expenses')}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -331,7 +347,7 @@ export default function DirectorsSuite() {
             </Card>
           </div>
 
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation('/invoices')}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="w-5 h-5 text-[#0F2B4C]" />
@@ -358,7 +374,7 @@ export default function DirectorsSuite() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation('/clients')}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-[#0F2B4C]" />
@@ -388,7 +404,7 @@ export default function DirectorsSuite() {
 
         <TabsContent value="operations" className="space-y-6">
           <div className="grid md:grid-cols-2 gap-6">
-            <Card>
+            <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation('/jobs')}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Activity className="w-5 h-5 text-[#0F2B4C]" />
@@ -464,7 +480,7 @@ export default function DirectorsSuite() {
         </TabsContent>
 
         <TabsContent value="team" className="space-y-6">
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation('/staff')}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-[#0F2B4C]" />
@@ -512,7 +528,8 @@ function MetricCard({
   subtitle, 
   icon: Icon, 
   color,
-  testId 
+  testId,
+  onClick
 }: { 
   title: string; 
   value: string; 
@@ -521,9 +538,17 @@ function MetricCard({
   icon: any; 
   color: string;
   testId: string;
+  onClick?: () => void;
 }) {
   return (
-    <Card data-testid={testId}>
+    <Card 
+      data-testid={testId} 
+      className={onClick ? "cursor-pointer hover:shadow-md transition-shadow" : ""}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => e.key === 'Enter' && onClick() : undefined}
+    >
       <CardContent className="p-4">
         <div className="flex items-start justify-between">
           <div className="p-2 rounded-lg" style={{ backgroundColor: `${color}20` }}>
@@ -545,9 +570,15 @@ function MetricCard({
   );
 }
 
-function QuickStatCard({ title, value, subtitle, icon: Icon }: { title: string; value: string | number; subtitle: string; icon: any }) {
+function QuickStatCard({ title, value, subtitle, icon: Icon, onClick }: { title: string; value: string | number; subtitle: string; icon: any; onClick?: () => void }) {
   return (
-    <Card>
+    <Card 
+      className={onClick ? "cursor-pointer hover:shadow-md transition-shadow" : ""}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => e.key === 'Enter' && onClick() : undefined}
+    >
       <CardContent className="p-4">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-[#0F2B4C]/10 rounded-lg">
