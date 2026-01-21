@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { BackButton } from "@/components/back-button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -117,11 +118,14 @@ export default function DirectorsSuite() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-[#0F2B4C]" data-testid="text-directors-title">
-            Directors Suite
-          </h1>
-          <p className="text-muted-foreground">Executive business intelligence and strategic insights</p>
+        <div className="flex items-center gap-4">
+          <BackButton fallbackPath="/" />
+          <div>
+            <h1 className="text-3xl font-bold text-[#0F2B4C]" data-testid="text-directors-title">
+              Directors Suite
+            </h1>
+            <p className="text-muted-foreground">Executive business intelligence and strategic insights</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-sm">

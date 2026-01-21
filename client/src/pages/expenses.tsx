@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Plus, CalendarIcon, Car, Package, Wrench, Fuel, Utensils, MoreHorizontal, Check, X, Loader2, Wallet, Camera, FileText, Image, FileSpreadsheet, File, Upload, ExternalLink, Trash2, Sparkles, Wand2 } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 import { ReceiptPhotoCapture } from "@/components/receipt-photo-capture";
 import { useUpload } from "@/hooks/use-upload";
 import { format, startOfMonth, endOfMonth } from "date-fns";
@@ -445,9 +446,12 @@ export default function Expenses() {
   return (
     <div className="container mx-auto p-4 pb-24 md:pb-4 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Expenses</h1>
-          <p className="text-muted-foreground">Track and manage your expenses</p>
+        <div className="flex items-center gap-4">
+          <BackButton fallbackPath="/" />
+          <div>
+            <h1 className="text-2xl font-bold">Expenses</h1>
+            <p className="text-muted-foreground">Track and manage your expenses</p>
+          </div>
         </div>
         <Dialog open={addExpenseOpen} onOpenChange={setAddExpenseOpen}>
           <DialogTrigger asChild>

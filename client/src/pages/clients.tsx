@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AITextarea } from "@/components/ui/ai-assist";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search, User, Phone, Mail, Star, Edit2, ChevronRight, ChevronLeft, Check, Home, Save, Upload, ExternalLink, FolderOpen, Image, FileSpreadsheet, File, Loader2, Sparkles, Briefcase, AlertCircle, Users, Calendar, Link2, Copy } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
@@ -1438,15 +1439,18 @@ export default function Clients() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          {isCreateJobSheetRoute ? "Create Job Sheet" : "Manage Clients"}
-        </h1>
-        <p className="text-muted-foreground">
-          {isCreateJobSheetRoute 
-            ? "Create a new job sheet for a client" 
-            : "Manage your client database and contacts"}
-        </p>
+      <div className="flex items-center gap-4">
+        <BackButton fallbackPath="/" />
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {isCreateJobSheetRoute ? "Create Job Sheet" : "Manage Clients"}
+          </h1>
+          <p className="text-muted-foreground">
+            {isCreateJobSheetRoute 
+              ? "Create a new job sheet for a client" 
+              : "Manage your client database and contacts"}
+          </p>
+        </div>
       </div>
 
       {isCreateJobSheetRoute ? (

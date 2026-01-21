@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Search, FileText, Send, CheckCircle, Clock, ArrowRight, Loader2, Plus } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -76,9 +77,12 @@ export default function Invoices() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Invoices</h1>
-          <p className="text-muted-foreground">Manage customer invoices and payments</p>
+        <div className="flex items-center gap-4">
+          <BackButton fallbackPath="/" />
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Invoices</h1>
+            <p className="text-muted-foreground">Manage customer invoices and payments</p>
+          </div>
         </div>
       </div>
 
