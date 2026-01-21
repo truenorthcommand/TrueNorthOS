@@ -549,6 +549,7 @@ export default function Clients() {
 
   const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
+    setCreatedPortalLink(null);
     try {
       const res = await fetch('/api/clients', {
         method: 'POST',
@@ -582,6 +583,12 @@ export default function Clients() {
             const portalData = await portalRes.json();
             portalUrl = `${window.location.origin}${portalData.portalUrl}`;
             setCreatedPortalLink(portalUrl);
+          } else {
+            toast({ 
+              title: "Portal Generation Failed", 
+              description: "Client was created but the portal link could not be generated. You can try again from the client settings.", 
+              variant: "destructive" 
+            });
           }
         }
         
