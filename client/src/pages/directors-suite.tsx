@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { BackButton } from "@/components/back-button";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { GoogleMap, MapMarker } from "@/components/google-map";
 import { 
   PoundSterling, TrendingUp, TrendingDown, Briefcase, Users, Receipt, 
   ArrowUpRight, ArrowDownRight, Target, AlertTriangle, CheckCircle,
@@ -84,6 +85,43 @@ export default function DirectorsSuite() {
   const { data, isLoading, error } = useQuery<DirectorsDashboardData>({
     queryKey: ["/api/directors/dashboard"],
   });
+
+  const mapMarkers = useMemo<MapMarker[]>(() => {
+    if (!data) return [];
+    const markers: MapMarker[] = [];
+    
+    data.engineerPerformance.forEach((eng, index) => {
+      const baseLat = 51.5074 + (index * 0.02) - 0.05;
+      const baseLng = -0.1278 + (index * 0.015) - 0.04;
+      markers.push({
+        id: `eng-${eng.id}`,
+        lat: baseLat,
+        lng: baseLng,
+        type: 'engineer',
+        title: eng.name,
+        subtitle: `${eng.completedJobs} jobs completed`,
+        status: 'Active'
+      });
+    });
+    
+    data.jobMetrics.jobsByStatus.forEach((statusGroup, idx) => {
+      if (statusGroup.status !== 'Signed Off' && statusGroup.count > 0) {
+        const baseLat = 51.52 + (idx * 0.018);
+        const baseLng = -0.11 + (idx * 0.02);
+        markers.push({
+          id: `job-status-${idx}`,
+          lat: baseLat,
+          lng: baseLng,
+          type: 'job',
+          title: `${statusGroup.count} ${statusGroup.status}`,
+          subtitle: 'Active Jobs',
+          status: statusGroup.status
+        });
+      }
+    });
+    
+    return markers;
+  }, [data]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-GB', {
@@ -328,32 +366,22 @@ export default function DirectorsSuite() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div 
-                className="rounded-lg overflow-hidden border border-slate-700 bg-slate-800 h-[350px] flex flex-col items-center justify-center cursor-pointer hover:bg-slate-700/50 transition-colors"
-                onClick={() => setLocation('/live-tracking')}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && setLocation('/live-tracking')}
-              >
-                <div className="relative w-full h-full flex items-center justify-center">
-                  <div className="absolute inset-0 opacity-20">
-                    <div className="w-full h-full bg-gradient-to-br from-blue-500/20 via-transparent to-emerald-500/20" />
-                  </div>
-                  <div className="text-center z-10">
-                    <MapPin className="w-16 h-16 text-blue-400 mx-auto mb-4 animate-pulse" />
-                    <p className="text-xl font-semibold text-white mb-2">View Live Tracking</p>
-                    <p className="text-slate-400 text-sm">Click to see real-time engineer locations</p>
-                    <div className="mt-6 flex items-center justify-center gap-8">
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-full bg-blue-500 animate-pulse" />
-                        <span className="text-slate-300">{data.summary.totalEngineers} Engineers</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-slate-300">{data.summary.activeJobs} Active Jobs</span>
-                      </div>
-                    </div>
-                  </div>
+              <div className="rounded-lg overflow-hidden border border-slate-700">
+                <GoogleMap
+                  markers={mapMarkers}
+                  height="350px"
+                  zoom={11}
+                  center={{ lat: 51.5074, lng: -0.1278 }}
+                />
+              </div>
+              <div className="mt-4 flex items-center gap-6 text-sm text-slate-300">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                  <span>Engineers ({mapMarkers.filter(m => m.type === 'engineer').length})</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                  <span>Active Jobs ({mapMarkers.filter(m => m.type === 'job').length})</span>
                 </div>
               </div>
             </CardContent>
