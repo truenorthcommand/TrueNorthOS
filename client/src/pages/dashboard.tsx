@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2, Pencil, Clock, Navigation, Briefcase, CheckCircle, LogIn, LogOut, Timer, Loader2, FileText, Receipt, Users, Wallet, TrendingUp, AlertCircle, Building2, Truck, Shield, ClipboardCheck, type LucideIcon } from "lucide-react";
+import { Plus, Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2, Pencil, Clock, Navigation, Briefcase, CheckCircle, LogIn, LogOut, Timer, Loader2, FileText, Receipt, Users, Wallet, TrendingUp, AlertCircle, Building2, Truck, Shield, ClipboardCheck, Crown, type LucideIcon } from "lucide-react";
 import { format, isToday, isTomorrow, isThisWeek, parseISO, formatDistanceToNow } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
@@ -56,11 +56,24 @@ const PORTAL_CONFIGS: PortalConfig[] = [
     icon: Wallet,
     gradient: 'from-green-600 to-green-800',
   },
+  {
+    role: 'director',
+    title: "Director's Suite",
+    description: 'Executive dashboards and business analytics',
+    path: '/directors-suite',
+    icon: Crown,
+    gradient: 'from-amber-500 to-amber-700',
+  },
 ];
 
 function RolePortals({ user, setLocation }: { user: any; setLocation: (path: string) => void }) {
   const userRoles = user.roles && user.roles.length > 0 ? user.roles : [user.role];
-  const availablePortals = PORTAL_CONFIGS.filter(portal => userRoles.includes(portal.role));
+  const availablePortals = PORTAL_CONFIGS.filter(portal => {
+    if (portal.role === 'director') {
+      return userRoles.includes('director') || user.hasDirectorsSuite;
+    }
+    return userRoles.includes(portal.role);
+  });
   
   if (availablePortals.length === 0) return null;
 
