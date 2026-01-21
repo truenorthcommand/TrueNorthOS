@@ -12,6 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
 import { ChevronLeft, ChevronRight, LayoutGrid, MapPin, Users, Gauge, User } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 import { format, isSameDay, parseISO, isValid, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 import { DndContext, DragEndEvent, DragOverEvent, DragOverlay, DragStartEvent, useSensor, useSensors, PointerSensor, TouchSensor, KeyboardSensor, useDroppable, pointerWithin, closestCenter, CollisionDetection } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
@@ -629,14 +630,17 @@ export default function PlannerPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <LayoutGrid className="h-8 w-8 text-primary" />
-            Planner Board
-          </h1>
-          <p className="text-muted-foreground">
-            Drag and drop jobs to schedule engineers
-          </p>
+        <div className="flex items-center gap-4">
+          <BackButton fallbackPath="/" />
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+              <LayoutGrid className="h-8 w-8 text-primary" />
+              Planner Board
+            </h1>
+            <p className="text-muted-foreground">
+              Drag and drop jobs to schedule engineers
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Dialog
