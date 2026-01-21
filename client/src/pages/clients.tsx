@@ -89,6 +89,8 @@ export default function Clients() {
     address: "",
     postcode: "",
   });
+  const [enableClientPortal, setEnableClientPortal] = useState(false);
+  const [createdPortalLink, setCreatedPortalLink] = useState<string | null>(null);
   const [newClientContacts, setNewClientContacts] = useState<Array<{
     name: string;
     email: string;
@@ -569,6 +571,20 @@ export default function Clients() {
           }
         }
         
+        // Generate portal token if enabled
+        let portalUrl = null;
+        if (enableClientPortal) {
+          const portalRes = await fetch(`/api/clients/${createdClient.id}/generate-portal-token`, {
+            method: 'POST',
+            credentials: 'include',
+          });
+          if (portalRes.ok) {
+            const portalData = await portalRes.json();
+            portalUrl = `${window.location.origin}${portalData.portalUrl}`;
+            setCreatedPortalLink(portalUrl);
+          }
+        }
+        
         setClients([...clients, createdClient]);
         setNewClient({
           name: "",
@@ -579,7 +595,16 @@ export default function Clients() {
           postcode: "",
         });
         setNewClientContacts([]);
-        toast({ title: "Success", description: "Client added successfully." });
+        setEnableClientPortal(false);
+        
+        if (portalUrl) {
+          toast({ 
+            title: "Client Created with Portal", 
+            description: "Client portal link has been generated. You can copy it below." 
+          });
+        } else {
+          toast({ title: "Success", description: "Client added successfully." });
+        }
       } else {
         toast({ title: "Error", description: "Failed to add client.", variant: "destructive" });
       }
@@ -1675,6 +1700,27 @@ export default function Clients() {
                   ))}
                 </div>
 
+                {/* Enable Client Portal Toggle */}
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="enable-portal" className="text-base font-medium flex items-center gap-2">
+                        <Link2 className="h-4 w-4 text-blue-600" />
+                        Enable Client Portal
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Generate a secure portal link for this client to view their quotes, invoices, and jobs
+                      </p>
+                    </div>
+                    <Switch
+                      id="enable-portal"
+                      checked={enableClientPortal}
+                      onCheckedChange={setEnableClientPortal}
+                      data-testid="switch-enable-client-portal"
+                    />
+                  </div>
+                </div>
+
                 <Button 
                   type="submit" 
                   className="w-full sm:w-auto" 
@@ -1684,6 +1730,49 @@ export default function Clients() {
                   Add Client
                 </Button>
               </form>
+
+              {/* Portal Link Display */}
+              {createdPortalLink && (
+                <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Link2 className="h-5 w-5 text-green-600" />
+                    <span className="font-medium text-green-800 dark:text-green-200">Client Portal Link Created</span>
+                  </div>
+                  <p className="text-sm text-green-700 dark:text-green-300 mb-3">
+                    Share this secure link with your client so they can access their portal:
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      value={createdPortalLink} 
+                      readOnly 
+                      className="bg-white dark:bg-slate-800 text-sm font-mono"
+                      data-testid="input-portal-link"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(createdPortalLink);
+                        toast({ title: "Copied!", description: "Portal link copied to clipboard." });
+                      }}
+                      data-testid="button-copy-portal-link"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 text-green-700 dark:text-green-300"
+                    onClick={() => setCreatedPortalLink(null)}
+                    data-testid="button-dismiss-portal-link"
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
