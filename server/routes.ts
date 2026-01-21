@@ -8252,5 +8252,358 @@ Be concise and practical. Focus on real issues that affect the business.`;
     }
   });
 
+  // ===== FORMS SYSTEM =====
+  
+  // Get all form templates
+  app.get("/api/forms/templates", requireAdmin, async (req, res) => {
+    try {
+      const templates = await storage.getFormTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching form templates:", error);
+      res.status(500).json({ error: "Failed to fetch form templates" });
+    }
+  });
+
+  // Get single form template
+  app.get("/api/forms/templates/:id", requireAuth, async (req, res) => {
+    try {
+      const template = await storage.getFormTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Error fetching form template:", error);
+      res.status(500).json({ error: "Failed to fetch form template" });
+    }
+  });
+
+  // Create form template
+  app.post("/api/forms/templates", requireAdmin, async (req, res) => {
+    try {
+      const { name, type } = req.body;
+      if (!name) {
+        return res.status(400).json({ error: "Template name is required" });
+      }
+      
+      const template = await storage.createFormTemplate({
+        name,
+        type: type || 'job_sheet',
+        status: 'draft',
+        createdBy: req.session.userId || null,
+      });
+      
+      // Create initial version with empty schema
+      await storage.createFormTemplateVersion({
+        templateId: template.id,
+        version: 1,
+        schema: { name, style: 'clean', fields: [] },
+      });
+      
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating form template:", error);
+      res.status(500).json({ error: "Failed to create form template" });
+    }
+  });
+
+  // Update form template
+  app.patch("/api/forms/templates/:id", requireAdmin, async (req, res) => {
+    try {
+      const { name, type, status } = req.body;
+      const template = await storage.updateFormTemplate(req.params.id, {
+        ...(name && { name }),
+        ...(type && { type }),
+        ...(status && { status }),
+      });
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating form template:", error);
+      res.status(500).json({ error: "Failed to update form template" });
+    }
+  });
+
+  // Delete form template
+  app.delete("/api/forms/templates/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteFormTemplate(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting form template:", error);
+      res.status(500).json({ error: "Failed to delete form template" });
+    }
+  });
+
+  // Duplicate form template
+  app.post("/api/forms/templates/:id/duplicate", requireAdmin, async (req, res) => {
+    try {
+      const original = await storage.getFormTemplate(req.params.id);
+      if (!original) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      
+      // Get the latest version schema
+      const versions = await storage.getFormTemplateVersions(req.params.id);
+      const latestVersion = versions[0];
+      
+      // Create duplicate
+      const duplicate = await storage.createFormTemplate({
+        name: `${original.name} (Copy)`,
+        type: original.type,
+        status: 'draft',
+        createdBy: req.session.userId || null,
+      });
+      
+      // Copy the schema from original
+      if (latestVersion) {
+        await storage.createFormTemplateVersion({
+          templateId: duplicate.id,
+          version: 1,
+          schema: latestVersion.schema,
+        });
+      }
+      
+      res.status(201).json(duplicate);
+    } catch (error) {
+      console.error("Error duplicating form template:", error);
+      res.status(500).json({ error: "Failed to duplicate form template" });
+    }
+  });
+
+  // Get template versions
+  app.get("/api/forms/templates/:id/versions", requireAuth, async (req, res) => {
+    try {
+      const versions = await storage.getFormTemplateVersions(req.params.id);
+      res.json(versions);
+    } catch (error) {
+      console.error("Error fetching template versions:", error);
+      res.status(500).json({ error: "Failed to fetch template versions" });
+    }
+  });
+
+  // Get single version schema
+  app.get("/api/forms/versions/:versionId/schema", requireAuth, async (req, res) => {
+    try {
+      const version = await storage.getFormTemplateVersion(req.params.versionId);
+      if (!version) {
+        return res.status(404).json({ error: "Version not found" });
+      }
+      res.json(version.schema);
+    } catch (error) {
+      console.error("Error fetching version schema:", error);
+      res.status(500).json({ error: "Failed to fetch version schema" });
+    }
+  });
+
+  // Update template schema (creates new draft version)
+  app.put("/api/forms/templates/:id/schema", requireAdmin, async (req, res) => {
+    try {
+      const { schema } = req.body;
+      const versions = await storage.getFormTemplateVersions(req.params.id);
+      const latestVersion = versions[0];
+      
+      if (latestVersion && !latestVersion.publishedAt) {
+        // Update existing draft version
+        const result = await pool.query(
+          `UPDATE form_template_versions SET schema = $1 WHERE id = $2 RETURNING *`,
+          [JSON.stringify(schema), latestVersion.id]
+        );
+        res.json(result.rows[0]);
+      } else {
+        // Create new draft version
+        const newVersion = latestVersion ? latestVersion.version + 1 : 1;
+        const version = await storage.createFormTemplateVersion({
+          templateId: req.params.id,
+          version: newVersion,
+          schema,
+        });
+        res.json(version);
+      }
+    } catch (error) {
+      console.error("Error updating template schema:", error);
+      res.status(500).json({ error: "Failed to update template schema" });
+    }
+  });
+
+  // Publish template version
+  app.post("/api/forms/templates/:id/publish", requireAdmin, async (req, res) => {
+    try {
+      const versions = await storage.getFormTemplateVersions(req.params.id);
+      const latestVersion = versions[0];
+      
+      if (!latestVersion) {
+        return res.status(400).json({ error: "No version to publish" });
+      }
+      
+      if (latestVersion.publishedAt) {
+        return res.status(400).json({ error: "Latest version is already published" });
+      }
+      
+      const published = await storage.publishFormTemplateVersion(latestVersion.id);
+      
+      // Update template status to published
+      await storage.updateFormTemplate(req.params.id, { status: 'published' });
+      
+      res.json(published);
+    } catch (error) {
+      console.error("Error publishing template:", error);
+      res.status(500).json({ error: "Failed to publish template" });
+    }
+  });
+
+  // Get form submissions
+  app.get("/api/forms/submissions", requireAuth, async (req, res) => {
+    try {
+      const { entityType, entityId, templateVersionId } = req.query;
+      const submissions = await storage.getFormSubmissions({
+        entityType: entityType as string,
+        entityId: entityId as string,
+        templateVersionId: templateVersionId as string,
+      });
+      res.json(submissions);
+    } catch (error) {
+      console.error("Error fetching form submissions:", error);
+      res.status(500).json({ error: "Failed to fetch form submissions" });
+    }
+  });
+
+  // Get single submission
+  app.get("/api/forms/submissions/:id", requireAuth, async (req, res) => {
+    try {
+      const submission = await storage.getFormSubmission(req.params.id);
+      if (!submission) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
+      res.json(submission);
+    } catch (error) {
+      console.error("Error fetching form submission:", error);
+      res.status(500).json({ error: "Failed to fetch form submission" });
+    }
+  });
+
+  // Create form submission
+  app.post("/api/forms/submissions", requireAuth, async (req, res) => {
+    try {
+      const { templateVersionId, entityType, entityId, data } = req.body;
+      
+      if (!templateVersionId || !entityType || !entityId) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      
+      const submission = await storage.createFormSubmission({
+        templateVersionId,
+        entityType,
+        entityId,
+        submittedBy: req.session.userId || null,
+        status: 'draft',
+        data: data || {},
+      });
+      
+      res.status(201).json(submission);
+    } catch (error) {
+      console.error("Error creating form submission:", error);
+      res.status(500).json({ error: "Failed to create form submission" });
+    }
+  });
+
+  // Update form submission (save draft)
+  app.patch("/api/forms/submissions/:id", requireAuth, async (req, res) => {
+    try {
+      const { data } = req.body;
+      const submission = await storage.updateFormSubmission(req.params.id, { data });
+      if (!submission) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
+      res.json(submission);
+    } catch (error) {
+      console.error("Error updating form submission:", error);
+      res.status(500).json({ error: "Failed to update form submission" });
+    }
+  });
+
+  // Submit form (finalize)
+  app.post("/api/forms/submissions/:id/submit", requireAuth, async (req, res) => {
+    try {
+      const submission = await storage.submitFormSubmission(req.params.id);
+      if (!submission) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
+      res.json(submission);
+    } catch (error) {
+      console.error("Error submitting form:", error);
+      res.status(500).json({ error: "Failed to submit form" });
+    }
+  });
+
+  // Get submission assets
+  app.get("/api/forms/submissions/:id/assets", requireAuth, async (req, res) => {
+    try {
+      const assets = await storage.getFormAssets(req.params.id);
+      res.json(assets);
+    } catch (error) {
+      console.error("Error fetching form assets:", error);
+      res.status(500).json({ error: "Failed to fetch form assets" });
+    }
+  });
+
+  // Upload form asset
+  app.post("/api/forms/assets/upload", requireAuth, async (req, res) => {
+    try {
+      const { submissionId, fieldKey, assetType, filePath } = req.body;
+      
+      if (!submissionId || !fieldKey || !assetType || !filePath) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      
+      const asset = await storage.createFormAsset({
+        submissionId,
+        fieldKey,
+        assetType,
+        filePath,
+      });
+      
+      res.status(201).json(asset);
+    } catch (error) {
+      console.error("Error uploading form asset:", error);
+      res.status(500).json({ error: "Failed to upload form asset" });
+    }
+  });
+
+  // Delete form asset
+  app.delete("/api/forms/assets/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteFormAsset(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting form asset:", error);
+      res.status(500).json({ error: "Failed to delete form asset" });
+    }
+  });
+
+  // Get published templates for filling (available to all authenticated users)
+  app.get("/api/forms/published-templates", requireAuth, async (req, res) => {
+    try {
+      const templates = await storage.getFormTemplates();
+      const publishedTemplates = templates.filter(t => t.status === 'published');
+      
+      // Get latest published version for each template
+      const templatesWithVersions = await Promise.all(
+        publishedTemplates.map(async (template) => {
+          const version = await storage.getLatestPublishedVersion(template.id);
+          return { ...template, latestVersion: version };
+        })
+      );
+      
+      res.json(templatesWithVersions.filter(t => t.latestVersion));
+    } catch (error) {
+      console.error("Error fetching published templates:", error);
+      res.status(500).json({ error: "Failed to fetch published templates" });
+    }
+  });
+
   return httpServer;
 }
