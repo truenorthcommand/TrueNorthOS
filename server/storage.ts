@@ -24,7 +24,7 @@ import {
   type Timesheet, type InsertTimesheet, type TimesheetWithUser,
   type Expense, type InsertExpense, type ExpenseWithDetails,
   type Payment, type InsertPayment, type PaymentWithInvoice,
-  type Skill, type SubSkill,
+  type Skill, type SubSkill, type UserSkill,
   type Inspection, type InsertInspection, type InspectionWithDetails,
   type InspectionItem, type InsertInspectionItem,
   type SnaggingSheet, type InsertSnaggingSheet, type SnaggingSheetWithDetails,
@@ -38,6 +38,10 @@ import {
   type AiConversation, type InsertAiConversation, type AiMessage,
   type AiBusinessPattern, type InsertAiBusinessPattern,
   type AiUserPreference, type InsertAiUserPreference,
+  type FormTemplate, type InsertFormTemplate,
+  type FormTemplateVersion, type InsertFormTemplateVersion,
+  type FormSubmission, type InsertFormSubmission,
+  type FormAsset, type InsertFormAsset,
   users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, clientContacts, clientProperties, jobUpdates,
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
@@ -45,7 +49,8 @@ import {
   skills, subSkills, userSkills,
   inspections, inspectionItems, snaggingSheets, snagItems,
   accountsReceipts, invoiceChaseLogs, fixedCosts, snippets, files,
-  aiConversations, aiBusinessPatterns, aiUserPreferences
+  aiConversations, aiBusinessPatterns, aiUserPreferences,
+  formTemplates, formTemplateVersions, formSubmissions, formAssets
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and, ne, inArray, gt, asc } from "drizzle-orm";
@@ -312,6 +317,32 @@ export interface IStorage {
   getAiUserPreference(userId: string): Promise<AiUserPreference | undefined>;
   upsertAiUserPreference(userId: string, data: Partial<AiUserPreference>): Promise<AiUserPreference>;
   trackUserAction(userId: string, action: string): Promise<void>;
+  
+  // Form Templates
+  getFormTemplates(): Promise<FormTemplate[]>;
+  getFormTemplate(id: string): Promise<FormTemplate | undefined>;
+  createFormTemplate(data: InsertFormTemplate): Promise<FormTemplate>;
+  updateFormTemplate(id: string, data: Partial<FormTemplate>): Promise<FormTemplate | undefined>;
+  deleteFormTemplate(id: string): Promise<void>;
+  
+  // Form Template Versions
+  getFormTemplateVersions(templateId: string): Promise<FormTemplateVersion[]>;
+  getFormTemplateVersion(id: string): Promise<FormTemplateVersion | undefined>;
+  getLatestPublishedVersion(templateId: string): Promise<FormTemplateVersion | undefined>;
+  createFormTemplateVersion(data: InsertFormTemplateVersion): Promise<FormTemplateVersion>;
+  publishFormTemplateVersion(id: string): Promise<FormTemplateVersion | undefined>;
+  
+  // Form Submissions
+  getFormSubmissions(filters?: { entityType?: string; entityId?: string; templateVersionId?: string }): Promise<FormSubmission[]>;
+  getFormSubmission(id: string): Promise<FormSubmission | undefined>;
+  createFormSubmission(data: InsertFormSubmission): Promise<FormSubmission>;
+  updateFormSubmission(id: string, data: Partial<FormSubmission>): Promise<FormSubmission | undefined>;
+  submitFormSubmission(id: string): Promise<FormSubmission | undefined>;
+  
+  // Form Assets
+  getFormAssets(submissionId: string): Promise<FormAsset[]>;
+  createFormAsset(data: InsertFormAsset): Promise<FormAsset>;
+  deleteFormAsset(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2427,6 +2458,130 @@ export class DatabaseStorage implements IStorage {
     const topActions = actions.slice(0, 20);
     
     await this.upsertAiUserPreference(userId, { preferredActions: topActions });
+  }
+
+  // Form Templates
+  async getFormTemplates(): Promise<FormTemplate[]> {
+    return db.select().from(formTemplates).orderBy(desc(formTemplates.createdAt));
+  }
+
+  async getFormTemplate(id: string): Promise<FormTemplate | undefined> {
+    const [template] = await db.select().from(formTemplates).where(eq(formTemplates.id, id));
+    return template;
+  }
+
+  async createFormTemplate(data: InsertFormTemplate): Promise<FormTemplate> {
+    const [template] = await db.insert(formTemplates).values(data).returning();
+    return template;
+  }
+
+  async updateFormTemplate(id: string, data: Partial<FormTemplate>): Promise<FormTemplate | undefined> {
+    const [template] = await db.update(formTemplates)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(formTemplates.id, id))
+      .returning();
+    return template;
+  }
+
+  async deleteFormTemplate(id: string): Promise<void> {
+    await db.delete(formTemplates).where(eq(formTemplates.id, id));
+  }
+
+  // Form Template Versions
+  async getFormTemplateVersions(templateId: string): Promise<FormTemplateVersion[]> {
+    return db.select().from(formTemplateVersions)
+      .where(eq(formTemplateVersions.templateId, templateId))
+      .orderBy(desc(formTemplateVersions.version));
+  }
+
+  async getFormTemplateVersion(id: string): Promise<FormTemplateVersion | undefined> {
+    const [version] = await db.select().from(formTemplateVersions)
+      .where(eq(formTemplateVersions.id, id));
+    return version;
+  }
+
+  async getLatestPublishedVersion(templateId: string): Promise<FormTemplateVersion | undefined> {
+    const versions = await db.select().from(formTemplateVersions)
+      .where(and(
+        eq(formTemplateVersions.templateId, templateId),
+        sql`${formTemplateVersions.publishedAt} IS NOT NULL`
+      ))
+      .orderBy(desc(formTemplateVersions.version))
+      .limit(1);
+    return versions[0];
+  }
+
+  async createFormTemplateVersion(data: InsertFormTemplateVersion): Promise<FormTemplateVersion> {
+    const [version] = await db.insert(formTemplateVersions).values(data).returning();
+    return version;
+  }
+
+  async publishFormTemplateVersion(id: string): Promise<FormTemplateVersion | undefined> {
+    const [version] = await db.update(formTemplateVersions)
+      .set({ publishedAt: new Date() })
+      .where(eq(formTemplateVersions.id, id))
+      .returning();
+    return version;
+  }
+
+  // Form Submissions
+  async getFormSubmissions(filters?: { entityType?: string; entityId?: string; templateVersionId?: string }): Promise<FormSubmission[]> {
+    let query = db.select().from(formSubmissions);
+    
+    if (filters?.entityType) {
+      query = query.where(eq(formSubmissions.entityType, filters.entityType)) as typeof query;
+    }
+    if (filters?.entityId) {
+      query = query.where(eq(formSubmissions.entityId, filters.entityId)) as typeof query;
+    }
+    if (filters?.templateVersionId) {
+      query = query.where(eq(formSubmissions.templateVersionId, filters.templateVersionId)) as typeof query;
+    }
+    
+    return query.orderBy(desc(formSubmissions.createdAt));
+  }
+
+  async getFormSubmission(id: string): Promise<FormSubmission | undefined> {
+    const [submission] = await db.select().from(formSubmissions)
+      .where(eq(formSubmissions.id, id));
+    return submission;
+  }
+
+  async createFormSubmission(data: InsertFormSubmission): Promise<FormSubmission> {
+    const [submission] = await db.insert(formSubmissions).values(data).returning();
+    return submission;
+  }
+
+  async updateFormSubmission(id: string, data: Partial<FormSubmission>): Promise<FormSubmission | undefined> {
+    const [submission] = await db.update(formSubmissions)
+      .set(data)
+      .where(eq(formSubmissions.id, id))
+      .returning();
+    return submission;
+  }
+
+  async submitFormSubmission(id: string): Promise<FormSubmission | undefined> {
+    const [submission] = await db.update(formSubmissions)
+      .set({ status: 'submitted', submittedAt: new Date() })
+      .where(eq(formSubmissions.id, id))
+      .returning();
+    return submission;
+  }
+
+  // Form Assets
+  async getFormAssets(submissionId: string): Promise<FormAsset[]> {
+    return db.select().from(formAssets)
+      .where(eq(formAssets.submissionId, submissionId))
+      .orderBy(formAssets.createdAt);
+  }
+
+  async createFormAsset(data: InsertFormAsset): Promise<FormAsset> {
+    const [asset] = await db.insert(formAssets).values(data).returning();
+    return asset;
+  }
+
+  async deleteFormAsset(id: string): Promise<void> {
+    await db.delete(formAssets).where(eq(formAssets.id, id));
   }
 }
 
