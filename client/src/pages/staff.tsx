@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-type Role = 'admin' | 'engineer' | 'surveyor' | 'fleet_manager' | 'works_manager' | 'accounts';
+type Role = 'admin' | 'engineer' | 'surveyor' | 'fleet_manager' | 'works_manager' | 'accounts' | 'director';
 type Skill = { id: string; name: string; category: string; icon?: string; };
 type SubSkill = { id: string; skillId: string; name: string; description?: string | null; };
 type Vehicle = { id: string; registration: string; make: string | null; model: string | null; type: string | null; assignedUserId: string | null; };
@@ -53,6 +53,7 @@ const ALL_ROLES: { value: Role; label: string; color: string }[] = [
   { value: 'fleet_manager', label: 'Fleet Manager', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
   { value: 'works_manager', label: 'Works Manager', color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300' },
   { value: 'accounts', label: 'Accounts', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
+  { value: 'director', label: 'Director', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
 ];
 
 const getRoleBadgeColor = (role: Role): string => {
