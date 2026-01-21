@@ -204,11 +204,12 @@ app.use((req, res, next) => {
 
       log("Seeding default form templates...");
       const defaultTemplates = [
+        // JOB SHEETS - 3 styles
         {
-          name: "Job Sheet",
+          name: "Job Sheet - Clean",
           type: "job_sheet" as const,
           schema: {
-            name: "Job Sheet",
+            name: "Job Sheet - Clean",
             style: "clean",
             fields: [
               { type: "text" as const, key: "job_ref", label: "Job Reference", required: true, prefill: "job.ref" },
@@ -224,10 +225,56 @@ app.use((req, res, next) => {
           }
         },
         {
-          name: "Client Creation Form",
+          name: "Job Sheet - Professional",
+          type: "job_sheet" as const,
+          schema: {
+            name: "Job Sheet - Professional",
+            style: "professional",
+            fields: [
+              { type: "text" as const, key: "job_ref", label: "Job Reference Number", required: true, prefill: "job.ref" },
+              { type: "text" as const, key: "customer_name", label: "Customer/Client Name", required: true, prefill: "client.name" },
+              { type: "text" as const, key: "contact_phone", label: "Contact Phone", required: true, prefill: "client.phone" },
+              { type: "textarea" as const, key: "address", label: "Site Address (Full)", required: true, prefill: "job.address" },
+              { type: "text" as const, key: "postcode", label: "Postcode", required: true },
+              { type: "date" as const, key: "date", label: "Date of Visit", required: true },
+              { type: "text" as const, key: "arrival_time", label: "Arrival Time", required: true },
+              { type: "text" as const, key: "departure_time", label: "Departure Time", required: true },
+              { type: "textarea" as const, key: "work_requested", label: "Work Requested by Customer", required: true },
+              { type: "textarea" as const, key: "work_completed", label: "Work Completed", required: true },
+              { type: "textarea" as const, key: "materials_used", label: "Materials & Parts Used", required: false },
+              { type: "number" as const, key: "labour_hours", label: "Labour Hours", required: true },
+              { type: "yesno" as const, key: "follow_up_required", label: "Follow-up Visit Required?", required: true },
+              { type: "textarea" as const, key: "follow_up_notes", label: "Follow-up Details", required: false },
+              { type: "textarea" as const, key: "engineer_notes", label: "Engineer Notes", required: false },
+              { type: "photo" as const, key: "before_photos", label: "Before Photos", required: false, multiple: true },
+              { type: "photo" as const, key: "after_photos", label: "After Photos", required: false, multiple: true },
+              { type: "signature" as const, key: "engineer_signature", label: "Engineer Signature", required: true },
+            ]
+          }
+        },
+        {
+          name: "Job Sheet - Compact",
+          type: "job_sheet" as const,
+          schema: {
+            name: "Job Sheet - Compact",
+            style: "compact",
+            fields: [
+              { type: "text" as const, key: "job_ref", label: "Job Ref", required: true, prefill: "job.ref" },
+              { type: "text" as const, key: "customer", label: "Customer", required: true, prefill: "client.name" },
+              { type: "date" as const, key: "date", label: "Date", required: true },
+              { type: "textarea" as const, key: "work_done", label: "Work Done", required: true },
+              { type: "number" as const, key: "hours", label: "Hours", required: true },
+              { type: "photo" as const, key: "photo", label: "Photo", required: false, multiple: false },
+            ]
+          }
+        },
+        
+        // CLIENT FORMS - 3 styles
+        {
+          name: "Client Form - Clean",
           type: "client_form" as const,
           schema: {
-            name: "Client Creation Form",
+            name: "Client Form - Clean",
             style: "clean",
             fields: [
               { type: "text" as const, key: "company_name", label: "Company/Client Name", required: true },
@@ -246,10 +293,63 @@ app.use((req, res, next) => {
           }
         },
         {
-          name: "Quote Sheet",
+          name: "Client Form - Professional",
+          type: "client_form" as const,
+          schema: {
+            name: "Client Form - Professional",
+            style: "professional",
+            fields: [
+              { type: "text" as const, key: "company_name", label: "Company/Organisation Name", required: true },
+              { type: "text" as const, key: "trading_name", label: "Trading Name (if different)", required: false },
+              { type: "text" as const, key: "company_reg", label: "Company Registration Number", required: false },
+              { type: "text" as const, key: "vat_number", label: "VAT Number", required: false },
+              { type: "text" as const, key: "primary_contact", label: "Primary Contact Name", required: true },
+              { type: "text" as const, key: "primary_email", label: "Primary Email", required: true },
+              { type: "text" as const, key: "primary_phone", label: "Primary Phone", required: true },
+              { type: "text" as const, key: "secondary_contact", label: "Secondary Contact Name", required: false },
+              { type: "text" as const, key: "secondary_phone", label: "Secondary Phone", required: false },
+              { type: "textarea" as const, key: "site_address", label: "Site Address", required: true },
+              { type: "text" as const, key: "site_postcode", label: "Site Postcode", required: true },
+              { type: "textarea" as const, key: "billing_address", label: "Billing Address (if different)", required: false },
+              { type: "text" as const, key: "billing_postcode", label: "Billing Postcode", required: false },
+              { type: "select" as const, key: "client_type", label: "Client Type", required: true, options: [
+                { label: "Domestic", value: "domestic" },
+                { label: "Commercial", value: "commercial" },
+                { label: "Industrial", value: "industrial" },
+                { label: "Public Sector", value: "public_sector" }
+              ]},
+              { type: "select" as const, key: "payment_terms", label: "Payment Terms", required: true, options: [
+                { label: "Immediate", value: "immediate" },
+                { label: "Net 14", value: "net14" },
+                { label: "Net 30", value: "net30" },
+                { label: "Net 60", value: "net60" }
+              ]},
+              { type: "textarea" as const, key: "special_requirements", label: "Special Requirements/Access Notes", required: false },
+              { type: "textarea" as const, key: "notes", label: "Additional Notes", required: false },
+            ]
+          }
+        },
+        {
+          name: "Client Form - Compact",
+          type: "client_form" as const,
+          schema: {
+            name: "Client Form - Compact",
+            style: "compact",
+            fields: [
+              { type: "text" as const, key: "name", label: "Name", required: true },
+              { type: "text" as const, key: "phone", label: "Phone", required: true },
+              { type: "text" as const, key: "email", label: "Email", required: false },
+              { type: "textarea" as const, key: "address", label: "Address", required: true },
+            ]
+          }
+        },
+        
+        // QUOTE SHEETS - 3 styles
+        {
+          name: "Quote Sheet - Clean",
           type: "quote_sheet" as const,
           schema: {
-            name: "Quote Sheet",
+            name: "Quote Sheet - Clean",
             style: "clean",
             fields: [
               { type: "text" as const, key: "quote_ref", label: "Quote Reference", required: true, prefill: "quote.number" },
@@ -265,10 +365,59 @@ app.use((req, res, next) => {
           }
         },
         {
-          name: "Job Sign-off Form",
+          name: "Quote Sheet - Professional",
+          type: "quote_sheet" as const,
+          schema: {
+            name: "Quote Sheet - Professional",
+            style: "professional",
+            fields: [
+              { type: "text" as const, key: "quote_ref", label: "Quote Reference Number", required: true, prefill: "quote.number" },
+              { type: "text" as const, key: "client_name", label: "Client/Company Name", required: true, prefill: "client.name" },
+              { type: "text" as const, key: "contact_name", label: "Contact Person", required: true },
+              { type: "textarea" as const, key: "site_address", label: "Site Address", required: true },
+              { type: "date" as const, key: "survey_date", label: "Survey/Assessment Date", required: false },
+              { type: "date" as const, key: "quote_date", label: "Quote Date", required: true },
+              { type: "date" as const, key: "valid_until", label: "Quote Valid Until", required: true },
+              { type: "textarea" as const, key: "project_description", label: "Project Description", required: true },
+              { type: "textarea" as const, key: "scope_of_work", label: "Detailed Scope of Work", required: true },
+              { type: "textarea" as const, key: "materials_breakdown", label: "Materials Breakdown", required: true },
+              { type: "number" as const, key: "materials_cost", label: "Materials Cost (£)", required: true },
+              { type: "number" as const, key: "labour_hours", label: "Estimated Labour Hours", required: true },
+              { type: "number" as const, key: "labour_rate", label: "Labour Rate (£/hour)", required: true },
+              { type: "number" as const, key: "labour_cost", label: "Labour Cost (£)", required: true },
+              { type: "number" as const, key: "subtotal", label: "Subtotal (£)", required: true },
+              { type: "number" as const, key: "vat", label: "VAT (£)", required: true },
+              { type: "number" as const, key: "total", label: "Total inc. VAT (£)", required: true },
+              { type: "text" as const, key: "estimated_duration", label: "Estimated Duration", required: true },
+              { type: "textarea" as const, key: "exclusions", label: "Exclusions", required: false },
+              { type: "textarea" as const, key: "payment_terms", label: "Payment Terms", required: true },
+              { type: "textarea" as const, key: "terms_conditions", label: "Terms & Conditions", required: true },
+              { type: "textarea" as const, key: "warranty", label: "Warranty Information", required: false },
+            ]
+          }
+        },
+        {
+          name: "Quote Sheet - Compact",
+          type: "quote_sheet" as const,
+          schema: {
+            name: "Quote Sheet - Compact",
+            style: "compact",
+            fields: [
+              { type: "text" as const, key: "quote_ref", label: "Quote #", required: true, prefill: "quote.number" },
+              { type: "text" as const, key: "client", label: "Client", required: true, prefill: "client.name" },
+              { type: "date" as const, key: "date", label: "Date", required: true },
+              { type: "textarea" as const, key: "work", label: "Work", required: true },
+              { type: "number" as const, key: "total", label: "Total (£)", required: true },
+            ]
+          }
+        },
+        
+        // SIGN-OFF FORMS - 3 styles
+        {
+          name: "Sign-off Form - Clean",
           type: "signoff" as const,
           schema: {
-            name: "Job Sign-off Form",
+            name: "Sign-off Form - Clean",
             style: "clean",
             fields: [
               { type: "text" as const, key: "job_ref", label: "Job Reference", required: true, prefill: "job.ref" },
@@ -280,6 +429,56 @@ app.use((req, res, next) => {
               { type: "photo" as const, key: "completion_photos", label: "Completion Photos", required: true, multiple: true },
               { type: "signature" as const, key: "engineer_signature", label: "Engineer Signature", required: true },
               { type: "signature" as const, key: "customer_signature", label: "Customer Signature", required: true },
+            ]
+          }
+        },
+        {
+          name: "Sign-off Form - Professional",
+          type: "signoff" as const,
+          schema: {
+            name: "Sign-off Form - Professional",
+            style: "professional",
+            fields: [
+              { type: "text" as const, key: "job_ref", label: "Job Reference Number", required: true, prefill: "job.ref" },
+              { type: "text" as const, key: "customer_name", label: "Customer/Client Name", required: true, prefill: "client.name" },
+              { type: "text" as const, key: "site_address", label: "Site Address", required: true, prefill: "job.address" },
+              { type: "date" as const, key: "completion_date", label: "Date of Completion", required: true },
+              { type: "text" as const, key: "completion_time", label: "Time of Completion", required: true },
+              { type: "textarea" as const, key: "work_summary", label: "Summary of Work Completed", required: true },
+              { type: "yesno" as const, key: "work_completed", label: "All work completed as per specification?", required: true },
+              { type: "yesno" as const, key: "tested_working", label: "All systems tested and working?", required: true },
+              { type: "yesno" as const, key: "site_clean", label: "Site left clean and tidy?", required: true },
+              { type: "yesno" as const, key: "waste_removed", label: "All waste removed from site?", required: true },
+              { type: "yesno" as const, key: "customer_shown", label: "Customer shown how to operate equipment?", required: false },
+              { type: "textarea" as const, key: "outstanding_items", label: "Outstanding Items (if any)", required: false },
+              { type: "textarea" as const, key: "customer_comments", label: "Customer Comments/Feedback", required: false },
+              { type: "select" as const, key: "customer_rating", label: "Customer Satisfaction Rating", required: false, options: [
+                { label: "Excellent", value: "excellent" },
+                { label: "Good", value: "good" },
+                { label: "Satisfactory", value: "satisfactory" },
+                { label: "Needs Improvement", value: "needs_improvement" }
+              ]},
+              { type: "photo" as const, key: "before_photos", label: "Before Photos", required: false, multiple: true },
+              { type: "photo" as const, key: "after_photos", label: "After/Completion Photos", required: true, multiple: true },
+              { type: "text" as const, key: "engineer_name", label: "Engineer Name (Print)", required: true, prefill: "user.name" },
+              { type: "signature" as const, key: "engineer_signature", label: "Engineer Signature", required: true },
+              { type: "text" as const, key: "customer_name_print", label: "Customer Name (Print)", required: true },
+              { type: "signature" as const, key: "customer_signature", label: "Customer Signature", required: true },
+            ]
+          }
+        },
+        {
+          name: "Sign-off Form - Compact",
+          type: "signoff" as const,
+          schema: {
+            name: "Sign-off Form - Compact",
+            style: "compact",
+            fields: [
+              { type: "text" as const, key: "job_ref", label: "Job Ref", required: true, prefill: "job.ref" },
+              { type: "date" as const, key: "date", label: "Date", required: true },
+              { type: "yesno" as const, key: "complete", label: "Work Complete?", required: true },
+              { type: "signature" as const, key: "engineer_sig", label: "Engineer", required: true },
+              { type: "signature" as const, key: "customer_sig", label: "Customer", required: true },
             ]
           }
         }
