@@ -761,7 +761,7 @@ async function getSmartInsights(): Promise<{ insights: SmartInsight[]; summary: 
         title: `${todaysJobs.length} Job${todaysJobs.length > 1 ? 's' : ''} Today`,
         description: `Scheduled work for ${today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}`,
         action: 'View schedule',
-        actionPath: '/schedule',
+        actionPath: '/schedule/calendar',
         priority: 'medium',
       });
     }
