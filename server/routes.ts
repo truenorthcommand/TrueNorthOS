@@ -3838,6 +3838,128 @@ Return ONLY valid JSON.`;
     }
   });
 
+  // Scan client document (business card, letterhead, etc.) and extract client details
+  app.post("/api/ai/scan-client-document", requireAuth, async (req, res) => {
+    try {
+      const { image } = req.body;
+
+      if (!image) {
+        return res.status(400).json({ error: "Image is required" });
+      }
+
+      // Server-side validation for image
+      if (typeof image !== 'string') {
+        return res.status(400).json({ error: "Image must be a string" });
+      }
+
+      // Validate base64 data URL format and size
+      if (image.startsWith('data:')) {
+        const mimeMatch = image.match(/^data:(image\/(jpeg|jpg|png|gif|webp|bmp));base64,/i);
+        if (!mimeMatch) {
+          return res.status(400).json({ error: "Invalid image format. Supported formats: JPEG, PNG, GIF, WebP, BMP" });
+        }
+        
+        // Check size (base64 encoded) - limit to ~10MB (base64 is ~33% larger than binary)
+        const base64Data = image.split(',')[1] || '';
+        const sizeInBytes = (base64Data.length * 3) / 4;
+        const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+        if (sizeInBytes > maxSizeBytes) {
+          return res.status(400).json({ error: "Image too large. Maximum size is 10MB" });
+        }
+      } else if (!image.startsWith('http://') && !image.startsWith('https://')) {
+        return res.status(400).json({ error: "Invalid image. Must be a base64 data URL or HTTP/HTTPS URL" });
+      }
+
+      const openai = getOpenAIClient();
+      if (!openai) {
+        return res.status(503).json({ error: "AI service not available. Please configure OpenAI API key." });
+      }
+
+      const systemPrompt = `You are a document scanner specialized in extracting business contact information from images such as business cards, company letterheads, invoices, or any document containing client/company details.
+
+Extract and return as JSON:
+- name: Company/Business name (the main business or company name)
+- contactName: Contact person's full name (individual person's name)
+- email: Email address
+- phone: Phone number (format as UK style if possible, e.g., 01onal 234 5678)
+- address: Full street address (exclude postcode)
+- postcode: UK postcode if visible
+
+Important rules:
+1. Return ONLY valid JSON with exactly these fields
+2. Use null for any fields not found in the image
+3. If you see both a company name and a person's name, put company in "name" and person in "contactName"
+4. Clean up phone numbers to readable format
+5. Separate the postcode from the address field
+6. For UK addresses, ensure proper formatting
+
+Return ONLY valid JSON, nothing else.`;
+
+      // Build message content with image
+      const messageContent: any[] = [
+        { type: "text", text: "Please scan this document and extract the client/business contact information." }
+      ];
+
+      messageContent.push({
+        type: "image_url",
+        image_url: { url: image }
+      });
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: messageContent }
+        ],
+        max_tokens: 1024,
+        response_format: { type: "json_object" },
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ error: "No response from AI" });
+      }
+
+      // Safely parse the AI response with fallback handling
+      let extractedData: Record<string, any> = {};
+      try {
+        extractedData = JSON.parse(content);
+      } catch (parseError) {
+        console.error("Failed to parse AI response:", content);
+        return res.status(500).json({ 
+          error: "Could not extract data from this image. Please try a clearer image or enter details manually." 
+        });
+      }
+
+      // Validate and sanitize extracted fields with type checking
+      const safeString = (value: any): string => {
+        if (value === null || value === undefined) return "";
+        if (typeof value === 'string') return value.trim();
+        if (typeof value === 'number') return String(value);
+        return "";
+      };
+
+      res.json({
+        success: true,
+        extractedData: {
+          name: safeString(extractedData.name),
+          contactName: safeString(extractedData.contactName),
+          email: safeString(extractedData.email),
+          phone: safeString(extractedData.phone),
+          address: safeString(extractedData.address),
+          postcode: safeString(extractedData.postcode),
+        },
+        aiPowered: true,
+      });
+    } catch (error: any) {
+      console.error("Client document scan error:", error);
+      if (error.code === 'insufficient_quota') {
+        return res.status(503).json({ error: "AI service quota exceeded. Please try again later." });
+      }
+      res.status(500).json({ error: error.message || "Failed to scan document" });
+    }
+  });
+
   // ==================== GEMINI AI FEATURES ====================
 
   // Import Gemini AI service functions

@@ -44,7 +44,7 @@ Foreman is built with a modern web stack.
 
 ### Key Features and Design Choices
 -   **Modular Design**: Seven integrated modules for Operations, Finance, Fleet, Workforce, Quality Control, Compliance, and Intelligence.
--   **AI Integration**: Extensive use of AI for features like job assignment, pricing advice, receipt OCR, web search, conversation memory, and quality assessment.
+-   **AI Integration**: Extensive use of AI for features like job assignment, pricing advice, receipt OCR, web search, conversation memory, quality assessment, and client document scanning.
 -   **UK Specific Compliance**: Built-in support for HMRC mileage rates, UK VAT calculations, Gas Safe, and BS 7671 regulations.
 -   **Role-Based Access Control**: Granular permissions based on user roles (Admin, Engineer, Super Admin).
 -   **Two-Factor Authentication (2FA)**: TOTP-based for enhanced security.

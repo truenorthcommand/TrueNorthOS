@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AITextarea } from "@/components/ui/ai-assist";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search, User, Phone, Mail, Star, Edit2, ChevronRight, ChevronLeft, Check, Home, Save, Upload, ExternalLink, FolderOpen, Image, FileSpreadsheet, File, Loader2, Sparkles, Briefcase, AlertCircle, Users, Calendar, Link2, Copy } from "lucide-react";
+import { Plus, Trash2, Building2, MapPin, FileText, Camera, X, Send, Search, User, Phone, Mail, Star, Edit2, ChevronRight, ChevronLeft, Check, Home, Save, Upload, ExternalLink, FolderOpen, Image, FileSpreadsheet, File, Loader2, Sparkles, Briefcase, AlertCircle, Users, Calendar, Link2, Copy, Scan } from "lucide-react";
 import { BackButton } from "@/components/back-button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -92,6 +92,12 @@ export default function Clients() {
   });
   const [enableClientPortal, setEnableClientPortal] = useState(false);
   const [createdPortalLink, setCreatedPortalLink] = useState<string | null>(null);
+  
+  const [showScannerModal, setShowScannerModal] = useState(false);
+  const [scannerImage, setScannerImage] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const scannerFileInputRef = useRef<HTMLInputElement>(null);
+  
   const [newClientContacts, setNewClientContacts] = useState<Array<{
     name: string;
     email: string;
@@ -547,6 +553,92 @@ export default function Clients() {
     setSelectedPropertyId("");
   }, [selectedClientId]);
 
+  const handleScannerFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid file",
+        description: "Please select an image file (JPG, PNG, etc.)",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select an image under 10MB",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setScannerImage(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleScanDocument = async () => {
+    if (!scannerImage) {
+      toast({
+        title: "No image",
+        description: "Please upload an image first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsScanning(true);
+
+    try {
+      const response = await fetch('/api/ai/scan-client-document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ image: scannerImage })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to scan document');
+      }
+
+      const data = await response.json();
+      const extracted = data.extractedData;
+
+      setNewClient({
+        name: extracted.name || newClient.name,
+        contactName: extracted.contactName || newClient.contactName,
+        email: extracted.email || newClient.email,
+        phone: extracted.phone || newClient.phone,
+        address: extracted.address || newClient.address,
+        postcode: extracted.postcode || newClient.postcode,
+      });
+
+      setShowScannerModal(false);
+      setScannerImage(null);
+      if (scannerFileInputRef.current) {
+        scannerFileInputRef.current.value = '';
+      }
+
+      toast({
+        title: "Scan complete",
+        description: "Client details extracted and auto-filled successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Scan failed",
+        description: error instanceof Error ? error.message : 'Failed to scan document',
+        variant: "destructive"
+      });
+    } finally {
+      setIsScanning(false);
+    }
+  };
 
   const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1524,8 +1616,20 @@ export default function Clients() {
       ) : (
         <div className="space-y-6">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <CardTitle className="text-lg">Add New Client</CardTitle>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowScannerModal(true)}
+                className="gap-2"
+                data-testid="button-scan-document"
+              >
+                <Scan className="h-4 w-4" />
+                <Sparkles className="h-3 w-3 text-amber-500" />
+                Scan Document
+              </Button>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleAddClient} className="space-y-4">
@@ -2383,6 +2487,103 @@ export default function Clients() {
                   Open Portal
                 </Button>
               </a>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showScannerModal} onOpenChange={setShowScannerModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Scan className="h-5 w-5" />
+              Scan Client Document
+              <Sparkles className="h-4 w-4 text-amber-500" />
+            </DialogTitle>
+            <DialogDescription>
+              Upload a business card, letterhead, or invoice to auto-fill client details using AI.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <input
+              ref={scannerFileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleScannerFileSelect}
+              className="hidden"
+              data-testid="input-scanner-file"
+            />
+            
+            {!scannerImage ? (
+              <div
+                onClick={() => scannerFileInputRef.current?.click()}
+                className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                data-testid="scanner-upload-zone"
+              >
+                <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                <p className="text-sm font-medium">Click to upload an image</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Business cards, letterheads, invoices
+                </p>
+              </div>
+            ) : (
+              <div className="relative">
+                <img
+                  src={scannerImage}
+                  alt="Document to scan"
+                  className="w-full rounded-lg border"
+                  data-testid="scanner-preview-image"
+                />
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="absolute top-2 right-2 h-8 w-8"
+                  onClick={() => {
+                    setScannerImage(null);
+                    if (scannerFileInputRef.current) {
+                      scannerFileInputRef.current.value = '';
+                    }
+                  }}
+                  data-testid="button-remove-scanner-image"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowScannerModal(false);
+                  setScannerImage(null);
+                  if (scannerFileInputRef.current) {
+                    scannerFileInputRef.current.value = '';
+                  }
+                }}
+                data-testid="button-cancel-scan"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleScanDocument}
+                disabled={!scannerImage || isScanning}
+                className="gap-2"
+                data-testid="button-extract-details"
+              >
+                {isScanning ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Extracting...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Extract Details
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </DialogContent>
