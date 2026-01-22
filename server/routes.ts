@@ -6735,6 +6735,79 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
     }
   });
 
+  // ==================== DEMO MODE (PUBLIC) ====================
+  
+  // Public demo endpoint for Directors Suite - no authentication required
+  app.get("/api/demo/directors/dashboard", async (req, res) => {
+    try {
+      // Return sample demonstration data
+      const demoData = {
+        summary: {
+          totalRevenue: 487250,
+          revenueGrowth: 12.5,
+          totalProfit: 145320,
+          profitMargin: 29.8,
+          outstandingInvoices: 42680,
+          overdueInvoices: 3,
+          activeJobs: 24,
+          completedJobsThisMonth: 47,
+          totalClients: 156,
+          newClientsThisMonth: 8,
+          totalEngineers: 12,
+          avgJobValue: 1850,
+        },
+        monthlyTrends: [
+          { month: "Aug", revenue: 38500, expenses: 28200, profit: 10300 },
+          { month: "Sep", revenue: 42100, expenses: 29800, profit: 12300 },
+          { month: "Oct", revenue: 45200, expenses: 31500, profit: 13700 },
+          { month: "Nov", revenue: 48900, expenses: 33200, profit: 15700 },
+          { month: "Dec", revenue: 52400, expenses: 35100, profit: 17300 },
+          { month: "Jan", revenue: 56800, expenses: 37600, profit: 19200 },
+        ],
+        jobMetrics: {
+          completionRate: 94.2,
+          avgCompletionTime: 2.4,
+          jobsByStatus: [
+            { status: "Signed Off", count: 47, color: "#22c55e" },
+            { status: "In Progress", count: 18, color: "#3b82f6" },
+            { status: "Ready", count: 6, color: "#f59e0b" },
+            { status: "Draft", count: 4, color: "#6b7280" },
+          ],
+        },
+        financialHealth: {
+          cashFlow: 28450,
+          receivables: 42680,
+          payables: 18920,
+          invoiceAgeing: [
+            { range: "Current", amount: 28500, color: "#22c55e" },
+            { range: "1-30 days", amount: 8200, color: "#f59e0b" },
+            { range: "31-60 days", amount: 4100, color: "#f97316" },
+            { range: "60+ days", amount: 1880, color: "#ef4444" },
+          ],
+        },
+        topClients: [
+          { id: "1", name: "BuildTech Solutions", revenue: 45600, jobCount: 24 },
+          { id: "2", name: "Premier Properties Ltd", revenue: 38200, jobCount: 18 },
+          { id: "3", name: "Westfield Developments", revenue: 32100, jobCount: 15 },
+          { id: "4", name: "City Centre Estates", revenue: 28400, jobCount: 12 },
+          { id: "5", name: "Northern Construction", revenue: 24800, jobCount: 11 },
+        ],
+        engineerPerformance: [
+          { id: "1", name: "James Wilson", completedJobs: 52, revenue: 96400, rating: 4.9 },
+          { id: "2", name: "Sarah Thompson", completedJobs: 48, revenue: 88200, rating: 4.8 },
+          { id: "3", name: "Michael Brown", completedJobs: 45, revenue: 82500, rating: 4.7 },
+          { id: "4", name: "Emma Davies", completedJobs: 42, revenue: 76800, rating: 4.8 },
+          { id: "5", name: "David Taylor", completedJobs: 38, revenue: 69400, rating: 4.6 },
+        ],
+      };
+
+      res.json(demoData);
+    } catch (error: any) {
+      console.error("Demo directors dashboard error:", error);
+      res.status(500).json({ error: "Failed to fetch demo dashboard data" });
+    }
+  });
+
   // ==================== DIRECTORS SUITE ====================
 
   app.get("/api/directors/dashboard", requireDirectorsSuite, async (req, res) => {

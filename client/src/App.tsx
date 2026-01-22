@@ -51,6 +51,7 @@ import Expenses from "@/pages/expenses";
 import Payments from "@/pages/payments";
 import Analytics from "@/pages/analytics";
 import DirectorsSuite from "@/pages/directors-suite";
+import DemoDirectorsSuite from "@/pages/demo-directors";
 import Subscription from "@/pages/subscription";
 import Referrals from "@/pages/referrals";
 import Workflows from "@/pages/workflows";
@@ -131,6 +132,7 @@ function Router() {
       <Route path="/pitch/investor" component={PitchInvestor} />
       <Route path="/pitch/sales" component={PitchSales} />
       <Route path="/pitch/onepager" component={PitchOnePager} />
+      <Route path="/demo/directors" component={DemoDirectorsSuite} />
       <Route path="/clients">
         <PrivateRoute component={Clients} />
       </Route>
