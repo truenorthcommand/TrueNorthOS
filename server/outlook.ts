@@ -141,9 +141,25 @@ async function getAccessToken(): Promise<string> {
   throw new Error("Outlook not connected. Please connect via the Outlook connector or configure Azure credentials.");
 }
 
+// Store the authenticated user's email for shared mailbox detection
+let authenticatedUserEmail: string | null = null;
+
 // Get the right API path for current auth mode
+// For shared mailboxes (when target email differs from logged-in user), use /users/{email} path
 function getUserPath(userEmail: string): string {
-  return isUsingDelegatedAuth ? "/me" : `/users/${userEmail}`;
+  if (!isUsingDelegatedAuth) {
+    // Application permissions - always use /users/{email}
+    return `/users/${userEmail}`;
+  }
+  
+  // Delegated auth - check if accessing shared mailbox
+  if (authenticatedUserEmail && userEmail.toLowerCase() !== authenticatedUserEmail.toLowerCase()) {
+    // Accessing a different mailbox (shared mailbox) - use /users/{email}
+    return `/users/${userEmail}`;
+  }
+  
+  // Accessing own mailbox
+  return "/me";
 }
 
 function getGraphClient(accessToken: string): Client {
@@ -171,8 +187,13 @@ export async function getCurrentUser(): Promise<{ email: string; displayName: st
       .select('mail,displayName,userPrincipalName')
       .get();
     
+    const email = user.mail || user.userPrincipalName;
+    
+    // Store the authenticated user's email for shared mailbox detection
+    authenticatedUserEmail = email;
+    
     return {
-      email: user.mail || user.userPrincipalName,
+      email,
       displayName: user.displayName
     };
   } catch (error) {
@@ -226,8 +247,10 @@ export async function getEmails(userEmail: string, top: number = 50): Promise<an
   const accessToken = await getAccessToken();
   const client = getGraphClient(accessToken);
 
-  const apiPath = `${getUserPath(userEmail)}/mailFolders/inbox/messages`;
-  console.log('Fetching emails from:', apiPath, 'isUsingDelegatedAuth:', isUsingDelegatedAuth);
+  const userPath = getUserPath(userEmail);
+  const isSharedMailbox = userPath !== "/me";
+  const apiPath = `${userPath}/mailFolders/inbox/messages`;
+  console.log('Fetching emails from:', apiPath, 'isUsingDelegatedAuth:', isUsingDelegatedAuth, 'isSharedMailbox:', isSharedMailbox);
 
   try {
     const messages = await client
@@ -262,8 +285,10 @@ export async function getSentEmails(userEmail: string, top: number = 50): Promis
   const accessToken = await getAccessToken();
   const client = getGraphClient(accessToken);
 
-  const apiPath = `${getUserPath(userEmail)}/mailFolders/sentItems/messages`;
-  console.log('Fetching sent emails from:', apiPath);
+  const userPath = getUserPath(userEmail);
+  const isSharedMailbox = userPath !== "/me";
+  const apiPath = `${userPath}/mailFolders/sentItems/messages`;
+  console.log('Fetching sent emails from:', apiPath, 'isSharedMailbox:', isSharedMailbox);
 
   try {
     const messages = await client
