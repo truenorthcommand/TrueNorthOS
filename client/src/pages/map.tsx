@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { hasRole } from "@/lib/types";
-import { LeafletMap, MapMarker } from "@/components/leaflet-map";
+import { GoogleMap, MapMarker } from "@/components/google-map";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -151,7 +151,7 @@ export default function MapPage() {
         <div className="lg:col-span-3">
           <Card>
             <CardContent className="p-0">
-              <LeafletMap 
+              <GoogleMap 
                 markers={markers} 
                 height="500px"
                 onMarkerClick={handleMarkerClick}
