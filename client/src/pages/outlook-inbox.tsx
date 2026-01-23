@@ -151,6 +151,7 @@ export default function OutlookInbox() {
   const [linkedClientId, setLinkedClientId] = useState<string>("");
   const [linkedJobId, setLinkedJobId] = useState<string>("");
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
+  const [activeFolder, setActiveFolder] = useState<"inbox" | "sent">("inbox");
 
   const { data: currentUser, isLoading: loadingCurrentUser } = useQuery<{ email: string; displayName: string }>({
     queryKey: ["/api/outlook/me"],
@@ -179,7 +180,7 @@ export default function OutlookInbox() {
     }
   }, [currentUser]);
 
-  const { data: emails = [], isLoading: loadingEmails, refetch: refetchEmails } = useQuery<OutlookEmail[]>({
+  const { data: inboxEmails = [], isLoading: loadingInbox, refetch: refetchInbox } = useQuery<OutlookEmail[]>({
     queryKey: ["/api/outlook/emails", userEmail],
     queryFn: async () => {
       if (!userEmail) return [];
@@ -189,6 +190,21 @@ export default function OutlookInbox() {
     },
     enabled: !!userEmail,
   });
+
+  const { data: sentEmails = [], isLoading: loadingSent, refetch: refetchSent } = useQuery<OutlookEmail[]>({
+    queryKey: ["/api/outlook/sent", userEmail],
+    queryFn: async () => {
+      if (!userEmail) return [];
+      const res = await fetch(`/api/outlook/sent/${encodeURIComponent(userEmail)}`);
+      if (!res.ok) throw new Error("Failed to fetch sent emails");
+      return res.json();
+    },
+    enabled: !!userEmail,
+  });
+
+  const emails = activeFolder === "inbox" ? inboxEmails : sentEmails;
+  const loadingEmails = activeFolder === "inbox" ? loadingInbox : loadingSent;
+  const refetchEmails = activeFolder === "inbox" ? refetchInbox : refetchSent;
 
   const { data: searchResults = [], isLoading: loadingSearch } = useQuery<OutlookEmail[]>({
     queryKey: ["/api/outlook/search", userEmail, searchQuery],
@@ -432,6 +448,32 @@ export default function OutlookInbox() {
 
       <div className="flex-1 flex gap-4 min-h-0">
         <div className="w-80 flex flex-col border rounded-lg bg-white dark:bg-slate-900 shadow-sm">
+          <div className="flex border-b">
+            <button
+              className={`flex-1 py-2 px-4 text-sm font-medium transition-colors ${
+                activeFolder === "inbox"
+                  ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50/50"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+              onClick={() => { setActiveFolder("inbox"); setSelectedEmail(null); }}
+              data-testid="tab-inbox"
+            >
+              <Mail className="h-4 w-4 inline-block mr-1.5" />
+              Inbox
+            </button>
+            <button
+              className={`flex-1 py-2 px-4 text-sm font-medium transition-colors ${
+                activeFolder === "sent"
+                  ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50/50"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+              onClick={() => { setActiveFolder("sent"); setSelectedEmail(null); }}
+              data-testid="tab-sent"
+            >
+              <Send className="h-4 w-4 inline-block mr-1.5" />
+              Sent
+            </button>
+          </div>
           <div className="p-3 border-b">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -477,10 +519,13 @@ export default function OutlookInbox() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <span className={`text-sm truncate ${!email.isRead ? "font-semibold" : "font-medium"}`}>
-                          {email.from?.emailAddress?.name || email.from?.emailAddress?.address || "Unknown"}
+                          {activeFolder === "sent" 
+                            ? `To: ${email.toRecipients?.[0]?.emailAddress?.name || email.toRecipients?.[0]?.emailAddress?.address || "Unknown"}`
+                            : (email.from?.emailAddress?.name || email.from?.emailAddress?.address || "Unknown")
+                          }
                         </span>
                         <span className="text-xs text-muted-foreground flex-shrink-0">
-                          {format(new Date(email.receivedDateTime), "MMM d")}
+                          {format(new Date(email.receivedDateTime || (email as any).sentDateTime), "MMM d")}
                         </span>
                       </div>
                       <p className={`text-sm truncate ${!email.isRead ? "font-medium" : "text-muted-foreground"}`}>

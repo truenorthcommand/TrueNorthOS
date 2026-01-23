@@ -258,6 +258,29 @@ export async function getEmails(userEmail: string, top: number = 50): Promise<an
   }
 }
 
+export async function getSentEmails(userEmail: string, top: number = 50): Promise<any[]> {
+  const accessToken = await getAccessToken();
+  const client = getGraphClient(accessToken);
+
+  const apiPath = `${getUserPath(userEmail)}/mailFolders/sentItems/messages`;
+  console.log('Fetching sent emails from:', apiPath);
+
+  try {
+    const messages = await client
+      .api(apiPath)
+      .top(top)
+      .select("id,subject,toRecipients,sentDateTime,bodyPreview,isRead")
+      .orderby("sentDateTime DESC")
+      .get();
+
+    console.log('Sent email fetch result count:', messages.value?.length || 0);
+    return messages.value || [];
+  } catch (error: any) {
+    console.error('Sent email fetch error:', error?.message || error);
+    return [];
+  }
+}
+
 export async function getCalendarEvents(userEmail: string, top: number = 10): Promise<any[]> {
   const accessToken = await getAccessToken();
   const client = getGraphClient(accessToken);

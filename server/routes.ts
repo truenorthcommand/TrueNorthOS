@@ -5897,6 +5897,19 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
     }
   });
 
+  app.get("/api/outlook/sent/:userEmail", requireRoles('admin'), async (req, res) => {
+    try {
+      const { userEmail } = req.params;
+      const top = parseInt(req.query.top as string) || 10;
+      
+      const emails = await outlook.getSentEmails(userEmail, top);
+      res.json(emails);
+    } catch (error: any) {
+      console.error("Get sent emails error:", error);
+      res.status(500).json({ error: error.message || "Failed to get sent emails" });
+    }
+  });
+
   app.get("/api/outlook/calendar/:userEmail", requireRoles('admin'), async (req, res) => {
     try {
       const { userEmail } = req.params;
