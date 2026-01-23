@@ -183,17 +183,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {!collapsed && (
           <>
             <img 
-              src="/logo-foreman.png" 
-              alt="FOREMAN - Keeping operations on track" 
+              src="/logo-pms.jpg" 
+              alt="Professional Maintenance Solutions" 
               className="w-full max-w-[180px] h-auto object-contain mx-auto"
             />
-            <span className="text-[10px] text-slate-400 tracking-wide">Powered By TrueNorth OS</span>
           </>
         )}
         {collapsed && (
           <img 
-            src="/logo-foreman.png" 
-            alt="FOREMAN" 
+            src="/logo-pms.jpg" 
+            alt="PMS" 
             className="w-10 h-10 object-cover mx-auto"
           />
         )}
@@ -576,8 +575,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </Sheet>
             
             <img 
-              src="/logo-foreman.png" 
-              alt="FOREMAN - Keeping operations on track" 
+              src="/logo-pms.jpg" 
+              alt="Professional Maintenance Solutions" 
               className="h-10 max-w-[140px] w-auto object-contain"
             />
 

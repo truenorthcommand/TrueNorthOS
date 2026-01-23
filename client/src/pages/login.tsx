@@ -49,14 +49,14 @@ export default function Login() {
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <img 
-              src="/logo-foreman.png" 
-              alt="Foreman" 
+              src="/logo-pms.jpg" 
+              alt="Professional Maintenance Solutions" 
               className="h-16 w-auto object-contain"
             />
           </div>
-          <CardTitle className="text-2xl font-bold">Foreman</CardTitle>
+          <CardTitle className="text-2xl font-bold">Professional Maintenance Solutions</CardTitle>
           <CardDescription>
-            {requires2FA ? "Enter your authentication code" : "Powered by TrueNorth OS"}
+            {requires2FA ? "Enter your authentication code" : "Field Service Management"}
           </CardDescription>
         </CardHeader>
         <CardContent>
