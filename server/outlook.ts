@@ -153,8 +153,15 @@ function getUserPath(userEmail: string): string {
   }
   
   // Delegated auth - check if accessing shared mailbox
+  // If authenticatedUserEmail is set and differs from target, use shared mailbox path
   if (authenticatedUserEmail && userEmail.toLowerCase() !== authenticatedUserEmail.toLowerCase()) {
-    // Accessing a different mailbox (shared mailbox) - use /users/{email}
+    return `/users/${userEmail}`;
+  }
+  
+  // If authenticatedUserEmail is NOT set but an explicit email is provided,
+  // assume shared mailbox access to be safe (fallback for when /me hasn't been called yet)
+  if (!authenticatedUserEmail && userEmail) {
+    console.log('Using shared mailbox path (authenticatedUserEmail not yet set):', userEmail);
     return `/users/${userEmail}`;
   }
   

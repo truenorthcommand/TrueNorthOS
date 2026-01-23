@@ -165,6 +165,7 @@ export default function OutlookInbox() {
 
   const hasInitialized = useState(false);
   
+  // Always default to info@promainsolutions.co.uk as the shared mailbox
   useEffect(() => {
     if (hasInitialized[0]) return;
     
@@ -174,11 +175,10 @@ export default function OutlookInbox() {
       hasInitialized[1](true);
       return;
     }
-    if (currentUser?.email) {
-      setUserEmail(currentUser.email);
-      hasInitialized[1](true);
-    }
-  }, [currentUser]);
+    // Default to info@promainsolutions.co.uk
+    setUserEmail("info@promainsolutions.co.uk");
+    hasInitialized[1](true);
+  }, []);
 
   const { data: inboxEmails = [], isLoading: loadingInbox, refetch: refetchInbox } = useQuery<OutlookEmail[]>({
     queryKey: ["/api/outlook/emails", userEmail],
