@@ -186,6 +186,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               alt="Professional Maintenance Solutions" 
               className="w-full max-w-[180px] h-auto object-contain mx-auto"
             />
+            <span className="text-[10px] text-gray-400 mt-1">Powered By TrueNorth OS</span>
           </>
         )}
         {collapsed && (
