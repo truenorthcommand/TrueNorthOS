@@ -162,27 +162,16 @@ export default function OutlookInbox() {
     retry: false,
   });
 
-  const { data: outlookUsers = [], isLoading: loadingUsers } = useQuery<OutlookUser[]>({
-    queryKey: ["/api/outlook/users"],
-    retry: false,
-    enabled: !currentUser,
-  });
-
   useEffect(() => {
-    if (currentUser?.email && !userEmail) {
-      setUserEmail(currentUser.email);
+    const savedEmail = localStorage.getItem("outlook_default_email");
+    if (savedEmail && !userEmail) {
+      setUserEmail(savedEmail);
       return;
     }
-    if (outlookUsers.length > 0 && !userEmail) {
-      const savedEmail = localStorage.getItem("outlook_default_email");
-      if (savedEmail && outlookUsers.some(u => u.mail === savedEmail || u.userPrincipalName === savedEmail)) {
-        setUserEmail(savedEmail);
-      } else {
-        const firstEmail = outlookUsers[0].mail || outlookUsers[0].userPrincipalName;
-        setUserEmail(firstEmail);
-      }
+    if (currentUser?.email && !userEmail) {
+      setUserEmail(currentUser.email);
     }
-  }, [currentUser, outlookUsers, userEmail]);
+  }, [currentUser, userEmail]);
 
   const { data: emails = [], isLoading: loadingEmails, refetch: refetchEmails } = useQuery<OutlookEmail[]>({
     queryKey: ["/api/outlook/emails", userEmail],
@@ -450,7 +439,7 @@ export default function OutlookInbox() {
           </div>
           
           <ScrollArea className="flex-1">
-            {loadingEmails || loadingUsers ? (
+            {loadingEmails ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
@@ -928,33 +917,25 @@ export default function OutlookInbox() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {outlookUsers.length > 0 ? (
-              <div className="space-y-2">
-                <Label>Email Account</Label>
-                <Select value={userEmail} onValueChange={setUserEmail}>
-                  <SelectTrigger data-testid="select-email-account">
-                    <SelectValue placeholder="Select account..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {outlookUsers.map((u) => (
-                      <SelectItem key={u.id} value={u.mail || u.userPrincipalName}>
-                        {u.displayName} ({u.mail || u.userPrincipalName})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {currentUser && (
-                  <p className="text-xs text-muted-foreground">
-                    Currently connected: {currentUser.displayName}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-4 text-muted-foreground">
-                <p>No Outlook accounts available.</p>
-                <p className="text-sm mt-1">Please connect your Outlook account.</p>
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="email-input">Email Address</Label>
+              <Input
+                id="email-input"
+                type="email"
+                placeholder="Enter email address (e.g. info@promainsolutions.co.uk)"
+                value={userEmail}
+                onChange={(e) => setUserEmail(e.target.value)}
+                data-testid="input-email-address"
+              />
+              {currentUser && (
+                <p className="text-xs text-muted-foreground">
+                  Currently connected: {currentUser.displayName} ({currentUser.email})
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Enter the email address you want to use for reading and sending emails.
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button onClick={handleSaveSettings}>Save Settings</Button>
