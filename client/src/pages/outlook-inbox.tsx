@@ -162,16 +162,22 @@ export default function OutlookInbox() {
     retry: false,
   });
 
+  const hasInitialized = useState(false);
+  
   useEffect(() => {
+    if (hasInitialized[0]) return;
+    
     const savedEmail = localStorage.getItem("outlook_default_email");
-    if (savedEmail && !userEmail) {
+    if (savedEmail) {
       setUserEmail(savedEmail);
+      hasInitialized[1](true);
       return;
     }
-    if (currentUser?.email && !userEmail) {
+    if (currentUser?.email) {
       setUserEmail(currentUser.email);
+      hasInitialized[1](true);
     }
-  }, [currentUser, userEmail]);
+  }, [currentUser]);
 
   const { data: emails = [], isLoading: loadingEmails, refetch: refetchEmails } = useQuery<OutlookEmail[]>({
     queryKey: ["/api/outlook/emails", userEmail],
