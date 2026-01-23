@@ -349,6 +349,7 @@ export default function OutlookInbox() {
     localStorage.setItem("outlook_default_email", userEmail);
     setSettingsDialogOpen(false);
     toast.success("Settings saved");
+    refetchEmails();
   };
 
   const handleCreateClient = () => {
