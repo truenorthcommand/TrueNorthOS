@@ -47,6 +47,7 @@ integrations = ["javascript_openai_ai_integrations:2.0.0", "outlook:1.0.0", "jav
 
 [userenv.shared]
 SETUP_KEY = "TrueNorth2024Reset"
+VITE_MAPBOX_PUBLIC_KEY = "pk.eyJ1IjoidHJ1ZW5vcnRob3BlcmF0aW9uc2dyb3VwIiwiYSI6ImNta2EwajVtMTFtYXgzZXFzMGxzcGN1aXMifQ.uDT1emidZW1OH018cRYTHw"
 
 [userenv.production]
 NODE_ENV = "production"
