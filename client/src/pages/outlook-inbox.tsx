@@ -928,18 +928,11 @@ export default function OutlookInbox() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {currentUser ? (
+            {outlookUsers.length > 0 ? (
               <div className="space-y-2">
-                <Label>Connected Account</Label>
-                <p className="text-sm text-muted-foreground">
-                  {currentUser.displayName} ({currentUser.email})
-                </p>
-              </div>
-            ) : outlookUsers.length > 0 ? (
-              <div className="space-y-2">
-                <Label>Select Email Account</Label>
+                <Label>Email Account</Label>
                 <Select value={userEmail} onValueChange={setUserEmail}>
-                  <SelectTrigger>
+                  <SelectTrigger data-testid="select-email-account">
                     <SelectValue placeholder="Select account..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -950,6 +943,11 @@ export default function OutlookInbox() {
                     ))}
                   </SelectContent>
                 </Select>
+                {currentUser && (
+                  <p className="text-xs text-muted-foreground">
+                    Currently connected: {currentUser.displayName}
+                  </p>
+                )}
               </div>
             ) : (
               <div className="text-center py-4 text-muted-foreground">
