@@ -16,9 +16,8 @@ import { GlobalAIAssistant } from "@/components/GlobalAIAssistant";
 
 type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools' | 'fleet' | 'finance' | 'clients' | 'files' | 'settings';
 
-const NAVY_PRIMARY = "#0F2B4C";
-const NAVY_LIGHT = "#1a3a5c";
-const NAVY_HOVER = "#163352";
+const LIGHT_BG = "#ffffff";
+const LIGHT_BORDER = "#e5e7eb";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
@@ -83,8 +82,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 className={cn(
                   "w-10 h-10 flex items-center justify-center rounded-lg transition-colors",
                   isActive 
-                    ? "bg-white/15 text-white" 
-                    : "text-slate-300 hover:bg-white/10 hover:text-white"
+                    ? "bg-blue-50 text-blue-700" 
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 )}
                 onClick={onClick}
                 data-testid={`nav-link-${href.replace(/\//g, '-').slice(1) || 'home'}`}
@@ -106,8 +105,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           className={cn(
             "w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors text-left",
             isActive 
-              ? "bg-white/15 text-white" 
-              : "text-slate-300 hover:bg-white/10 hover:text-white"
+              ? "bg-blue-50 text-blue-700" 
+              : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
           )}
           onClick={() => {
             setIsOpen(false);
@@ -138,7 +137,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+              className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
               onClick={() => setSidebarCollapsed(false)}
               data-testid={`menu-group-${section}`}
             >
@@ -156,7 +155,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <Collapsible open={isExpanded(section)} onOpenChange={() => toggleSection(section)}>
         <CollapsibleTrigger asChild>
           <button
-            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-200 hover:bg-white/10 hover:text-white rounded-lg transition-colors"
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors"
             data-testid={`menu-group-${section}`}
           >
             <Icon className="h-5 w-5" />
@@ -177,7 +176,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const NavContent = ({ collapsed = false }: { collapsed?: boolean }) => (
     <div className="flex flex-col gap-2 h-full">
       <div className={cn(
-        "flex flex-col items-center gap-1 mb-6 pb-4 border-b border-white/20",
+        "flex flex-col items-center gap-1 mb-6 pb-4 border-b border-gray-200",
         collapsed ? "justify-center" : "px-2"
       )}>
         {!collapsed && (
@@ -210,8 +209,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   className={cn(
                     "w-10 h-10 flex items-center justify-center rounded-lg transition-colors",
                     location === "/" 
-                      ? "bg-white/15 text-white" 
-                      : "text-slate-300 hover:bg-white/10 hover:text-white"
+                      ? "bg-blue-50 text-blue-700" 
+                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                   )}
                   data-testid="nav-dashboard"
                 >
@@ -227,8 +226,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors",
                 location === "/" 
-                  ? "bg-white/15 text-white" 
-                  : "text-slate-300 hover:bg-white/10 hover:text-white"
+                  ? "bg-blue-50 text-blue-700" 
+                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
               )}
               onClick={() => setIsOpen(false)}
               data-testid="nav-dashboard"
@@ -256,8 +255,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     className={cn(
                       "w-10 h-10 flex items-center justify-center rounded-lg transition-colors",
                       location === "/outlook-inbox" 
-                        ? "bg-white/15 text-white" 
-                        : "text-slate-300 hover:bg-white/10 hover:text-white"
+                        ? "bg-blue-50 text-blue-700" 
+                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                     )}
                     data-testid="nav-email"
                   >
@@ -273,8 +272,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 className={cn(
                   "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors",
                   location === "/outlook-inbox" 
-                    ? "bg-white/15 text-white" 
-                    : "text-slate-300 hover:bg-white/10 hover:text-white"
+                    ? "bg-blue-50 text-blue-700" 
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 )}
                 onClick={() => setIsOpen(false)}
                 data-testid="nav-email"
@@ -336,8 +335,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   className={cn(
                     "w-10 h-10 flex items-center justify-center rounded-lg transition-colors relative",
                     location === "/messages" 
-                      ? "bg-white/15 text-white" 
-                      : "text-slate-300 hover:bg-white/10 hover:text-white"
+                      ? "bg-blue-50 text-blue-700" 
+                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                   )}
                   data-testid="nav-messages"
                 >
@@ -358,8 +357,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors",
                 location === "/messages" 
-                  ? "bg-white/15 text-white" 
-                  : "text-slate-300 hover:bg-white/10 hover:text-white"
+                  ? "bg-blue-50 text-blue-700" 
+                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
               )}
               onClick={() => setIsOpen(false)}
               data-testid="nav-messages"
@@ -446,7 +445,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   window.location.reload();
                 }
               }}
-              className="flex items-center gap-3 px-3 py-2 text-sm rounded-lg text-slate-300 hover:bg-white/10 hover:text-white transition-colors w-full"
+              className="flex items-center gap-3 px-3 py-2 text-sm rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors w-full"
               data-testid="button-clear-cache-sidebar"
             >
               <RefreshCw className="h-4 w-4" />
@@ -466,7 +465,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       window.location.reload();
                     }
                   }}
-                  className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+                  className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
                   data-testid="button-clear-cache-sidebar-collapsed"
                 >
                   <RefreshCw className="h-4 w-4" />
@@ -478,15 +477,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </MenuGroup>
       </nav>
 
-      <div className={cn("border-t border-white/20 pt-2 mt-auto", collapsed && "flex flex-col items-center")}>
+      <div className={cn("border-t border-gray-200 pt-2 mt-auto", collapsed && "flex flex-col items-center")}>
         {!collapsed && (
           <div className="px-4 py-1 mb-1 flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-medium shrink-0">
+            <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-medium shrink-0">
               {user.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U'}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-white truncate">{user.name}</p>
-              <p className="text-[10px] text-slate-400 capitalize truncate">
+              <p className="text-xs font-medium text-gray-900 truncate">{user.name}</p>
+              <p className="text-[10px] text-gray-500 capitalize truncate">
                 {(user.roles && user.roles.length > 0 ? user.roles : [user.role]).join(' • ')}
               </p>
             </div>
@@ -496,7 +495,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Tooltip>
             <TooltipTrigger asChild>
               <button 
-                className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-300 hover:bg-red-600 hover:text-white transition-colors" 
+                className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors" 
                 onClick={() => {
                   setIsOpen(false);
                   logout();
@@ -510,7 +509,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Tooltip>
         ) : (
           <button 
-            className="w-full flex items-center gap-2 px-4 py-2 text-xs font-medium text-slate-300 hover:bg-red-600 hover:text-white rounded-lg transition-colors" 
+            className="w-full flex items-center gap-2 px-4 py-2 text-xs font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors" 
             onClick={() => {
               setIsOpen(false);
               logout();
@@ -528,13 +527,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <TooltipProvider delayDuration={0}>
       <div className="min-h-screen flex bg-gray-100">
-        {/* Desktop Sidebar - Navy Theme */}
+        {/* Desktop Sidebar - Light Theme */}
         <aside 
           className={cn(
-            "hidden md:flex flex-col h-screen sticky top-0 transition-all duration-300 print:hidden",
+            "hidden md:flex flex-col h-screen sticky top-0 transition-all duration-300 print:hidden border-r",
             sidebarCollapsed ? "w-16" : "w-64"
           )}
-          style={{ backgroundColor: NAVY_PRIMARY }}
+          style={{ backgroundColor: LIGHT_BG, borderColor: LIGHT_BORDER }}
         >
           {/* Collapse Toggle Button */}
           <button
@@ -559,16 +558,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-h-screen bg-gray-100">
-          {/* Mobile Header - Navy Theme */}
-          <header className="sticky top-0 z-30 flex h-16 items-center gap-4 px-4 shadow-md md:hidden print:hidden" style={{ backgroundColor: NAVY_PRIMARY }}>
+          {/* Mobile Header - Light Theme */}
+          <header className="sticky top-0 z-30 flex h-16 items-center gap-4 px-4 shadow-sm border-b md:hidden print:hidden" style={{ backgroundColor: LIGHT_BG, borderColor: LIGHT_BORDER }}>
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
               <SheetTrigger asChild>
-                <button className="p-2 text-white hover:bg-white/10 rounded-lg">
+                <button className="p-2 text-gray-700 hover:bg-gray-100 rounded-lg">
                   <Menu className="h-6 w-6" />
                   <span className="sr-only">Toggle menu</span>
                 </button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[300px] sm:w-[350px] p-6 border-white/20" style={{ backgroundColor: NAVY_PRIMARY }}>
+              <SheetContent side="left" className="w-[300px] sm:w-[350px] p-6 border-gray-200" style={{ backgroundColor: LIGHT_BG }}>
                 <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                 <NavContent collapsed={false} />
               </SheetContent>
@@ -582,7 +581,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
             <div className="ml-auto flex items-center gap-2">
               <button 
-                className="p-2 text-white hover:bg-white/10 rounded-lg"
+                className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
                 onClick={() => window.location.reload()}
                 data-testid="button-refresh-app-mobile"
               >
@@ -590,7 +589,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <span className="sr-only">Refresh app</span>
               </button>
               <button 
-                className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg"
+                className="px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg"
                 onClick={logout}
               >
                 Sign Out
