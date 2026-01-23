@@ -49,7 +49,7 @@ export default function Login() {
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <img 
-              src="/logo-pms.jpg" 
+              src="/logo-pms.png" 
               alt="Professional Maintenance Solutions" 
               className="h-16 w-auto object-contain"
             />

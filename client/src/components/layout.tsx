@@ -183,7 +183,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {!collapsed && (
           <>
             <img 
-              src="/logo-pms.jpg" 
+              src="/logo-pms.png" 
               alt="Professional Maintenance Solutions" 
               className="w-full max-w-[180px] h-auto object-contain mx-auto"
             />
@@ -191,7 +191,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         )}
         {collapsed && (
           <img 
-            src="/logo-pms.jpg" 
+            src="/logo-pms.png" 
             alt="PMS" 
             className="w-10 h-10 object-cover mx-auto"
           />
@@ -575,7 +575,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </Sheet>
             
             <img 
-              src="/logo-pms.jpg" 
+              src="/logo-pms.png" 
               alt="Professional Maintenance Solutions" 
               className="h-10 max-w-[140px] w-auto object-contain"
             />
