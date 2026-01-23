@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { GoogleMap, MapMarker } from "@/components/google-map";
+import { LeafletMap, MapMarker } from "@/components/leaflet-map";
 import { 
   PoundSterling, TrendingUp, TrendingDown, Briefcase, Users, Receipt, 
   ArrowUpRight, ArrowDownRight, Target, AlertTriangle, CheckCircle,
@@ -343,7 +343,7 @@ export default function DemoDirectorsSuite() {
             </CardHeader>
             <CardContent>
               <div className="rounded-lg overflow-hidden border border-slate-700">
-                <GoogleMap
+                <LeafletMap
                   markers={mapMarkers}
                   height="350px"
                   zoom={11}
