@@ -47,7 +47,7 @@ export default function CompletedJobs() {
         </div>
       </div>
 
-      <div className="flex items-center space-x-2 bg-white dark:bg-slate-900 p-2 rounded-lg border shadow-sm">
+      <div className="flex items-center space-x-2 bg-card p-2 rounded-lg border shadow-sm">
         <Search className="w-5 h-5 text-muted-foreground ml-2" />
         <Input
           placeholder="Search by job number, customer, address, or client..."
@@ -118,7 +118,7 @@ export default function CompletedJobs() {
                       </div>
                     </div>
                   </CardContent>
-                  <CardFooter className="pt-3 border-t bg-slate-50 dark:bg-slate-900/50">
+                  <CardFooter className="pt-3 border-t bg-muted">
                     <div className="w-full flex items-center justify-between text-sm font-medium text-primary">
                       View Details
                       <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

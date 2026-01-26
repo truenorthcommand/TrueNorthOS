@@ -210,7 +210,7 @@ export default function CalendarPage() {
               {Array.from({ length: startDayOfWeek }).map((_, index) => (
                 <div
                   key={`empty-start-${index}`}
-                  className="h-24 bg-slate-50 dark:bg-slate-900/50 rounded"
+                  className="h-24 bg-muted rounded"
                   data-testid={`empty-start-${index}`}
                 />
               ))}
@@ -228,7 +228,7 @@ export default function CalendarPage() {
                         ? "border-primary bg-primary/10"
                         : isTodayDate
                         ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30"
-                        : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                        : "border-border hover:bg-muted"
                     }`}
                     onClick={() => setSelectedDate(day)}
                     data-testid={`calendar-day-${format(day, "yyyy-MM-dd")}`}
@@ -264,7 +264,7 @@ export default function CalendarPage() {
               {Array.from({ length: trailingDays }).map((_, index) => (
                 <div
                   key={`empty-end-${index}`}
-                  className="h-24 bg-slate-50 dark:bg-slate-900/50 rounded"
+                  className="h-24 bg-muted rounded"
                   data-testid={`empty-end-${index}`}
                 />
               ))}
@@ -294,7 +294,7 @@ export default function CalendarPage() {
                 {selectedDateJobs.map((job) => (
                   <div
                     key={job.id}
-                    className="p-3 rounded-lg border hover:bg-slate-50 dark:hover:bg-slate-900/50 cursor-pointer transition-colors"
+                    className="p-3 rounded-lg border hover:bg-muted cursor-pointer transition-colors"
                     onClick={() => setLocation(`/jobs/${job.id}`)}
                     data-testid={`calendar-job-${job.id}`}
                   >

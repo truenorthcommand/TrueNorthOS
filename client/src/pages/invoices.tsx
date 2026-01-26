@@ -257,7 +257,7 @@ export default function Invoices() {
         </Button>
       </div>
 
-      <div className="flex items-center space-x-2 bg-white dark:bg-slate-900 p-2 rounded-lg border shadow-sm">
+      <div className="flex items-center space-x-2 bg-card p-2 rounded-lg border shadow-sm">
         <Search className="w-5 h-5 text-muted-foreground ml-2" />
         <Input
           placeholder="Search invoices..."
@@ -413,7 +413,7 @@ export default function Invoices() {
 
               <div className="space-y-3">
                 {lineItems.map((item, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-2 items-start p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                  <div key={index} className="grid grid-cols-12 gap-2 items-start p-3 bg-muted rounded-lg">
                     <div className="col-span-12 md:col-span-5">
                       <Input
                         placeholder="Description"
@@ -474,7 +474,7 @@ export default function Invoices() {
             </div>
 
             {/* Totals */}
-            <Card className="bg-slate-50 dark:bg-slate-900">
+            <Card className="bg-muted">
               <CardContent className="pt-4">
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">

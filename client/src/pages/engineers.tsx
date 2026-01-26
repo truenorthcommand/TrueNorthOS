@@ -122,13 +122,13 @@ export default function Engineers() {
 
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg">
+                  <div className="bg-muted p-3 rounded-lg">
                     <p className="text-xs text-muted-foreground">Completed</p>
                     <p className="text-xl font-bold text-emerald-600">
                       {completedJobsCount}
                     </p>
                   </div>
-                  <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg">
+                  <div className="bg-muted p-3 rounded-lg">
                     <p className="text-xs text-muted-foreground">In Progress</p>
                     <p className="text-xl font-bold text-blue-600">
                       {currentJobsCount}
@@ -143,7 +143,7 @@ export default function Engineers() {
                       <div className="space-y-2 max-h-64 overflow-y-auto">
                         {allJobs.map((job) => (
                           <Link key={job.id} href={`/jobs/${job.id}`}>
-                            <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border hover:border-primary transition-colors cursor-pointer">
+                            <div className="bg-muted p-3 rounded-lg border hover:border-primary transition-colors cursor-pointer">
                               <div className="flex items-start justify-between gap-2 mb-2">
                                 <div className="flex-1 min-w-0">
                                   <p className="font-medium text-sm truncate">{job.customerName}</p>

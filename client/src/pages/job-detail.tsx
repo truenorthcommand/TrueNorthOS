@@ -671,7 +671,7 @@ export default function JobDetail() {
       case "low":
         return "bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300";
       default:
-        return "bg-slate-100 dark:bg-slate-800";
+        return "bg-muted";
     }
   };
 
@@ -805,7 +805,7 @@ export default function JobDetail() {
       <div className="grid gap-6 print:block">
         {/* Customer & Site Info */}
         <Card className="print:shadow-none print:border-none">
-          <CardHeader className="bg-slate-50 dark:bg-slate-900/50 print:bg-transparent print:p-0 print:mb-4">
+          <CardHeader className="bg-muted print:bg-transparent print:p-0 print:mb-4">
             <CardTitle className="text-lg flex items-center gap-2">
               <MapPin className="h-5 w-5 text-primary" />
               Site & Customer Details
@@ -1186,7 +1186,7 @@ export default function JobDetail() {
 
             {/* Long-running Job Toggle (Admin Only) */}
             {user?.role === "admin" && (
-              <div className="flex items-center justify-between p-4 border rounded-lg mt-6 bg-slate-50 dark:bg-slate-900/50">
+              <div className="flex items-center justify-between p-4 border rounded-lg mt-6 bg-muted">
                 <div className="space-y-0.5">
                   <Label htmlFor="long-running-toggle" className="flex items-center gap-2">
                     <ClipboardList className="h-4 w-4" />
@@ -1208,7 +1208,7 @@ export default function JobDetail() {
 
         {/* Work Details */}
         <Card className="print:shadow-none print:border-none">
-          <CardHeader className="bg-slate-50 dark:bg-slate-900/50 print:bg-transparent print:p-0 print:mb-4">
+          <CardHeader className="bg-muted print:bg-transparent print:p-0 print:mb-4">
             <CardTitle className="text-lg flex items-center gap-2">
               <FileCheck className="h-5 w-5 text-primary" />
               Work Details
@@ -1289,7 +1289,7 @@ export default function JobDetail() {
                 <CardContent className="pt-6 print:pt-0 space-y-6">
                   {/* Update Form */}
                   {!isReadOnly && todayUpdates.remaining > 0 && (
-                    <div className="space-y-4 p-4 bg-white dark:bg-slate-900/50 rounded-lg border" data-testid="form-daily-update">
+                    <div className="space-y-4 p-4 bg-card rounded-lg border" data-testid="form-daily-update">
                       <div className="flex items-center justify-between">
                         <Label className="text-base font-semibold">Add Progress Update</Label>
                         <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
@@ -1328,7 +1328,7 @@ export default function JobDetail() {
                               </button>
                             </div>
                           ))}
-                          <label className="h-20 w-20 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+                          <label className="h-20 w-20 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-muted transition-colors">
                             <Upload className="h-5 w-5 text-muted-foreground mb-1" />
                             <span className="text-xs text-muted-foreground">Add</span>
                             <input
@@ -1370,7 +1370,7 @@ export default function JobDetail() {
                     <Label className="text-base font-semibold">Update History</Label>
                     
                     {Object.keys(groupedUpdates).length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground bg-slate-50 dark:bg-slate-900/30 rounded-lg border border-dashed">
+                      <div className="text-center py-8 text-muted-foreground bg-muted rounded-lg border border-dashed">
                         <p>No updates recorded yet.</p>
                       </div>
                     ) : (
@@ -1387,7 +1387,7 @@ export default function JobDetail() {
                               .map((update) => (
                                 <div 
                                   key={update.id} 
-                                  className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg border ml-6"
+                                  className="p-4 bg-muted rounded-lg border ml-6"
                                   data-testid={`update-item-${update.id}`}
                                 >
                                   <div className="flex items-start justify-between mb-2">
@@ -1432,7 +1432,7 @@ export default function JobDetail() {
 
         {/* Materials */}
         <Card className="print:shadow-none print:border-none">
-          <CardHeader className="bg-slate-50 dark:bg-slate-900/50 print:bg-transparent print:p-0 print:mb-4">
+          <CardHeader className="bg-muted print:bg-transparent print:p-0 print:mb-4">
             <div className="flex justify-between items-center">
               <CardTitle className="text-lg">Materials & Parts</CardTitle>
             </div>
@@ -1442,7 +1442,7 @@ export default function JobDetail() {
               {(job.materials || []).length > 0 && (
                 <div className="border rounded-md overflow-hidden print:border-none">
                   <table className="w-full text-sm text-left">
-                    <thead className="bg-slate-100 dark:bg-slate-800 text-muted-foreground print:bg-transparent print:border-b">
+                    <thead className="bg-muted text-muted-foreground print:bg-transparent print:border-b">
                       <tr>
                         <th className="p-3 font-medium">Item Name</th>
                         <th className="p-3 font-medium w-32">Quantity</th>
@@ -1541,7 +1541,7 @@ export default function JobDetail() {
              ) : (
                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                  {(job.photos || []).filter(p => p.source === 'admin').map((photo) => (
-                   <div key={photo.id} className="relative group aspect-square bg-slate-100 rounded-md overflow-hidden border">
+                   <div key={photo.id} className="relative group aspect-square bg-muted rounded-md overflow-hidden border">
                      <img src={photo.url} alt="Reference photo" className="w-full h-full object-cover" />
                      {user?.role === 'admin' && !isReadOnly && (
                        <Button
@@ -1597,7 +1597,7 @@ export default function JobDetail() {
              ) : (
                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                  {(job.photos || []).filter(p => !p.source || p.source === 'engineer').map((photo) => (
-                   <div key={photo.id} className="relative group aspect-square bg-slate-100 rounded-md overflow-hidden border">
+                   <div key={photo.id} className="relative group aspect-square bg-muted rounded-md overflow-hidden border">
                      <img src={photo.url} alt="Evidence photo" className="w-full h-full object-cover" />
                      {!isReadOnly && (
                        <Button
@@ -1711,15 +1711,15 @@ export default function JobDetail() {
         {/* Signatures Preview (if signed off) */}
         {(job.signatures || []).length > 0 && (
           <Card className="print:shadow-none print:border-none break-inside-avoid">
-            <CardHeader className="bg-slate-50 dark:bg-slate-900/50 print:bg-transparent print:p-0 print:mb-4">
+            <CardHeader className="bg-muted print:bg-transparent print:p-0 print:mb-4">
               <CardTitle className="text-lg">Signatures</CardTitle>
             </CardHeader>
             <CardContent className="pt-6 print:pt-0">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {(job.signatures || []).map((sig) => (
-                  <div key={sig.id} className="border rounded-md p-4 bg-slate-50/50 print:border-black print:bg-transparent">
+                  <div key={sig.id} className="border rounded-md p-4 bg-muted/50 print:border-black print:bg-transparent">
                     <p className="text-sm font-medium mb-2 capitalize text-muted-foreground">{sig.type} Signature</p>
-                    <div className="bg-white border-b-2 border-dashed border-slate-300 h-24 mb-2 flex items-center justify-center print:bg-transparent print:border-black">
+                    <div className="bg-card border-b-2 border-dashed border-border h-24 mb-2 flex items-center justify-center print:bg-transparent print:border-black">
                       <img src={sig.url} alt="Signature" className="max-h-full max-w-full" />
                     </div>
                     <div className="flex justify-between items-end">
@@ -1777,7 +1777,7 @@ export default function JobDetail() {
           </CardHeader>
           <CardContent className="pt-6 print:pt-0">
             {!isReadOnly && (
-              <div className="space-y-4 mb-6 p-4 bg-white dark:bg-slate-900/50 rounded-lg border">
+              <div className="space-y-4 mb-6 p-4 bg-card rounded-lg border">
                 <div className="space-y-2">
                   <Label>Action Description</Label>
                   <AITextarea
@@ -1799,7 +1799,7 @@ export default function JobDetail() {
                         className={`px-3 py-2 rounded text-sm font-medium capitalize border-2 transition-all ${
                           selectedPriority === priority
                             ? getPriorityColor(priority) + ' border-current'
-                            : 'border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-current'
+                            : 'border-border bg-muted text-muted-foreground hover:border-current'
                         }`}
                       >
                         {priority}
@@ -1846,7 +1846,7 @@ export default function JobDetail() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground bg-white dark:bg-slate-900/30 rounded-lg border border-dashed">
+              <div className="text-center py-8 text-muted-foreground bg-card rounded-lg border border-dashed">
                 <p>No further actions recorded.</p>
               </div>
             )}
@@ -1955,7 +1955,7 @@ export default function JobDetail() {
                   Professional Summary
                   {report.aiPowered && <Sparkles className="h-3 w-3 text-amber-500" />}
                 </h4>
-                <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg text-sm whitespace-pre-wrap">
+                <div className="bg-muted p-4 rounded-lg text-sm whitespace-pre-wrap">
                   {report.professionalSummary}
                 </div>
               </div>
@@ -1966,7 +1966,7 @@ export default function JobDetail() {
                   <h4 className="font-semibold text-sm mb-3 text-primary">Materials Used</h4>
                   <div className="border rounded-lg overflow-hidden">
                     <table className="w-full text-sm">
-                      <thead className="bg-slate-50 dark:bg-slate-900/50">
+                      <thead className="bg-muted">
                         <tr>
                           <th className="text-left p-2 font-medium">Qty</th>
                           <th className="text-left p-2 font-medium">Description</th>
@@ -2018,7 +2018,7 @@ export default function JobDetail() {
                         <img 
                           src={s.data} 
                           alt={`${s.type} signature`} 
-                          className="h-16 border rounded bg-white"
+                          className="h-16 border rounded bg-card"
                         />
                       </div>
                     ))}

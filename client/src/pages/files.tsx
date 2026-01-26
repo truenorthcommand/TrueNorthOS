@@ -305,7 +305,7 @@ export default function Files() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="bg-white dark:bg-gray-800 border-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900"
+                          className="bg-card border-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900"
                           onClick={() => setNewFileData({ ...newFileData, clientId: aiSuggestion.suggestedClientId || "" })}
                           data-testid="button-apply-client"
                         >
@@ -318,7 +318,7 @@ export default function Files() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="bg-white dark:bg-gray-800 border-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900"
+                          className="bg-card border-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900"
                           onClick={() => setNewFileData({ ...newFileData, jobId: aiSuggestion.suggestedJobId || "" })}
                           data-testid="button-apply-job"
                         >
@@ -331,7 +331,7 @@ export default function Files() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="bg-white dark:bg-gray-800 border-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 capitalize"
+                          className="bg-card border-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 capitalize"
                           onClick={() => setNewFileData({ ...newFileData, category: aiSuggestion.suggestedCategory || "" })}
                           data-testid="button-apply-category"
                         >

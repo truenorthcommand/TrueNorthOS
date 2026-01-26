@@ -95,7 +95,7 @@ export default function Quotes() {
         </Button>
       </div>
 
-      <div className="flex items-center space-x-2 bg-white dark:bg-slate-900 p-2 rounded-lg border shadow-sm">
+      <div className="flex items-center space-x-2 bg-card p-2 rounded-lg border shadow-sm">
         <Search className="w-5 h-5 text-muted-foreground ml-2" />
         <Input
           placeholder="Search quotes..."

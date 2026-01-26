@@ -447,7 +447,7 @@ export default function OutlookInbox() {
       </div>
 
       <div className="flex-1 flex gap-4 min-h-0">
-        <div className="w-80 flex flex-col border rounded-lg bg-white dark:bg-slate-900 shadow-sm">
+        <div className="w-80 flex flex-col border rounded-lg bg-card shadow-sm">
           <div className="flex border-b">
             <button
               className={`flex-1 py-2 px-4 text-sm font-medium transition-colors ${
@@ -546,7 +546,7 @@ export default function OutlookInbox() {
         </div>
 
         <div className="flex-1 flex gap-4 min-w-0">
-          <div className="flex-1 border rounded-lg bg-white dark:bg-slate-900 shadow-sm flex flex-col min-w-0">
+          <div className="flex-1 border rounded-lg bg-card shadow-sm flex flex-col min-w-0">
             {selectedEmail ? (
               <>
                 <div className="p-4 border-b">
@@ -688,7 +688,7 @@ export default function OutlookInbox() {
           </div>
 
           {selectedEmail && (
-            <div className={`${sidebarExpanded ? 'w-72' : 'w-12'} border rounded-lg bg-white dark:bg-slate-900 shadow-sm flex flex-col transition-all duration-200`}>
+            <div className={`${sidebarExpanded ? 'w-72' : 'w-12'} border rounded-lg bg-card shadow-sm flex flex-col transition-all duration-200`}>
               <div className="p-3 border-b bg-blue-600 text-white rounded-t-lg flex items-center justify-between">
                 {sidebarExpanded && <h3 className="font-semibold text-sm">Quick Actions</h3>}
                 <Button

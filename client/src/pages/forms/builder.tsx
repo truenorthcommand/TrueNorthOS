@@ -51,16 +51,16 @@ function SortableField({ field, onEdit, onDelete }: SortableFieldProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-3 p-3 bg-white border rounded-lg group hover:border-slate-400 transition-colors"
+      className="flex items-center gap-3 p-3 bg-card border rounded-lg group hover:border-muted-foreground transition-colors"
     >
-      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 text-slate-400 hover:text-slate-600">
+      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 text-muted-foreground hover:text-foreground">
         <GripVertical className="h-4 w-4" />
       </button>
       <div className="flex items-center gap-2 flex-1 min-w-0">
-        <FieldIcon className="h-4 w-4 text-slate-400 shrink-0" />
+        <FieldIcon className="h-4 w-4 text-muted-foreground shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm truncate">{field.label}</p>
-          <p className="text-xs text-slate-500">{field.key} {field.required && <span className="text-red-500">*</span>}</p>
+          <p className="text-xs text-muted-foreground">{field.key} {field.required && <span className="text-red-500">*</span>}</p>
         </div>
       </div>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -214,8 +214,8 @@ export default function FormBuilder() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="sticky top-0 z-10 bg-white border-b px-6 py-4">
+    <div className="min-h-screen bg-muted">
+      <div className="sticky top-0 z-10 bg-card border-b px-6 py-4">
         <div className="flex items-center justify-between max-w-5xl mx-auto">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={() => setLocation("/forms/templates")} data-testid="button-back">
@@ -223,7 +223,7 @@ export default function FormBuilder() {
             </Button>
             <div>
               <h1 className="font-semibold text-lg">{template?.name || "Form Builder"}</h1>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-muted-foreground">
                 {template?.status === "draft" ? "Draft" : "Published"} • {fields.length} fields
               </p>
             </div>
@@ -259,7 +259,7 @@ export default function FormBuilder() {
               </CardHeader>
               <CardContent>
                 {fields.length === 0 ? (
-                  <div className="text-center py-12 text-slate-500">
+                  <div className="text-center py-12 text-muted-foreground">
                     <p>No fields yet. Add fields from the panel on the right.</p>
                   </div>
                 ) : (
@@ -339,7 +339,7 @@ export default function FormBuilder() {
                   }}
                   data-testid="input-field-key"
                 />
-                <p className="text-xs text-slate-500">Unique identifier used for data storage</p>
+                <p className="text-xs text-muted-foreground">Unique identifier used for data storage</p>
               </div>
 
               <Separator />
@@ -347,7 +347,7 @@ export default function FormBuilder() {
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Required</Label>
-                  <p className="text-xs text-slate-500">Make this field mandatory</p>
+                  <p className="text-xs text-muted-foreground">Make this field mandatory</p>
                 </div>
                 <Switch
                   checked={editingField.required || false}
@@ -364,7 +364,7 @@ export default function FormBuilder() {
                 <div className="flex items-center justify-between">
                   <div>
                     <Label>Allow Multiple</Label>
-                    <p className="text-xs text-slate-500">Allow multiple photos</p>
+                    <p className="text-xs text-muted-foreground">Allow multiple photos</p>
                   </div>
                   <Switch
                     checked={editingField.multiple || false}

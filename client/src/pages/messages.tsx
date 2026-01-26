@@ -429,11 +429,11 @@ export default function Messages() {
       <Card className="h-full overflow-hidden border-0 shadow-lg">
         <div className="flex h-full">
           {/* Conversation List */}
-          <div className={`w-full md:w-80 lg:w-96 border-r bg-gray-50 ${isMobileViewingConvo ? "hidden md:flex md:flex-col" : "flex flex-col"}`}>
+          <div className={`w-full md:w-80 lg:w-96 border-r border-border bg-muted ${isMobileViewingConvo ? "hidden md:flex md:flex-col" : "flex flex-col"}`}>
             <div className="flex flex-col h-full">
-              <div className="p-4 border-b bg-white">
+              <div className="p-4 border-b border-border bg-card">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-bold flex items-center gap-2 text-gray-800">
+                  <h2 className="text-xl font-bold flex items-center gap-2 text-foreground">
                     <MessageCircle className="h-6 w-6 text-[#25D366]" />
                     Messages
                   </h2>
@@ -534,13 +534,13 @@ export default function Messages() {
                 </div>
 
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search conversations..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.stopPropagation()}
-                    className="pl-10 bg-gray-100 border-0"
+                    className="pl-10 bg-muted border-0"
                     data-testid="input-search-conversations"
                   />
                 </div>
@@ -552,8 +552,8 @@ export default function Messages() {
                     <Loader2 className="h-6 w-6 animate-spin text-[#25D366]" />
                   </div>
                 ) : filteredConversations.length === 0 ? (
-                  <div className="p-6 text-center text-gray-500">
-                    <MessageCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                  <div className="p-6 text-center text-muted-foreground">
+                    <MessageCircle className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
                     <p className="font-medium">No conversations yet</p>
                     <p className="text-sm">Start a new conversation to chat with your team</p>
                   </div>
@@ -561,8 +561,8 @@ export default function Messages() {
                   filteredConversations.map((conversation) => (
                     <div
                       key={conversation.id}
-                      className={`flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-100 transition-colors border-b border-gray-100 ${
-                        selectedConversation?.id === conversation.id ? "bg-gray-100" : "bg-white"
+                      className={`flex items-center gap-3 p-4 cursor-pointer hover:bg-muted transition-colors border-b border-border ${
+                        selectedConversation?.id === conversation.id ? "bg-muted" : "bg-card"
                       }`}
                       onClick={() => {
                         setSelectedConversation(conversation);
@@ -577,15 +577,15 @@ export default function Messages() {
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <span className="font-semibold text-gray-900 truncate">{getConversationName(conversation)}</span>
+                          <span className="font-semibold text-foreground truncate">{getConversationName(conversation)}</span>
                           {conversation.lastMessage && (
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-muted-foreground">
                               {formatMessageTime(conversation.lastMessage.createdAt)}
                             </span>
                           )}
                         </div>
                         <div className="flex items-center justify-between mt-0.5">
-                          <p className="text-sm text-gray-500 truncate">
+                          <p className="text-sm text-muted-foreground truncate">
                             {typingUsers.get(conversation.id) ? (
                               <span className="text-[#25D366] italic">typing...</span>
                             ) : conversation.lastMessage ? (
@@ -618,7 +618,7 @@ export default function Messages() {
             {selectedConversation ? (
               <>
                 {/* Chat Header */}
-                <div className="p-3 border-b bg-gray-50 flex items-center gap-3">
+                <div className="p-3 border-b border-border bg-muted flex items-center gap-3">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -634,8 +634,8 @@ export default function Messages() {
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900">{getConversationName(selectedConversation)}</h3>
-                    <p className="text-xs text-gray-500">
+                    <h3 className="font-semibold text-foreground">{getConversationName(selectedConversation)}</h3>
+                    <p className="text-xs text-muted-foreground">
                       {typingUsers.get(selectedConversation.id) ? (
                         <span className="text-[#25D366]">typing...</span>
                       ) : selectedConversation.isGroup ? (
@@ -654,8 +654,8 @@ export default function Messages() {
                       <Loader2 className="h-6 w-6 animate-spin text-[#25D366]" />
                     </div>
                   ) : messages.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                      <div className="bg-white/80 rounded-lg p-6 text-center">
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                      <div className="bg-card/80 rounded-lg p-6 text-center">
                         <MessageCircle className="h-12 w-12 mx-auto mb-3 text-[#25D366] opacity-60" />
                         <p className="font-medium">No messages yet</p>
                         <p className="text-sm">Send a message to start the conversation</p>
@@ -676,7 +676,7 @@ export default function Messages() {
                           >
                             {!isOwn && showAvatar && (
                               <Avatar className="h-7 w-7 mb-1">
-                                <AvatarFallback className="text-xs bg-gray-400 text-white">
+                                <AvatarFallback className="text-xs bg-muted-foreground text-card">
                                   {message.sender?.name?.split(" ").map(n => n[0]).join("").slice(0, 2) || "?"}
                                 </AvatarFallback>
                               </Avatar>
@@ -685,8 +685,8 @@ export default function Messages() {
                             <div
                               className={`max-w-[75%] rounded-lg px-3 py-2 shadow-sm relative ${
                                 isOwn
-                                  ? "bg-[#DCF8C6] rounded-br-none"
-                                  : "bg-white rounded-bl-none"
+                                  ? "bg-[#DCF8C6] dark:bg-[#005C4B] rounded-br-none"
+                                  : "bg-card rounded-bl-none"
                               }`}
                             >
                               {showName && (
@@ -703,9 +703,9 @@ export default function Messages() {
                                 </div>
                               )}
                               {message.content && message.content !== "📷 Photo" && (
-                                <p className="break-words text-gray-900 text-[15px]">{message.content}</p>
+                                <p className="break-words text-foreground text-[15px]">{message.content}</p>
                               )}
-                              <div className={`flex items-center justify-end gap-1 mt-1 ${isOwn ? "text-gray-600" : "text-gray-500"}`}>
+                              <div className={`flex items-center justify-end gap-1 mt-1 ${isOwn ? "text-muted-foreground" : "text-muted-foreground"}`}>
                                 <span className="text-[11px]">
                                   {format(new Date(message.createdAt), "HH:mm")}
                                 </span>
@@ -724,7 +724,7 @@ export default function Messages() {
 
                 {/* Image Preview */}
                 {imagePreview && (
-                  <div className="p-3 border-t bg-gray-100">
+                  <div className="p-3 border-t border-border bg-muted">
                     <div className="relative inline-block">
                       <img src={imagePreview} alt="Preview" className="h-20 rounded-lg" />
                       <button
@@ -739,7 +739,7 @@ export default function Messages() {
                 )}
 
                 {/* Message Input */}
-                <form onSubmit={handleSendMessage} className="p-3 border-t bg-gray-50 flex items-center gap-2">
+                <form onSubmit={handleSendMessage} className="p-3 border-t border-border bg-muted flex items-center gap-2">
                   <input
                     type="file"
                     accept="image/*"
@@ -763,7 +763,7 @@ export default function Messages() {
                     variant="ghost"
                     size="icon"
                     onClick={() => cameraInputRef.current?.click()}
-                    className="text-gray-500 hover:text-[#25D366]"
+                    className="text-muted-foreground hover:text-[#25D366]"
                     data-testid="button-camera"
                   >
                     <Camera className="h-5 w-5" />
@@ -774,7 +774,7 @@ export default function Messages() {
                     variant="ghost"
                     size="icon"
                     onClick={() => fileInputRef.current?.click()}
-                    className="text-gray-500 hover:text-[#25D366]"
+                    className="text-muted-foreground hover:text-[#25D366]"
                     data-testid="button-attach-image"
                   >
                     <ImageIcon className="h-5 w-5" />
@@ -788,7 +788,7 @@ export default function Messages() {
                       handleTyping();
                     }}
                     onKeyDown={(e) => e.stopPropagation()}
-                    className="flex-1 bg-white rounded-full border-0 shadow-sm"
+                    className="flex-1 bg-card rounded-full border-0 shadow-sm"
                     data-testid="input-message"
                   />
                   
@@ -808,12 +808,12 @@ export default function Messages() {
                 </form>
               </>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full bg-gray-50 text-gray-500">
+              <div className="flex flex-col items-center justify-center h-full bg-muted text-muted-foreground">
                 <div className="text-center p-8">
                   <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-[#25D366]/10 flex items-center justify-center">
                     <MessageCircle className="h-12 w-12 text-[#25D366]" />
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-800 mb-2">Pro Main Messages</h3>
+                  <h3 className="text-xl font-semibold text-foreground mb-2">Pro Main Messages</h3>
                   <p className="text-sm max-w-xs">Send and receive messages with your team. Select a conversation or start a new one.</p>
                 </div>
               </div>

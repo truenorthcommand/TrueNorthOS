@@ -150,8 +150,8 @@ export default function FormSubmissions() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Form Submissions</h1>
-          <p className="text-slate-500 mt-1">View and manage submitted forms</p>
+          <h1 className="text-2xl font-bold text-foreground">Form Submissions</h1>
+          <p className="text-muted-foreground mt-1">View and manage submitted forms</p>
         </div>
         <Dialog open={isNewFormOpen} onOpenChange={setIsNewFormOpen}>
           <DialogTrigger asChild>
@@ -166,17 +166,17 @@ export default function FormSubmissions() {
             </DialogHeader>
             <div className="space-y-3 py-4">
               {publishedTemplates.length === 0 ? (
-                <p className="text-center text-slate-500 py-4">No published templates available</p>
+                <p className="text-center text-muted-foreground py-4">No published templates available</p>
               ) : (
                 publishedTemplates.map((template) => (
                   <button
                     key={template.id}
-                    className="w-full p-4 text-left border rounded-lg hover:bg-slate-50 transition-colors"
+                    className="w-full p-4 text-left border rounded-lg hover:bg-muted transition-colors"
                     onClick={() => handleStartForm(template)}
                     data-testid={`button-select-template-${template.id}`}
                   >
                     <p className="font-medium">{template.name}</p>
-                    <p className="text-sm text-slate-500">Version {template.latestVersion.version}</p>
+                    <p className="text-sm text-muted-foreground">Version {template.latestVersion.version}</p>
                   </button>
                 ))
               )}
@@ -187,7 +187,7 @@ export default function FormSubmissions() {
 
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by entity ID..."
             className="pl-10"
@@ -221,14 +221,14 @@ export default function FormSubmissions() {
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
         </div>
       ) : filteredSubmissions.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <ClipboardList className="h-12 w-12 text-slate-300 mb-4" />
-            <h3 className="text-lg font-medium text-slate-900">No submissions found</h3>
-            <p className="text-slate-500 mt-1">
+            <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium text-foreground">No submissions found</h3>
+            <p className="text-muted-foreground mt-1">
               {submissions.length === 0 ? "Fill out a form to see submissions here" : "Try adjusting your filters"}
             </p>
           </CardContent>
@@ -240,13 +240,13 @@ export default function FormSubmissions() {
               <CardContent className="flex items-center justify-between py-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-slate-400" />
+                    <FileText className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">{entityTypeLabels[submission.entityType]} Form</span>
                     <Badge className={statusColors[submission.status]}>
                       {submission.status.charAt(0).toUpperCase() + submission.status.slice(1)}
                     </Badge>
                   </div>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-muted-foreground">
                     Entity: {submission.entityId.slice(0, 8)}... •{" "}
                     {submission.submittedAt
                       ? `Submitted ${new Date(submission.submittedAt).toLocaleDateString()}`
@@ -307,16 +307,16 @@ export default function FormSubmissions() {
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-slate-500">Entity Type:</span>
+                  <span className="text-muted-foreground">Entity Type:</span>
                   <span className="ml-2 font-medium">{entityTypeLabels[selectedSubmission.entityType]}</span>
                 </div>
                 <div>
-                  <span className="text-slate-500">Entity ID:</span>
+                  <span className="text-muted-foreground">Entity ID:</span>
                   <span className="ml-2 font-medium">{selectedSubmission.entityId.slice(0, 12)}...</span>
                 </div>
                 {selectedSubmission.submittedAt && (
                   <div className="col-span-2">
-                    <span className="text-slate-500">Submitted:</span>
+                    <span className="text-muted-foreground">Submitted:</span>
                     <span className="ml-2 font-medium">{new Date(selectedSubmission.submittedAt).toLocaleString()}</span>
                   </div>
                 )}
@@ -348,8 +348,8 @@ export default function FormSubmissions() {
 
                 return (
                   <div key={field.key} className="space-y-1">
-                    <p className="text-sm font-medium text-slate-700">{field.label}</p>
-                    <div className="text-sm text-slate-900">{displayValue}</div>
+                    <p className="text-sm font-medium text-foreground">{field.label}</p>
+                    <div className="text-sm text-foreground">{displayValue}</div>
                   </div>
                 );
               })}

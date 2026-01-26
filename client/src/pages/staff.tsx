@@ -59,7 +59,7 @@ const ALL_ROLES: { value: Role; label: string; color: string }[] = [
 
 const getRoleBadgeColor = (role: Role): string => {
   const found = ALL_ROLES.find(r => r.value === role);
-  return found?.color || 'bg-gray-100 text-gray-700';
+  return found?.color || 'bg-muted text-muted-foreground';
 };
 
 const getRoleLabel = (role: Role): string => {
@@ -892,7 +892,7 @@ export default function Staff() {
     return (
       <div
         key={member.id}
-        className="flex flex-col gap-2 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg"
+        className="flex flex-col gap-2 p-3 bg-muted rounded-lg"
         data-testid={`staff-member-${member.id}`}
       >
         <div className="flex items-start justify-between">
@@ -939,7 +939,7 @@ export default function Staff() {
         {member.skills && member.skills.length > 0 && (
           <div className="flex flex-wrap gap-1 ml-13 mt-1">
             {member.skills.map(skill => (
-              <Badge key={skill.id} variant="outline" className="text-xs bg-slate-100 dark:bg-slate-800">
+              <Badge key={skill.id} variant="outline" className="text-xs bg-muted">
                 {skill.name}
               </Badge>
             ))}

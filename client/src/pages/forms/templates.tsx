@@ -148,8 +148,8 @@ export default function FormTemplates() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Form Templates</h1>
-          <p className="text-slate-500 mt-1">Create and manage customisable form templates</p>
+          <h1 className="text-2xl font-bold text-foreground">Form Templates</h1>
+          <p className="text-muted-foreground mt-1">Create and manage customisable form templates</p>
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
@@ -203,7 +203,7 @@ export default function FormTemplates() {
 
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search templates..."
             className="pl-10"
@@ -239,14 +239,14 @@ export default function FormTemplates() {
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
         </div>
       ) : filteredTemplates.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <ClipboardList className="h-12 w-12 text-slate-300 mb-4" />
-            <h3 className="text-lg font-medium text-slate-900">No templates found</h3>
-            <p className="text-slate-500 mt-1">
+            <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium text-foreground">No templates found</h3>
+            <p className="text-muted-foreground mt-1">
               {templates.length === 0 ? "Create your first form template to get started" : "Try adjusting your filters"}
             </p>
           </CardContent>
@@ -269,7 +269,7 @@ export default function FormTemplates() {
               <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                 <div className="space-y-1">
                   <CardTitle className="text-base font-semibold">{template.name}</CardTitle>
-                  <p className="text-sm text-slate-500">{typeLabels[template.type] || template.type}</p>
+                  <p className="text-sm text-muted-foreground">{typeLabels[template.type] || template.type}</p>
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -321,7 +321,7 @@ export default function FormTemplates() {
                   <Badge className={statusColors[template.status]}>
                     {template.status.charAt(0).toUpperCase() + template.status.slice(1)}
                   </Badge>
-                  <span className="text-xs text-slate-400">
+                  <span className="text-xs text-muted-foreground">
                     {new Date(template.createdAt).toLocaleDateString()}
                   </span>
                 </div>

@@ -124,7 +124,7 @@ export default function Jobs() {
         )}
       </div>
 
-      <div className="flex items-center space-x-2 bg-white dark:bg-slate-900 p-2 rounded-lg border shadow-sm">
+      <div className="flex items-center space-x-2 bg-card p-2 rounded-lg border shadow-sm">
         <Search className="w-5 h-5 text-muted-foreground ml-2" />
         <Input 
           placeholder="Search jobs, customers, or addresses..." 
@@ -368,8 +368,8 @@ function JobCard({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Progress</span>
-                <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{completedCount}/{progressItems.length}</span>
+                <span className="text-xs font-semibold text-muted-foreground">Progress</span>
+                <span className="text-xs font-bold text-muted-foreground">{completedCount}/{progressItems.length}</span>
               </div>
               <Progress value={progressPercentage} className="h-2" />
             </div>
@@ -383,7 +383,7 @@ function JobCard({
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
                       item.complete 
                         ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' 
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                        : 'bg-muted text-muted-foreground'
                     }`}
                   >
                     <Icon className="w-3 h-3" />
@@ -395,7 +395,7 @@ function JobCard({
             </div>
           </div>
         </CardContent>
-        <CardFooter className="pt-3 border-t bg-slate-50 dark:bg-slate-900/50">
+        <CardFooter className="pt-3 border-t bg-muted">
           <div className="w-full flex items-center justify-between">
             <span className="text-sm font-medium text-primary flex items-center gap-1">
               View Details

@@ -945,7 +945,7 @@ export default function Clients() {
             </div>
 
             {selectedClient && (
-              <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border space-y-3">
+              <div className="bg-muted p-4 rounded-lg border space-y-3">
                 <div className="flex items-center gap-2">
                   <Building2 className="h-4 w-4 text-primary" />
                   <p className="text-sm font-medium">Client Information</p>
@@ -1018,7 +1018,7 @@ export default function Clients() {
                       </SelectContent>
                     </Select>
                   ) : (
-                    <div className="p-4 border rounded-lg bg-slate-50 dark:bg-slate-900/50 border-amber-300">
+                    <div className="p-4 border rounded-lg bg-muted border-amber-300">
                       <p className="text-sm text-muted-foreground">
                         No properties found for this client. Add a new property to continue.
                       </p>
@@ -1027,7 +1027,7 @@ export default function Clients() {
                 </div>
 
                 {showAddProperty && (
-                  <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border space-y-4">
+                  <div className="bg-muted p-4 rounded-lg border space-y-4">
                     <div className="flex items-center gap-2">
                       <Home className="h-4 w-4 text-primary" />
                       <p className="text-sm font-medium">New Property</p>
@@ -1277,7 +1277,7 @@ export default function Clients() {
                     </button>
                   </div>
                 ))}
-                <label className="h-24 w-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+                <label className="h-24 w-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-muted transition-colors">
                   <Camera className="h-6 w-6 text-muted-foreground mb-1" />
                   <span className="text-xs text-muted-foreground">
                     {isUploadingPhoto ? "..." : "Add"}
@@ -1508,7 +1508,7 @@ export default function Clients() {
             )}
 
             {/* Summary Card */}
-            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border space-y-3">
+            <div className="bg-muted p-4 rounded-lg border space-y-3">
               <p className="text-sm font-medium">Job Summary</p>
               <div className="grid gap-2 text-sm">
                 <div className="flex justify-between">
@@ -1719,7 +1719,7 @@ export default function Clients() {
                     Add Property Address (optional)
                   </Button>
                 ) : (
-                  <div className="border rounded-lg p-4 space-y-4 bg-slate-50 dark:bg-slate-900/50">
+                  <div className="border rounded-lg p-4 space-y-4 bg-muted">
                     <div className="flex items-center justify-between">
                       <Label className="text-base font-medium flex items-center gap-2">
                         <Home className="h-4 w-4" />
@@ -1764,7 +1764,7 @@ export default function Clients() {
                 )}
 
                 {/* Additional Contact Persons Section */}
-                <div className="border rounded-lg p-4 space-y-4 bg-slate-50 dark:bg-slate-900/50">
+                <div className="border rounded-lg p-4 space-y-4 bg-muted">
                   <div className="flex items-center justify-between">
                     <Label className="text-base font-medium">Additional Contact Persons</Label>
                     <Button
@@ -1784,7 +1784,7 @@ export default function Clients() {
                   )}
                   
                   {newClientContacts.map((contact, index) => (
-                    <div key={index} className="border rounded-md p-3 bg-white dark:bg-slate-800 space-y-3">
+                    <div key={index} className="border rounded-md p-3 bg-card space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Contact {index + 1}</span>
                         <Button
@@ -1924,7 +1924,7 @@ export default function Clients() {
                     <Input 
                       value={createdPortalLink} 
                       readOnly 
-                      className="bg-white dark:bg-slate-800 text-sm font-mono"
+                      className="bg-card text-sm font-mono"
                       data-testid="input-portal-link"
                     />
                     <Button
@@ -1955,7 +1955,7 @@ export default function Clients() {
             </CardContent>
           </Card>
 
-          <div className="flex items-center space-x-2 bg-white dark:bg-slate-900 p-2 rounded-lg border shadow-sm mb-4">
+          <div className="flex items-center space-x-2 bg-card p-2 rounded-lg border shadow-sm mb-4">
             <Search className="w-5 h-5 text-muted-foreground ml-2" />
             <Input 
               placeholder="Search clients by name, contact, email, or address..." 
@@ -1974,7 +1974,7 @@ export default function Clients() {
                 data-testid={`card-client-${client.id}`}
               >
                 <CardHeader
-                  className="pb-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                  className="pb-3 cursor-pointer hover:bg-muted"
                   onClick={() =>
                     setExpandedClientId(
                       expandedClientId === client.id ? null : client.id
@@ -2045,7 +2045,7 @@ export default function Clients() {
                 {expandedClientId === client.id && (
                   <CardContent className="border-t space-y-6 pt-6">
                     {editingClient?.id === client.id ? (
-                      <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg space-y-4">
+                      <div className="bg-muted p-4 rounded-lg space-y-4">
                         <div className="flex items-center gap-2 mb-2">
                           <Edit2 className="h-4 w-4 text-primary" />
                           <p className="text-sm font-semibold">Edit Client</p>
@@ -2196,7 +2196,7 @@ export default function Clients() {
 
                       {/* Add Contact Form */}
                       {showAddContact === client.id && (
-                        <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg mb-4 space-y-3">
+                        <div className="bg-muted p-4 rounded-lg mb-4 space-y-3">
                           <p className="text-sm font-medium">New Contact</p>
                           <div className="grid md:grid-cols-2 gap-3">
                             <div className="space-y-1">
@@ -2275,7 +2275,7 @@ export default function Clients() {
                             (clientContacts[client.id] || []).map((contact) => (
                               <div
                                 key={contact.id}
-                                className="flex items-start justify-between p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg"
+                                className="flex items-start justify-between p-3 bg-muted rounded-lg"
                                 data-testid={`contact-card-${contact.id}`}
                               >
                                 {editingContact?.id === contact.id ? (
@@ -2463,7 +2463,7 @@ export default function Clients() {
                               {(clientFiles[client.id] || []).map((file) => (
                                 <div
                                   key={file.id}
-                                  className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors"
+                                  className="flex items-center gap-3 p-3 bg-muted rounded-lg hover:bg-accent transition-colors"
                                   data-testid={`file-item-${file.id}`}
                                 >
                                   {getFileIcon(file.mimeType)}
