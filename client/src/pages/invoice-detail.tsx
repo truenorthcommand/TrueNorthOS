@@ -205,8 +205,8 @@ export default function InvoiceDetail() {
                 </tr>
               </thead>
               <tbody>
-                {invoice.lineItems.map((item) => (
-                  <tr key={item.id} className="border-b">
+                {invoice.lineItems.map((item, index) => (
+                  <tr key={item.id || `item-${index}`} className="border-b">
                     <td className="py-3 px-2">{item.description}</td>
                     <td className="py-3 px-2 text-right">{item.quantity}</td>
                     <td className="py-3 px-2 text-right">£{item.unitCost.toFixed(2)}</td>

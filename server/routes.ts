@@ -2124,6 +2124,8 @@ export async function registerRoutes(
         invoiceNo,
         accessToken,
         createdById: req.session.userId,
+        dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
+        invoiceDate: req.body.invoiceDate ? new Date(req.body.invoiceDate) : new Date(),
       });
       res.json(invoice);
     } catch (error) {
