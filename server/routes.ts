@@ -6386,10 +6386,10 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
   app.post("/api/messages/conversations/:conversationId/messages", requireAuth, async (req, res) => {
     try {
       const { conversationId } = req.params;
-      const { content } = req.body;
+      const { content, imageUrl } = req.body;
 
-      if (!content || typeof content !== 'string' || content.trim() === '') {
-        return res.status(400).json({ error: "Message content is required" });
+      if ((!content || typeof content !== 'string' || content.trim() === '') && !imageUrl) {
+        return res.status(400).json({ error: "Message content or image is required" });
       }
 
       // Verify user is a member of this conversation (efficient check)
@@ -6402,7 +6402,8 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
       const message = await storage.createMessage({
         conversationId,
         senderId: req.session.userId!,
-        content: content.trim(),
+        content: content?.trim() || "",
+        imageUrl: imageUrl || null,
       });
 
       // Get sender info for the response

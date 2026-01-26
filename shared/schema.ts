@@ -511,6 +511,7 @@ export const messages = pgTable("messages", {
   conversationId: varchar("conversation_id").notNull(),
   senderId: varchar("sender_id").notNull(),
   content: text("content").notNull(),
+  imageUrl: text("image_url"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
