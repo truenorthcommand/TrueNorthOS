@@ -89,7 +89,10 @@ export default function Clients() {
     phone: "",
     address: "",
     postcode: "",
+    propertyAddress: "",
+    propertyPostcode: "",
   });
+  const [showPropertyAddress, setShowPropertyAddress] = useState(false);
   const [enableClientPortal, setEnableClientPortal] = useState(false);
   const [createdPortalLink, setCreatedPortalLink] = useState<string | null>(null);
   
@@ -617,6 +620,8 @@ export default function Clients() {
         phone: extracted.phone || newClient.phone,
         address: extracted.address || newClient.address,
         postcode: extracted.postcode || newClient.postcode,
+        propertyAddress: newClient.propertyAddress,
+        propertyPostcode: newClient.propertyPostcode,
       });
 
       setShowScannerModal(false);
@@ -693,7 +698,10 @@ export default function Clients() {
           phone: "",
           address: "",
           postcode: "",
+          propertyAddress: "",
+          propertyPostcode: "",
         });
+        setShowPropertyAddress(false);
         setNewClientContacts([]);
         setEnableClientPortal(false);
         
@@ -1676,7 +1684,7 @@ export default function Clients() {
                 </div>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Address <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                    <Label>Address</Label>
                     <Textarea
                       placeholder="Full address"
                       value={newClient.address}
@@ -1697,6 +1705,63 @@ export default function Clients() {
                     />
                   </div>
                 </div>
+
+                {/* Property Address Section */}
+                {!showPropertyAddress ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowPropertyAddress(true)}
+                    className="w-full justify-start text-muted-foreground"
+                    data-testid="button-add-property-address"
+                  >
+                    <Home className="h-4 w-4 mr-2" />
+                    Add Property Address (optional)
+                  </Button>
+                ) : (
+                  <div className="border rounded-lg p-4 space-y-4 bg-slate-50 dark:bg-slate-900/50">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base font-medium flex items-center gap-2">
+                        <Home className="h-4 w-4" />
+                        Property Address
+                      </Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setShowPropertyAddress(false);
+                          setNewClient({ ...newClient, propertyAddress: "", propertyPostcode: "" });
+                        }}
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                        data-testid="button-remove-property-address"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Property Address</Label>
+                        <Textarea
+                          placeholder="Full property address"
+                          value={newClient.propertyAddress}
+                          onChange={(e) => setNewClient({ ...newClient, propertyAddress: e.target.value })}
+                          className="min-h-[80px]"
+                          data-testid="input-property-address"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Property Postcode</Label>
+                        <Input
+                          placeholder="e.g., SW1A 1AA"
+                          value={newClient.propertyPostcode}
+                          onChange={(e) => setNewClient({ ...newClient, propertyPostcode: e.target.value })}
+                          data-testid="input-property-postcode"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Additional Contact Persons Section */}
                 <div className="border rounded-lg p-4 space-y-4 bg-slate-50 dark:bg-slate-900/50">
