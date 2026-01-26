@@ -108,7 +108,7 @@ function SortableJobCard({
       style={style}
       {...attributes}
       {...listeners}
-      className="bg-white dark:bg-slate-800 border rounded-md p-2 mb-1 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing select-none"
+      className="bg-card border border-border rounded-md p-2 mb-1 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing select-none"
       data-testid={`planner-job-${job.id}`}
     >
       <p className="text-xs font-medium truncate">{job.nickname || job.customerName}</p>
@@ -148,11 +148,11 @@ function DroppableCell({
   return (
     <div
       ref={setNodeRef}
-      className={`min-h-[100px] p-1 border-r border-b transition-colors ${
+      className={`min-h-[100px] p-1 border-r border-b border-border transition-colors ${
         isOver
           ? "bg-primary/10 border-primary"
           : isEmpty
-          ? "bg-slate-50 dark:bg-slate-900/30"
+          ? "bg-muted/30"
           : ""
       }`}
       data-testid={`planner-cell-${id}`}
@@ -179,7 +179,7 @@ function JobCardOverlay({ job }: { job: Job }) {
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 border-2 border-primary rounded-md p-2 shadow-lg w-48">
+    <div className="bg-card border-2 border-primary rounded-md p-2 shadow-lg w-48">
       <div className="flex items-center gap-1 mb-1">
         <Badge className={`${getStatusColor(job.status)} text-xs px-1 py-0`}>
           {job.status === "Awaiting Signatures" ? "Await" : job.status}
@@ -266,7 +266,7 @@ export default function PlannerPage() {
         name: e.name,
       }));
     },
-    enabled: user?.role === "admin",
+    enabled: hasRole(user, "admin") || hasRole(user, "works_manager") || hasRole(user, "surveyor"),
   });
 
   useEffect(() => {
@@ -662,7 +662,7 @@ export default function PlannerPage() {
                   {engineers.map((engineer) => (
                     <div
                       key={engineer.id}
-                      className="flex items-center gap-3 p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+                      className="flex items-center gap-3 p-2 rounded hover:bg-muted"
                     >
                       <Checkbox
                         id={`engineer-${engineer.id}`}
@@ -725,8 +725,8 @@ export default function PlannerPage() {
             onDragEnd={handleDragEnd}
           >
             <div className="min-w-[900px]">
-              <div className="grid grid-cols-8 border-t border-l">
-                <div className="p-2 font-medium text-sm bg-slate-100 dark:bg-slate-800 border-r border-b">
+              <div className="grid grid-cols-8 border-t border-l border-border">
+                <div className="p-2 font-medium text-sm bg-muted border-r border-b border-border text-foreground">
                   Engineer
                 </div>
                 {weekDays.map((day) => {
@@ -740,10 +740,10 @@ export default function PlannerPage() {
                     >
                       <PopoverTrigger asChild>
                         <div
-                          className={`p-2 text-center font-medium text-sm border-r border-b cursor-pointer hover:bg-primary/5 transition-colors ${
+                          className={`p-2 text-center font-medium text-sm border-r border-b border-border cursor-pointer hover:bg-primary/5 transition-colors ${
                             isSameDay(day, new Date())
                               ? "bg-primary/10 text-primary"
-                              : "bg-slate-100 dark:bg-slate-800"
+                              : "bg-muted text-foreground"
                           }`}
                           data-testid={`planner-day-header-${dayStr}`}
                         >
@@ -781,7 +781,7 @@ export default function PlannerPage() {
                                   stroke="currentColor"
                                   strokeWidth="4"
                                   fill="none"
-                                  className="text-slate-200 dark:text-slate-700"
+                                  className="text-muted-foreground/30"
                                 />
                                 <circle
                                   cx="28"
@@ -846,7 +846,7 @@ export default function PlannerPage() {
                   <>
                     <div
                       key={`name-${engineer.id}`}
-                      className="p-2 font-medium text-sm border-r border-b bg-slate-50 dark:bg-slate-900/50 flex items-center"
+                      className="p-2 font-medium text-sm border-r border-b border-border bg-muted/50 flex items-center text-foreground"
                     >
                       {engineer.name}
                     </div>
