@@ -18,7 +18,8 @@ import {
   Plus,
   Pencil,
   Trash2,
-  Loader2
+  Loader2,
+  ExternalLink
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -29,6 +30,7 @@ type AiAdvisor = {
   icon: string;
   category: string;
   systemPrompt: string;
+  gptId: string | null;
   isActive: boolean;
 };
 
@@ -71,6 +73,7 @@ export default function AdminAdvisors() {
     icon: "Bot",
     category: "general",
     systemPrompt: "",
+    gptId: "",
     isActive: true,
   });
 
@@ -131,6 +134,7 @@ export default function AdminAdvisors() {
       icon: "Bot",
       category: "general",
       systemPrompt: "",
+      gptId: "",
       isActive: true,
     });
     setEditingAdvisor(null);
@@ -145,6 +149,7 @@ export default function AdminAdvisors() {
       icon: advisor.icon,
       category: advisor.category,
       systemPrompt: advisor.systemPrompt,
+      gptId: advisor.gptId || "",
       isActive: advisor.isActive,
     });
     setIsDialogOpen(true);
@@ -277,6 +282,21 @@ export default function AdminAdvisors() {
                 />
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="gptId">GPT ID (Optional)</Label>
+                <Input
+                  id="gptId"
+                  value={formData.gptId}
+                  onChange={(e) => setFormData({ ...formData, gptId: e.target.value })}
+                  placeholder="e.g., g-6978ca050fb8819181dfc21d110e9e0c-project-manager"
+                  className="font-mono text-sm"
+                  data-testid="input-gpt-id"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Custom GPT ID from OpenAI. Find it in the GPT URL after /g/
+                </p>
+              </div>
+
               <div className="flex items-center gap-2">
                 <Switch
                   id="isActive"
@@ -375,6 +395,20 @@ export default function AdminAdvisors() {
               </CardHeader>
               <CardContent>
                 <CardDescription className="mb-3">{advisor.description}</CardDescription>
+                {advisor.gptId && (
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">GPT ID:</span>
+                    <code className="text-xs bg-muted px-2 py-0.5 rounded font-mono">{advisor.gptId}</code>
+                    <a
+                      href={`https://chat.openai.com/g/${advisor.gptId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-primary hover:underline flex items-center gap-1"
+                    >
+                      Open in ChatGPT <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                )}
                 <details className="text-sm">
                   <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
                     View System Prompt

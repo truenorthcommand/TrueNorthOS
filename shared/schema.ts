@@ -303,6 +303,7 @@ export const aiAdvisors = pgTable("ai_advisors", {
   icon: text("icon").notNull().default("Bot"),
   category: text("category").notNull().default("general"),
   systemPrompt: text("system_prompt").notNull(),
+  gptId: text("gpt_id"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
