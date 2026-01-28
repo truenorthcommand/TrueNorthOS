@@ -1870,6 +1870,68 @@ export const insertExceptionSchema = createInsertSchema(exceptions).omit({
 export type InsertException = z.infer<typeof insertExceptionSchema>;
 export type Exception = typeof exceptions.$inferSelect;
 
+// Assets - Equipment, parts, and items tracked with barcodes/QR codes
+export const assets = pgTable("assets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  serialNumber: text("serial_number"),
+  barcode: text("barcode"),
+  manufacturer: text("manufacturer"),
+  model: text("model"),
+  description: text("description"),
+  categoryType: text("category_type").default("equipment"), // equipment, tool, part, vehicle, other
+  condition: text("condition").default("good"), // new, good, fair, needs_repair, decommissioned
+  location: text("location"),
+  purchaseDate: timestamp("purchase_date"),
+  purchasePrice: doublePrecision("purchase_price"),
+  warrantyExpiry: timestamp("warranty_expiry"),
+  warrantyNotes: text("warranty_notes"),
+  warrantyProvider: text("warranty_provider"),
+  assignedJobId: varchar("assigned_job_id"),
+  assignedClientId: varchar("assigned_client_id"),
+  assignedUserId: varchar("assigned_user_id"),
+  photos: jsonb("photos").default([]),
+  documents: jsonb("documents").default([]),
+  notes: text("notes"),
+  lastServiceDate: timestamp("last_service_date"),
+  nextServiceDue: timestamp("next_service_due"),
+  productUrl: text("product_url"),
+  manualUrl: text("manual_url"),
+  qrCodeData: text("qr_code_data"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAssetSchema = createInsertSchema(assets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAsset = z.infer<typeof insertAssetSchema>;
+export type Asset = typeof assets.$inferSelect;
+
+// Asset History - Audit log for asset changes
+export const assetHistory = pgTable("asset_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  assetId: varchar("asset_id").notNull(),
+  action: text("action").notNull(), // created, updated, assigned, condition_changed, service_completed
+  description: text("description"),
+  previousValue: jsonb("previous_value"),
+  newValue: jsonb("new_value"),
+  performedBy: varchar("performed_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAssetHistorySchema = createInsertSchema(assetHistory).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAssetHistory = z.infer<typeof insertAssetHistorySchema>;
+export type AssetHistory = typeof assetHistory.$inferSelect;
+
 // AI Cache for storing cached AI responses
 export const aiCache = pgTable("ai_cache", {
   key: varchar("key").primaryKey(),

@@ -49,6 +49,8 @@ import {
   type WorkflowRule, type InsertWorkflowRule,
   type WorkflowExecution, type InsertWorkflowExecution,
   type WorkflowLog, type InsertWorkflowLog,
+  type Asset, type InsertAsset,
+  type AssetHistory, type InsertAssetHistory,
   users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, clientContacts, clientProperties, jobUpdates,
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
@@ -59,7 +61,8 @@ import {
   aiConversations, aiBusinessPatterns, aiUserPreferences,
   formTemplates, formTemplateVersions, formSubmissions, formAssets,
   featureFlags, exceptions, domainEvents, webhookSubscriptions, webhookDeliveries, aiRequests,
-  workflowRules, workflowExecutions, workflowLogs
+  workflowRules, workflowExecutions, workflowLogs,
+  assets, assetHistory
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and, ne, inArray, gt, asc } from "drizzle-orm";
@@ -395,6 +398,21 @@ export interface IStorage {
   getRecentJobs(limit: number): Promise<Job[]>;
   getRecentClients(limit: number): Promise<Client[]>;
   getActiveJobs(): Promise<Job[]>;
+  
+  // Assets
+  getAssets(filters?: { condition?: string; categoryType?: string; assignedClientId?: string; assignedJobId?: string; isActive?: boolean }): Promise<Asset[]>;
+  getAsset(id: string): Promise<Asset | undefined>;
+  getAssetByBarcode(barcode: string): Promise<Asset | undefined>;
+  getAssetBySerialNumber(serialNumber: string): Promise<Asset | undefined>;
+  createAsset(data: InsertAsset): Promise<Asset>;
+  updateAsset(id: string, data: Partial<Asset>): Promise<Asset | undefined>;
+  deleteAsset(id: string): Promise<void>;
+  searchAssets(query: string): Promise<Asset[]>;
+  getAssetsExpiringWarranty(days: number): Promise<Asset[]>;
+  
+  // Asset History
+  getAssetHistory(assetId: string): Promise<AssetHistory[]>;
+  createAssetHistory(data: InsertAssetHistory): Promise<AssetHistory>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2976,6 +2994,107 @@ export class DatabaseStorage implements IStorage {
       .where(or(eq(jobs.status, 'In Progress'), eq(jobs.status, 'Draft'), eq(jobs.status, 'Awaiting Signatures')))
       .orderBy(desc(jobs.updatedAt))
       .limit(25);
+  }
+
+  // ==================== ASSETS ====================
+  async getAssets(filters?: { condition?: string; categoryType?: string; assignedClientId?: string; assignedJobId?: string; isActive?: boolean }): Promise<Asset[]> {
+    let query = db.select().from(assets);
+    const conditions = [];
+    
+    if (filters?.condition) {
+      conditions.push(eq(assets.condition, filters.condition));
+    }
+    if (filters?.categoryType) {
+      conditions.push(eq(assets.categoryType, filters.categoryType));
+    }
+    if (filters?.assignedClientId) {
+      conditions.push(eq(assets.assignedClientId, filters.assignedClientId));
+    }
+    if (filters?.assignedJobId) {
+      conditions.push(eq(assets.assignedJobId, filters.assignedJobId));
+    }
+    if (filters?.isActive !== undefined) {
+      conditions.push(eq(assets.isActive, filters.isActive));
+    }
+    
+    if (conditions.length > 0) {
+      return db.select().from(assets).where(and(...conditions)).orderBy(desc(assets.createdAt));
+    }
+    return db.select().from(assets).orderBy(desc(assets.createdAt));
+  }
+
+  async getAsset(id: string): Promise<Asset | undefined> {
+    const [asset] = await db.select().from(assets).where(eq(assets.id, id));
+    return asset;
+  }
+
+  async getAssetByBarcode(barcode: string): Promise<Asset | undefined> {
+    const [asset] = await db.select().from(assets).where(eq(assets.barcode, barcode));
+    return asset;
+  }
+
+  async getAssetBySerialNumber(serialNumber: string): Promise<Asset | undefined> {
+    const [asset] = await db.select().from(assets).where(eq(assets.serialNumber, serialNumber));
+    return asset;
+  }
+
+  async createAsset(data: InsertAsset): Promise<Asset> {
+    const [asset] = await db.insert(assets).values(data).returning();
+    return asset;
+  }
+
+  async updateAsset(id: string, data: Partial<Asset>): Promise<Asset | undefined> {
+    const [asset] = await db.update(assets)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(assets.id, id))
+      .returning();
+    return asset;
+  }
+
+  async deleteAsset(id: string): Promise<void> {
+    await db.delete(assets).where(eq(assets.id, id));
+  }
+
+  async searchAssets(query: string): Promise<Asset[]> {
+    const searchPattern = `%${query}%`;
+    return db.select().from(assets)
+      .where(or(
+        sql`${assets.name} ILIKE ${searchPattern}`,
+        sql`${assets.serialNumber} ILIKE ${searchPattern}`,
+        sql`${assets.barcode} ILIKE ${searchPattern}`,
+        sql`${assets.manufacturer} ILIKE ${searchPattern}`,
+        sql`${assets.model} ILIKE ${searchPattern}`,
+        sql`${assets.description} ILIKE ${searchPattern}`
+      ))
+      .orderBy(desc(assets.createdAt))
+      .limit(50);
+  }
+
+  async getAssetsExpiringWarranty(days: number): Promise<Asset[]> {
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + days);
+    const now = new Date();
+    
+    return db.select().from(assets)
+      .where(and(
+        eq(assets.isActive, true),
+        sql`${assets.warrantyExpiry} IS NOT NULL`,
+        sql`${assets.warrantyExpiry} >= ${now}`,
+        sql`${assets.warrantyExpiry} <= ${futureDate}`
+      ))
+      .orderBy(asc(assets.warrantyExpiry));
+  }
+
+  // ==================== ASSET HISTORY ====================
+  async getAssetHistory(assetId: string): Promise<AssetHistory[]> {
+    return db.select().from(assetHistory)
+      .where(eq(assetHistory.assetId, assetId))
+      .orderBy(desc(assetHistory.createdAt));
+  }
+
+  async createAssetHistory(data: InsertAssetHistory): Promise<AssetHistory> {
+    const [history] = await db.insert(assetHistory).values(data).returning();
+    return history;
   }
 }
 
