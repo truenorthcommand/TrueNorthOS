@@ -5,6 +5,10 @@ import { hasRole } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw, Mic, BookOpen, Mail, LayoutGrid, FolderOpen, Shield, Crown, Link2, Gift, Sparkles, ClipboardList, Sun, Moon, QrCode } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Scanner } from "@/components/scanner";
+import { parseProMainCode } from "@/lib/qr-utils";
+import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useState, useCallback } from "react";
@@ -21,11 +25,32 @@ type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools' | 'fleet' | 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [expandedSections, setExpandedSections] = useState<MenuSection[]>(['jobs']);
   const { refreshJobs } = useStore();
+  const { toast } = useToast();
+  const [adminScanDialogOpen, setAdminScanDialogOpen] = useState(false);
+
+  const handleAdminScanSuccess = (code: string) => {
+    const parsed = parseProMainCode(code);
+    if (parsed) {
+      setAdminScanDialogOpen(false);
+      if (parsed.type === 'job') {
+        toast({ title: "Job Scanned", description: `Navigating to job...` });
+        navigate(`/jobs/${parsed.id}`);
+      } else if (parsed.type === 'client') {
+        toast({ title: "Client Scanned", description: `Navigating to client...` });
+        navigate(`/clients/${parsed.id}`);
+      } else if (parsed.type === 'asset') {
+        toast({ title: "Asset Scanned", description: `Asset ID: ${parsed.id}` });
+      }
+    } else {
+      toast({ title: "Unknown Code", description: code, variant: "default" });
+      setAdminScanDialogOpen(false);
+    }
+  };
   
   const handleNotification = useCallback((notification: Notification) => {
     if (notification.type === 'urgent_job_assigned' || 
@@ -613,6 +638,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <span className="sr-only">Scan QR/Barcode</span>
                 </button>
               </Link>
+              {hasRole(user, 'admin') && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button 
+                      className="p-2 text-primary hover:bg-primary/10 rounded-lg"
+                      onClick={() => setAdminScanDialogOpen(true)}
+                      data-testid="button-quick-scan-admin-mobile"
+                    >
+                      <Sparkles className="h-5 w-5" />
+                      <span className="sr-only">Quick Scan</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Quick Scan</TooltipContent>
+                </Tooltip>
+              )}
               <button 
                 className="p-2 text-muted-foreground hover:bg-muted rounded-lg"
                 onClick={toggleTheme}
@@ -673,22 +713,57 @@ export function Layout({ children }: { children: React.ReactNode }) {
           
           <GlobalAIAssistant />
           
-          {/* Floating Refresh Button - Desktop */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                className="fixed bottom-6 right-6 h-12 w-12 rounded-full shadow-lg bg-card hover:bg-muted border border-border hidden md:flex items-center justify-center print:hidden z-40"
-                onClick={() => window.location.reload()}
-                data-testid="button-refresh-app-desktop"
-              >
-                <RefreshCw className="h-5 w-5 text-muted-foreground" />
-                <span className="sr-only">Refresh app</span>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="left">
-              <p>Refresh app</p>
-            </TooltipContent>
-          </Tooltip>
+          {/* Admin Quick Scan Dialog */}
+          <Dialog open={adminScanDialogOpen} onOpenChange={setAdminScanDialogOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Quick Scan</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground mb-4">
+                Scan a QR code or barcode to quickly navigate to a job, client, or asset.
+              </p>
+              <Scanner 
+                onScanSuccess={handleAdminScanSuccess}
+                onScanError={(error) => toast({ title: "Scan Error", description: error, variant: "destructive" })}
+              />
+            </DialogContent>
+          </Dialog>
+          
+          {/* Floating Buttons - Desktop */}
+          <div className="fixed bottom-6 right-6 hidden md:flex flex-col gap-3 print:hidden z-40">
+            {hasRole(user, 'admin') && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className="h-12 w-12 rounded-full shadow-lg bg-primary hover:bg-primary/90 border border-primary flex items-center justify-center"
+                    onClick={() => setAdminScanDialogOpen(true)}
+                    data-testid="button-quick-scan-admin-desktop"
+                  >
+                    <QrCode className="h-5 w-5 text-primary-foreground" />
+                    <span className="sr-only">Quick Scan</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  <p>Quick Scan</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className="h-12 w-12 rounded-full shadow-lg bg-card hover:bg-muted border border-border flex items-center justify-center"
+                  onClick={() => window.location.reload()}
+                  data-testid="button-refresh-app-desktop"
+                >
+                  <RefreshCw className="h-5 w-5 text-muted-foreground" />
+                  <span className="sr-only">Refresh app</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                <p>Refresh app</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </div>
       </div>
     </TooltipProvider>

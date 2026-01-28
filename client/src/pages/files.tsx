@@ -11,7 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useUpload } from "@/hooks/use-upload";
 import { apiRequest } from "@/lib/queryClient";
-import { FolderOpen, Upload, FileText, Image, FileSpreadsheet, File, Search, Grid, List, Trash2, Link2, ExternalLink, X, Loader2, Sparkles, Check } from "lucide-react";
+import { FolderOpen, Upload, FileText, Image, FileSpreadsheet, File, Search, Grid, List, Trash2, Link2, ExternalLink, X, Loader2, Sparkles, Check, QrCode } from "lucide-react";
+import { Scanner } from "@/components/scanner";
+import { parseProMainCode } from "@/lib/qr-utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { FileWithRelations, Client, Job, Expense } from "@shared/schema";
 
@@ -62,6 +64,37 @@ export default function Files() {
     category: "",
     notes: "",
   });
+  const [scanDialogOpen, setScanDialogOpen] = useState(false);
+
+  const handleScanSuccess = (code: string) => {
+    const parsed = parseProMainCode(code);
+    if (parsed) {
+      if (parsed.type === 'job') {
+        const matchedJob = jobs.find(j => j.id === parsed.id);
+        if (matchedJob) {
+          setNewFileData(prev => ({ ...prev, jobId: parsed.id }));
+          toast({ title: "Job Scanned", description: `Ready to attach file to Job ${matchedJob.jobNo}` });
+        } else {
+          toast({ title: "Job Not Found", description: "The scanned job ID was not found", variant: "destructive" });
+        }
+      } else if (parsed.type === 'client') {
+        const matchedClient = clients.find(c => c.id === parsed.id);
+        if (matchedClient) {
+          setNewFileData(prev => ({ ...prev, clientId: parsed.id }));
+          toast({ title: "Client Scanned", description: `Ready to attach file to ${matchedClient.name}` });
+        } else {
+          toast({ title: "Client Not Found", description: "The scanned client ID was not found", variant: "destructive" });
+        }
+      } else if (parsed.type === 'asset') {
+        toast({ title: "Asset Scanned", description: `Asset ID: ${parsed.id}. Select a job or client to attach the file.` });
+      }
+      setScanDialogOpen(false);
+      setUploadDialogOpen(true);
+    } else {
+      toast({ title: "Unknown Code", description: `Scanned: ${code}`, variant: "default" });
+      setScanDialogOpen(false);
+    }
+  };
 
   const { data: files = [], isLoading } = useQuery<FileWithRelations[]>({
     queryKey: ["/api/files"],
@@ -244,13 +277,18 @@ export default function Files() {
           <p className="text-muted-foreground">Manage uploaded documents and files</p>
         </div>
         
-        <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-upload-file">
-              <Upload className="mr-2 h-4 w-4" />
-              Upload File
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setScanDialogOpen(true)} data-testid="button-scan-to-attach">
+            <QrCode className="mr-2 h-4 w-4" />
+            Scan to Attach
+          </Button>
+          <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-upload-file">
+                <Upload className="mr-2 h-4 w-4" />
+                Upload File
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Upload File</DialogTitle>
@@ -468,6 +506,22 @@ export default function Files() {
                 </Button>
               )}
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        </div>
+
+        <Dialog open={scanDialogOpen} onOpenChange={setScanDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Scan QR/Barcode</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground mb-4">
+              Scan a job or client QR code to pre-select the assignment for your file upload.
+            </p>
+            <Scanner 
+              onScanSuccess={handleScanSuccess}
+              onScanError={(error) => toast({ title: "Scan Error", description: error, variant: "destructive" })}
+            />
           </DialogContent>
         </Dialog>
       </div>

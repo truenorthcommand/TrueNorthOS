@@ -18,7 +18,8 @@ import {
   File, Image, FileSpreadsheet, ExternalLink, FolderOpen, QrCode
 } from "lucide-react";
 import QRCode from "qrcode";
-import { generateProMainCode } from "@/lib/qr-utils";
+import { generateProMainCode, parseProMainCode } from "@/lib/qr-utils";
+import { Scanner } from "@/components/scanner";
 import { useUpload } from "@/hooks/use-upload";
 import { apiRequest } from "@/lib/queryClient";
 import type { FileWithRelations } from "@shared/schema";
@@ -104,6 +105,60 @@ export default function JobDetail() {
   // QR Code dialog state
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
+  
+  // Scan dialog state
+  const [scanDialogOpen, setScanDialogOpen] = useState(false);
+  const [scanResult, setScanResult] = useState<{ code: string; parsed: { type: string; id: string } | null } | null>(null);
+
+  const handleJobScanSuccess = (code: string) => {
+    const parsed = parseProMainCode(code);
+    setScanResult({ code, parsed });
+    
+    if (parsed) {
+      if (parsed.type === 'asset') {
+        toast({ title: "Asset Scanned", description: `Asset ID: ${parsed.id}` });
+      } else if (parsed.type === 'job') {
+        if (parsed.id === jobId) {
+          toast({ title: "Current Job", description: "This is the current job you're viewing" });
+        } else {
+          toast({ title: "Different Job", description: `Scanned job ID: ${parsed.id}` });
+        }
+      } else if (parsed.type === 'client') {
+        toast({ title: "Client Scanned", description: `Client ID: ${parsed.id}` });
+      }
+    } else {
+      toast({ title: "Code Scanned", description: code });
+    }
+  };
+
+  const handleLogToJob = async (code: string, parsed: { type: string; id: string } | null) => {
+    if (!job) return;
+    const logEntry = parsed 
+      ? `[${parsed.type.toUpperCase()}] ${parsed.id} - Scanned ${new Date().toLocaleString()}`
+      : `[BARCODE] ${code} - Scanned ${new Date().toLocaleString()}`;
+    
+    const updatedNotes = job.notes ? `${job.notes}\n${logEntry}` : logEntry;
+    await updateJob(job.id, { notes: updatedNotes });
+    
+    toast({ 
+      title: "Logged to Job", 
+      description: parsed ? `${parsed.type} logged to job notes` : "Barcode logged to job notes" 
+    });
+    closeScanDialog();
+  };
+
+  const handleCreateAsset = () => {
+    toast({ 
+      title: "Coming Soon", 
+      description: "Asset creation feature will be available soon.",
+      variant: "default"
+    });
+  };
+
+  const closeScanDialog = () => {
+    setScanDialogOpen(false);
+    setScanResult(null);
+  };
   
   // View mode state - admins default to admin view, engineers to engineer view
   const [viewMode, setViewMode] = useState<'admin' | 'engineer'>('admin');
@@ -787,6 +842,15 @@ export default function JobDetail() {
           >
             <FileText className="mr-2 h-4 w-4" />
             Report
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => setScanDialogOpen(true)} 
+            className="flex-1 sm:flex-none"
+            data-testid="button-scan-job"
+          >
+            <QrCode className="mr-2 h-4 w-4" />
+            Scan
           </Button>
           
           {job.status !== "Signed Off" && (
@@ -2137,6 +2201,107 @@ export default function JobDetail() {
               Close
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Scan Dialog for parts/assets/documents */}
+      <Dialog open={scanDialogOpen} onOpenChange={(open) => { if (!open) closeScanDialog(); else setScanDialogOpen(true); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="h-5 w-5" />
+              Scan Parts / Assets
+            </DialogTitle>
+            <DialogDescription>
+              Scan a QR code or barcode to log parts, assets, or documents to this job.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {!scanResult ? (
+            <Scanner 
+              onScanSuccess={handleJobScanSuccess}
+              onScanError={(error) => toast({ title: "Scan Error", description: error, variant: "destructive" })}
+            />
+          ) : (
+            <div className="space-y-4">
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm font-medium mb-2">Scanned Code:</p>
+                <p className="font-mono text-sm break-all">{scanResult.code}</p>
+                
+                {scanResult.parsed && (
+                  <div className="mt-3 pt-3 border-t">
+                    <p className="text-sm text-muted-foreground">
+                      Type: <span className="font-medium capitalize">{scanResult.parsed.type}</span>
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      ID: <span className="font-mono">{scanResult.parsed.id}</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                {scanResult.parsed?.type === 'asset' || scanResult.parsed?.type === 'part' ? (
+                  <Button 
+                    className="w-full"
+                    onClick={() => handleLogToJob(scanResult.code, scanResult.parsed)}
+                    data-testid="button-log-to-job"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Log to Job
+                  </Button>
+                ) : scanResult.parsed ? (
+                  <Button 
+                    className="w-full"
+                    onClick={() => handleLogToJob(scanResult.code, scanResult.parsed)}
+                    data-testid="button-log-to-job"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Log to Job Notes
+                  </Button>
+                ) : (
+                  <div className="space-y-2">
+                    <Button 
+                      className="w-full"
+                      onClick={() => handleLogToJob(scanResult.code, null)}
+                      data-testid="button-log-barcode-to-job"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Log Barcode to Job
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleCreateAsset}
+                      data-testid="button-create-asset"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Create Asset from Code
+                    </Button>
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => setScanResult(null)}
+                  data-testid="button-scan-another"
+                >
+                  Scan Another
+                </Button>
+                <Button 
+                  variant="ghost"
+                  className="flex-1"
+                  onClick={closeScanDialog}
+                  data-testid="button-done-scanning"
+                >
+                  Done
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
