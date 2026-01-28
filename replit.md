@@ -51,6 +51,38 @@ Pro Main is built with a modern web stack.
 -   **Progressive Web App (PWA)**: Mobile-first design with offline capabilities.
 -   **File Storage**: Centralized file browser with AI-powered smart assignment and integration with Replit Object Storage.
 
+### Global AI Assistant Architecture (Jan 2026)
+The Global AI Assistant has been optimized for production readiness:
+
+-   **Modular Structure**: Split into focused modules under `server/globalAssistant/`:
+    -   `routes.ts`: API endpoints
+    -   `context.ts`: Intent-based context building with bounded queries
+    -   `tokenBudget.ts`: Token budgeting (12k char cap, entity limits)
+    -   `cache.ts`: TTL-based caching (24h summary, 6h insights, 30m suggestions)
+    -   `config.ts`: Centralized model configuration with fallback
+    -   `retry.ts`: Exponential backoff for reliability
+    -   `search.ts`: Web search with improved trigger detection
+    -   `insights.ts`: Smart insights and suggestions
+    -   `prompts.ts`: System prompts
+    -   `openai.ts`: OpenAI client management
+
+-   **Performance Optimizations**:
+    -   Intent-based queries (bounded: 25 jobs, 25 clients, 50 quotes/invoices)
+    -   SQL aggregates instead of full record fetching
+    -   Postgres-backed ai_cache table for derived context
+    -   Token budgeting prevents context overflow
+
+-   **Reliability Features**:
+    -   Retry with exponential backoff (429/5xx/timeouts)
+    -   Model fallback (gpt-4o → gpt-4-turbo-preview)
+    -   Clean client disconnect handling
+    -   User-friendly error messages
+
+-   **Frontend Enhancements**:
+    -   Markdown rendering for AI responses
+    -   Per-message copy button
+    -   Retry button for error states
+
 ## External Dependencies
 
 -   **OpenAI API**: For various AI Advisors and intelligent features.
