@@ -1,0 +1,128 @@
+You are working inside my existing repo (React 19 + TS + Vite + Tailwind/shadcn + Wouter + TanStack Query; Node/Express + TS; Postgres + Drizzle; Zod). Implement improvements to the **Global AI Assistant**, which is primarily in `server/globalAssistant.ts` (~895 lines) and frontend components under `client/src/components/GlobalAIAssist*` and `client/src/components/ui/ai-assist.ts`.
+
+## Goal
+Implement the following improvements safely and incrementally (no rewrites). Preserve existing endpoints and UX. Output a patch with concise notes.
+
+## Non-negotiables
+- Do NOT ask for or add API keys/secrets.
+- Do NOT move OpenAI calls to the client. All LLM calls remain server-side.
+- Keep behavior compatible: same routes, same response shapes unless you add backward-compatible fields.
+- Do not log raw message content or sensitive customer data.
+
+---
+
+# Step 0 — Confirm current architecture (quick scan)
+1) Verify `/api/global-assistant/chat` is server-side streaming (SSE or chunked).
+2) Confirm OpenAI usage by inspecting imports/config and identify env var names used (names only).
+3) Identify these hotspots in `server/globalAssistant.ts`:
+   - `getBusinessContext()` (currently fetches ALL jobs/clients/quotes/invoices per message)
+   - `getSmartInsights()` (same issue)
+   - `getDynamicSuggestions()` (same issue)
+   - model string (e.g. `gpt-5.1`) and where it’s used
+
+Then begin implementing improvements below.
+
+---
+
+# P0 (Critical) — Stop fetching ALL records every request
+## Implement an intent-based context builder
+Create a backend module (new files are OK) that builds context based on intent:
+- intents: `chat | insights | suggestions | search`
+
+Replace “fetch everything” calls with **bounded, relevant subsets**:
+- Jobs: active OR last 25 updated
+- Clients: last 25 updated
+- Quotes/Invoices: last 50 updated OR only relevant statuses (pending/overdue/etc.)
+Prefer aggregate SQL for insights (COUNT/SUM/GROUP BY) instead of pulling full rows.
+
+### Requirements
+- All queries must be tenant-scoped (orgId from auth/session, not client-supplied).
+- Add hard caps to prevent runaway payloads.
+- Ensure response quality remains good (context is smaller but more relevant).
+
+---
+
+# P0 (Critical) — Token budgeting + truncation
+Add a simple budget system (tokenizer optional; char-based acceptable):
+- Cap business context string size (e.g. 8–16k chars)
+- Cap the number of entities included
+- Dynamically reduce conversation history based on remaining budget
+- Cap web search injection (top 3 results max, summarized before injection)
+- If context would exceed budget, include a short note in logs (sizes/counts only).
+
+This MUST prevent “context length exceeded” style failures.
+
+---
+
+# P0 (Critical) — Caching for derived context
+Add caching for derived summaries/results:
+- Org/business summary: TTL ~24h
+- Smart insights: TTL 1–6h
+- Suggestions: TTL 10–30m
+
+Use Postgres (Drizzle) as cache storage if Redis isn’t present:
+- Create an `ai_cache` table: key, value(json/text), orgId, updatedAt, expiresAt, version
+- Provide helper functions: `cacheGet(key)`, `cacheSet(key, value, ttl)`, `cacheDelPrefix(prefix)`
+- Log cache hit/miss (no sensitive content).
+
+---
+
+# P1 — Model verification + fallback
+Centralize model selection:
+- Put model name in one config module.
+- If the configured model fails with “model not found” (or similar), fallback to a safe default already used in the repo; otherwise use a conservative fallback.
+- Log the model used (name only) and whether fallback occurred.
+
+---
+
+# P1 — Reliability improvements (retries + timeouts + clean streaming)
+- Add retry with exponential backoff for transient errors (429/5xx/timeouts), max 2–3 retries.
+- Add request timeouts for LLM calls (e.g. 30–45s) and return a helpful error.
+- Ensure streaming endpoint handles client disconnect cleanly (stop work if `req` closes).
+- Improve error messages returned to frontend (actionable: “try again”, “reduce scope”, etc.)
+
+---
+
+# P1 — Web search discipline (Tavily)
+- Only trigger web search for messages that clearly require recency or web lookup (e.g. “latest”, “news”, “today”, “what’s happening”, explicit request).
+- Cap Tavily result count and summarize results before injecting into the prompt/context.
+- Add a clear separation: web context is optional and strictly budgeted.
+
+---
+
+# P2 — Maintainability refactor (ONLY after P0/P1 pass)
+If time permits (and only after tests/smoke checks pass), split `server/globalAssistant.ts` into modules without changing behavior:
+- `server/globalAssistant/routes.ts`
+- `server/globalAssistant/context.ts`
+- `server/globalAssistant/insights.ts`
+- `server/globalAssistant/search.ts`
+- `server/globalAssistant/openai.ts` (client + retry + model selection)
+- `server/globalAssistant/prompts.ts`
+
+Keep exports stable so the server boots without route changes.
+
+---
+
+# Frontend (small, safe UX improvements only)
+Without changing overall UX:
+- Ensure markdown renders nicely in assistant messages (sanitized).
+- Add per-message copy button (if easy and safe).
+- Improve loading/error states (retry button).
+Do not add new complex UI unless it’s trivial.
+
+---
+
+# Deliverables (must output)
+1) **Files changed list** (paths)
+2) **Patch notes** (bullets: what/why)
+3) **How to test** (manual checklist):
+   - send message, stream works
+   - suggestions endpoint works
+   - insights endpoint works
+   - web search triggers only when appropriate
+   - verify caching hit/miss with repeated requests
+4) **Before/after metrics** (best-effort):
+   - approximate payload sizes (chars), counts of fetched records
+   - any latency improvement observed in logs
+
+Now implement the P0 improvements first, then P1, then optional P2. Make changes directly in the repo.
