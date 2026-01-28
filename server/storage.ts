@@ -42,6 +42,10 @@ import {
   type FormTemplateVersion, type InsertFormTemplateVersion,
   type FormSubmission, type InsertFormSubmission,
   type FormAsset, type InsertFormAsset,
+  type FeatureFlag, type InsertFeatureFlag,
+  type Exception, type InsertException,
+  type DomainEvent, type WebhookSubscription, type InsertWebhookSubscription,
+  type WebhookDelivery, type AiRequest,
   users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, clientContacts, clientProperties, jobUpdates,
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
@@ -50,7 +54,8 @@ import {
   inspections, inspectionItems, snaggingSheets, snagItems,
   accountsReceipts, invoiceChaseLogs, fixedCosts, snippets, files,
   aiConversations, aiBusinessPatterns, aiUserPreferences,
-  formTemplates, formTemplateVersions, formSubmissions, formAssets
+  formTemplates, formTemplateVersions, formSubmissions, formAssets,
+  featureFlags, exceptions, domainEvents, webhookSubscriptions, webhookDeliveries, aiRequests
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and, ne, inArray, gt, asc } from "drizzle-orm";
@@ -343,6 +348,38 @@ export interface IStorage {
   getFormAssets(submissionId: string): Promise<FormAsset[]>;
   createFormAsset(data: InsertFormAsset): Promise<FormAsset>;
   deleteFormAsset(id: string): Promise<void>;
+  
+  // Feature Flags
+  getFeatureFlags(): Promise<FeatureFlag[]>;
+  getFeatureFlag(key: string): Promise<FeatureFlag | undefined>;
+  isFeatureEnabled(key: string, tenantId?: string): Promise<boolean>;
+  createFeatureFlag(data: InsertFeatureFlag): Promise<FeatureFlag>;
+  updateFeatureFlag(id: string, data: Partial<FeatureFlag>): Promise<FeatureFlag | undefined>;
+  deleteFeatureFlag(id: string): Promise<void>;
+  
+  // Exceptions
+  getExceptions(filters?: { status?: string; type?: string; severity?: string }): Promise<Exception[]>;
+  getException(id: string): Promise<Exception | undefined>;
+  createException(data: InsertException): Promise<Exception>;
+  updateException(id: string, data: Partial<Exception>): Promise<Exception | undefined>;
+  resolveException(id: string, resolvedById: string, notes?: string): Promise<Exception | undefined>;
+  
+  // Webhook Subscriptions
+  getWebhookSubscriptions(): Promise<WebhookSubscription[]>;
+  getWebhookSubscription(id: string): Promise<WebhookSubscription | undefined>;
+  createWebhookSubscription(data: InsertWebhookSubscription): Promise<WebhookSubscription>;
+  updateWebhookSubscription(id: string, data: Partial<WebhookSubscription>): Promise<WebhookSubscription | undefined>;
+  deleteWebhookSubscription(id: string): Promise<void>;
+  
+  // Webhook Deliveries
+  getWebhookDeliveries(subscriptionId?: string): Promise<WebhookDelivery[]>;
+  getWebhookDelivery(id: string): Promise<WebhookDelivery | undefined>;
+  
+  // AI Requests
+  getAiRequests(filters?: { approvalStatus?: string; endpoint?: string }): Promise<AiRequest[]>;
+  getAiRequest(id: string): Promise<AiRequest | undefined>;
+  approveAiRequest(id: string, approvedById: string): Promise<AiRequest | undefined>;
+  rejectAiRequest(id: string, approvedById: string): Promise<AiRequest | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2582,6 +2619,183 @@ export class DatabaseStorage implements IStorage {
 
   async deleteFormAsset(id: string): Promise<void> {
     await db.delete(formAssets).where(eq(formAssets.id, id));
+  }
+
+  // ==================== PHASE 0: FOUNDATION ====================
+
+  // Feature Flags
+  async getFeatureFlags(): Promise<FeatureFlag[]> {
+    return db.select().from(featureFlags).orderBy(featureFlags.key);
+  }
+
+  async getFeatureFlag(key: string): Promise<FeatureFlag | undefined> {
+    const [flag] = await db.select().from(featureFlags).where(eq(featureFlags.key, key));
+    return flag;
+  }
+
+  async isFeatureEnabled(key: string, tenantId?: string): Promise<boolean> {
+    const flag = await this.getFeatureFlag(key);
+    if (!flag) return false;
+    if (!flag.isEnabled) return false;
+    
+    const enabledTenants = flag.enabledForTenants as string[];
+    if (enabledTenants.length === 0) return true;
+    return tenantId ? enabledTenants.includes(tenantId) : false;
+  }
+
+  async createFeatureFlag(data: InsertFeatureFlag): Promise<FeatureFlag> {
+    const [flag] = await db.insert(featureFlags).values(data).returning();
+    return flag;
+  }
+
+  async updateFeatureFlag(id: string, data: Partial<FeatureFlag>): Promise<FeatureFlag | undefined> {
+    const [flag] = await db.update(featureFlags)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(featureFlags.id, id))
+      .returning();
+    return flag;
+  }
+
+  async deleteFeatureFlag(id: string): Promise<void> {
+    await db.delete(featureFlags).where(eq(featureFlags.id, id));
+  }
+
+  // Exceptions
+  async getExceptions(filters?: { status?: string; type?: string; severity?: string }): Promise<Exception[]> {
+    let conditions: any[] = [];
+    
+    if (filters?.status) {
+      conditions.push(eq(exceptions.status, filters.status));
+    }
+    if (filters?.type) {
+      conditions.push(eq(exceptions.type, filters.type));
+    }
+    if (filters?.severity) {
+      conditions.push(eq(exceptions.severity, filters.severity));
+    }
+    
+    if (conditions.length === 0) {
+      return db.select().from(exceptions).orderBy(desc(exceptions.createdAt));
+    }
+    
+    return db.select().from(exceptions)
+      .where(and(...conditions))
+      .orderBy(desc(exceptions.createdAt));
+  }
+
+  async getException(id: string): Promise<Exception | undefined> {
+    const [exception] = await db.select().from(exceptions).where(eq(exceptions.id, id));
+    return exception;
+  }
+
+  async createException(data: InsertException): Promise<Exception> {
+    const [exception] = await db.insert(exceptions).values(data).returning();
+    return exception;
+  }
+
+  async updateException(id: string, data: Partial<Exception>): Promise<Exception | undefined> {
+    const [exception] = await db.update(exceptions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(exceptions.id, id))
+      .returning();
+    return exception;
+  }
+
+  async resolveException(id: string, resolvedById: string, notes?: string): Promise<Exception | undefined> {
+    const [exception] = await db.update(exceptions)
+      .set({ 
+        status: 'resolved', 
+        resolvedById, 
+        resolvedAt: new Date(),
+        resolutionNotes: notes,
+        updatedAt: new Date()
+      })
+      .where(eq(exceptions.id, id))
+      .returning();
+    return exception;
+  }
+
+  // Webhook Subscriptions
+  async getWebhookSubscriptions(): Promise<WebhookSubscription[]> {
+    return db.select().from(webhookSubscriptions).orderBy(desc(webhookSubscriptions.createdAt));
+  }
+
+  async getWebhookSubscription(id: string): Promise<WebhookSubscription | undefined> {
+    const [subscription] = await db.select().from(webhookSubscriptions).where(eq(webhookSubscriptions.id, id));
+    return subscription;
+  }
+
+  async createWebhookSubscription(data: InsertWebhookSubscription): Promise<WebhookSubscription> {
+    const [subscription] = await db.insert(webhookSubscriptions).values(data).returning();
+    return subscription;
+  }
+
+  async updateWebhookSubscription(id: string, data: Partial<WebhookSubscription>): Promise<WebhookSubscription | undefined> {
+    const [subscription] = await db.update(webhookSubscriptions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(webhookSubscriptions.id, id))
+      .returning();
+    return subscription;
+  }
+
+  async deleteWebhookSubscription(id: string): Promise<void> {
+    await db.delete(webhookSubscriptions).where(eq(webhookSubscriptions.id, id));
+  }
+
+  // Webhook Deliveries
+  async getWebhookDeliveries(subscriptionId?: string): Promise<WebhookDelivery[]> {
+    if (subscriptionId) {
+      return db.select().from(webhookDeliveries)
+        .where(eq(webhookDeliveries.subscriptionId, subscriptionId))
+        .orderBy(desc(webhookDeliveries.createdAt));
+    }
+    return db.select().from(webhookDeliveries).orderBy(desc(webhookDeliveries.createdAt));
+  }
+
+  async getWebhookDelivery(id: string): Promise<WebhookDelivery | undefined> {
+    const [delivery] = await db.select().from(webhookDeliveries).where(eq(webhookDeliveries.id, id));
+    return delivery;
+  }
+
+  // AI Requests
+  async getAiRequests(filters?: { approvalStatus?: string; endpoint?: string }): Promise<AiRequest[]> {
+    let conditions: any[] = [];
+    
+    if (filters?.approvalStatus) {
+      conditions.push(eq(aiRequests.approvalStatus, filters.approvalStatus));
+    }
+    if (filters?.endpoint) {
+      conditions.push(eq(aiRequests.endpoint, filters.endpoint));
+    }
+    
+    if (conditions.length === 0) {
+      return db.select().from(aiRequests).orderBy(desc(aiRequests.createdAt));
+    }
+    
+    return db.select().from(aiRequests)
+      .where(and(...conditions))
+      .orderBy(desc(aiRequests.createdAt));
+  }
+
+  async getAiRequest(id: string): Promise<AiRequest | undefined> {
+    const [request] = await db.select().from(aiRequests).where(eq(aiRequests.id, id));
+    return request;
+  }
+
+  async approveAiRequest(id: string, approvedById: string): Promise<AiRequest | undefined> {
+    const [request] = await db.update(aiRequests)
+      .set({ approvalStatus: 'approved', approvedById, approvedAt: new Date() })
+      .where(eq(aiRequests.id, id))
+      .returning();
+    return request;
+  }
+
+  async rejectAiRequest(id: string, approvedById: string): Promise<AiRequest | undefined> {
+    const [request] = await db.update(aiRequests)
+      .set({ approvalStatus: 'rejected', approvedById, approvedAt: new Date() })
+      .where(eq(aiRequests.id, id))
+      .returning();
+    return request;
   }
 }
 

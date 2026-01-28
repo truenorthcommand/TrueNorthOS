@@ -1617,3 +1617,233 @@ export const formSchemaDefinition = z.object({
 });
 
 export type FormSchemaDefinition = z.infer<typeof formSchemaDefinition>;
+
+// ==================== PHASE 0: FOUNDATION TABLES ====================
+
+// Feature flags for tenant-level feature toggles
+export const featureFlags = pgTable("feature_flags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  isEnabled: boolean("is_enabled").notNull().default(false),
+  enabledForTenants: jsonb("enabled_for_tenants").default([]), // Array of tenant IDs
+  metadata: jsonb("metadata").default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFeatureFlagSchema = createInsertSchema(featureFlags).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFeatureFlag = z.infer<typeof insertFeatureFlagSchema>;
+export type FeatureFlag = typeof featureFlags.$inferSelect;
+
+// Domain events for event-driven architecture
+export const domainEvents = pgTable("domain_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  eventType: text("event_type").notNull(),
+  payload: jsonb("payload").notNull().default({}),
+  dedupeKey: text("dedupe_key"), // For idempotency
+  aggregateType: text("aggregate_type"), // e.g., "job", "invoice", "form"
+  aggregateId: varchar("aggregate_id"),
+  version: integer("version").default(1),
+  causedById: varchar("caused_by_id"), // User who caused the event
+  correlationId: varchar("correlation_id"), // For tracing related events
+  metadata: jsonb("metadata").default({}),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDomainEventSchema = createInsertSchema(domainEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertDomainEvent = z.infer<typeof insertDomainEventSchema>;
+export type DomainEvent = typeof domainEvents.$inferSelect;
+
+// Job queue for background processing
+export const jobQueue = pgTable("job_queue", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobType: text("job_type").notNull(), // e.g., "workflow_run", "webhook_delivery", "pdf_render"
+  payload: jsonb("payload").notNull().default({}),
+  priority: integer("priority").notNull().default(0), // Higher = more important
+  status: text("status").notNull().default("pending"), // pending | processing | completed | failed | dead_letter
+  attempts: integer("attempts").notNull().default(0),
+  maxAttempts: integer("max_attempts").notNull().default(3),
+  lastError: text("last_error"),
+  scheduledFor: timestamp("scheduled_for").defaultNow(),
+  lockedAt: timestamp("locked_at"),
+  lockedBy: text("locked_by"), // Worker ID
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertJobQueueSchema = createInsertSchema(jobQueue).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertJobQueue = z.infer<typeof insertJobQueueSchema>;
+export type JobQueueItem = typeof jobQueue.$inferSelect;
+
+// Workflow execution logs for detailed step tracking
+export const workflowLogs = pgTable("workflow_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  executionId: varchar("execution_id").notNull(),
+  stepIndex: integer("step_index").notNull(),
+  actionType: text("action_type").notNull(),
+  input: jsonb("input").default({}),
+  output: jsonb("output").default({}),
+  status: text("status").notNull().default("pending"), // pending | success | failed | skipped
+  errorMessage: text("error_message"),
+  durationMs: integer("duration_ms"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWorkflowLogSchema = createInsertSchema(workflowLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertWorkflowLog = z.infer<typeof insertWorkflowLogSchema>;
+export type WorkflowLog = typeof workflowLogs.$inferSelect;
+
+// Webhook subscriptions for external integrations
+export const webhookSubscriptions = pgTable("webhook_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  secret: text("secret").notNull(), // For HMAC signing
+  eventTypes: jsonb("event_types").notNull().default([]), // Array of event types to subscribe to
+  isActive: boolean("is_active").notNull().default(true),
+  headers: jsonb("headers").default({}), // Custom headers to send
+  retryPolicy: jsonb("retry_policy").default({ maxAttempts: 3, backoffMs: 1000 }),
+  createdById: varchar("created_by_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertWebhookSubscriptionSchema = createInsertSchema(webhookSubscriptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertWebhookSubscription = z.infer<typeof insertWebhookSubscriptionSchema>;
+export type WebhookSubscription = typeof webhookSubscriptions.$inferSelect;
+
+// Webhook delivery logs
+export const webhookDeliveries = pgTable("webhook_deliveries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subscriptionId: varchar("subscription_id").notNull(),
+  eventId: varchar("event_id").notNull(), // Reference to domain_events
+  eventType: text("event_type").notNull(),
+  payload: jsonb("payload").notNull().default({}),
+  status: text("status").notNull().default("pending"), // pending | success | failed
+  attempts: integer("attempts").notNull().default(0),
+  lastAttemptAt: timestamp("last_attempt_at"),
+  responseStatus: integer("response_status"),
+  responseBody: text("response_body"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertWebhookDeliverySchema = createInsertSchema(webhookDeliveries).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertWebhookDelivery = z.infer<typeof insertWebhookDeliverySchema>;
+export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;
+
+// AI request logs for tracking and auditing
+export const aiRequests = pgTable("ai_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  provider: text("provider").notNull(), // openai | gemini | etc
+  model: text("model").notNull(),
+  endpoint: text("endpoint").notNull(), // e.g., "/api/ai/job-notes"
+  promptVersion: text("prompt_version"),
+  inputRefsJson: jsonb("input_refs_json").default({}), // References to entities used as input
+  promptTokens: integer("prompt_tokens"),
+  completionTokens: integer("completion_tokens"),
+  totalTokens: integer("total_tokens"),
+  outputJson: jsonb("output_json").default({}),
+  confidence: doublePrecision("confidence"),
+  sourcesUsed: jsonb("sources_used").default([]),
+  approvalStatus: text("approval_status").default("pending"), // pending | approved | rejected
+  approvedById: varchar("approved_by_id"),
+  approvedAt: timestamp("approved_at"),
+  requestedById: varchar("requested_by_id"),
+  durationMs: integer("duration_ms"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAiRequestSchema = createInsertSchema(aiRequests).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAiRequest = z.infer<typeof insertAiRequestSchema>;
+export type AiRequest = typeof aiRequests.$inferSelect;
+
+// Exceptions for error tracking and resolution
+export const exceptions = pgTable("exceptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(), // workflow_failed | webhook_failed | ai_failed | job_blocked | validation_error
+  severity: text("severity").notNull().default("warning"), // info | warning | error | critical
+  title: text("title").notNull(),
+  message: text("message"),
+  context: jsonb("context").default({}), // Additional context data
+  entityType: text("entity_type"), // job | invoice | form | workflow
+  entityId: varchar("entity_id"),
+  stackTrace: text("stack_trace"),
+  status: text("status").notNull().default("open"), // open | acknowledged | resolved | ignored
+  resolvedById: varchar("resolved_by_id"),
+  resolvedAt: timestamp("resolved_at"),
+  resolutionNotes: text("resolution_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertExceptionSchema = createInsertSchema(exceptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertException = z.infer<typeof insertExceptionSchema>;
+export type Exception = typeof exceptions.$inferSelect;
+
+// Event type definitions
+export type DomainEventType =
+  | "JobCreated"
+  | "JobStatusChanged"
+  | "JobCompleted"
+  | "JobClosed"
+  | "FormSubmitted"
+  | "InvoiceCreated"
+  | "InvoicePaid"
+  | "QuoteCreated"
+  | "QuoteAccepted"
+  | "ClientCreated"
+  | "WorkflowTriggered"
+  | "WorkflowCompleted"
+  | "WebhookDelivered"
+  | "AiRequestCompleted";
+
+// Job queue type definitions
+export type JobQueueType =
+  | "workflow_run"
+  | "webhook_delivery"
+  | "pdf_render"
+  | "email_send"
+  | "sms_send"
+  | "ai_request";
