@@ -79,14 +79,17 @@ export default function AssetFormPage() {
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
+    retry: false,
   });
 
   const { data: jobs = [] } = useQuery<Job[]>({
     queryKey: ["/api/jobs"],
+    retry: false,
   });
 
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
+    retry: false,
   });
 
   useEffect(() => {
@@ -419,12 +422,12 @@ export default function AssetFormPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="assignedClientId">Assigned Client</Label>
-                <Select value={formData.assignedClientId} onValueChange={(v) => handleChange("assignedClientId", v)}>
+                <Select value={formData.assignedClientId || "none"} onValueChange={(v) => handleChange("assignedClientId", v === "none" ? "" : v)}>
                   <SelectTrigger data-testid="select-client">
                     <SelectValue placeholder="Select client" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {clients.map(client => (
                       <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                     ))}
@@ -434,12 +437,12 @@ export default function AssetFormPage() {
               
               <div className="space-y-2">
                 <Label htmlFor="assignedJobId">Assigned Job</Label>
-                <Select value={formData.assignedJobId} onValueChange={(v) => handleChange("assignedJobId", v)}>
+                <Select value={formData.assignedJobId || "none"} onValueChange={(v) => handleChange("assignedJobId", v === "none" ? "" : v)}>
                   <SelectTrigger data-testid="select-job">
                     <SelectValue placeholder="Select job" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {jobs.slice(0, 50).map(job => (
                       <SelectItem key={job.id} value={job.id}>#{job.id}</SelectItem>
                     ))}
@@ -449,12 +452,12 @@ export default function AssetFormPage() {
               
               <div className="space-y-2">
                 <Label htmlFor="assignedUserId">Assigned Engineer</Label>
-                <Select value={formData.assignedUserId} onValueChange={(v) => handleChange("assignedUserId", v)}>
+                <Select value={formData.assignedUserId || "none"} onValueChange={(v) => handleChange("assignedUserId", v === "none" ? "" : v)}>
                   <SelectTrigger data-testid="select-engineer">
                     <SelectValue placeholder="Select engineer" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {users.filter(u => u.role === "engineer").map(user => (
                       <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
                     ))}
