@@ -10,7 +10,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Camera, Save, Send, X, Loader2, Calculator } from "lucide-react";
+import { useOfflineForms } from "@/hooks/use-offline-forms";
+import { ArrowLeft, Camera, Save, Send, X, Loader2, Calculator, WifiOff, Cloud } from "lucide-react";
 import type { FormField, FormSchemaDefinition } from "@shared/schema";
 import { processFormFields, validateForm, evaluateFormula } from "@/lib/form-logic";
 
@@ -129,8 +130,11 @@ export default function FormFill() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { isOnline, saveDraft: saveOfflineDraft, getDraft: getOfflineDraft, queueSubmission: queueOfflineSubmission, pendingCount } = useOfflineForms();
 
   const [formData, setFormData] = useState<Record<string, unknown>>({});
+  const [hasOfflineDraft, setHasOfflineDraft] = useState(false);
+  const [offlineDraftChecked, setOfflineDraftChecked] = useState(false);
   const [activePhotoField, setActivePhotoField] = useState<string | null>(null);
 
   const { data: version, isLoading: isLoadingVersion } = useQuery({
@@ -170,7 +174,25 @@ export default function FormFill() {
   }, [existingSubmission]);
 
   useEffect(() => {
-    if (version?.fields && entity && !existingSubmission) {
+    async function loadOfflineDraft() {
+      if (versionId && entityType && entityId && !submissionId && !existingSubmission) {
+        const offlineDraft = await getOfflineDraft(versionId, entityType, entityId);
+        if (offlineDraft) {
+          setFormData(offlineDraft.data);
+          setHasOfflineDraft(true);
+          toast({
+            title: "Draft Loaded",
+            description: "Restored your offline draft.",
+          });
+        }
+      }
+      setOfflineDraftChecked(true);
+    }
+    loadOfflineDraft();
+  }, [versionId, entityType, entityId, submissionId, existingSubmission, getOfflineDraft, toast]);
+
+  useEffect(() => {
+    if (version?.fields && entity && !existingSubmission && !hasOfflineDraft && offlineDraftChecked) {
       const prefillData: Record<string, unknown> = {};
       version.fields.forEach((field) => {
         if (field.prefill) {
@@ -239,6 +261,13 @@ export default function FormFill() {
   });
 
   const handleSaveDraft = async () => {
+    if (!isOnline && versionId) {
+      await saveOfflineDraft(versionId, entityType, entityId, formData as Record<string, any>);
+      setHasOfflineDraft(true);
+      toast({ title: "Saved Offline", description: "Draft saved to your device" });
+      return;
+    }
+
     try {
       if (submissionId) {
         await updateSubmissionMutation.mutateAsync({ id: submissionId });
@@ -249,7 +278,13 @@ export default function FormFill() {
       }
       toast({ title: "Saved", description: "Draft saved successfully" });
     } catch {
-      toast({ title: "Error", description: "Failed to save draft", variant: "destructive" });
+      if (versionId) {
+        await saveOfflineDraft(versionId, entityType, entityId, formData as Record<string, any>);
+        setHasOfflineDraft(true);
+        toast({ title: "Saved Offline", description: "Network error - draft saved to your device" });
+      } else {
+        toast({ title: "Error", description: "Failed to save draft", variant: "destructive" });
+      }
     }
   };
 
@@ -271,6 +306,16 @@ export default function FormFill() {
 
     const submissionData = { ...formData, ...finalValues };
 
+    if (!isOnline && versionId) {
+      await queueOfflineSubmission(versionId, entityType, entityId, submissionData);
+      toast({
+        title: "Queued for Submission",
+        description: "Form will be submitted when you're back online.",
+      });
+      setLocation(`/${entityType}s/${entityId}`);
+      return;
+    }
+
     try {
       let id = submissionId;
       if (!id) {
@@ -281,7 +326,16 @@ export default function FormFill() {
       }
       await submitMutation.mutateAsync(id!);
     } catch {
-      toast({ title: "Error", description: "Failed to submit form", variant: "destructive" });
+      if (versionId) {
+        await queueOfflineSubmission(versionId, entityType, entityId, submissionData);
+        toast({
+          title: "Queued for Submission",
+          description: "Network error - form will be submitted when connected.",
+        });
+        setLocation(`/${entityType}s/${entityId}`);
+      } else {
+        toast({ title: "Error", description: "Failed to submit form", variant: "destructive" });
+      }
     }
   };
 
@@ -506,6 +560,18 @@ export default function FormFill() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <h1 className="font-semibold">{version.name}</h1>
+            {!isOnline && (
+              <span className="flex items-center gap-1 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full" data-testid="offline-indicator">
+                <WifiOff className="h-3 w-3" />
+                Offline
+              </span>
+            )}
+            {pendingCount > 0 && isOnline && (
+              <span className="flex items-center gap-1 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full" data-testid="pending-sync-indicator">
+                <Cloud className="h-3 w-3" />
+                {pendingCount} pending
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={createSubmissionMutation.isPending || updateSubmissionMutation.isPending} data-testid="button-save-draft">
