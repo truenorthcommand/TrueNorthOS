@@ -9040,7 +9040,6 @@ Be concise and practical. Focus on real issues that affect the business.`;
           templateId: created.id,
           version: 1,
           schema: template.schema,
-          status: 'published',
           publishedAt: new Date(),
         });
         

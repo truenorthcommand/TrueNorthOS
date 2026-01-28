@@ -20,6 +20,7 @@ import {
 import { useUpload } from "@/hooks/use-upload";
 import { apiRequest } from "@/lib/queryClient";
 import type { FileWithRelations } from "@shared/schema";
+import { JobChecklist } from "@/components/job-checklist";
 
 function getFileIcon(mimeType: string | null) {
   if (!mimeType) return <File className="h-5 w-5 text-muted-foreground" />;
@@ -687,8 +688,6 @@ export default function JobDetail() {
     }
   };
 
-  // Sign-off is always available - no validation required
-  const isReadyForSignOff = true;
 
   return (
     <div className="max-w-4xl mx-auto pb-20">
@@ -789,17 +788,22 @@ export default function JobDetail() {
       )}
 
 
-      {/* Sign-off Ready Indicator - Only show in engineer view */}
-      {!showAdminView && job.status !== "Signed Off" && isReadyForSignOff && (
-        <Card className="mb-6 border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 no-print" data-testid="card-ready-signoff">
-          <CardContent className="py-4">
-            <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
-              <FileCheck className="h-5 w-5" />
-              <span className="font-medium">Ready for sign-off</span>
-              <span className="text-sm text-muted-foreground ml-2">— All required fields completed. Engineer and customer signatures needed on sign-off page.</span>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Job Checklist - Only show in engineer view when job not signed off */}
+      {!showAdminView && job.status !== "Signed Off" && (
+        <JobChecklist 
+          job={{
+            id: job.id,
+            jobNo: job.jobNo,
+            status: job.status,
+            description: job.description,
+            worksCompleted: job.worksCompleted,
+            photos: job.photos,
+            signatures: job.signatures,
+            signOffLat: job.signOffLat,
+            signOffAddress: job.signOffAddress,
+          }}
+          className="mb-6 no-print"
+        />
       )}
 
       <div className="grid gap-6 print:block">
