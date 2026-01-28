@@ -45,7 +45,7 @@ import {
   type FeatureFlag, type InsertFeatureFlag,
   type Exception, type InsertException,
   type DomainEvent, type WebhookSubscription, type InsertWebhookSubscription,
-  type WebhookDelivery, type AiRequest,
+  type WebhookDelivery, type AiRequest, type InsertAiRequest,
   type WorkflowRule, type InsertWorkflowRule,
   type WorkflowExecution, type InsertWorkflowExecution,
   type WorkflowLog, type InsertWorkflowLog,
@@ -382,6 +382,7 @@ export interface IStorage {
   // AI Requests
   getAiRequests(filters?: { approvalStatus?: string; endpoint?: string }): Promise<AiRequest[]>;
   getAiRequest(id: string): Promise<AiRequest | undefined>;
+  createAiRequest(request: InsertAiRequest): Promise<AiRequest>;
   approveAiRequest(id: string, approvedById: string): Promise<AiRequest | undefined>;
   rejectAiRequest(id: string, approvedById: string): Promise<AiRequest | undefined>;
 }
@@ -2790,6 +2791,11 @@ export class DatabaseStorage implements IStorage {
   async getAiRequest(id: string): Promise<AiRequest | undefined> {
     const [request] = await db.select().from(aiRequests).where(eq(aiRequests.id, id));
     return request;
+  }
+
+  async createAiRequest(request: InsertAiRequest): Promise<AiRequest> {
+    const [created] = await db.insert(aiRequests).values(request).returning();
+    return created;
   }
 
   async approveAiRequest(id: string, approvedById: string): Promise<AiRequest | undefined> {
