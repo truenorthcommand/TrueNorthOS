@@ -9206,5 +9206,127 @@ Be concise and practical. Focus on real issues that affect the business.`;
     }
   });
 
+  // ==================== WEBHOOK MANAGEMENT ROUTES ====================
+
+  // List all webhook subscriptions (admin only)
+  app.get("/api/webhooks", requireAdmin, async (req, res) => {
+    try {
+      const subscriptions = await storage.getWebhookSubscriptions();
+      res.json(subscriptions);
+    } catch (error) {
+      console.error("Error fetching webhook subscriptions:", error);
+      res.status(500).json({ error: "Failed to fetch webhook subscriptions" });
+    }
+  });
+
+  // Create webhook subscription (admin only)
+  app.post("/api/webhooks", requireAdmin, async (req, res) => {
+    try {
+      const { name, url, eventTypes, headers, retryPolicy } = req.body;
+      
+      if (!name || !url || !eventTypes) {
+        return res.status(400).json({ error: "name, url, and eventTypes are required" });
+      }
+
+      const secret = crypto.randomBytes(32).toString("hex");
+      
+      const subscription = await storage.createWebhookSubscription({
+        name,
+        url,
+        secret,
+        eventTypes,
+        headers: headers || {},
+        retryPolicy: retryPolicy || { maxAttempts: 3, backoffMs: 1000 },
+        isActive: true,
+        createdById: req.session.userId || null,
+      });
+
+      res.status(201).json(subscription);
+    } catch (error) {
+      console.error("Error creating webhook subscription:", error);
+      res.status(500).json({ error: "Failed to create webhook subscription" });
+    }
+  });
+
+  // Get webhook subscription details
+  app.get("/api/webhooks/:id", requireAuth, async (req, res) => {
+    try {
+      const subscription = await storage.getWebhookSubscription(req.params.id);
+      if (!subscription) {
+        return res.status(404).json({ error: "Webhook subscription not found" });
+      }
+      res.json(subscription);
+    } catch (error) {
+      console.error("Error fetching webhook subscription:", error);
+      res.status(500).json({ error: "Failed to fetch webhook subscription" });
+    }
+  });
+
+  // Update webhook subscription
+  app.patch("/api/webhooks/:id", requireAdmin, async (req, res) => {
+    try {
+      const { name, url, eventTypes, headers, retryPolicy, isActive } = req.body;
+      
+      const updates: any = {};
+      if (name !== undefined) updates.name = name;
+      if (url !== undefined) updates.url = url;
+      if (eventTypes !== undefined) updates.eventTypes = eventTypes;
+      if (headers !== undefined) updates.headers = headers;
+      if (retryPolicy !== undefined) updates.retryPolicy = retryPolicy;
+      if (isActive !== undefined) updates.isActive = isActive;
+
+      const subscription = await storage.updateWebhookSubscription(req.params.id, updates);
+      if (!subscription) {
+        return res.status(404).json({ error: "Webhook subscription not found" });
+      }
+      res.json(subscription);
+    } catch (error) {
+      console.error("Error updating webhook subscription:", error);
+      res.status(500).json({ error: "Failed to update webhook subscription" });
+    }
+  });
+
+  // Delete webhook subscription
+  app.delete("/api/webhooks/:id", requireAdmin, async (req, res) => {
+    try {
+      const subscription = await storage.getWebhookSubscription(req.params.id);
+      if (!subscription) {
+        return res.status(404).json({ error: "Webhook subscription not found" });
+      }
+      await storage.deleteWebhookSubscription(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting webhook subscription:", error);
+      res.status(500).json({ error: "Failed to delete webhook subscription" });
+    }
+  });
+
+  // Get delivery logs for a subscription
+  app.get("/api/webhooks/:id/deliveries", requireAuth, async (req, res) => {
+    try {
+      const subscription = await storage.getWebhookSubscription(req.params.id);
+      if (!subscription) {
+        return res.status(404).json({ error: "Webhook subscription not found" });
+      }
+      const deliveries = await storage.getWebhookDeliveries(req.params.id);
+      res.json(deliveries);
+    } catch (error) {
+      console.error("Error fetching webhook deliveries:", error);
+      res.status(500).json({ error: "Failed to fetch webhook deliveries" });
+    }
+  });
+
+  // Send test webhook delivery
+  app.post("/api/webhooks/:id/test", requireAdmin, async (req, res) => {
+    try {
+      const { sendTestWebhook } = await import("./webhook-service");
+      const delivery = await sendTestWebhook(req.params.id);
+      res.json(delivery);
+    } catch (error: any) {
+      console.error("Error sending test webhook:", error);
+      res.status(500).json({ error: error.message || "Failed to send test webhook" });
+    }
+  });
+
   return httpServer;
 }

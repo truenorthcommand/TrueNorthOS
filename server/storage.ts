@@ -45,7 +45,7 @@ import {
   type FeatureFlag, type InsertFeatureFlag,
   type Exception, type InsertException,
   type DomainEvent, type WebhookSubscription, type InsertWebhookSubscription,
-  type WebhookDelivery, type AiRequest, type InsertAiRequest,
+  type WebhookDelivery, type InsertWebhookDelivery, type AiRequest, type InsertAiRequest,
   type WorkflowRule, type InsertWorkflowRule,
   type WorkflowExecution, type InsertWorkflowExecution,
   type WorkflowLog, type InsertWorkflowLog,
@@ -378,6 +378,8 @@ export interface IStorage {
   // Webhook Deliveries
   getWebhookDeliveries(subscriptionId?: string): Promise<WebhookDelivery[]>;
   getWebhookDelivery(id: string): Promise<WebhookDelivery | undefined>;
+  createWebhookDelivery(data: InsertWebhookDelivery): Promise<WebhookDelivery>;
+  updateWebhookDelivery(id: string, data: Partial<WebhookDelivery>): Promise<WebhookDelivery | undefined>;
   
   // AI Requests
   getAiRequests(filters?: { approvalStatus?: string; endpoint?: string }): Promise<AiRequest[]>;
@@ -2765,6 +2767,19 @@ export class DatabaseStorage implements IStorage {
 
   async getWebhookDelivery(id: string): Promise<WebhookDelivery | undefined> {
     const [delivery] = await db.select().from(webhookDeliveries).where(eq(webhookDeliveries.id, id));
+    return delivery;
+  }
+
+  async createWebhookDelivery(data: InsertWebhookDelivery): Promise<WebhookDelivery> {
+    const [delivery] = await db.insert(webhookDeliveries).values(data).returning();
+    return delivery;
+  }
+
+  async updateWebhookDelivery(id: string, data: Partial<WebhookDelivery>): Promise<WebhookDelivery | undefined> {
+    const [delivery] = await db.update(webhookDeliveries)
+      .set(data)
+      .where(eq(webhookDeliveries.id, id))
+      .returning();
     return delivery;
   }
 

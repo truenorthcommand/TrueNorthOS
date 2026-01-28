@@ -259,9 +259,9 @@ async function processWebhookDelivery(job: JobQueueItem): Promise<void> {
   // Send webhook
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "X-Webhook-Signature": `t=${timestamp},v1=${signature}`,
-    "X-Event-Type": delivery.eventType,
-    "X-Delivery-Id": delivery.id,
+    "X-Webhook-Signature-256": `sha256=${signature}`,
+    "X-Webhook-Event": delivery.eventType,
+    "X-Webhook-Delivery-Id": delivery.id,
     ...(subscription.headers as Record<string, string> || {}),
   };
 
