@@ -58,6 +58,7 @@ import Referrals from "@/pages/referrals";
 import Workflows from "@/pages/workflows";
 import VoiceNotes from "@/pages/voice-notes";
 import DocumentScanner from "@/pages/document-scanner";
+import ScanPage from "@/pages/scan";
 import Proposal from "@/pages/proposal";
 import UserGuide from "@/pages/user-guide";
 import WorksManagerDashboard from "@/pages/works-manager-dashboard";
@@ -255,6 +256,9 @@ function Router() {
       </Route>
       <Route path="/document-scanner">
         <PrivateRoute component={DocumentScanner} />
+      </Route>
+      <Route path="/scan">
+        <PrivateRoute component={ScanPage} />
       </Route>
       <Route path="/user-guide">
         <PrivateRoute component={UserGuide} />

@@ -15,8 +15,10 @@ import {
   MapPin, Phone, Mail, Calendar, Upload, X, FileCheck,
   AlertCircle, AlertTriangle, AlertOctagon, Users, ChevronDown, ClipboardList,
   Sparkles, Loader2, Briefcase, User, Navigation, FileText,
-  File, Image, FileSpreadsheet, ExternalLink, FolderOpen
+  File, Image, FileSpreadsheet, ExternalLink, FolderOpen, QrCode
 } from "lucide-react";
+import QRCode from "qrcode";
+import { generateProMainCode } from "@/lib/qr-utils";
 import { useUpload } from "@/hooks/use-upload";
 import { apiRequest } from "@/lib/queryClient";
 import type { FileWithRelations } from "@shared/schema";
@@ -98,6 +100,10 @@ export default function JobDetail() {
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [report, setReport] = useState<any>(null);
+  
+  // QR Code dialog state
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   
   // View mode state - admins default to admin view, engineers to engineer view
   const [viewMode, setViewMode] = useState<'admin' | 'engineer'>('admin');
@@ -488,6 +494,26 @@ export default function JobDetail() {
     }
   };
 
+  // Generate QR code for this job
+  const showQrCode = async () => {
+    if (!job) return;
+    setQrDialogOpen(true);
+    try {
+      const qrContent = generateProMainCode('job', job.id);
+      const dataUrl = await QRCode.toDataURL(qrContent, {
+        width: 256,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#ffffff',
+        },
+      });
+      setQrCodeDataUrl(dataUrl);
+    } catch (error) {
+      console.error('Failed to generate QR code:', error);
+    }
+  };
+
   // Print report
   const printReport = () => {
     const printWindow = window.open('', '_blank');
@@ -708,6 +734,16 @@ export default function JobDetail() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold">{job.jobNo}</h1>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={showQrCode}
+                className="h-8 w-8"
+                title="Show QR Code"
+                data-testid="button-show-qr"
+              >
+                <QrCode className="h-4 w-4" />
+              </Button>
               <Badge variant={job.status === "Signed Off" ? "default" : "secondary"}>
                 {job.status}
               </Badge>
@@ -2062,6 +2098,45 @@ export default function JobDetail() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* QR Code Dialog */}
+      <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="h-5 w-5" />
+              Job QR Code
+            </DialogTitle>
+            <DialogDescription>
+              Scan this code to quickly access job {job.jobNo}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center py-4">
+            {qrCodeDataUrl ? (
+              <>
+                <img 
+                  src={qrCodeDataUrl} 
+                  alt={`QR Code for job ${job.jobNo}`}
+                  className="w-64 h-64 border rounded-lg"
+                  data-testid="qr-code-image"
+                />
+                <p className="text-xs text-muted-foreground mt-4 font-mono">
+                  {generateProMainCode('job', job.id)}
+                </p>
+              </>
+            ) : (
+              <div className="w-64 h-64 flex items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </div>
+          <div className="flex justify-center">
+            <Button variant="outline" onClick={() => setQrDialogOpen(false)}>
+              Close
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
