@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MessageSquare, X, Send, Sparkles, Search, Loader2, ExternalLink, Minimize2, Maximize2, History, Plus, Trash2, ChevronLeft, Globe, AlertTriangle, TrendingUp, Info, ArrowRight, Lightbulb } from "lucide-react";
+import { MessageSquare, X, Send, Sparkles, Search, Loader2, ExternalLink, Minimize2, Maximize2, History, Plus, Trash2, ChevronLeft, Globe, AlertTriangle, TrendingUp, Info, ArrowRight, Lightbulb, Copy, Check, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   role: "user" | "assistant";
@@ -50,6 +51,9 @@ export function GlobalAIAssistant() {
   const [isSearchingWeb, setIsSearchingWeb] = useState(false);
   const [insights, setInsights] = useState<SmartInsight[]>([]);
   const [showInsights, setShowInsights] = useState(true);
+  const [copiedMessageIdx, setCopiedMessageIdx] = useState<number | null>(null);
+  const [hasError, setHasError] = useState(false);
+  const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [location, navigate] = useLocation();
@@ -248,6 +252,8 @@ export function GlobalAIAssistant() {
     setSuggestions([]);
     setSearchResults([]);
     setShowSearch(false);
+    setLastUserMessage(messageToSend);
+    setHasError(false);
 
     // Create a new conversation if we don't have one (preserve messages since we just added one)
     let convId = currentConversationId;
@@ -309,9 +315,10 @@ export function GlobalAIAssistant() {
       }
     } catch (error) {
       console.error("Error sending message:", error);
+      setHasError(true);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Sorry, I encountered an error. Please try again." },
+        { role: "assistant", content: "Sorry, I encountered an error. Please check your connection and try again." },
       ]);
     } finally {
       setIsLoading(false);
@@ -356,6 +363,24 @@ export function GlobalAIAssistant() {
       invoice: "💷",
     };
     return icons[type] || "📄";
+  };
+
+  const handleCopyMessage = async (content: string, idx: number) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedMessageIdx(idx);
+      setTimeout(() => setCopiedMessageIdx(null), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
+  const handleRetry = () => {
+    if (lastUserMessage) {
+      setMessages((prev) => prev.filter((m) => !m.content.includes("Sorry, I encountered an error")));
+      setHasError(false);
+      handleSubmit(undefined, lastUserMessage);
+    }
   };
 
   const renderMessageContent = (content: string, isUser: boolean) => {
@@ -674,15 +699,48 @@ export function GlobalAIAssistant() {
                 >
                   <div
                     className={cn(
-                      "max-w-[85%] rounded-2xl px-4 py-2",
+                      "max-w-[85%] rounded-2xl px-4 py-2 group relative",
                       message.role === "user"
                         ? "bg-blue-600 text-white"
                         : "bg-gray-100 text-gray-800"
                     )}
                   >
-                    <p className="text-sm whitespace-pre-wrap">
-                      {renderMessageContent(message.content, message.role === "user")}
-                    </p>
+                    {message.role === "user" ? (
+                      <p className="text-sm whitespace-pre-wrap">
+                        {renderMessageContent(message.content, true)}
+                      </p>
+                    ) : (
+                      <div className="text-sm prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-pre:bg-gray-800 prose-pre:text-gray-100 prose-code:bg-gray-200 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-a:text-blue-600 prose-a:underline">
+                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                      </div>
+                    )}
+                    {message.role === "assistant" && message.content && !message.content.includes("Sorry, I encountered an error") && (
+                      <button
+                        onClick={() => handleCopyMessage(message.content, idx)}
+                        className="absolute -bottom-1 -right-1 p-1.5 bg-white border shadow-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-50"
+                        data-testid={`button-copy-message-${idx}`}
+                        title="Copy message"
+                      >
+                        {copiedMessageIdx === idx ? (
+                          <span className="flex items-center gap-1 text-xs text-green-600">
+                            <Check className="h-3 w-3" />
+                            Copied!
+                          </span>
+                        ) : (
+                          <Copy className="h-3 w-3 text-gray-500" />
+                        )}
+                      </button>
+                    )}
+                    {message.role === "assistant" && message.content.includes("Sorry, I encountered an error") && hasError && (
+                      <button
+                        onClick={handleRetry}
+                        className="mt-2 flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
+                        data-testid="button-retry-message"
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                        Try Again
+                      </button>
+                    )}
                   </div>
                 </div>
               ))
