@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
+import { useEffect, useRef, useState, useCallback, Component, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,25 +22,32 @@ interface ScannerProps {
 
 type CameraFacing = 'environment' | 'user';
 
-const SUPPORTED_FORMATS = [
-  Html5QrcodeSupportedFormats.QR_CODE,
-  Html5QrcodeSupportedFormats.CODE_128,
-  Html5QrcodeSupportedFormats.EAN_13,
-  Html5QrcodeSupportedFormats.EAN_8,
-  Html5QrcodeSupportedFormats.UPC_A,
-  Html5QrcodeSupportedFormats.UPC_E,
-  Html5QrcodeSupportedFormats.CODE_39,
-  Html5QrcodeSupportedFormats.CODE_93,
-  Html5QrcodeSupportedFormats.CODABAR,
-  Html5QrcodeSupportedFormats.ITF,
-];
+class ScannerErrorBoundary extends Component<
+  { children: ReactNode; fallback: ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode; fallback: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
 
-function isIOS(): boolean {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error('Scanner error boundary caught:', error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
 }
 
-export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps) {
+function ScannerInner({ onScanSuccess, onScanError, className }: ScannerProps) {
   const [isScanning, setIsScanning] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,177 +55,142 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualCode, setManualCode] = useState('');
   const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
+  const [isReady, setIsReady] = useState(false);
   
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerRef = useRef<any>(null);
   const scannerIdRef = useRef(`scanner-${Math.random().toString(36).substr(2, 9)}`);
-  const isScanningRef = useRef(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    setIsMounted(true);
-    return () => {
-      setIsMounted(false);
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+    mountedRef.current = true;
+    const timer = setTimeout(() => {
+      if (mountedRef.current) {
+        setIsReady(true);
       }
+    }, 100);
+
+    return () => {
+      mountedRef.current = false;
+      clearTimeout(timer);
+      cleanupScanner();
     };
   }, []);
 
-  const cleanupScanner = useCallback(async () => {
+  const cleanupScanner = useCallback(() => {
     if (scannerRef.current) {
       try {
-        const state = scannerRef.current.getState();
+        const state = scannerRef.current.getState?.();
         if (state === 2) {
-          await scannerRef.current.stop();
+          scannerRef.current.stop?.().catch(() => {});
         }
-      } catch {}
-      try {
-        scannerRef.current.clear();
+        scannerRef.current.clear?.();
       } catch {}
       scannerRef.current = null;
     }
-    isScanningRef.current = false;
   }, []);
 
   const stopScanning = useCallback(async () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    await cleanupScanner();
-    if (isMounted) {
+    cleanupScanner();
+    if (mountedRef.current) {
       setIsScanning(false);
     }
-  }, [cleanupScanner, isMounted]);
+  }, [cleanupScanner]);
 
   const startScanning = useCallback(async () => {
-    if (isScanningRef.current) return;
-    
+    if (!isReady) {
+      setError('Scanner not ready. Please try again.');
+      return;
+    }
+
     setError(null);
     setIsLoading(true);
 
-    timeoutRef.current = setTimeout(() => {
-      if (isMounted) {
+    const timeoutId = setTimeout(() => {
+      if (mountedRef.current) {
         setIsLoading(false);
-        setError('Camera initialization timed out. Please try again or use manual entry.');
+        setError('Camera took too long to start. Please try again or use manual entry.');
         setShowManualInput(true);
-        cleanupScanner();
       }
     }, 15000);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       const elementId = scannerIdRef.current;
       const element = document.getElementById(elementId);
+      
       if (!element) {
-        throw new Error('Scanner element not ready. Please close and reopen the dialog.');
+        clearTimeout(timeoutId);
+        throw new Error('Scanner container not found. Please refresh the page.');
       }
+
+      const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
+
+      const FORMATS = [
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.CODE_39,
+      ];
 
       let devices;
       try {
-        if (isIOS()) {
-          await navigator.mediaDevices.getUserMedia({ 
-            video: { 
-              facingMode: cameraFacing,
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            } 
-          }).then(stream => {
-            stream.getTracks().forEach(track => track.stop());
-          });
-        }
-        
         devices = await Html5Qrcode.getCameras();
       } catch (camErr) {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
+        clearTimeout(timeoutId);
         const msg = camErr instanceof Error ? camErr.message : String(camErr);
-        console.error('Camera access error:', msg);
-        
         if (msg.includes('Permission') || msg.includes('denied') || msg.includes('NotAllowed')) {
-          throw new Error('Camera permission denied. Please allow camera access in Safari settings: Settings > Safari > Camera > Allow');
+          throw new Error('Camera permission denied. Please allow camera access and try again.');
         }
-        if (msg.includes('NotFound') || msg.includes('not found')) {
-          throw new Error('No camera found. Please ensure camera permissions are enabled.');
-        }
-        if (msg.includes('NotReadable') || msg.includes('in use')) {
-          throw new Error('Camera is in use by another app. Please close other apps using the camera.');
-        }
-        throw new Error('Could not access camera. Please check your browser settings and try again.');
+        throw new Error('Could not access camera. Check browser permissions.');
       }
 
       if (!devices || devices.length === 0) {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
-        throw new Error('No camera detected. Please check camera permissions in Settings > Safari > Camera');
+        clearTimeout(timeoutId);
+        throw new Error('No camera found. Use manual entry below.');
       }
 
-      setHasMultipleCameras(devices.length > 1);
+      if (mountedRef.current) {
+        setHasMultipleCameras(devices.length > 1);
+      }
 
-      await cleanupScanner();
+      cleanupScanner();
 
       scannerRef.current = new Html5Qrcode(elementId, {
-        formatsToSupport: SUPPORTED_FORMATS,
+        formatsToSupport: FORMATS,
         verbose: false,
       });
 
-      isScanningRef.current = true;
-
-      const config = {
-        fps: isIOS() ? 5 : 10,
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0,
-        disableFlip: false,
-      };
-
       await scannerRef.current.start(
         { facingMode: cameraFacing },
-        config,
+        { fps: 10, qrbox: { width: 250, height: 250 } },
         (decodedText: string) => {
           onScanSuccess(decodedText);
         },
         undefined
       );
 
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-      
-      if (isMounted) {
+      clearTimeout(timeoutId);
+      if (mountedRef.current) {
         setIsScanning(true);
         setIsLoading(false);
-        setRetryCount(0);
       }
     } catch (err) {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
+      clearTimeout(timeoutId);
       const errorMessage = err instanceof Error ? err.message : 'Failed to start camera';
       console.error('Scanner error:', errorMessage);
-      if (isMounted) {
+      if (mountedRef.current) {
         setError(errorMessage);
         setShowManualInput(true);
         setIsLoading(false);
       }
       onScanError?.(errorMessage);
-      await cleanupScanner();
+      cleanupScanner();
     }
-  }, [cameraFacing, onScanSuccess, onScanError, cleanupScanner, isMounted]);
-
-  const retryScanning = useCallback(async () => {
-    setRetryCount(prev => prev + 1);
-    setError(null);
-    await startScanning();
-  }, [startScanning]);
+  }, [cameraFacing, onScanSuccess, onScanError, cleanupScanner, isReady]);
 
   const switchCamera = useCallback(async () => {
     const newFacing = cameraFacing === 'environment' ? 'user' : 'environment';
@@ -227,9 +198,7 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
     
     if (isScanning) {
       await stopScanning();
-      setTimeout(() => {
-        startScanning();
-      }, 300);
+      setTimeout(() => startScanning(), 300);
     }
   }, [cameraFacing, isScanning, stopScanning, startScanning]);
 
@@ -242,14 +211,27 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
     }
   };
 
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      cleanupScanner();
-    };
-  }, [cleanupScanner]);
+  const retryScanning = () => {
+    setError(null);
+    startScanning();
+  };
+
+  if (!isReady) {
+    return (
+      <div className={className}>
+        <Card className="overflow-hidden">
+          <CardContent className="p-0">
+            <div className="w-full aspect-square bg-muted flex items-center justify-center min-h-[280px]">
+              <div className="text-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Loading scanner...</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className={className}>
@@ -258,7 +240,6 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
           <div 
             id={scannerIdRef.current}
             className="relative w-full aspect-square bg-black min-h-[280px]"
-            style={{ WebkitTransform: 'translateZ(0)' }}
           >
             {!isScanning && !isLoading && !error && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/90">
@@ -267,11 +248,6 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
                 <p className="text-muted-foreground text-xs px-4 text-center">
                   Tap "Start Scanning" to activate camera
                 </p>
-                {isIOS() && (
-                  <p className="text-muted-foreground text-xs px-4 text-center mt-2 italic">
-                    Safari will ask for camera permission
-                  </p>
-                )}
               </div>
             )}
             
@@ -279,9 +255,7 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/90 z-10">
                 <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
                 <p className="text-sm text-muted-foreground">Starting camera...</p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {isIOS() ? 'Please allow camera access when prompted' : 'This may take a moment'}
-                </p>
+                <p className="text-xs text-muted-foreground mt-2">Please allow camera access when prompted</p>
               </div>
             )}
 
@@ -290,12 +264,10 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
                 <AlertCircle className="h-12 w-12 text-destructive mb-4" />
                 <p className="text-sm font-medium text-destructive text-center mb-2">Camera Error</p>
                 <p className="text-xs text-muted-foreground text-center mb-4">{error}</p>
-                {retryCount < 3 && (
-                  <Button variant="outline" size="sm" onClick={retryScanning}>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Try Again
-                  </Button>
-                )}
+                <Button variant="outline" size="sm" onClick={retryScanning}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Try Again
+                </Button>
               </div>
             )}
 
@@ -377,7 +349,6 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
                       data-testid="input-manual-code"
                       autoFocus
                       autoComplete="off"
-                      autoCapitalize="off"
                     />
                     <Button type="submit" disabled={!manualCode.trim()} data-testid="button-submit-manual">
                       Go
@@ -407,5 +378,58 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export function Scanner(props: ScannerProps) {
+  return (
+    <ScannerErrorBoundary
+      fallback={
+        <div className={props.className}>
+          <Card className="overflow-hidden">
+            <CardContent className="p-6 text-center">
+              <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+              <p className="font-medium text-destructive mb-2">Scanner Error</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                The camera scanner encountered an error. Please refresh the page or use manual entry.
+              </p>
+              <ManualEntryFallback onScanSuccess={props.onScanSuccess} />
+            </CardContent>
+          </Card>
+        </div>
+      }
+    >
+      <ScannerInner {...props} />
+    </ScannerErrorBoundary>
+  );
+}
+
+function ManualEntryFallback({ onScanSuccess }: { onScanSuccess: (code: string) => void }) {
+  const [code, setCode] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (code.trim()) {
+      onScanSuccess(code.trim());
+      setCode('');
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <Label htmlFor="fallback-code" className="text-sm font-medium">Enter Code Manually</Label>
+      <div className="flex gap-2">
+        <Input
+          id="fallback-code"
+          placeholder="Enter code here..."
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          data-testid="input-fallback-code"
+        />
+        <Button type="submit" disabled={!code.trim()}>
+          Go
+        </Button>
+      </div>
+    </form>
   );
 }
