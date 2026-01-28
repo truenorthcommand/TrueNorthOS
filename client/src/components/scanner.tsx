@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, Component, ReactNode } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,32 +22,7 @@ interface ScannerProps {
 
 type CameraFacing = 'environment' | 'user';
 
-class ScannerErrorBoundary extends Component<
-  { children: ReactNode; fallback: ReactNode },
-  { hasError: boolean }
-> {
-  constructor(props: { children: ReactNode; fallback: ReactNode }) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error) {
-    console.error('Scanner error boundary caught:', error);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback;
-    }
-    return this.props.children;
-  }
-}
-
-function ScannerInner({ onScanSuccess, onScanError, className }: ScannerProps) {
+export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps) {
   const [isScanning, setIsScanning] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,23 +30,27 @@ function ScannerInner({ onScanSuccess, onScanError, className }: ScannerProps) {
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualCode, setManualCode] = useState('');
   const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
-  const [isReady, setIsReady] = useState(false);
   
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const scannerRef = useRef<any>(null);
-  const scannerIdRef = useRef(`scanner-${Math.random().toString(36).substr(2, 9)}`);
+  const scannerContainerId = useRef(`qr-scanner-${Math.random().toString(36).substr(2, 9)}`);
   const mountedRef = useRef(true);
 
   useEffect(() => {
     mountedRef.current = true;
-    const timer = setTimeout(() => {
-      if (mountedRef.current) {
-        setIsReady(true);
-      }
-    }, 100);
+    
+    navigator.mediaDevices?.enumerateDevices?.()
+      .then(devices => {
+        const videoDevices = devices.filter(d => d.kind === 'videoinput');
+        if (mountedRef.current) {
+          setHasMultipleCameras(videoDevices.length > 1);
+        }
+      })
+      .catch(() => {});
 
     return () => {
       mountedRef.current = false;
-      clearTimeout(timer);
       cleanupScanner();
     };
   }, []);
@@ -81,15 +60,22 @@ function ScannerInner({ onScanSuccess, onScanError, className }: ScannerProps) {
       try {
         const state = scannerRef.current.getState?.();
         if (state === 2) {
-          scannerRef.current.stop?.().catch(() => {});
+          scannerRef.current.stop().catch(() => {});
         }
-        scannerRef.current.clear?.();
+      } catch {}
+      try {
+        scannerRef.current.clear();
       } catch {}
       scannerRef.current = null;
     }
+    
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
   }, []);
 
-  const stopScanning = useCallback(async () => {
+  const stopScanning = useCallback(() => {
     cleanupScanner();
     if (mountedRef.current) {
       setIsScanning(false);
@@ -97,35 +83,21 @@ function ScannerInner({ onScanSuccess, onScanError, className }: ScannerProps) {
   }, [cleanupScanner]);
 
   const startScanning = useCallback(async () => {
-    if (!isReady) {
-      setError('Scanner not ready. Please try again.');
-      return;
-    }
-
     setError(null);
     setIsLoading(true);
 
-    const timeoutId = setTimeout(() => {
-      if (mountedRef.current) {
-        setIsLoading(false);
-        setError('Camera took too long to start. Please try again or use manual entry.');
-        setShowManualInput(true);
-      }
-    }, 15000);
-
     try {
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      const elementId = scannerIdRef.current;
-      const element = document.getElementById(elementId);
+      cleanupScanner();
       
-      if (!element) {
-        clearTimeout(timeoutId);
-        throw new Error('Scanner container not found. Please refresh the page.');
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      const container = document.getElementById(scannerContainerId.current);
+      if (!container) {
+        throw new Error('Scanner container not ready');
       }
 
       const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
-
+      
       const FORMATS = [
         Html5QrcodeSupportedFormats.QR_CODE,
         Html5QrcodeSupportedFormats.CODE_128,
@@ -134,54 +106,48 @@ function ScannerInner({ onScanSuccess, onScanError, className }: ScannerProps) {
         Html5QrcodeSupportedFormats.UPC_A,
         Html5QrcodeSupportedFormats.UPC_E,
         Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.CODE_93,
       ];
 
-      let devices;
-      try {
-        devices = await Html5Qrcode.getCameras();
-      } catch (camErr) {
-        clearTimeout(timeoutId);
-        const msg = camErr instanceof Error ? camErr.message : String(camErr);
-        if (msg.includes('Permission') || msg.includes('denied') || msg.includes('NotAllowed')) {
-          throw new Error('Camera permission denied. Please allow camera access and try again.');
-        }
-        throw new Error('Could not access camera. Check browser permissions.');
-      }
-
-      if (!devices || devices.length === 0) {
-        clearTimeout(timeoutId);
-        throw new Error('No camera found. Use manual entry below.');
-      }
-
-      if (mountedRef.current) {
-        setHasMultipleCameras(devices.length > 1);
-      }
-
-      cleanupScanner();
-
-      scannerRef.current = new Html5Qrcode(elementId, {
+      scannerRef.current = new Html5Qrcode(scannerContainerId.current, {
         formatsToSupport: FORMATS,
         verbose: false,
       });
 
       await scannerRef.current.start(
         { facingMode: cameraFacing },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+        },
         (decodedText: string) => {
-          onScanSuccess(decodedText);
+          if (mountedRef.current) {
+            onScanSuccess(decodedText);
+          }
         },
         undefined
       );
 
-      clearTimeout(timeoutId);
       if (mountedRef.current) {
         setIsScanning(true);
         setIsLoading(false);
       }
     } catch (err) {
-      clearTimeout(timeoutId);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to start camera';
-      console.error('Scanner error:', errorMessage);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('Scanner error:', msg);
+      
+      let errorMessage = 'Could not start camera scanner.';
+      if (msg.includes('Permission') || msg.includes('denied') || msg.includes('NotAllowed')) {
+        errorMessage = 'Camera permission denied. Please allow camera access in your browser settings.';
+      } else if (msg.includes('NotFound') || msg.includes('not found') || msg.includes('Requested device not found')) {
+        errorMessage = 'No camera found on this device.';
+      } else if (msg.includes('NotReadable') || msg.includes('in use')) {
+        errorMessage = 'Camera is in use by another app.';
+      } else if (msg.includes('container')) {
+        errorMessage = 'Scanner failed to initialize. Please refresh the page.';
+      }
+      
       if (mountedRef.current) {
         setError(errorMessage);
         setShowManualInput(true);
@@ -190,15 +156,15 @@ function ScannerInner({ onScanSuccess, onScanError, className }: ScannerProps) {
       onScanError?.(errorMessage);
       cleanupScanner();
     }
-  }, [cameraFacing, onScanSuccess, onScanError, cleanupScanner, isReady]);
+  }, [cameraFacing, onScanSuccess, onScanError, cleanupScanner]);
 
   const switchCamera = useCallback(async () => {
     const newFacing = cameraFacing === 'environment' ? 'user' : 'environment';
     setCameraFacing(newFacing);
     
     if (isScanning) {
-      await stopScanning();
-      setTimeout(() => startScanning(), 300);
+      stopScanning();
+      setTimeout(() => startScanning(), 500);
     }
   }, [cameraFacing, isScanning, stopScanning, startScanning]);
 
@@ -216,31 +182,19 @@ function ScannerInner({ onScanSuccess, onScanError, className }: ScannerProps) {
     startScanning();
   };
 
-  if (!isReady) {
-    return (
-      <div className={className}>
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <div className="w-full aspect-square bg-muted flex items-center justify-center min-h-[280px]">
-              <div className="text-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">Loading scanner...</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className={className}>
       <Card className="overflow-hidden">
         <CardContent className="p-0">
-          <div 
-            id={scannerIdRef.current}
-            className="relative w-full aspect-square bg-black min-h-[280px]"
-          >
+          <div className="relative w-full aspect-square bg-black min-h-[280px] overflow-hidden">
+            <div
+              id={scannerContainerId.current}
+              className="absolute inset-0 w-full h-full"
+              style={{ 
+                display: isScanning || isLoading ? 'block' : 'none',
+              }}
+            />
+            
             {!isScanning && !isLoading && !error && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/90">
                 <Camera className="h-16 w-16 text-muted-foreground mb-4" />
@@ -273,7 +227,7 @@ function ScannerInner({ onScanSuccess, onScanError, className }: ScannerProps) {
 
             {isScanning && (
               <div className="absolute inset-0 pointer-events-none z-10">
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[250px] h-[250px]">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] h-[200px]">
                   <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-lg"></div>
                   <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-lg"></div>
                   <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-lg"></div>
@@ -378,58 +332,5 @@ function ScannerInner({ onScanSuccess, onScanError, className }: ScannerProps) {
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-export function Scanner(props: ScannerProps) {
-  return (
-    <ScannerErrorBoundary
-      fallback={
-        <div className={props.className}>
-          <Card className="overflow-hidden">
-            <CardContent className="p-6 text-center">
-              <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-              <p className="font-medium text-destructive mb-2">Scanner Error</p>
-              <p className="text-sm text-muted-foreground mb-4">
-                The camera scanner encountered an error. Please refresh the page or use manual entry.
-              </p>
-              <ManualEntryFallback onScanSuccess={props.onScanSuccess} />
-            </CardContent>
-          </Card>
-        </div>
-      }
-    >
-      <ScannerInner {...props} />
-    </ScannerErrorBoundary>
-  );
-}
-
-function ManualEntryFallback({ onScanSuccess }: { onScanSuccess: (code: string) => void }) {
-  const [code, setCode] = useState('');
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (code.trim()) {
-      onScanSuccess(code.trim());
-      setCode('');
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      <Label htmlFor="fallback-code" className="text-sm font-medium">Enter Code Manually</Label>
-      <div className="flex gap-2">
-        <Input
-          id="fallback-code"
-          placeholder="Enter code here..."
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          data-testid="input-fallback-code"
-        />
-        <Button type="submit" disabled={!code.trim()}>
-          Go
-        </Button>
-      </div>
-    </form>
   );
 }
