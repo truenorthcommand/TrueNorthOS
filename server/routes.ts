@@ -17,6 +17,9 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import { registerGlobalAssistantRoutes } from "./globalAssistant";
 import { insertFileSchema } from "@shared/schema";
 import { setupAuth } from "./replit_integrations/auth";
+import { generateFormPdf } from "./form-pdf";
+import { emitEvent } from "./events";
+import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
 
 function getStripeClient(): Stripe | null {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -8878,13 +8881,95 @@ Be concise and practical. Focus on real issues that affect the business.`;
     }
   });
 
-  // Submit form (finalize)
+  // Submit form (finalize with PDF generation and event emission)
   app.post("/api/forms/submissions/:id/submit", requireAuth, async (req, res) => {
     try {
       const submission = await storage.submitFormSubmission(req.params.id);
       if (!submission) {
         return res.status(404).json({ error: "Submission not found" });
       }
+
+      // Get version and template info for PDF generation
+      const version = await storage.getFormTemplateVersion(submission.templateVersionId);
+      if (version) {
+        const template = await storage.getFormTemplate(version.templateId);
+        const templateName = template?.name || "Form";
+        
+        // Get submitter info
+        const submitter = submission.submittedBy ? await storage.getUser(submission.submittedBy) : null;
+        
+        // Get entity info
+        let entityInfo: { type: string; name?: string } | undefined;
+        if (submission.entityType === "job" && submission.entityId) {
+          const job = await storage.getJob(parseInt(submission.entityId));
+          entityInfo = { type: "Job", name: job?.jobNumber };
+        } else if (submission.entityType === "client" && submission.entityId) {
+          const client = await storage.getClient(parseInt(submission.entityId));
+          entityInfo = { type: "Client", name: client?.companyName || client?.contactName };
+        } else if (submission.entityType === "quote" && submission.entityId) {
+          entityInfo = { type: "Quote", name: `#${submission.entityId}` };
+        }
+        
+        try {
+          // Generate PDF
+          const pdfBuffer = await generateFormPdf({
+            templateName,
+            version,
+            submission,
+            submittedBy: submitter ? `${submitter.firstName} ${submitter.lastName}` : undefined,
+            entityInfo,
+          });
+          
+          // Store PDF in object storage
+          const objectStorageService = new ObjectStorageService();
+          const sanitizedName = templateName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+          const fileName = `${sanitizedName}_${submission.id}.pdf`;
+          
+          const { objectPath } = await objectStorageService.writeBuffer({
+            buffer: pdfBuffer,
+            fileName,
+            contentType: "application/pdf",
+            subPath: "forms",
+          });
+          
+          // Create file record if entity is a job
+          if (submission.entityType === "job" && submission.entityId) {
+            await storage.createFile({
+              fileName,
+              fileType: "application/pdf",
+              filePath: objectPath,
+              folderId: null,
+              uploadedBy: submission.submittedBy || undefined,
+              entityType: "job",
+              entityId: submission.entityId,
+            });
+          }
+          
+          console.log(`[Forms] PDF generated for submission ${submission.id}: ${objectPath}`);
+        } catch (pdfError) {
+          console.error("Error generating PDF (non-blocking):", pdfError);
+          // PDF generation failure is non-blocking
+        }
+      }
+      
+      // Emit domain event for workflow processing
+      try {
+        await emitEvent("form.submitted", {
+          submissionId: submission.id,
+          templateVersionId: submission.templateVersionId,
+          entityType: submission.entityType,
+          entityId: submission.entityId,
+          submittedBy: submission.submittedBy,
+          data: submission.data,
+        }, {
+          aggregateType: "form_submission",
+          aggregateId: submission.id,
+          causedById: submission.submittedBy || undefined,
+        });
+      } catch (eventError) {
+        console.error("Error emitting form.submitted event (non-blocking):", eventError);
+      }
+      
       res.json(submission);
     } catch (error) {
       console.error("Error submitting form:", error);
