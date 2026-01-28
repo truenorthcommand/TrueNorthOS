@@ -10,8 +10,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Camera, Save, Send, X, Loader2 } from "lucide-react";
+import { ArrowLeft, Camera, Save, Send, X, Loader2, Calculator } from "lucide-react";
 import type { FormField, FormSchemaDefinition } from "@shared/schema";
+import { processFormFields, validateForm, evaluateFormula } from "@/lib/form-logic";
 
 interface SignaturePadProps {
   value?: string;
@@ -186,7 +187,8 @@ export default function FormFill() {
   }, [version, entity, existingSubmission, entityType]);
 
   const createSubmissionMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (data?: Record<string, any>) => {
+      const submissionData = data || formData;
       const res = await fetch("/api/forms/submissions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -195,7 +197,7 @@ export default function FormFill() {
           templateVersionId: versionId,
           entityType,
           entityId,
-          data: formData,
+          data: submissionData,
         }),
       });
       if (!res.ok) throw new Error("Failed to create submission");
@@ -204,12 +206,13 @@ export default function FormFill() {
   });
 
   const updateSubmissionMutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, data }: { id: string; data?: Record<string, any> }) => {
+      const submissionData = data || formData;
       const res = await fetch(`/api/forms/submissions/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ data: formData }),
+        body: JSON.stringify({ data: submissionData }),
       });
       if (!res.ok) throw new Error("Failed to update submission");
       return res.json();
@@ -238,9 +241,9 @@ export default function FormFill() {
   const handleSaveDraft = async () => {
     try {
       if (submissionId) {
-        await updateSubmissionMutation.mutateAsync(submissionId);
+        await updateSubmissionMutation.mutateAsync({ id: submissionId });
       } else {
-        const result = await createSubmissionMutation.mutateAsync();
+        const result = await createSubmissionMutation.mutateAsync(formData);
         const newUrl = `/forms/fill/${versionId}?entityType=${entityType}&entityId=${entityId}&submissionId=${result.id}`;
         window.history.replaceState({}, "", newUrl);
       }
@@ -251,28 +254,30 @@ export default function FormFill() {
   };
 
   const handleSubmit = async () => {
-    const requiredFields = version?.fields.filter((f) => f.required) || [];
-    const missingFields = requiredFields.filter((f) => {
-      const value = formData[f.key];
-      return value === undefined || value === null || value === "";
-    });
-
-    if (missingFields.length > 0) {
+    const fields = version?.fields || [];
+    const { computedValues: finalValues } = processFormFields(fields, formData);
+    
+    const validation = validateForm(fields, formData);
+    
+    if (!validation.valid) {
+      const errorMessages = Object.values(validation.errors);
       toast({
         title: "Required fields missing",
-        description: `Please fill in: ${missingFields.map((f) => f.label).join(", ")}`,
+        description: errorMessages.slice(0, 3).join(", ") + (errorMessages.length > 3 ? ` and ${errorMessages.length - 3} more` : ""),
         variant: "destructive",
       });
       return;
     }
 
+    const submissionData = { ...formData, ...finalValues };
+
     try {
       let id = submissionId;
       if (!id) {
-        const result = await createSubmissionMutation.mutateAsync();
+        const result = await createSubmissionMutation.mutateAsync(submissionData);
         id = result.id;
       } else {
-        await updateSubmissionMutation.mutateAsync(id);
+        await updateSubmissionMutation.mutateAsync({ id, data: submissionData });
       }
       await submitMutation.mutateAsync(id!);
     } catch {
@@ -460,10 +465,21 @@ export default function FormFill() {
             onChange={(dataUrl) => setFormData({ ...formData, [field.key]: dataUrl })}
           />
         );
+      case "calculated":
+        const calculatedValue = field.formula ? evaluateFormula(field.formula, formData) : 0;
+        return (
+          <div className="flex items-center gap-2 p-3 bg-muted rounded-lg" data-testid={`calculated-${field.key}`}>
+            <Calculator className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium text-lg">{calculatedValue}</span>
+            {field.helpText && <span className="text-sm text-muted-foreground ml-2">({field.helpText})</span>}
+          </div>
+        );
       default:
         return <p className="text-slate-500">Unsupported field type: {field.type}</p>;
     }
   };
+
+  const { visibleFields, computedValues } = processFormFields(version?.fields || [], formData);
 
   if (isLoadingVersion) {
     return (
@@ -505,13 +521,16 @@ export default function FormFill() {
       </div>
 
       <div className="max-w-2xl mx-auto p-4 space-y-4">
-        {version.fields.map((field) => (
+        {visibleFields.map((field) => (
           <Card key={field.key}>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">
                 {field.label}
                 {field.required && <span className="text-red-500 ml-1">*</span>}
               </CardTitle>
+              {field.helpText && field.type !== "calculated" && (
+                <p className="text-xs text-muted-foreground">{field.helpText}</p>
+              )}
             </CardHeader>
             <CardContent>{renderField(field)}</CardContent>
           </Card>

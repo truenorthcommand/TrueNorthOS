@@ -13,8 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, GripVertical, Trash2, Save, Send, Type, AlignLeft, Hash, Calendar, List, CheckSquare, Camera, PenTool, ToggleLeft, Repeat } from "lucide-react";
-import type { FormField, FormSchemaDefinition } from "@shared/schema";
+import { ArrowLeft, Plus, GripVertical, Trash2, Save, Send, Type, AlignLeft, Hash, Calendar, List, CheckSquare, Camera, PenTool, ToggleLeft, Repeat, Calculator } from "lucide-react";
+import type { FormField, FormSchemaDefinition, ConditionalLogic } from "@shared/schema";
 
 const fieldTypes = [
   { type: "text", label: "Text", icon: Type },
@@ -28,6 +28,7 @@ const fieldTypes = [
   { type: "photo", label: "Photo", icon: Camera },
   { type: "signature", label: "Signature", icon: PenTool },
   { type: "repeatable_group", label: "Repeatable Group", icon: Repeat },
+  { type: "calculated", label: "Calculated", icon: Calculator },
 ] as const;
 
 interface SortableFieldProps {
@@ -449,6 +450,60 @@ export default function FormBuilder() {
                       <Plus className="h-4 w-4 mr-1" />
                       Add Option
                     </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Calculated field formula */}
+              {editingField.type === "calculated" && (
+                <div className="space-y-4">
+                  <Separator />
+                  <div className="space-y-2">
+                    <Label>Formula</Label>
+                    <Input
+                      value={editingField.formula || ""}
+                      onChange={(e) => {
+                        const updated = { ...editingField, formula: e.target.value };
+                        setEditingField(updated);
+                        updateField(editingField.key, { formula: e.target.value });
+                      }}
+                      placeholder="e.g., {quantity} * {unit_price}"
+                      data-testid="input-formula"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Use {"{field_key}"} to reference other fields. Supports: +, -, *, /, parentheses.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Placeholder and help text for text fields */}
+              {(editingField.type === "text" || editingField.type === "textarea" || editingField.type === "number") && (
+                <div className="space-y-4">
+                  <Separator />
+                  <div className="space-y-2">
+                    <Label>Placeholder</Label>
+                    <Input
+                      value={editingField.placeholder || ""}
+                      onChange={(e) => {
+                        const updated = { ...editingField, placeholder: e.target.value };
+                        setEditingField(updated);
+                        updateField(editingField.key, { placeholder: e.target.value });
+                      }}
+                      placeholder="Placeholder text..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Help Text</Label>
+                    <Input
+                      value={editingField.helpText || ""}
+                      onChange={(e) => {
+                        const updated = { ...editingField, helpText: e.target.value };
+                        setEditingField(updated);
+                        updateField(editingField.key, { helpText: e.target.value });
+                      }}
+                      placeholder="Additional instructions..."
+                    />
                   </div>
                 </div>
               )}

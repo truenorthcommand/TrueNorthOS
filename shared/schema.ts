@@ -1581,9 +1581,23 @@ export const insertFormAssetSchema = createInsertSchema(formAssets).omit({
 export type InsertFormAsset = z.infer<typeof insertFormAssetSchema>;
 export type FormAsset = typeof formAssets.$inferSelect;
 
+// Condition types for conditional logic
+export interface FieldCondition {
+  field: string; // Key of the field to compare
+  operator: "equals" | "not_equals" | "contains" | "not_contains" | "greater_than" | "less_than" | "is_empty" | "is_not_empty";
+  value?: string | number | boolean;
+}
+
+export interface ConditionalLogic {
+  action: "show" | "hide" | "require" | "not_require" | "set_value";
+  conditions: FieldCondition[];
+  logic: "and" | "or"; // How to combine conditions
+  setValue?: string; // For set_value action
+}
+
 // Form field schema for template builder
 export interface FormField {
-  type: "text" | "textarea" | "number" | "date" | "select" | "multiselect" | "checkbox" | "yesno" | "photo" | "signature" | "repeatable_group";
+  type: "text" | "textarea" | "number" | "date" | "select" | "multiselect" | "checkbox" | "yesno" | "photo" | "signature" | "repeatable_group" | "calculated";
   key: string;
   label: string;
   required?: boolean;
@@ -1591,12 +1605,37 @@ export interface FormField {
   multiple?: boolean;
   options?: { label: string; value: string }[];
   fields?: FormField[]; // For repeatable_group
+  // Phase 2: Conditional logic
+  conditionalLogic?: ConditionalLogic[];
+  // Phase 2: Calculated fields
+  formula?: string; // e.g., "{field1} + {field2} * 0.2"
+  // UI hints
+  placeholder?: string;
+  helpText?: string;
+  minValue?: number;
+  maxValue?: number;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string; // Regex pattern for validation
 }
+
+export const fieldConditionSchema = z.object({
+  field: z.string(),
+  operator: z.enum(["equals", "not_equals", "contains", "not_contains", "greater_than", "less_than", "is_empty", "is_not_empty"]),
+  value: z.union([z.string(), z.number(), z.boolean()]).optional(),
+});
+
+export const conditionalLogicSchema = z.object({
+  action: z.enum(["show", "hide", "require", "not_require", "set_value"]),
+  conditions: z.array(fieldConditionSchema),
+  logic: z.enum(["and", "or"]),
+  setValue: z.string().optional(),
+});
 
 export const formFieldSchema: z.ZodType<FormField> = z.object({
   type: z.enum([
     "text", "textarea", "number", "date", "select", "multiselect",
-    "checkbox", "yesno", "photo", "signature", "repeatable_group"
+    "checkbox", "yesno", "photo", "signature", "repeatable_group", "calculated"
   ]),
   key: z.string(),
   label: z.string(),
@@ -1608,6 +1647,15 @@ export const formFieldSchema: z.ZodType<FormField> = z.object({
     value: z.string(),
   })).optional(),
   fields: z.lazy(() => z.array(formFieldSchema)).optional(),
+  conditionalLogic: z.array(conditionalLogicSchema).optional(),
+  formula: z.string().optional(),
+  placeholder: z.string().optional(),
+  helpText: z.string().optional(),
+  minValue: z.number().optional(),
+  maxValue: z.number().optional(),
+  minLength: z.number().optional(),
+  maxLength: z.number().optional(),
+  pattern: z.string().optional(),
 });
 
 export const formSchemaDefinition = z.object({
