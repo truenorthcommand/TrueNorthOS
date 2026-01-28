@@ -1235,6 +1235,76 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== TODAY FEED (PROTECTED) ====================
+
+  app.get("/api/today", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+
+      // Get user's jobs for today
+      let allJobs;
+      if (req.session.userRole === 'engineer') {
+        allJobs = await storage.getJobsByEngineer(userId);
+      } else {
+        allJobs = await storage.getAllJobs();
+      }
+
+      // Filter jobs scheduled for today
+      const todayJobs = allJobs.filter(job => {
+        if (!job.date) return false;
+        const jobDate = new Date(job.date);
+        return jobDate >= today && jobDate < tomorrow;
+      }).sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+
+      // Calculate stats
+      const stats = {
+        totalJobs: todayJobs.length,
+        completedJobs: todayJobs.filter(j => j.status === 'Completed').length,
+        pendingJobs: todayJobs.filter(j => ['Draft', 'Scheduled'].includes(j.status)).length,
+        inProgressJobs: todayJobs.filter(j => j.status === 'In Progress').length,
+      };
+
+      // Determine greeting based on time
+      const hour = now.getHours();
+      let greeting = 'Good morning';
+      if (hour >= 12 && hour < 17) greeting = 'Good afternoon';
+      else if (hour >= 17) greeting = 'Good evening';
+      greeting += `, ${user?.name?.split(' ')[0] || 'there'}`;
+
+      // Determine next action
+      let nextAction = undefined;
+      const pendingJob = todayJobs.find(j => j.status !== 'Completed');
+      if (pendingJob) {
+        nextAction = {
+          type: 'job',
+          jobId: pendingJob.id,
+          jobNo: pendingJob.jobNo,
+          message: `Continue with ${pendingJob.nickname || pendingJob.jobNo} - ${pendingJob.customerName}`,
+        };
+      }
+
+      res.json({
+        greeting,
+        date: now.toLocaleDateString('en-GB', { 
+          weekday: 'long', 
+          day: 'numeric', 
+          month: 'long', 
+          year: 'numeric' 
+        }),
+        jobs: todayJobs,
+        stats,
+        nextAction,
+      });
+    } catch (error) {
+      console.error('[today] Error fetching today feed:', error);
+      res.status(500).json({ error: 'Failed to fetch today feed' });
+    }
+  });
+
   // ==================== JOB ROUTES (PROTECTED) ====================
 
   app.get("/api/jobs", requireAuth, async (req, res) => {
@@ -4088,6 +4158,71 @@ Return ONLY valid JSON, nothing else.`;
     } catch (error: any) {
       console.error("Gemini image generation error:", error);
       res.status(500).json({ error: error.message || "Failed to generate image" });
+    }
+  });
+
+  // ==================== EXCEPTIONS ====================
+
+  app.get("/api/exceptions", requireAuth, async (req, res) => {
+    try {
+      const status = req.query.status as string;
+      const type = req.query.type as string;
+      const severity = req.query.severity as string;
+      
+      const filters: { status?: string; type?: string; severity?: string } = {};
+      if (status && status !== 'all') filters.status = status;
+      if (type && type !== 'all') filters.type = type;
+      if (severity && severity !== 'all') filters.severity = severity;
+      
+      const exceptionsList = await storage.getExceptions(filters);
+      res.json(exceptionsList);
+    } catch (error) {
+      console.error('[exceptions] Error fetching exceptions:', error);
+      res.status(500).json({ error: 'Failed to fetch exceptions' });
+    }
+  });
+
+  app.get("/api/exceptions/:id", requireAuth, async (req, res) => {
+    try {
+      const exception = await storage.getException(req.params.id);
+      if (!exception) {
+        return res.status(404).json({ error: 'Exception not found' });
+      }
+      res.json(exception);
+    } catch (error) {
+      console.error('[exceptions] Error fetching exception:', error);
+      res.status(500).json({ error: 'Failed to fetch exception' });
+    }
+  });
+
+  app.post("/api/exceptions/:id/resolve", requireAuth, async (req, res) => {
+    try {
+      const { notes } = req.body;
+      const exception = await storage.resolveException(
+        req.params.id, 
+        req.session.userId!, 
+        notes
+      );
+      if (!exception) {
+        return res.status(404).json({ error: 'Exception not found' });
+      }
+      res.json(exception);
+    } catch (error) {
+      console.error('[exceptions] Error resolving exception:', error);
+      res.status(500).json({ error: 'Failed to resolve exception' });
+    }
+  });
+
+  app.patch("/api/exceptions/:id", requireAuth, async (req, res) => {
+    try {
+      const exception = await storage.updateException(req.params.id, req.body);
+      if (!exception) {
+        return res.status(404).json({ error: 'Exception not found' });
+      }
+      res.json(exception);
+    } catch (error) {
+      console.error('[exceptions] Error updating exception:', error);
+      res.status(500).json({ error: 'Failed to update exception' });
     }
   });
 
@@ -8906,7 +9041,7 @@ Be concise and practical. Focus on real issues that affect the business.`;
           version: 1,
           schema: template.schema,
           status: 'published',
-          publishedAt: new Date().toISOString(),
+          publishedAt: new Date(),
         });
         
         createdTemplates.push(created);

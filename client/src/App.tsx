@@ -83,6 +83,8 @@ import FormTemplates from "@/pages/forms/templates";
 import FormBuilder from "@/pages/forms/builder";
 import FormFill from "@/pages/forms/fill";
 import FormSubmissions from "@/pages/forms/submissions";
+import Today from "@/pages/today";
+import Exceptions from "@/pages/exceptions";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -161,6 +163,9 @@ function Router() {
       <Route path="/map">
         <PrivateRoute component={MapPage} />
       </Route>
+      <Route path="/today">
+        <PrivateRoute component={Today} />
+      </Route>
       <Route path="/time-logs">
         <PrivateRoute component={TimeLogs} />
       </Route>
@@ -187,6 +192,9 @@ function Router() {
       </Route>
       <Route path="/workflows">
         <PrivateRoute component={Workflows} />
+      </Route>
+      <Route path="/exceptions">
+        <PrivateRoute component={Exceptions} />
       </Route>
       <Route path="/quotes">
         <PrivateRoute component={Quotes} />
