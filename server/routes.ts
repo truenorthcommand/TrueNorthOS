@@ -9328,5 +9328,172 @@ Be concise and practical. Focus on real issues that affect the business.`;
     }
   });
 
+  // ==================== ASSETS ====================
+  
+  // List all assets with optional filters
+  app.get("/api/assets", requireAuth, async (req, res) => {
+    try {
+      const { condition, categoryType, assignedClientId, assignedJobId, isActive, search } = req.query;
+      
+      if (search && typeof search === 'string') {
+        const assets = await storage.searchAssets(search);
+        return res.json(assets);
+      }
+      
+      const filters: any = {};
+      if (condition) filters.condition = condition;
+      if (categoryType) filters.categoryType = categoryType;
+      if (assignedClientId) filters.assignedClientId = assignedClientId;
+      if (assignedJobId) filters.assignedJobId = assignedJobId;
+      if (isActive !== undefined) filters.isActive = isActive === 'true';
+      
+      const assets = await storage.getAssets(Object.keys(filters).length > 0 ? filters : undefined);
+      res.json(assets);
+    } catch (error) {
+      console.error("Error fetching assets:", error);
+      res.status(500).json({ error: "Failed to fetch assets" });
+    }
+  });
+
+  // Get assets with expiring warranty
+  app.get("/api/assets/warranty-expiring", requireAuth, async (req, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 30;
+      const assets = await storage.getAssetsExpiringWarranty(days);
+      res.json(assets);
+    } catch (error) {
+      console.error("Error fetching expiring warranty assets:", error);
+      res.status(500).json({ error: "Failed to fetch assets with expiring warranty" });
+    }
+  });
+
+  // Lookup asset by barcode
+  app.get("/api/assets/lookup/barcode/:barcode", requireAuth, async (req, res) => {
+    try {
+      const asset = await storage.getAssetByBarcode(req.params.barcode);
+      if (!asset) {
+        return res.status(404).json({ error: "Asset not found", barcode: req.params.barcode });
+      }
+      res.json(asset);
+    } catch (error) {
+      console.error("Error looking up asset by barcode:", error);
+      res.status(500).json({ error: "Failed to lookup asset" });
+    }
+  });
+
+  // Lookup asset by serial number
+  app.get("/api/assets/lookup/serial/:serialNumber", requireAuth, async (req, res) => {
+    try {
+      const asset = await storage.getAssetBySerialNumber(req.params.serialNumber);
+      if (!asset) {
+        return res.status(404).json({ error: "Asset not found", serialNumber: req.params.serialNumber });
+      }
+      res.json(asset);
+    } catch (error) {
+      console.error("Error looking up asset by serial number:", error);
+      res.status(500).json({ error: "Failed to lookup asset" });
+    }
+  });
+
+  // Get single asset by ID
+  app.get("/api/assets/:id", requireAuth, async (req, res) => {
+    try {
+      const asset = await storage.getAsset(req.params.id);
+      if (!asset) {
+        return res.status(404).json({ error: "Asset not found" });
+      }
+      res.json(asset);
+    } catch (error) {
+      console.error("Error fetching asset:", error);
+      res.status(500).json({ error: "Failed to fetch asset" });
+    }
+  });
+
+  // Create new asset
+  app.post("/api/assets", requireAuth, async (req, res) => {
+    try {
+      const asset = await storage.createAsset(req.body);
+      
+      // Log history
+      await storage.createAssetHistory({
+        assetId: asset.id,
+        action: 'created',
+        description: `Asset created: ${asset.name}`,
+        newValue: asset,
+        performedBy: (req as any).user?.id,
+      });
+      
+      res.status(201).json(asset);
+    } catch (error) {
+      console.error("Error creating asset:", error);
+      res.status(500).json({ error: "Failed to create asset" });
+    }
+  });
+
+  // Update asset
+  app.put("/api/assets/:id", requireAuth, async (req, res) => {
+    try {
+      const existingAsset = await storage.getAsset(req.params.id);
+      if (!existingAsset) {
+        return res.status(404).json({ error: "Asset not found" });
+      }
+      
+      const asset = await storage.updateAsset(req.params.id, req.body);
+      
+      // Log history
+      await storage.createAssetHistory({
+        assetId: req.params.id,
+        action: 'updated',
+        description: `Asset updated`,
+        previousValue: existingAsset,
+        newValue: asset,
+        performedBy: (req as any).user?.id,
+      });
+      
+      res.json(asset);
+    } catch (error) {
+      console.error("Error updating asset:", error);
+      res.status(500).json({ error: "Failed to update asset" });
+    }
+  });
+
+  // Delete asset (soft delete - set isActive to false)
+  app.delete("/api/assets/:id", requireAdmin, async (req, res) => {
+    try {
+      const existingAsset = await storage.getAsset(req.params.id);
+      if (!existingAsset) {
+        return res.status(404).json({ error: "Asset not found" });
+      }
+      
+      // Soft delete
+      await storage.updateAsset(req.params.id, { isActive: false });
+      
+      // Log history
+      await storage.createAssetHistory({
+        assetId: req.params.id,
+        action: 'deleted',
+        description: `Asset deactivated: ${existingAsset.name}`,
+        previousValue: existingAsset,
+        performedBy: (req as any).user?.id,
+      });
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting asset:", error);
+      res.status(500).json({ error: "Failed to delete asset" });
+    }
+  });
+
+  // Get asset history
+  app.get("/api/assets/:id/history", requireAuth, async (req, res) => {
+    try {
+      const history = await storage.getAssetHistory(req.params.id);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching asset history:", error);
+      res.status(500).json({ error: "Failed to fetch asset history" });
+    }
+  });
+
   return httpServer;
 }
