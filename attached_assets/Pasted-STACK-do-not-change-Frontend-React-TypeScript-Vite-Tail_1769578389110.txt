@@ -1,0 +1,49 @@
+STACK (do not change):
+Frontend: React + TypeScript, Vite, Tailwind, shadcn/ui, Wouter routing, TanStack Query, PWA offline support.
+Backend: Node.js + Express + TypeScript, session auth, RBAC roles (Admin, Engineer, SuperAdmin, WorksManager, Surveyor), TOTP 2FA.
+DB: Postgres (Neon), Drizzle ORM, Zod validation.
+Storage: Replit Object Storage.
+
+GOAL:
+Implement upgrades: Foundation (feature flags, domain events, queue), UX Today/Job gating, Forms Engine v1, Workflow Engine v1, AI Assist with logging, Exceptions, Webhooks, Offline mutation queue, scanning.
+
+PHASE 0 FOUNDATION (must be first):
+- Create tables: feature_flags, domain_events, job_queue, workflow_runs/logs, webhook_subscriptions/deliveries, ai_requests, exceptions, forms tables.
+- Implement emitEvent(tenantId, type, payload, dedupeKey?) that inserts into domain_events and enqueues jobs for workflow_run and webhook_delivery.
+- Implement Postgres queue worker that polls job_queue using FOR UPDATE SKIP LOCKED, retries, dead-letter status.
+
+PHASE 1 UX:
+- Build /today route and feed endpoints.
+- Build /jobs/:id with “Next Action” and Close Job gating checklist.
+- Build /exceptions screen and endpoints.
+
+PHASE 2 FORMS V1:
+- Implement forms CRUD + publish versioning.
+- Implement form schema_json structure with Zod validation generated from schema.
+- Implement conditional logic engine (show/hide, required-if, setValue), repeatable groups, calculations.
+- Implement submission pipeline: validate -> persist -> enqueue pdf_render -> attach -> emit FormSubmitted event.
+- Implement offline form submission using IndexedDB Dexie queue and TanStack Query persistence.
+
+PHASE 3 WORKFLOWS V1:
+- Implement workflows table storing trigger, conditions_json expression tree, actions_json list.
+- Implement runner: match workflows by tenant + trigger; evaluate; execute actions; log every step.
+- Required actions: CreateTask, SendNotification, UpdateEntityField, CreateInvoiceDraft, CreateJobFromQuote, BlockJobClosure, CallWebhook.
+- Create audit logs and exceptions on failure.
+
+PHASE 4 AI:
+- Implement endpoints: /api/ai/job-notes, /api/ai/compliance-gap, /api/ai/parts-suggest.
+- Log all AI requests to ai_requests with provider, prompt_version, input_refs_json, output_json.
+- Return confidence + sources_used always.
+- Require human approval before writing to job notes.
+
+PHASE 5 INTEGRATIONS + SCAN:
+- Implement webhooks subscriptions with HMAC signature, retry policy, delivery logs UI.
+- Add QR/barcode scanning in UI; link scans to job/customer/asset.
+- Add optional OCR for serial/model capture.
+
+DELIVERABLES:
+- Drizzle migrations
+- Express routes per module
+- React pages and shadcn/ui components
+- Offline queue + sync + conflict handling
+- Tests: Vitest + Supertest for core flows (form submit, workflow run, webhook delivery, job close gating)
