@@ -86,6 +86,9 @@ import FormFill from "@/pages/forms/fill";
 import FormSubmissions from "@/pages/forms/submissions";
 import Today from "@/pages/today";
 import Exceptions from "@/pages/exceptions";
+import Assets from "@/pages/assets";
+import AssetDetail from "@/pages/asset-detail";
+import AssetForm from "@/pages/asset-form";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -196,6 +199,18 @@ function Router() {
       </Route>
       <Route path="/exceptions">
         <PrivateRoute component={Exceptions} />
+      </Route>
+      <Route path="/assets">
+        <PrivateRoute component={Assets} />
+      </Route>
+      <Route path="/assets/new">
+        <PrivateRoute component={AssetForm} />
+      </Route>
+      <Route path="/assets/:id">
+        <PrivateRoute component={AssetDetail} />
+      </Route>
+      <Route path="/assets/:id/edit">
+        <PrivateRoute component={AssetForm} />
       </Route>
       <Route path="/quotes">
         <PrivateRoute component={Quotes} />

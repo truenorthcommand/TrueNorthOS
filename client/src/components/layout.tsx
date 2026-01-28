@@ -3,7 +3,7 @@ import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { hasRole } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw, Mic, BookOpen, Mail, LayoutGrid, FolderOpen, Shield, Crown, Link2, Gift, Sparkles, ClipboardList, Sun, Moon, QrCode } from "lucide-react";
+import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw, Mic, BookOpen, Mail, LayoutGrid, FolderOpen, Shield, Crown, Link2, Gift, Sparkles, ClipboardList, Sun, Moon, QrCode, Package } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Scanner } from "@/components/scanner";
@@ -19,7 +19,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useStore } from "@/lib/store";
 import { GlobalAIAssistant } from "@/components/GlobalAIAssistant";
 
-type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools' | 'fleet' | 'finance' | 'clients' | 'files' | 'settings';
+type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools' | 'fleet' | 'assets' | 'finance' | 'clients' | 'files' | 'settings';
 
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -421,6 +421,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <NavLink href="/fleet/vehicles" icon={Truck}>Vehicles</NavLink>
           <NavLink href="/fleet/walkaround" icon={ClipboardCheck}>Walkaround Check</NavLink>
           <NavLink href="/fleet/report-defect" icon={AlertTriangle}>Report Defect</NavLink>
+        </MenuGroup>
+
+        {/* Assets Section - Equipment, tools, and parts tracking */}
+        <MenuGroup title="Assets" icon={Package} section="assets">
+          <NavLink href="/assets" icon={Package}>All Assets</NavLink>
         </MenuGroup>
 
 
