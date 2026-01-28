@@ -176,6 +176,12 @@ export default function JobDetail() {
     queryKey: [`/api/jobs/${jobId}/files`],
     enabled: !!jobId,
   });
+  
+  // Blocking exceptions query for workflow job gating
+  const { data: blockingExceptions = [] } = useQuery<Array<{ id: string; title: string; message?: string | null; severity: string }>>({
+    queryKey: [`/api/jobs/${jobId}/blocking-exceptions`],
+    enabled: !!jobId,
+  });
 
   const createFileMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -802,6 +808,7 @@ export default function JobDetail() {
             signOffLat: job.signOffLat,
             signOffAddress: job.signOffAddress,
           }}
+          blockingExceptions={blockingExceptions}
           className="mb-6 no-print"
         />
       )}

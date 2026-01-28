@@ -46,6 +46,9 @@ import {
   type Exception, type InsertException,
   type DomainEvent, type WebhookSubscription, type InsertWebhookSubscription,
   type WebhookDelivery, type AiRequest,
+  type WorkflowRule, type InsertWorkflowRule,
+  type WorkflowExecution, type InsertWorkflowExecution,
+  type WorkflowLog, type InsertWorkflowLog,
   users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, clientContacts, clientProperties, jobUpdates,
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
@@ -55,7 +58,8 @@ import {
   accountsReceipts, invoiceChaseLogs, fixedCosts, snippets, files,
   aiConversations, aiBusinessPatterns, aiUserPreferences,
   formTemplates, formTemplateVersions, formSubmissions, formAssets,
-  featureFlags, exceptions, domainEvents, webhookSubscriptions, webhookDeliveries, aiRequests
+  featureFlags, exceptions, domainEvents, webhookSubscriptions, webhookDeliveries, aiRequests,
+  workflowRules, workflowExecutions, workflowLogs
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and, ne, inArray, gt, asc } from "drizzle-orm";
@@ -358,7 +362,7 @@ export interface IStorage {
   deleteFeatureFlag(id: string): Promise<void>;
   
   // Exceptions
-  getExceptions(filters?: { status?: string; type?: string; severity?: string }): Promise<Exception[]>;
+  getExceptions(filters?: { status?: string; type?: string; severity?: string; entityType?: string; entityId?: string }): Promise<Exception[]>;
   getException(id: string): Promise<Exception | undefined>;
   createException(data: InsertException): Promise<Exception>;
   updateException(id: string, data: Partial<Exception>): Promise<Exception | undefined>;
@@ -2661,7 +2665,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Exceptions
-  async getExceptions(filters?: { status?: string; type?: string; severity?: string }): Promise<Exception[]> {
+  async getExceptions(filters?: { status?: string; type?: string; severity?: string; entityType?: string; entityId?: string }): Promise<Exception[]> {
     let conditions: any[] = [];
     
     if (filters?.status) {
@@ -2672,6 +2676,12 @@ export class DatabaseStorage implements IStorage {
     }
     if (filters?.severity) {
       conditions.push(eq(exceptions.severity, filters.severity));
+    }
+    if (filters?.entityType) {
+      conditions.push(eq(exceptions.entityType, filters.entityType));
+    }
+    if (filters?.entityId) {
+      conditions.push(eq(exceptions.entityId, filters.entityId));
     }
     
     if (conditions.length === 0) {
@@ -2796,6 +2806,97 @@ export class DatabaseStorage implements IStorage {
       .where(eq(aiRequests.id, id))
       .returning();
     return request;
+  }
+
+  // ==================== WORKFLOW RULES ====================
+  async getWorkflowRules(isActive?: boolean): Promise<WorkflowRule[]> {
+    if (isActive !== undefined) {
+      return db.select().from(workflowRules)
+        .where(eq(workflowRules.isActive, isActive))
+        .orderBy(desc(workflowRules.priority), asc(workflowRules.createdAt));
+    }
+    return db.select().from(workflowRules)
+      .orderBy(desc(workflowRules.priority), asc(workflowRules.createdAt));
+  }
+
+  async getWorkflowRule(id: string): Promise<WorkflowRule | undefined> {
+    const [rule] = await db.select().from(workflowRules).where(eq(workflowRules.id, id));
+    return rule;
+  }
+
+  async getWorkflowRulesByTrigger(triggerType: string): Promise<WorkflowRule[]> {
+    return db.select().from(workflowRules)
+      .where(and(
+        eq(workflowRules.triggerType, triggerType),
+        eq(workflowRules.isActive, true)
+      ))
+      .orderBy(desc(workflowRules.priority));
+  }
+
+  async createWorkflowRule(data: InsertWorkflowRule): Promise<WorkflowRule> {
+    const [rule] = await db.insert(workflowRules).values(data).returning();
+    return rule;
+  }
+
+  async updateWorkflowRule(id: string, data: Partial<WorkflowRule>): Promise<WorkflowRule | undefined> {
+    const [rule] = await db.update(workflowRules)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(workflowRules.id, id))
+      .returning();
+    return rule;
+  }
+
+  async deleteWorkflowRule(id: string): Promise<void> {
+    await db.delete(workflowRules).where(eq(workflowRules.id, id));
+  }
+
+  // ==================== WORKFLOW EXECUTIONS ====================
+  async getWorkflowExecutions(ruleId?: string): Promise<WorkflowExecution[]> {
+    if (ruleId) {
+      return db.select().from(workflowExecutions)
+        .where(eq(workflowExecutions.ruleId, ruleId))
+        .orderBy(desc(workflowExecutions.executedAt));
+    }
+    return db.select().from(workflowExecutions)
+      .orderBy(desc(workflowExecutions.executedAt));
+  }
+
+  async getWorkflowExecution(id: string): Promise<WorkflowExecution | undefined> {
+    const [execution] = await db.select().from(workflowExecutions).where(eq(workflowExecutions.id, id));
+    return execution;
+  }
+
+  async createWorkflowExecution(data: InsertWorkflowExecution): Promise<WorkflowExecution> {
+    const [execution] = await db.insert(workflowExecutions).values(data).returning();
+    return execution;
+  }
+
+  async updateWorkflowExecution(id: string, data: Partial<WorkflowExecution>): Promise<WorkflowExecution | undefined> {
+    const [execution] = await db.update(workflowExecutions)
+      .set(data)
+      .where(eq(workflowExecutions.id, id))
+      .returning();
+    return execution;
+  }
+
+  // ==================== WORKFLOW LOGS ====================
+  async getWorkflowLogs(executionId: string): Promise<WorkflowLog[]> {
+    return db.select().from(workflowLogs)
+      .where(eq(workflowLogs.executionId, executionId))
+      .orderBy(asc(workflowLogs.stepIndex));
+  }
+
+  async createWorkflowLog(data: InsertWorkflowLog): Promise<WorkflowLog> {
+    const [log] = await db.insert(workflowLogs).values(data).returning();
+    return log;
+  }
+
+  async updateWorkflowLog(id: string, data: Partial<WorkflowLog>): Promise<WorkflowLog | undefined> {
+    const [log] = await db.update(workflowLogs)
+      .set(data)
+      .where(eq(workflowLogs.id, id))
+      .returning();
+    return log;
   }
 }
 

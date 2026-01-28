@@ -31,6 +31,13 @@ interface ChecklistItem {
   };
 }
 
+interface BlockingException {
+  id: string;
+  title: string;
+  message?: string | null;
+  severity: string;
+}
+
 interface JobChecklistProps {
   job: {
     id: string;
@@ -48,6 +55,7 @@ interface JobChecklistProps {
     name: string;
     completed: boolean;
   }>;
+  blockingExceptions?: BlockingException[];
   onNavigateToPhotos?: () => void;
   onNavigateToForms?: () => void;
   className?: string;
@@ -55,7 +63,8 @@ interface JobChecklistProps {
 
 export function JobChecklist({ 
   job, 
-  requiredForms = [], 
+  requiredForms = [],
+  blockingExceptions = [], 
   onNavigateToPhotos,
   onNavigateToForms,
   className 
@@ -223,31 +232,69 @@ export function JobChecklist({
         <Progress value={progressPercent} className="h-2 mt-2" />
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Blocking Exceptions */}
+        {blockingExceptions.length > 0 && (
+          <div className="rounded-lg p-4 border bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800" data-testid="blocking-exceptions">
+            <div className="flex items-start gap-3">
+              <Lock className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h4 className="font-medium text-sm text-red-800 dark:text-red-200">Job Closure Blocked</h4>
+                <p className="text-xs text-red-600 dark:text-red-300 mb-2">The following issues must be resolved before this job can be closed:</p>
+                <ul className="space-y-1">
+                  {blockingExceptions.map((exc) => (
+                    <li key={exc.id} className="text-sm text-red-700 dark:text-red-300 flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <span>{exc.title}{exc.message ? `: ${exc.message}` : ''}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Next Action Banner */}
         <div 
           className={cn(
             "rounded-lg p-4 border",
-            nextAction.canProceedToSignOff 
-              ? "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800" 
-              : "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800"
+            blockingExceptions.length > 0
+              ? "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800"
+              : nextAction.canProceedToSignOff 
+                ? "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800" 
+                : "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800"
           )}
           data-testid="banner-next-action"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {nextAction.canProceedToSignOff ? (
+              {blockingExceptions.length > 0 ? (
+                <Lock className="h-5 w-5 text-red-600" />
+              ) : nextAction.canProceedToSignOff ? (
                 <CheckCircle2 className="h-5 w-5 text-green-600" />
               ) : (
                 <AlertCircle className="h-5 w-5 text-amber-600" />
               )}
               <div>
                 <h4 className="font-medium text-sm">
-                  {nextAction.canProceedToSignOff ? 'Ready for Sign-off' : 'Next: ' + nextAction.label}
+                  {blockingExceptions.length > 0 
+                    ? 'Job Closure Blocked' 
+                    : nextAction.canProceedToSignOff 
+                      ? 'Ready for Sign-off' 
+                      : 'Next: ' + nextAction.label}
                 </h4>
-                <p className="text-xs text-muted-foreground">{nextAction.description}</p>
+                <p className="text-xs text-muted-foreground">
+                  {blockingExceptions.length > 0 
+                    ? `${blockingExceptions.length} blocking issue${blockingExceptions.length > 1 ? 's' : ''} must be resolved`
+                    : nextAction.description}
+                </p>
               </div>
             </div>
-            {nextAction.canProceedToSignOff ? (
+            {blockingExceptions.length > 0 ? (
+              <Button size="sm" variant="outline" disabled data-testid="button-blocked">
+                <Lock className="h-4 w-4 mr-1" />
+                Blocked
+              </Button>
+            ) : nextAction.canProceedToSignOff ? (
               <Link href={`/jobs/${job.id}/sign-off`}>
                 <Button size="sm" data-testid="button-go-signoff">
                   Sign Off

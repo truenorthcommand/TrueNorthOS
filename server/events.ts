@@ -223,7 +223,9 @@ async function processJob(job: JobQueueItem): Promise<void> {
 async function processWorkflowRun(job: JobQueueItem): Promise<void> {
   const payload = job.payload as { eventId: string; eventType: string };
   console.log(`[Workflow] Processing workflow for event: ${payload.eventType}`);
-  // TODO: Implement workflow execution in Phase 3
+  
+  const { processWorkflowForEvent } = await import("./workflow-runner");
+  await processWorkflowForEvent(payload.eventId, payload.eventType);
 }
 
 async function processWebhookDelivery(job: JobQueueItem): Promise<void> {
@@ -312,8 +314,8 @@ export async function createException(data: {
   entityType?: string;
   entityId?: string;
   stackTrace?: string;
-}): Promise<void> {
-  await db.insert(exceptions).values({
+}): Promise<{ id: string }> {
+  const [exception] = await db.insert(exceptions).values({
     type: data.type,
     severity: data.severity || "warning",
     title: data.title,
@@ -323,9 +325,10 @@ export async function createException(data: {
     entityId: data.entityId,
     stackTrace: data.stackTrace,
     status: "open",
-  });
+  }).returning({ id: exceptions.id });
 
-  console.log(`[Exception] Created: ${data.type} - ${data.title}`);
+  console.log(`[Exception] Created: ${data.type} - ${data.title} (${exception.id})`);
+  return exception;
 }
 
 // ==================== HELPERS ====================

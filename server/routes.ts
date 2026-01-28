@@ -1525,6 +1525,21 @@ export async function registerRoutes(
       if (existingJob.status === 'Signed Off') {
         return res.status(400).json({ error: "Job is already signed off" });
       }
+      
+      // Check for blocking exceptions (workflow job gating)
+      const blockingExceptions = await storage.getExceptions({
+        entityType: 'job',
+        entityId: req.params.id,
+        type: 'job_blocked',
+        status: 'open'
+      });
+      
+      if (blockingExceptions.length > 0) {
+        return res.status(400).json({ 
+          error: "Job closure is blocked by workflow rules",
+          blockingReasons: blockingExceptions.map(e => e.message || e.title)
+        });
+      }
 
       const photos = existingJob.photos as any[] || [];
       const engineerPhotos = photos.filter((p: any) => !p.source || p.source === 'engineer');
@@ -1563,6 +1578,36 @@ export async function registerRoutes(
       res.json(job);
     } catch (error) {
       res.status(500).json({ error: "Failed to sign off job" });
+    }
+  });
+
+  // ==================== JOB BLOCKING EXCEPTIONS ====================
+  
+  app.get("/api/jobs/:id/blocking-exceptions", requireAuth, async (req, res) => {
+    try {
+      const job = await storage.getJob(req.params.id);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      if (req.session.userRole === 'engineer' && job.assignedToId !== req.session.userId) {
+        const assignedIds = job.assignedToIds as string[] || [];
+        if (!assignedIds.includes(req.session.userId!)) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+
+      const blockingExceptions = await storage.getExceptions({
+        entityType: 'job',
+        entityId: req.params.id,
+        type: 'job_blocked',
+        status: 'open'
+      });
+      
+      res.json(blockingExceptions);
+    } catch (error) {
+      console.error("Failed to get blocking exceptions:", error);
+      res.status(500).json({ error: "Failed to get blocking exceptions" });
     }
   });
 
