@@ -43,60 +43,93 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualCode, setManualCode] = useState('');
   const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const scannerIdRef = useRef(`scanner-${Date.now()}`);
+  const scannerIdRef = useRef(`scanner-${Math.random().toString(36).substr(2, 9)}`);
+  const isScanningRef = useRef(false);
 
-  const stopScanning = useCallback(async () => {
+  useEffect(() => {
+    setIsMounted(true);
+    return () => {
+      setIsMounted(false);
+    };
+  }, []);
+
+  const cleanupScanner = useCallback(async () => {
     if (scannerRef.current) {
       try {
         const state = scannerRef.current.getState();
-        if (state === 2) { // SCANNING
+        if (state === 2) {
           await scannerRef.current.stop();
         }
-      } catch (err) {
-        console.error('Error stopping scanner:', err);
-      }
+      } catch {}
+      try {
+        scannerRef.current.clear();
+      } catch {}
+      scannerRef.current = null;
     }
-    setIsScanning(false);
+    isScanningRef.current = false;
   }, []);
 
+  const stopScanning = useCallback(async () => {
+    await cleanupScanner();
+    if (isMounted) {
+      setIsScanning(false);
+    }
+  }, [cleanupScanner, isMounted]);
+
   const startScanning = useCallback(async () => {
+    if (isScanningRef.current) return;
+    
     setError(null);
     setIsLoading(true);
 
+    const timeoutId = setTimeout(() => {
+      if (isMounted) {
+        setIsLoading(false);
+        setError('Camera initialization timed out. Please try again or use manual entry.');
+        setShowManualInput(true);
+      }
+    }, 10000);
+
     try {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       const elementId = scannerIdRef.current;
       const element = document.getElementById(elementId);
       if (!element) {
-        throw new Error('Scanner element not found. Please try again.');
+        clearTimeout(timeoutId);
+        throw new Error('Scanner element not ready. Please close and reopen the dialog.');
       }
 
-      const devices = await Html5Qrcode.getCameras();
+      let devices;
+      try {
+        devices = await Html5Qrcode.getCameras();
+      } catch (camErr) {
+        clearTimeout(timeoutId);
+        const msg = camErr instanceof Error ? camErr.message : 'Camera access denied';
+        if (msg.includes('Permission') || msg.includes('denied')) {
+          throw new Error('Camera permission denied. Please allow camera access in your browser settings, or use manual entry below.');
+        }
+        throw new Error('Could not access camera. Please check permissions or use manual entry.');
+      }
+
+      if (!devices || devices.length === 0) {
+        clearTimeout(timeoutId);
+        throw new Error('No camera found on this device. Use manual entry below.');
+      }
+
       setHasMultipleCameras(devices.length > 1);
 
-      if (devices.length === 0) {
-        throw new Error('No cameras found on this device');
-      }
-
-      if (scannerRef.current) {
-        try {
-          await scannerRef.current.stop();
-          scannerRef.current.clear();
-        } catch {
-        }
-        scannerRef.current = null;
-      }
+      await cleanupScanner();
 
       scannerRef.current = new Html5Qrcode(elementId, {
         formatsToSupport: SUPPORTED_FORMATS,
         verbose: false,
       });
 
-      const qrCodeSuccessCallback = (decodedText: string) => {
-        onScanSuccess(decodedText);
-      };
+      isScanningRef.current = true;
 
       await scannerRef.current.start(
         { facingMode: cameraFacing },
@@ -105,19 +138,29 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
           qrbox: { width: 250, height: 250 },
           aspectRatio: 1.0,
         },
-        qrCodeSuccessCallback,
+        (decodedText: string) => {
+          onScanSuccess(decodedText);
+        },
         undefined
       );
 
-      setIsScanning(true);
+      clearTimeout(timeoutId);
+      if (isMounted) {
+        setIsScanning(true);
+        setIsLoading(false);
+      }
     } catch (err) {
+      clearTimeout(timeoutId);
       const errorMessage = err instanceof Error ? err.message : 'Failed to start camera';
-      setError(errorMessage);
+      if (isMounted) {
+        setError(errorMessage);
+        setShowManualInput(true);
+        setIsLoading(false);
+      }
       onScanError?.(errorMessage);
-    } finally {
-      setIsLoading(false);
+      await cleanupScanner();
     }
-  }, [cameraFacing, onScanSuccess, onScanError]);
+  }, [cameraFacing, onScanSuccess, onScanError, cleanupScanner, isMounted]);
 
   const switchCamera = useCallback(async () => {
     const newFacing = cameraFacing === 'environment' ? 'user' : 'environment';
@@ -127,7 +170,7 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
       await stopScanning();
       setTimeout(() => {
         startScanning();
-      }, 100);
+      }, 200);
     }
   }, [cameraFacing, isScanning, stopScanning, startScanning]);
 
@@ -142,25 +185,9 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
 
   useEffect(() => {
     return () => {
-      if (scannerRef.current) {
-        const scanner = scannerRef.current;
-        try {
-          const state = scanner.getState();
-          if (state === 2) {
-            scanner.stop().catch(() => {}).finally(() => {
-              try { scanner.clear(); } catch {}
-            });
-          } else {
-            try { scanner.clear(); } catch {}
-          }
-        } catch {
-          try { scanner.clear(); } catch {}
-        }
-        scannerRef.current = null;
-      }
+      cleanupScanner();
     };
-  }, []);
-
+  }, [cleanupScanner]);
 
   return (
     <div className={className}>
@@ -168,13 +195,15 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
         <CardContent className="p-0">
           <div 
             id={scannerIdRef.current}
-            ref={containerRef}
-            className="relative w-full aspect-square bg-black"
+            className="relative w-full aspect-square bg-black min-h-[250px]"
           >
-            {!isScanning && !isLoading && (
+            {!isScanning && !isLoading && !error && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/90">
                 <Camera className="h-16 w-16 text-muted-foreground mb-4" />
                 <p className="text-muted-foreground text-sm mb-4">Camera preview</p>
+                <p className="text-muted-foreground text-xs px-4 text-center">
+                  Tap "Start Scanning" to activate camera
+                </p>
               </div>
             )}
             
@@ -182,6 +211,15 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/90 z-10">
                 <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
                 <p className="text-sm text-muted-foreground">Starting camera...</p>
+                <p className="text-xs text-muted-foreground mt-2">This may take a moment</p>
+              </div>
+            )}
+
+            {error && !isLoading && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/90 z-10 p-4">
+                <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+                <p className="text-sm font-medium text-destructive text-center mb-2">Camera Error</p>
+                <p className="text-xs text-muted-foreground text-center">{error}</p>
               </div>
             )}
 
@@ -197,16 +235,6 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
             )}
           </div>
 
-          {error && (
-            <div className="p-4 bg-destructive/10 flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-destructive">Camera Error</p>
-                <p className="text-xs text-muted-foreground mt-1">{error}</p>
-              </div>
-            </div>
-          )}
-
           <div className="p-4 space-y-4">
             <div className="flex gap-2">
               {!isScanning ? (
@@ -221,7 +249,7 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
                   ) : (
                     <Camera className="mr-2 h-4 w-4" />
                   )}
-                  Start Scanning
+                  {isLoading ? 'Starting...' : 'Start Scanning'}
                 </Button>
               ) : (
                 <Button
@@ -248,26 +276,29 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
               )}
               
               <Button
-                variant="outline"
+                variant={showManualInput ? "default" : "outline"}
                 size="icon"
                 onClick={() => setShowManualInput(!showManualInput)}
                 data-testid="button-manual-entry"
+                title="Manual code entry"
               >
                 <Keyboard className="h-4 w-4" />
               </Button>
             </div>
 
             {showManualInput && (
-              <form onSubmit={handleManualSubmit} className="space-y-3">
+              <form onSubmit={handleManualSubmit} className="space-y-3 p-3 bg-muted/50 rounded-lg">
                 <div className="space-y-2">
-                  <Label htmlFor="manual-code">Manual Entry</Label>
+                  <Label htmlFor="manual-code" className="text-sm font-medium">Manual Entry</Label>
+                  <p className="text-xs text-muted-foreground">Type or paste a code below</p>
                   <div className="flex gap-2">
                     <Input
                       id="manual-code"
-                      placeholder="Enter code manually..."
+                      placeholder="Enter code here..."
                       value={manualCode}
                       onChange={(e) => setManualCode(e.target.value)}
                       data-testid="input-manual-code"
+                      autoFocus
                     />
                     <Button type="submit" disabled={!manualCode.trim()} data-testid="button-submit-manual">
                       Go
@@ -288,9 +319,11 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
               </form>
             )}
 
-            <p className="text-xs text-center text-muted-foreground">
-              Position the QR code or barcode within the frame
-            </p>
+            {!showManualInput && (
+              <p className="text-xs text-center text-muted-foreground">
+                Position the QR code or barcode within the frame, or tap the keyboard icon for manual entry
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
