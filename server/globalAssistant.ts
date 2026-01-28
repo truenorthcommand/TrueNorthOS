@@ -5,6 +5,8 @@ import type { Job, Client, Quote, Invoice, AiMessage } from "@shared/schema";
 import { getBoundedBusinessContext, getBusinessStats } from "./globalAssistant/context";
 import { buildBudgetedContext, limitWebResults, DEFAULT_BUDGET } from "./globalAssistant/tokenBudget";
 import { cacheGet, cacheSet, getCacheKey, CACHE_TTL } from "./globalAssistant/cache";
+import { AI_CONFIG, getModelWithFallback, enableFallbackModel, isModelNotFoundError } from "./globalAssistant/config";
+import { withRetry, isRetryableError } from "./globalAssistant/retry";
 
 // Tavily Web Search types
 interface TavilySearchResult {
@@ -88,44 +90,137 @@ async function searchWeb(query: string): Promise<{ results: TavilySearchResult[]
   }
 }
 
-function shouldSearchWeb(message: string): boolean {
-  const searchTriggers = [
+interface WebSearchTriggerResult {
+  shouldSearch: boolean;
+  matchedPattern?: string;
+}
+
+function shouldSearchWeb(message: string): WebSearchTriggerResult {
+  const lowerMessage = message.toLowerCase();
+  
+  const negativePatterns = [
+    "show my",
+    "my jobs",
+    "my quotes",
+    "my invoices",
+    "my clients",
+    "list my",
+    "display my",
+    "open my",
+    "view my",
+  ];
+  
+  if (negativePatterns.some(pattern => lowerMessage.includes(pattern))) {
+    console.log("[Web Search] Skipped - matched negative pattern for internal data query");
+    return { shouldSearch: false };
+  }
+  
+  const recencyKeywords = [
+    "latest",
+    "recent",
+    "news",
+    "today",
+    "this week",
+    "current",
+    "2024",
+    "2025",
+    "2026",
+  ];
+  
+  const explicitSearchRequests = [
     "search for",
     "search the web",
     "look up",
-    "find online",
+    "find out about",
+    "what is the",
     "google",
-    "research",
-    "what is",
-    "how to",
-    "where can i",
-    "where to buy",
-    "supplier",
-    "price of",
-    "cost of",
-    "regulations",
+    "research online",
+  ];
+  
+  const technicalTriggers = [
     "bs 7671",
     "gas safe",
     "building regs",
     "part p",
     "wiring regulations",
+    "regulations",
     "specifications",
-    "specs for",
     "datasheet",
-    "technical",
     "manufacturer",
+  ];
+  
+  const supplierTriggers = [
+    "where to buy",
+    "supplier",
+    "price of",
+    "cost of",
     "stockist",
     "wholesaler",
     "trade counter",
     "plumbers merchant",
     "electrical wholesaler",
-    "compare",
-    "alternative to",
-    "equivalent",
   ];
+  
+  for (const keyword of recencyKeywords) {
+    if (lowerMessage.includes(keyword)) {
+      console.log(`[Web Search] Triggered - recency keyword: "${keyword}"`);
+      return { shouldSearch: true, matchedPattern: `recency:${keyword}` };
+    }
+  }
+  
+  for (const phrase of explicitSearchRequests) {
+    if (lowerMessage.includes(phrase)) {
+      console.log(`[Web Search] Triggered - explicit search request: "${phrase}"`);
+      return { shouldSearch: true, matchedPattern: `explicit:${phrase}` };
+    }
+  }
+  
+  for (const term of technicalTriggers) {
+    if (lowerMessage.includes(term)) {
+      console.log(`[Web Search] Triggered - technical term: "${term}"`);
+      return { shouldSearch: true, matchedPattern: `technical:${term}` };
+    }
+  }
+  
+  for (const term of supplierTriggers) {
+    if (lowerMessage.includes(term)) {
+      console.log(`[Web Search] Triggered - supplier term: "${term}"`);
+      return { shouldSearch: true, matchedPattern: `supplier:${term}` };
+    }
+  }
+  
+  return { shouldSearch: false };
+}
 
-  const lowerMessage = message.toLowerCase();
-  return searchTriggers.some(trigger => lowerMessage.includes(trigger));
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    
+    if (message.includes('429') || message.includes('rate limit')) {
+      return "The AI service is busy. Please try again in a moment.";
+    }
+    
+    if (message.includes('timeout') || message.includes('timed out') ||
+        message.includes('etimedout') || message.includes('deadline')) {
+      return "The request took too long. Try asking a simpler question.";
+    }
+    
+    if (message.includes('context') && message.includes('long') ||
+        message.includes('maximum context') || message.includes('token limit')) {
+      return "Your conversation is getting long. Start a new chat for best results.";
+    }
+    
+    if (isModelNotFoundError(error)) {
+      return "There was an issue with the AI service. Please try again.";
+    }
+    
+    if (message.includes('500') || message.includes('502') ||
+        message.includes('503') || message.includes('504')) {
+      return "There was an issue with the AI service. Please try again.";
+    }
+  }
+  
+  return "There was an issue processing your request. Please try again.";
 }
 
 function getOpenAIClient(): OpenAI | null {
@@ -372,6 +467,13 @@ export function registerGlobalAssistantRoutes(app: Express): void {
 
   // Chat endpoint with conversation persistence
   app.post("/api/global-assistant/chat", async (req: Request, res: Response) => {
+    let clientDisconnected = false;
+    
+    req.on('close', () => {
+      clientDisconnected = true;
+      console.log("[Chat] Client disconnected");
+    });
+    
     try {
       const openai = getOpenAIClient();
       if (!openai) {
@@ -408,11 +510,12 @@ export function registerGlobalAssistantRoutes(app: Express): void {
 
       // Check if web search is needed
       let webSearchResults = "";
-      if (shouldSearchWeb(message)) {
-        console.log("Performing web search for:", message);
+      const searchTrigger = shouldSearchWeb(message);
+      if (searchTrigger.shouldSearch) {
+        console.log(`[Chat] Performing web search for: "${message}" (matched: ${searchTrigger.matchedPattern})`);
         const searchData = await searchWeb(message);
         if (searchData && searchData.results.length > 0) {
-          const limitedResults = limitWebResults(searchData.results, DEFAULT_BUDGET.maxWebResults);
+          const limitedResults = limitWebResults(searchData.results, Math.min(DEFAULT_BUDGET.maxWebResults, 3));
           webSearchResults = `\n\nWEB SEARCH RESULTS:`;
           if (searchData.answer) {
             webSearchResults += `\nSummary: ${searchData.answer}\n`;
@@ -451,21 +554,56 @@ USER MESSAGE: ${message}`;
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
 
-      const stream = await openai.chat.completions.create({
-        model: "gpt-5.1",
-        messages,
-        stream: true,
-        max_completion_tokens: 1024,
-      });
+      const createStream = async (modelToUse: string) => {
+        console.log(`[Chat] Using model: ${modelToUse}`);
+        return openai.chat.completions.create({
+          model: modelToUse,
+          messages,
+          stream: true,
+          max_completion_tokens: AI_CONFIG.maxCompletionTokens,
+        });
+      };
+
+      let stream;
+      const { model: selectedModel, isFallback } = getModelWithFallback();
+      
+      try {
+        stream = await withRetry(
+          () => createStream(selectedModel),
+          { maxRetries: AI_CONFIG.maxRetries },
+          isRetryableError
+        );
+      } catch (streamError) {
+        if (isModelNotFoundError(streamError) && !isFallback) {
+          console.log(`[Chat] Primary model failed, trying fallback model: ${AI_CONFIG.fallbackModel}`);
+          enableFallbackModel();
+          stream = await withRetry(
+            () => createStream(AI_CONFIG.fallbackModel),
+            { maxRetries: AI_CONFIG.maxRetries },
+            isRetryableError
+          );
+        } else {
+          throw streamError;
+        }
+      }
 
       let fullResponse = "";
 
       for await (const chunk of stream) {
+        if (clientDisconnected) {
+          console.log("[Chat] Client disconnected, stopping stream processing");
+          break;
+        }
+        
         const content = chunk.choices[0]?.delta?.content || "";
         if (content) {
           fullResponse += content;
           res.write(`data: ${JSON.stringify({ content })}\n\n`);
         }
+      }
+
+      if (clientDisconnected) {
+        return;
       }
 
       // Save assistant response to conversation
@@ -482,11 +620,17 @@ USER MESSAGE: ${message}`;
       res.end();
     } catch (error) {
       console.error("Error in global assistant:", error);
+      const errorMessage = getErrorMessage(error);
+      
+      if (clientDisconnected) {
+        return;
+      }
+      
       if (res.headersSent) {
-        res.write(`data: ${JSON.stringify({ error: "Failed to process message" })}\n\n`);
+        res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
         res.end();
       } else {
-        res.status(500).json({ error: "Failed to process message" });
+        res.status(500).json({ error: errorMessage });
       }
     }
   });
