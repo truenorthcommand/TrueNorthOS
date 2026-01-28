@@ -387,6 +387,14 @@ export interface IStorage {
   createAiRequest(request: InsertAiRequest): Promise<AiRequest>;
   approveAiRequest(id: string, approvedById: string): Promise<AiRequest | undefined>;
   rejectAiRequest(id: string, approvedById: string): Promise<AiRequest | undefined>;
+  
+  // AI Assistant Aggregate Queries
+  getJobStats(): Promise<{ active: number; completed: number; pending: number }>;
+  getInvoiceStats(): Promise<{ unpaid: number; overdue: number; totalUnpaid: number }>;
+  getQuoteStats(): Promise<{ pending: number; sent: number }>;
+  getRecentJobs(limit: number): Promise<Job[]>;
+  getRecentClients(limit: number): Promise<Client[]>;
+  getActiveJobs(): Promise<Job[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2918,6 +2926,56 @@ export class DatabaseStorage implements IStorage {
       .where(eq(workflowLogs.id, id))
       .returning();
     return log;
+  }
+
+  // ==================== AI ASSISTANT AGGREGATE QUERIES ====================
+  async getJobStats(): Promise<{ active: number; completed: number; pending: number }> {
+    const result = await db.select({
+      active: sql<number>`COUNT(*) FILTER (WHERE ${jobs.status} = 'In Progress')`,
+      completed: sql<number>`COUNT(*) FILTER (WHERE ${jobs.status} = 'Signed Off')`,
+      pending: sql<number>`COUNT(*) FILTER (WHERE ${jobs.status} = 'Draft' OR ${jobs.status} = 'Awaiting Signatures')`,
+    }).from(jobs);
+    return result[0] || { active: 0, completed: 0, pending: 0 };
+  }
+
+  async getInvoiceStats(): Promise<{ unpaid: number; overdue: number; totalUnpaid: number }> {
+    const now = new Date();
+    const result = await db.select({
+      unpaid: sql<number>`COUNT(*) FILTER (WHERE ${invoices.status} IN ('Sent', 'Overdue'))`,
+      overdue: sql<number>`COUNT(*) FILTER (WHERE ${invoices.status} = 'Overdue' OR (${invoices.status} = 'Sent' AND ${invoices.dueDate} < ${now}))`,
+      totalUnpaid: sql<number>`COALESCE(SUM(${invoices.total}) FILTER (WHERE ${invoices.status} IN ('Sent', 'Overdue')), 0)`,
+    }).from(invoices);
+    return {
+      unpaid: Number(result[0]?.unpaid || 0),
+      overdue: Number(result[0]?.overdue || 0),
+      totalUnpaid: Number(result[0]?.totalUnpaid || 0),
+    };
+  }
+
+  async getQuoteStats(): Promise<{ pending: number; sent: number }> {
+    const result = await db.select({
+      pending: sql<number>`COUNT(*) FILTER (WHERE ${quotes.status} = 'Pending')`,
+      sent: sql<number>`COUNT(*) FILTER (WHERE ${quotes.status} = 'Sent')`,
+    }).from(quotes);
+    return {
+      pending: Number(result[0]?.pending || 0),
+      sent: Number(result[0]?.sent || 0),
+    };
+  }
+
+  async getRecentJobs(limit: number): Promise<Job[]> {
+    return db.select().from(jobs).orderBy(desc(jobs.updatedAt)).limit(limit);
+  }
+
+  async getRecentClients(limit: number): Promise<Client[]> {
+    return db.select().from(clients).orderBy(desc(clients.updatedAt)).limit(limit);
+  }
+
+  async getActiveJobs(): Promise<Job[]> {
+    return db.select().from(jobs)
+      .where(or(eq(jobs.status, 'In Progress'), eq(jobs.status, 'Draft'), eq(jobs.status, 'Awaiting Signatures')))
+      .orderBy(desc(jobs.updatedAt))
+      .limit(25);
   }
 }
 

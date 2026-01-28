@@ -1870,6 +1870,23 @@ export const insertExceptionSchema = createInsertSchema(exceptions).omit({
 export type InsertException = z.infer<typeof insertExceptionSchema>;
 export type Exception = typeof exceptions.$inferSelect;
 
+// AI Cache for storing cached AI responses
+export const aiCache = pgTable("ai_cache", {
+  key: varchar("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  orgId: varchar("org_id"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+  version: integer("version").default(1),
+});
+
+export const insertAiCacheSchema = createInsertSchema(aiCache).omit({
+  updatedAt: true,
+});
+
+export type InsertAiCache = z.infer<typeof insertAiCacheSchema>;
+export type AiCache = typeof aiCache.$inferSelect;
+
 // Event type definitions
 export type DomainEventType =
   | "JobCreated"

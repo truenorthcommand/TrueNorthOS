@@ -1,7 +1,10 @@
 import type { Express, Request, Response } from "express";
 import OpenAI from "openai";
 import { storage } from "./storage";
-import type { Job, Client, Quote, Invoice, AiMessage, AiBusinessPattern, AiUserPreference } from "@shared/schema";
+import type { Job, Client, Quote, Invoice, AiMessage } from "@shared/schema";
+import { getBoundedBusinessContext, getBusinessStats } from "./globalAssistant/context";
+import { buildBudgetedContext, limitWebResults, DEFAULT_BUDGET } from "./globalAssistant/tokenBudget";
+import { cacheGet, cacheSet, getCacheKey, CACHE_TTL } from "./globalAssistant/cache";
 
 // Tavily Web Search types
 interface TavilySearchResult {
@@ -195,113 +198,6 @@ interface SearchResult {
   status?: string;
 }
 
-async function getLearnedPatterns(): Promise<string> {
-  try {
-    const patterns = await storage.getAiBusinessPatterns();
-    if (patterns.length === 0) return "";
-    
-    const pricingPatterns = patterns.filter(p => p.patternType === 'pricing');
-    const materialPatterns = patterns.filter(p => p.patternType === 'materials');
-    const engineerPatterns = patterns.filter(p => p.patternType === 'engineer_assignment');
-    
-    let context = "\n\nLEARNED BUSINESS PATTERNS:";
-    
-    if (pricingPatterns.length > 0) {
-      const pricing = pricingPatterns[0].data as { avgPrice: number; minPrice: number; maxPrice: number; sampleSize: number };
-      context += `\n- Typical Quote Range: £${pricing.minPrice.toFixed(0)} - £${pricing.maxPrice.toFixed(0)} (avg: £${pricing.avgPrice.toFixed(0)}, based on ${pricing.sampleSize} quotes)`;
-    }
-    
-    if (materialPatterns.length > 0) {
-      const topMaterials = materialPatterns.slice(0, 5);
-      context += `\n- Common Materials: ${topMaterials.map(m => (m.data as { materialName: string }).materialName).join(', ')}`;
-    }
-    
-    if (engineerPatterns.length > 0) {
-      const topEngineers = engineerPatterns.slice(0, 3);
-      context += `\n- Most Active Engineers: ${topEngineers.map(e => (e.data as { engineerName: string }).engineerName).join(', ')}`;
-    }
-    
-    return context;
-  } catch (error) {
-    console.error("Error fetching learned patterns:", error);
-    return "";
-  }
-}
-
-async function getUserPreferenceContext(userId: string): Promise<string> {
-  try {
-    const pref = await storage.getAiUserPreference(userId);
-    if (!pref) return "";
-    
-    let context = "\n\nUSER PREFERENCES:";
-    context += `\n- Communication style: ${pref.communicationStyle || 'professional'}`;
-    
-    const actions = (pref.preferredActions as { action: string; count: number }[]) || [];
-    if (actions.length > 0) {
-      const topActions = actions.slice(0, 5).map(a => a.action);
-      context += `\n- Frequent actions: ${topActions.join(', ')}`;
-    }
-    
-    return context;
-  } catch (error) {
-    console.error("Error fetching user preferences:", error);
-    return "";
-  }
-}
-
-async function getBusinessContext(userId: string): Promise<string> {
-  try {
-    const [jobs, clients, quotes, invoices, user] = await Promise.all([
-      storage.getAllJobs(),
-      storage.getAllClients(),
-      storage.getAllQuotes(),
-      storage.getAllInvoices(),
-      storage.getUser(userId),
-    ]);
-
-    const activeJobs = jobs.filter((j: Job) => j.status === 'in_progress' || j.status === 'pending');
-    const completedJobs = jobs.filter((j: Job) => j.status === 'completed');
-    const pendingQuotes = quotes.filter((q: Quote) => q.status === 'pending' || q.status === 'sent');
-    const unpaidInvoices = invoices.filter((i: Invoice) => i.status === 'sent' || i.status === 'overdue');
-    const overdueInvoices = invoices.filter((i: Invoice) => i.status === 'overdue');
-
-    const totalUnpaid = unpaidInvoices.reduce((sum: number, inv: Invoice) => sum + Number(inv.total || 0), 0);
-
-    // Get learned patterns and user preferences
-    const [learnedPatterns, userPreferences] = await Promise.all([
-      getLearnedPatterns(),
-      getUserPreferenceContext(userId),
-    ]);
-
-    return `
-BUSINESS SUMMARY:
-- Total Clients: ${clients.length}
-- Active Jobs: ${activeJobs.length}
-- Completed Jobs: ${completedJobs.length}
-- Pending Quotes: ${pendingQuotes.length}
-- Unpaid Invoices: ${unpaidInvoices.length} (£${totalUnpaid.toLocaleString()})
-- Overdue Invoices: ${overdueInvoices.length}
-
-USER: ${user?.name || 'Unknown'} (${user?.role || 'user'})
-
-RECENT JOBS (last 5):
-${jobs.slice(0, 5).map((j: Job) => `- #${j.jobNo}: ${j.nickname || j.customerName} - ${j.status}`).join('\n')}
-
-RECENT CLIENTS (last 5):
-${clients.slice(0, 5).map((c: Client) => `- #${c.id}: ${c.name} - ${c.email || 'no email'}`).join('\n')}
-
-RECENT QUOTES (last 5):
-${quotes.slice(0, 5).map((q: Quote) => `- #${q.id}: £${q.total} - ${q.status}`).join('\n')}
-
-RECENT INVOICES (last 5):
-${invoices.slice(0, 5).map((i: Invoice) => `- #${i.id}: £${i.total} - ${i.status}`).join('\n')}
-${learnedPatterns}${userPreferences}
-`;
-  } catch (error) {
-    console.error("Error fetching business context:", error);
-    return "Unable to fetch business data at this time.";
-  }
-}
 
 async function searchEntities(query: string): Promise<SearchResult[]> {
   const results: SearchResult[] = [];
@@ -508,7 +404,7 @@ export function registerGlobalAssistantRoutes(app: Express): void {
         await storage.addMessageToConversation(conversationId, userMessage);
       }
 
-      const businessContext = await getBusinessContext(userId);
+      const businessContext = await getBoundedBusinessContext(userId, 'chat');
 
       // Check if web search is needed
       let webSearchResults = "";
@@ -516,28 +412,35 @@ export function registerGlobalAssistantRoutes(app: Express): void {
         console.log("Performing web search for:", message);
         const searchData = await searchWeb(message);
         if (searchData && searchData.results.length > 0) {
+          const limitedResults = limitWebResults(searchData.results, DEFAULT_BUDGET.maxWebResults);
           webSearchResults = `\n\nWEB SEARCH RESULTS:`;
           if (searchData.answer) {
             webSearchResults += `\nSummary: ${searchData.answer}\n`;
           }
           webSearchResults += `\nSources:`;
-          searchData.results.forEach((result, i) => {
+          limitedResults.forEach((result, i) => {
             webSearchResults += `\n${i + 1}. ${result.title}\n   URL: ${result.url}\n   ${result.content.slice(0, 200)}...`;
           });
         }
       }
 
+      // Build budgeted context
+      const budgeted = buildBudgetedContext({
+        businessContext,
+        conversationHistory,
+        webResults: webSearchResults || undefined,
+      });
+
       const contextMessage = `
 CURRENT CONTEXT:
 - Page: ${currentPage || 'Dashboard'}
-${businessContext}
-${webSearchResults}
+${budgeted.context}
 
 USER MESSAGE: ${message}`;
 
       const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
         { role: "system", content: SYSTEM_PROMPT },
-        ...conversationHistory.slice(-10).map((msg: { role: string; content: string }) => ({
+        ...budgeted.conversationHistory.map((msg: { role: string; content: string }) => ({
           role: msg.role as "user" | "assistant",
           content: msg.content,
         })),
@@ -616,9 +519,20 @@ USER MESSAGE: ${message}`;
       }
 
       const currentPage = req.query.page as string || 'dashboard';
+      const cacheKey = getCacheKey('suggestions', `${userId}:${currentPage}`);
+      
+      // Check cache first
+      const cached = await cacheGet<string[]>(cacheKey);
+      if (cached) {
+        return res.json({ suggestions: cached });
+      }
       
       // Get dynamic suggestions based on business context
       const dynamicSuggestions = await getDynamicSuggestions(currentPage);
+      
+      // Cache for 30 minutes
+      await cacheSet(cacheKey, dynamicSuggestions, CACHE_TTL.SUGGESTIONS, userId);
+      
       res.json({ suggestions: dynamicSuggestions });
     } catch (error) {
       console.error("Error getting suggestions:", error);
@@ -634,7 +548,19 @@ USER MESSAGE: ${message}`;
         return res.status(401).json({ error: "Authentication required" });
       }
 
+      const cacheKey = getCacheKey('insights', userId);
+      
+      // Check cache first
+      const cached = await cacheGet<{ insights: SmartInsight[]; summary: { activeJobs: number; overdueInvoices: number; pendingQuotes: number; totalOutstanding: number } }>(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
       const insights = await getSmartInsights();
+      
+      // Cache for 6 hours
+      await cacheSet(cacheKey, insights, CACHE_TTL.SMART_INSIGHTS, userId);
+      
       res.json(insights);
     } catch (error) {
       console.error("Error getting smart insights:", error);
