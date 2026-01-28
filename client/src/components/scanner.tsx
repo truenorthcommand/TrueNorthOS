@@ -67,6 +67,12 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
     setIsLoading(true);
 
     try {
+      const elementId = scannerIdRef.current;
+      const element = document.getElementById(elementId);
+      if (!element) {
+        throw new Error('Scanner element not found. Please try again.');
+      }
+
       const devices = await Html5Qrcode.getCameras();
       setHasMultipleCameras(devices.length > 1);
 
@@ -74,12 +80,19 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
         throw new Error('No cameras found on this device');
       }
 
-      if (!scannerRef.current) {
-        scannerRef.current = new Html5Qrcode(scannerIdRef.current, {
-          formatsToSupport: SUPPORTED_FORMATS,
-          verbose: false,
-        });
+      if (scannerRef.current) {
+        try {
+          await scannerRef.current.stop();
+          scannerRef.current.clear();
+        } catch {
+        }
+        scannerRef.current = null;
       }
+
+      scannerRef.current = new Html5Qrcode(elementId, {
+        formatsToSupport: SUPPORTED_FORMATS,
+        verbose: false,
+      });
 
       const qrCodeSuccessCallback = (decodedText: string) => {
         onScanSuccess(decodedText);
@@ -131,20 +144,23 @@ export function Scanner({ onScanSuccess, onScanError, className }: ScannerProps)
     return () => {
       if (scannerRef.current) {
         const scanner = scannerRef.current;
-        scanner.stop().catch(() => {}).finally(() => {
-          scanner.clear();
-        });
+        try {
+          const state = scanner.getState();
+          if (state === 2) {
+            scanner.stop().catch(() => {}).finally(() => {
+              try { scanner.clear(); } catch {}
+            });
+          } else {
+            try { scanner.clear(); } catch {}
+          }
+        } catch {
+          try { scanner.clear(); } catch {}
+        }
+        scannerRef.current = null;
       }
     };
   }, []);
 
-  useEffect(() => {
-    if (isScanning && cameraFacing) {
-      stopScanning().then(() => {
-        setTimeout(() => startScanning(), 100);
-      });
-    }
-  }, [cameraFacing]);
 
   return (
     <div className={className}>
