@@ -108,23 +108,23 @@ function SortableJobCard({
       style={style}
       {...attributes}
       {...listeners}
-      className="bg-card border border-border rounded-md p-2 mb-1 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing select-none"
+      className="bg-card border border-border rounded-md px-1.5 py-1 mb-0.5 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing select-none"
       data-testid={`planner-job-${job.id}`}
     >
-      <p className="text-xs font-medium truncate">{job.nickname || job.customerName}</p>
+      <p className="text-[11px] font-medium truncate leading-tight">{job.nickname || job.customerName}</p>
       {job.postcode && (
-        <p className="text-xs text-muted-foreground truncate flex items-center">
-          <MapPin className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
+        <p className="text-[10px] text-muted-foreground truncate flex items-center leading-tight">
+          <MapPin className="h-2 w-2 mr-0.5 flex-shrink-0" />
           {job.postcode}
         </p>
       )}
       {job.isLongRunning && updateCount && (
         <Badge 
           variant="outline" 
-          className="mt-1 text-[10px] px-1 py-0 bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700"
+          className="text-[9px] px-1 py-0 bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700"
           data-testid={`badge-updates-${job.id}`}
         >
-          Updates: {updateCount.count}/2
+          {updateCount.count}/2
         </Badge>
       )}
     </div>
@@ -148,7 +148,7 @@ function DroppableCell({
   return (
     <div
       ref={setNodeRef}
-      className={`min-h-[100px] p-1 border-r border-b border-border transition-colors ${
+      className={`min-h-[180px] p-1 border-r border-b border-border transition-colors ${
         isOver
           ? "bg-primary/10 border-primary"
           : isEmpty
