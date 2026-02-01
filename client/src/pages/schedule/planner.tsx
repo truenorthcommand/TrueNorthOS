@@ -17,7 +17,7 @@ import { format, isSameDay, parseISO, isValid, startOfWeek, addDays, addWeeks, s
 import { DndContext, DragEndEvent, DragOverEvent, DragOverlay, DragStartEvent, useSensor, useSensors, PointerSensor, TouchSensor, KeyboardSensor, useDroppable, pointerWithin, closestCenter, CollisionDetection } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
 function safeParseISO(dateStr: string | null | undefined): Date | null {
@@ -198,7 +198,6 @@ export default function PlannerPage() {
   const { jobs, refreshJobs, optimisticUpdateJobFields, optimisticReorderJobs } = useStore();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const [weekStart, setWeekStart] = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 })
@@ -451,7 +450,7 @@ export default function PlannerPage() {
     onSuccess: (data) => {
       const key = data?._mutationKey;
       if (key) rollbacksRef.current.delete(key);
-      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      refreshJobs();
     },
     onError: (error: Error, variables) => {
       const key = variables.jobId;
@@ -485,7 +484,7 @@ export default function PlannerPage() {
     onSuccess: (data) => {
       const key = data?._mutationKey;
       if (key) rollbacksRef.current.delete(key);
-      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      refreshJobs();
     },
     onError: (error: Error, variables) => {
       const key = variables.map(o => o.jobId).join(',');
