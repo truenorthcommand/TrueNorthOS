@@ -19,6 +19,8 @@ interface StoreContextType {
   removeFurtherAction: (jobId: string, actionId: string) => Promise<void>;
   deleteJob: (id: string) => Promise<void>;
   signOffJob: (id: string) => Promise<void>;
+  optimisticUpdateJobFields: (jobId: string, updates: Partial<Job>) => () => void;
+  optimisticReorderJobs: (jobOrders: { jobId: string; orderIndex: number }[]) => () => void;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -270,6 +272,55 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const optimisticUpdateJobFields = useCallback((jobId: string, updates: Partial<Job>): () => void => {
+    let snapshot: Job | null = null;
+    
+    setJobs(prev => {
+      const previousJob = prev.find(j => j.id === jobId);
+      snapshot = previousJob ? { ...previousJob } : null;
+      return prev.map(job => 
+        job.id === jobId ? { ...job, ...updates } : job
+      );
+    });
+    
+    return () => {
+      if (snapshot) {
+        const capturedSnapshot = snapshot;
+        setJobs(prev => prev.map(job => job.id === jobId ? capturedSnapshot : job));
+      }
+    };
+  }, []);
+
+  const optimisticReorderJobs = useCallback((jobOrders: { jobId: string; orderIndex: number }[]): () => void => {
+    let previousOrderIndexes: Record<string, number | undefined> = {};
+    
+    setJobs(prev => {
+      jobOrders.forEach(({ jobId }) => {
+        const job = prev.find(j => j.id === jobId);
+        if (job) {
+          previousOrderIndexes[jobId] = job.orderIndex;
+        }
+      });
+      return prev.map(job => {
+        const order = jobOrders.find(o => o.jobId === job.id);
+        if (order) {
+          return { ...job, orderIndex: order.orderIndex };
+        }
+        return job;
+      });
+    });
+    
+    return () => {
+      const capturedIndexes = previousOrderIndexes;
+      setJobs(prev => prev.map(job => {
+        if (capturedIndexes.hasOwnProperty(job.id)) {
+          return { ...job, orderIndex: capturedIndexes[job.id] };
+        }
+        return job;
+      }));
+    };
+  }, []);
+
   return (
     <StoreContext.Provider
       value={{
@@ -288,6 +339,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         removeFurtherAction,
         deleteJob,
         signOffJob,
+        optimisticUpdateJobFields,
+        optimisticReorderJobs,
       }}
     >
       {children}

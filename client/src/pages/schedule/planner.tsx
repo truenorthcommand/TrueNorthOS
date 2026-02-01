@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
@@ -195,7 +195,7 @@ function JobCardOverlay({ job }: { job: Job }) {
 
 export default function PlannerPage() {
   const { user } = useAuth();
-  const { jobs, refreshJobs } = useStore();
+  const { jobs, refreshJobs, optimisticUpdateJobFields, optimisticReorderJobs } = useStore();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -205,11 +205,13 @@ export default function PlannerPage() {
   );
   const [visibleEngineerIds, setVisibleEngineerIds] = useState<string[]>([]);
   const [activeJob, setActiveJob] = useState<Job | null>(null);
-  const [overId, setOverId] = useState<string | null>(null);
+  const overIdRef = useRef<string | null>(null);
   const [engineerDialogOpen, setEngineerDialogOpen] = useState(false);
   const [updateCounts, setUpdateCounts] = useState<Record<string, { count: number; remaining: number }>>({});
   const [utilizationPopoverDay, setUtilizationPopoverDay] = useState<string | null>(null);
   const [engineers, setEngineers] = useState<Engineer[]>([]);
+  
+  const rollbacksRef = useRef<Map<string, () => void>>(new Map());
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -312,38 +314,60 @@ export default function PlannerPage() {
     return engineers.filter((e) => visibleEngineerIds.includes(e.id));
   }, [engineers, visibleEngineerIds]);
 
+  const jobsByCell = useMemo(() => {
+    const map: Record<string, Job[]> = {};
+    jobs.forEach((job) => {
+      const jobDate = safeParseISO(job.date);
+      if (!jobDate) return;
+      const dateKey = format(jobDate, "yyyy-MM-dd");
+      const assignedIds =
+        job.assignedToIds && job.assignedToIds.length > 0
+          ? job.assignedToIds
+          : job.assignedToId
+          ? [job.assignedToId]
+          : [];
+      assignedIds.forEach((engineerId) => {
+        const cellKey = `${engineerId}_${dateKey}`;
+        if (!map[cellKey]) map[cellKey] = [];
+        map[cellKey].push(job);
+      });
+      if (assignedIds.length === 0) {
+        const cellKey = `unassigned_${dateKey}`;
+        if (!map[cellKey]) map[cellKey] = [];
+        map[cellKey].push(job);
+      }
+    });
+    Object.keys(map).forEach((key) => {
+      map[key].sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+    });
+    return map;
+  }, [jobs]);
+
   const getJobsForCell = (engineerId: string, date: Date): Job[] => {
-    return jobs
-      .filter((job) => {
-        const jobDate = safeParseISO(job.date);
-        if (!jobDate || !isSameDay(jobDate, date)) return false;
-        const assignedIds =
-          job.assignedToIds && job.assignedToIds.length > 0
-            ? job.assignedToIds
-            : job.assignedToId
-            ? [job.assignedToId]
-            : [];
-        return assignedIds.includes(engineerId);
-      })
-      .sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+    const dateKey = format(date, "yyyy-MM-dd");
+    const cellKey = `${engineerId}_${dateKey}`;
+    return jobsByCell[cellKey] || [];
   };
 
   const getUnassignedJobsForDay = (date: Date): Job[] => {
-    return jobs
-      .filter((job) => {
-        const jobDate = safeParseISO(job.date);
-        if (!jobDate || !isSameDay(jobDate, date)) return false;
-        const assignedIds =
-          job.assignedToIds && job.assignedToIds.length > 0
-            ? job.assignedToIds
-            : job.assignedToId
-            ? [job.assignedToId]
-            : [];
-        const hasNoAssignment = assignedIds.length === 0;
-        const assignedToHiddenEngineer = assignedIds.length > 0 && 
-          !assignedIds.some((id) => visibleEngineerIds.includes(id));
-        return hasNoAssignment || assignedToHiddenEngineer;
-      })
+    const dateKey = format(date, "yyyy-MM-dd");
+    const unassignedKey = `unassigned_${dateKey}`;
+    const unassignedJobs = jobsByCell[unassignedKey] || [];
+    
+    const hiddenEngineerJobs = jobs.filter((job) => {
+      const jobDate = safeParseISO(job.date);
+      if (!jobDate || !isSameDay(jobDate, date)) return false;
+      const assignedIds =
+        job.assignedToIds && job.assignedToIds.length > 0
+          ? job.assignedToIds
+          : job.assignedToId
+          ? [job.assignedToId]
+          : [];
+      return assignedIds.length > 0 && 
+        !assignedIds.some((id) => visibleEngineerIds.includes(id));
+    });
+    
+    return [...unassignedJobs, ...hiddenEngineerJobs]
       .sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
   };
 
@@ -422,13 +446,20 @@ export default function PlannerPage() {
         const error = await response.json();
         throw new Error(error.error || "Failed to update job");
       }
-      return response.json();
+      return { ...await response.json(), _mutationKey: jobId };
     },
-    onSuccess: () => {
-      refreshJobs();
+    onSuccess: (data) => {
+      const key = data?._mutationKey;
+      if (key) rollbacksRef.current.delete(key);
       queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables) => {
+      const key = variables.jobId;
+      const rollback = rollbacksRef.current.get(key);
+      if (rollback) {
+        rollback();
+        rollbacksRef.current.delete(key);
+      }
       toast({
         title: "Error",
         description: error.message,
@@ -449,13 +480,20 @@ export default function PlannerPage() {
         const error = await response.json();
         throw new Error(error.error || "Failed to reorder jobs");
       }
-      return response.json();
+      return { ...await response.json(), _mutationKey: jobOrders.map(o => o.jobId).join(',') };
     },
-    onSuccess: () => {
-      refreshJobs();
+    onSuccess: (data) => {
+      const key = data?._mutationKey;
+      if (key) rollbacksRef.current.delete(key);
       queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables) => {
+      const key = variables.map(o => o.jobId).join(',');
+      const rollback = rollbacksRef.current.get(key);
+      if (rollback) {
+        rollback();
+        rollbacksRef.current.delete(key);
+      }
       toast({
         title: "Error",
         description: error.message,
@@ -470,21 +508,19 @@ export default function PlannerPage() {
     if (job) {
       setActiveJob(job);
     }
-    setOverId(null);
+    overIdRef.current = null;
   };
 
   const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
+    const { over } = event;
     if (!over) {
-      setOverId(null);
+      overIdRef.current = null;
       return;
     }
     
-    const activeIdStr = active.id as string;
     const overIdStr = over.id as string;
-    
-    if (activeIdStr !== overIdStr) {
-      setOverId(overIdStr);
+    if (overIdRef.current !== overIdStr) {
+      overIdRef.current = overIdStr;
     }
   };
 
@@ -495,11 +531,11 @@ export default function PlannerPage() {
     const activeId = active.id as string;
     let targetId = over?.id as string;
     
-    if (targetId === activeId && overId && overId !== activeId) {
-      targetId = overId;
+    if (targetId === activeId && overIdRef.current && overIdRef.current !== activeId) {
+      targetId = overIdRef.current;
     }
     
-    setOverId(null);
+    overIdRef.current = null;
     
     if (!targetId) return;
 
@@ -543,6 +579,8 @@ export default function PlannerPage() {
               orderIndex: index,
             }));
 
+            const reorderKey = jobOrders.map(o => o.jobId).join(',');
+            rollbacksRef.current.set(reorderKey, optimisticReorderJobs(jobOrders));
             reorderJobsMutation.mutate(jobOrders);
             toast({
               title: "Jobs reordered",
@@ -582,6 +620,17 @@ export default function PlannerPage() {
     const newOrderIndex = targetCellJobs.length;
 
     const isMultiEngineerJob = currentAssignedIds.length > 1;
+
+    const optimisticUpdates: Partial<Job> = {
+      date: fullIsoDate,
+      orderIndex: newOrderIndex,
+    };
+    if (!isMultiEngineerJob) {
+      optimisticUpdates.assignedToId = engineerId;
+      optimisticUpdates.assignedToIds = [engineerId];
+    }
+
+    rollbacksRef.current.set(activeId, optimisticUpdateJobFields(activeId, optimisticUpdates));
 
     updateJobMutation.mutate({
       jobId: activeId,
