@@ -1,0 +1,66 @@
+1.	Goal
+	1.	Make Planner drag/drop feel instant by:
+	1.	Applying optimistic UI updates immediately on drop (reorder + move).
+	2.	Doing rollback on mutation failure.
+	3.	Avoiding unnecessary renders and expensive filtering during drag.
+	4.	Keeping existing API endpoints/payloads unchanged.
+	2.	Current code context
+	1.	getJobsForCell(engineerId, date) filters jobs and sorts by orderIndex.
+	2.	handleDragEnd supports:
+	1.	Reorder when dropped on another job in same cell.
+	2.	Move when dropped on a droppable cell id like "engineerId_YYYY-MM-DD".
+	3.	Mutations:
+	1.	reorderJobsMutation.mutate(jobOrders)
+	2.	updateJobMutation.mutate({ jobId, date, engineerId, orderIndex, preserveEngineers, currentAssignedToIds })
+	3.	Implement optimistic updates for reorder (CASE 1)
+	1.	In the reorder branch (same engineer + same date):
+	1.	After computing reorderedJobs and jobOrders, apply an optimistic update to local store jobs before calling reorderJobsMutation.
+	2.	Optimistic update rule:
+	1.	For each { jobId, orderIndex } in jobOrders, update that job’s orderIndex in the jobs array.
+	3.	Add rollback:
+	1.	Capture previous orderIndex values for those job ids before updating.
+	2.	If reorderJobsMutation fails, restore those previous orderIndex values and show a destructive toast.
+	2.	Ensure the optimistic update happens synchronously in the UI thread before the mutation call.
+	4.	Implement optimistic updates for move (CASE 2)
+	1.	Before calling updateJobMutation.mutate(...), apply optimistic changes to the moved job in local store:
+	1.	Set job.date = fullIsoDate
+	2.	Set job.orderIndex = newOrderIndex
+	3.	If isMultiEngineerJob is false:
+	1.	Set assignedToId = engineerId
+	2.	Set assignedToIds = [] (or undefined) to reflect single assignment
+	4.	If isMultiEngineerJob is true:
+	1.	Do NOT change assigned engineer fields (preserve them).
+	2.	Rollback:
+	1.	Capture the previous job snapshot for activeId (deep-ish clone) before optimistic update.
+	2.	If updateJobMutation fails, restore the job snapshot and show a destructive toast.
+	5.	Where to put the optimistic logic
+	1.	Preferred: implement helper actions in the store (useStore) so PlannerPage doesn’t manually mutate jobs:
+	1.	Add to store:
+	1.	optimisticUpdateJobFields(jobId, updates) -> rollback()
+	2.	optimisticReorderJobs(jobOrders) -> rollback()
+	2.	Use these from PlannerPage’s handleDragEnd.
+	2.	If store refactor is too heavy, do it locally in PlannerPage using setJobs from store, but do NOT duplicate logic in multiple places.
+	6.	Do NOT refetch on success
+	1.	Ensure neither reorder nor move calls refreshJobs() in the success path.
+	2.	Keep your existing engineer polling every 30s as background revalidation.
+	7.	Make drag-over cheaper (optional but recommended)
+	1.	If you have handleDragOver updating overId in state frequently:
+	1.	Change it to only set state when over.id changes.
+	2.	Or store overId in a useRef instead of state to avoid re-renders during drag.
+	8.	Performance fix: reduce repeated filtering work
+	1.	getJobsForCell currently filters the full jobs array for every cell render.
+	2.	Create a memoized index:
+	1.	jobsByCell = useMemo(() => buildMap(jobs), [jobs])
+	2.	key format: ${engineerId}_${yyyy-MM-dd}
+	3.	value: already sorted array by orderIndex
+	3.	Replace getJobsForCell usage with lookup from jobsByCell to avoid O(cells * jobs) filtering per render.
+	9.	Mutation error wiring
+	1.	Ensure reorderJobsMutation and updateJobMutation are configured with:
+	1.	onError: () => rollback()
+	2.	onSuccess: () => {} (no refresh)
+	2.	Don’t show “Jobs reordered” toast until success OR keep it but ensure rollback toast appears on failure.
+	10.	Acceptance criteria
+	11.	Reorder in same cell updates instantly with no delay.
+	12.	Move to another cell updates instantly with no delay.
+	13.	On network failure, UI reverts to previous state and shows error toast.
+	14.	CPU usage and re-renders during drag reduce (especially on mobile).
