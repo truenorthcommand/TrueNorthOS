@@ -22,6 +22,7 @@ import { generateFormPdf } from "./form-pdf";
 import { emitEvent } from "./events";
 import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
 import { sendPortalInvitation, sendPasswordResetEmail } from "./email";
+import { logAuditEvent, logFailedAction, createUserSession, endUserSession, updateSessionActivity, logAuditLogAccess, getAuditLogs, getAuditLogById, getFailedActions, getActiveSessions, getAuditStats, getClientIp, getUserAgent } from "./audit";
 
 function getStripeClient(): Stripe | null {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -9725,6 +9726,194 @@ Be concise and practical. Focus on real issues that affect the business.`;
     } catch (error) {
       console.error("Error fetching asset history:", error);
       res.status(500).json({ error: "Failed to fetch asset history" });
+    }
+  });
+
+  // ==================== AUDIT LOG ROUTES ====================
+  
+  // Get audit logs - Directors Suite only
+  app.get("/api/audit/logs", requireRoles('super_admin', 'admin'), async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !user.hasDirectorsSuite) {
+        return res.status(403).json({ error: "Director's Suite access required" });
+      }
+      
+      const filters = {
+        startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
+        endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+        userId: req.query.userId as string | undefined,
+        actionType: req.query.actionType as string | undefined,
+        actionCategory: req.query.actionCategory as string | undefined,
+        entityType: req.query.entityType as string | undefined,
+        severity: req.query.severity as string | undefined,
+        search: req.query.search as string | undefined,
+        limit: req.query.limit ? parseInt(req.query.limit as string) : 50,
+        offset: req.query.offset ? parseInt(req.query.offset as string) : 0,
+      };
+      
+      const result = await getAuditLogs(filters);
+      
+      // Log this access
+      await logAuditLogAccess({
+        accessedByUserId: req.session.userId!,
+        accessedByUserName: user.name,
+        accessType: "view",
+        filtersApplied: filters,
+        recordsAccessed: result.logs.length,
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching audit logs:", error);
+      res.status(500).json({ error: "Failed to fetch audit logs" });
+    }
+  });
+  
+  // Get single audit log by ID
+  app.get("/api/audit/logs/:id", requireRoles('super_admin', 'admin'), async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !user.hasDirectorsSuite) {
+        return res.status(403).json({ error: "Director's Suite access required" });
+      }
+      
+      const log = await getAuditLogById(req.params.id);
+      if (!log) {
+        return res.status(404).json({ error: "Audit log not found" });
+      }
+      res.json(log);
+    } catch (error) {
+      console.error("Error fetching audit log:", error);
+      res.status(500).json({ error: "Failed to fetch audit log" });
+    }
+  });
+  
+  // Get audit statistics
+  app.get("/api/audit/stats", requireRoles('super_admin', 'admin'), async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !user.hasDirectorsSuite) {
+        return res.status(403).json({ error: "Director's Suite access required" });
+      }
+      
+      const stats = await getAuditStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching audit stats:", error);
+      res.status(500).json({ error: "Failed to fetch audit stats" });
+    }
+  });
+  
+  // Get failed login attempts
+  app.get("/api/audit/failed-actions", requireRoles('super_admin', 'admin'), async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !user.hasDirectorsSuite) {
+        return res.status(403).json({ error: "Director's Suite access required" });
+      }
+      
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
+      
+      const failedActions = await getFailedActions({ limit, offset });
+      res.json(failedActions);
+    } catch (error) {
+      console.error("Error fetching failed actions:", error);
+      res.status(500).json({ error: "Failed to fetch failed actions" });
+    }
+  });
+  
+  // Get active sessions
+  app.get("/api/audit/sessions", requireRoles('super_admin', 'admin'), async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !user.hasDirectorsSuite) {
+        return res.status(403).json({ error: "Director's Suite access required" });
+      }
+      
+      const sessions = await getActiveSessions();
+      res.json(sessions);
+    } catch (error) {
+      console.error("Error fetching active sessions:", error);
+      res.status(500).json({ error: "Failed to fetch active sessions" });
+    }
+  });
+  
+  // Export audit logs
+  app.get("/api/audit/export", requireRoles('super_admin', 'admin'), async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !user.hasDirectorsSuite) {
+        return res.status(403).json({ error: "Director's Suite access required" });
+      }
+      
+      const format = (req.query.format as string) || "json";
+      
+      const filters = {
+        startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
+        endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+        userId: req.query.userId as string | undefined,
+        actionType: req.query.actionType as string | undefined,
+        actionCategory: req.query.actionCategory as string | undefined,
+        entityType: req.query.entityType as string | undefined,
+        severity: req.query.severity as string | undefined,
+        limit: 10000, // Max export limit
+        offset: 0,
+      };
+      
+      const result = await getAuditLogs(filters);
+      
+      // Log this export
+      await logAuditLogAccess({
+        accessedByUserId: req.session.userId!,
+        accessedByUserName: user.name,
+        accessType: "export",
+        filtersApplied: filters,
+        recordsAccessed: result.logs.length,
+        exportFormat: format,
+      });
+      
+      if (format === "csv") {
+        const csvHeaders = "ID,Timestamp,User,Role,Action Type,Category,Entity Type,Entity ID,Description,Severity\n";
+        const csvRows = result.logs.map(log => 
+          `"${log.id}","${log.timestamp}","${log.userName}","${log.userRole}","${log.actionType}","${log.actionCategory || ''}","${log.entityType}","${log.entityId || ''}","${(log.actionDescription || '').replace(/"/g, '""')}","${log.severity}"`
+        ).join("\n");
+        
+        res.setHeader("Content-Type", "text/csv");
+        res.setHeader("Content-Disposition", `attachment; filename=audit_logs_${new Date().toISOString().split('T')[0]}.csv`);
+        res.send(csvHeaders + csvRows);
+      } else {
+        res.setHeader("Content-Type", "application/json");
+        res.setHeader("Content-Disposition", `attachment; filename=audit_logs_${new Date().toISOString().split('T')[0]}.json`);
+        res.json(result.logs);
+      }
+    } catch (error) {
+      console.error("Error exporting audit logs:", error);
+      res.status(500).json({ error: "Failed to export audit logs" });
+    }
+  });
+  
+  // Get distinct values for filters
+  app.get("/api/audit/filter-options", requireRoles('super_admin', 'admin'), async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !user.hasDirectorsSuite) {
+        return res.status(403).json({ error: "Director's Suite access required" });
+      }
+      
+      const users = await storage.getUsers();
+      
+      res.json({
+        actionTypes: ["create", "update", "delete", "login", "logout", "failed_login", "password_reset", "password_change", "export", "import", "bulk_update", "bulk_delete", "approve", "reject", "cancel", "send_email", "send_sms", "download", "upload", "share", "transfer", "assign", "enable", "disable", "archive", "restore", "view"],
+        actionCategories: ["auth", "client", "job", "quote", "invoice", "finance", "team", "schedule", "fleet", "settings", "report", "document", "asset"],
+        entityTypes: ["user", "client", "job", "quote", "invoice", "payment", "expense", "timesheet", "vehicle", "walkaround_check", "defect", "asset", "file", "settings", "form", "workflow"],
+        severities: ["info", "warning", "critical"],
+        users: users.map(u => ({ id: u.id, name: u.name })),
+      });
+    } catch (error) {
+      console.error("Error fetching filter options:", error);
+      res.status(500).json({ error: "Failed to fetch filter options" });
     }
   });
 
