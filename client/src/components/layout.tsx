@@ -3,6 +3,7 @@ import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { hasRole } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { BackButton } from "@/components/back-button";
 import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw, Mic, BookOpen, Mail, LayoutGrid, FolderOpen, Shield, Crown, Link2, Gift, Sparkles, ClipboardList, Sun, Moon, QrCode, Package } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -720,6 +721,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
           <main className="flex-1 p-4 md:p-6 lg:p-8 w-full bg-background">
             <div className="max-w-7xl mx-auto">
+              {/* Global Back Button - shown on all pages except Dashboard */}
+              {location !== "/" && (
+                <div className="mb-4 print:hidden">
+                  <BackButton fallbackPath="/" />
+                </div>
+              )}
               {children}
             </div>
           </main>

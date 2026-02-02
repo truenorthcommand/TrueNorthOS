@@ -12,7 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2, Pencil, Users, Loader2 } from "lucide-react";
-import { BackButton } from "@/components/back-button";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
@@ -106,14 +105,11 @@ export default function Jobs() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <BackButton fallbackPath="/" />
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight" data-testid="text-jobs-title">Jobs in Progress</h1>
-            <p className="text-muted-foreground">
-              {user.role === "admin" ? "Track all field operations and completion status" : "Track your assigned jobs"}
-            </p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-jobs-title">Jobs in Progress</h1>
+          <p className="text-muted-foreground">
+            {user.role === "admin" ? "Track all field operations and completion status" : "Track your assigned jobs"}
+          </p>
         </div>
         
         {user.role === "admin" && (

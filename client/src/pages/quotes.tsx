@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, FileText, Send, CheckCircle, XCircle, Clock, ArrowRight, Loader2 } from "lucide-react";
-import { BackButton } from "@/components/back-button";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -82,12 +81,9 @@ export default function Quotes() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <BackButton fallbackPath="/" />
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Quotes</h1>
-            <p className="text-muted-foreground">Create and manage customer quotes</p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Quotes</h1>
+          <p className="text-muted-foreground">Create and manage customer quotes</p>
         </div>
         <Button size="lg" onClick={() => setLocation("/quotes/new")} data-testid="button-new-quote">
           <Plus className="mr-2 h-5 w-5" />

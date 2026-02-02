@@ -9,7 +9,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, FileText, Send, CheckCircle, Clock, ArrowRight, Loader2, Plus, Trash2, X } from "lucide-react";
-import { BackButton } from "@/components/back-button";
 import { format, addDays } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -244,12 +243,9 @@ export default function Invoices() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <BackButton fallbackPath="/" />
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Invoices</h1>
-            <p className="text-muted-foreground">Manage customer invoices and payments</p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Invoices</h1>
+          <p className="text-muted-foreground">Manage customer invoices and payments</p>
         </div>
         <Button onClick={() => setShowCreateDialog(true)} data-testid="button-create-invoice">
           <Plus className="w-4 h-4 mr-2" />

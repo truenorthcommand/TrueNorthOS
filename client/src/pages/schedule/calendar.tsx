@@ -14,7 +14,6 @@ import {
   Clock,
   Users,
 } from "lucide-react";
-import { BackButton } from "@/components/back-button";
 import {
   format,
   startOfMonth,
@@ -115,17 +114,14 @@ export default function CalendarPage() {
   return (
     <div className="space-y-6" data-testid="calendar-page">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <BackButton fallbackPath="/" />
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2" data-testid="calendar-title">
-              <CalendarIcon className="h-8 w-8 text-primary" />
-              Job Calendar
-            </h1>
-            <p className="text-muted-foreground" data-testid="calendar-description">
-              View all jobs scheduled for each month
-            </p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2" data-testid="calendar-title">
+            <CalendarIcon className="h-8 w-8 text-primary" />
+            Job Calendar
+          </h1>
+          <p className="text-muted-foreground" data-testid="calendar-description">
+            View all jobs scheduled for each month
+          </p>
         </div>
       </div>
 

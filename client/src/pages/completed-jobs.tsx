@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Calendar, MapPin, User, CheckCircle2, ArrowRight, Eye } from "lucide-react";
-import { BackButton } from "@/components/back-button";
 import { format } from "date-fns";
 
 export default function CompletedJobs() {
@@ -37,14 +36,11 @@ export default function CompletedJobs() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <BackButton fallbackPath="/" />
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Completed Jobs</h1>
-          <p className="text-muted-foreground">
-            Archived and signed-off job sheets ({totalCompleted} total)
-          </p>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Completed Jobs</h1>
+        <p className="text-muted-foreground">
+          Archived and signed-off job sheets ({totalCompleted} total)
+        </p>
       </div>
 
       <div className="flex items-center space-x-2 bg-card p-2 rounded-lg border shadow-sm">

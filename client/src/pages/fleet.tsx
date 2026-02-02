@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ClipboardCheck, AlertTriangle, Truck, Plus, Search, Filter, ChevronRight } from "lucide-react";
-import { BackButton } from "@/components/back-button";
 import { format } from "date-fns";
 import type { DefectWithDetails, VehicleWithStats } from "@shared/schema";
 
@@ -76,12 +75,9 @@ export default function Fleet() {
   return (
     <div className="container mx-auto p-4 pb-24 md:pb-4 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <BackButton fallbackPath="/" />
-          <div>
-            <h1 className="text-2xl font-bold">Fleet Maintenance</h1>
-            <p className="text-muted-foreground">Manage vehicle checks and defects</p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold">Fleet Maintenance</h1>
+          <p className="text-muted-foreground">Manage vehicle checks and defects</p>
         </div>
         <div className="flex gap-2">
           <Button onClick={() => setLocation("/fleet/walkaround")} data-testid="button-start-walkaround">
