@@ -78,7 +78,7 @@ function RolePortals({ user, setLocation }: { user: any; setLocation: (path: str
   if (availablePortals.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className="grid grid-cols-2 gap-4">
       {availablePortals.map(portal => {
         const Icon = portal.icon;
         return (
