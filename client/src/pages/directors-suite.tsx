@@ -12,8 +12,11 @@ import {
   PoundSterling, TrendingUp, TrendingDown, Briefcase, Users, Receipt, 
   ArrowUpRight, ArrowDownRight, Target, AlertTriangle, CheckCircle,
   Calendar, Clock, Building2, Wallet, BarChart3, PieChart, Activity,
-  ChevronRight, FileText, CreditCard, Percent, MapPin
+  ChevronRight, FileText, CreditCard, Percent, MapPin, Shield, Download,
+  Search, Filter, ChevronDown, ChevronUp, RefreshCw
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart as RechartsPie, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ComposedChart
@@ -234,6 +237,10 @@ export default function DirectorsSuite() {
           <TabsTrigger value="team" className="text-slate-400 data-[state=active]:bg-amber-600 data-[state=active]:text-white">
             <Users className="w-4 h-4 mr-2" />
             Team
+          </TabsTrigger>
+          <TabsTrigger value="audit" className="text-slate-400 data-[state=active]:bg-amber-600 data-[state=active]:text-white">
+            <Shield className="w-4 h-4 mr-2" />
+            Audit Logs
           </TabsTrigger>
         </TabsList>
 
@@ -596,7 +603,330 @@ export default function DirectorsSuite() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="audit" className="space-y-6">
+          <AuditLogsViewer />
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function AuditLogsViewer() {
+  const [search, setSearch] = useState("");
+  const [actionType, setActionType] = useState<string>("");
+  const [actionCategory, setActionCategory] = useState<string>("");
+  const [entityType, setEntityType] = useState<string>("");
+  const [severity, setSeverity] = useState<string>("");
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const limit = 20;
+
+  const { data: filterOptions } = useQuery<{
+    actionTypes: string[];
+    actionCategories: string[];
+    entityTypes: string[];
+    severities: string[];
+    users: { id: string; name: string }[];
+  }>({
+    queryKey: ["/api/audit/filter-options"],
+  });
+
+  const { data: stats } = useQuery<{
+    totalLogs: number;
+    todayLogs: number;
+    criticalLogs: number;
+    warningLogs: number;
+    failedLogins: number;
+    activeSessions: number;
+  }>({
+    queryKey: ["/api/audit/stats"],
+  });
+
+  const { data: logsData, isLoading, refetch } = useQuery<{
+    logs: any[];
+    total: number;
+  }>({
+    queryKey: ["/api/audit/logs", { search, actionType, actionCategory, entityType, severity, limit, offset: page * limit }],
+  });
+
+  const handleExport = async (format: "csv" | "json") => {
+    const params = new URLSearchParams();
+    if (search) params.append("search", search);
+    if (actionType) params.append("actionType", actionType);
+    if (actionCategory) params.append("actionCategory", actionCategory);
+    if (entityType) params.append("entityType", entityType);
+    if (severity) params.append("severity", severity);
+    params.append("format", format);
+
+    window.open(`/api/audit/export?${params.toString()}`, "_blank");
+  };
+
+  const getSeverityColor = (sev: string) => {
+    switch (sev) {
+      case "critical": return "bg-red-500/20 text-red-400 border-red-500/30";
+      case "warning": return "bg-amber-500/20 text-amber-400 border-amber-500/30";
+      default: return "bg-blue-500/20 text-blue-400 border-blue-500/30";
+    }
+  };
+
+  const getActionIcon = (action: string) => {
+    switch (action) {
+      case "create": return <CheckCircle className="w-4 h-4 text-green-400" />;
+      case "update": return <RefreshCw className="w-4 h-4 text-blue-400" />;
+      case "delete": return <AlertTriangle className="w-4 h-4 text-red-400" />;
+      case "login": return <Users className="w-4 h-4 text-green-400" />;
+      case "logout": return <Users className="w-4 h-4 text-slate-400" />;
+      default: return <Activity className="w-4 h-4 text-slate-400" />;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <Card className="bg-slate-800/50 border-slate-700">
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-white">{stats?.totalLogs?.toLocaleString() || 0}</div>
+            <div className="text-xs text-slate-400">Total Logs</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-slate-800/50 border-slate-700">
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-white">{stats?.todayLogs?.toLocaleString() || 0}</div>
+            <div className="text-xs text-slate-400">Today</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-slate-800/50 border-slate-700">
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-red-400">{stats?.criticalLogs || 0}</div>
+            <div className="text-xs text-slate-400">Critical</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-slate-800/50 border-slate-700">
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-amber-400">{stats?.warningLogs || 0}</div>
+            <div className="text-xs text-slate-400">Warnings</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-slate-800/50 border-slate-700">
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-red-400">{stats?.failedLogins || 0}</div>
+            <div className="text-xs text-slate-400">Failed Logins</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-slate-800/50 border-slate-700">
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-green-400">{stats?.activeSessions || 0}</div>
+            <div className="text-xs text-slate-400">Active Sessions</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="bg-slate-800/50 border-slate-700">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Shield className="w-5 h-5" />
+                System Audit Log
+              </CardTitle>
+              <CardDescription className="text-slate-400">
+                Complete record of all user actions and system events
+              </CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => refetch()} className="border-slate-600 text-slate-300">
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Refresh
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleExport("csv")} className="border-slate-600 text-slate-300">
+                <Download className="w-4 h-4 mr-1" />
+                CSV
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleExport("json")} className="border-slate-600 text-slate-300">
+                <Download className="w-4 h-4 mr-1" />
+                JSON
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-3">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                placeholder="Search logs..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10 bg-slate-700 border-slate-600 text-white"
+                data-testid="input-audit-search"
+              />
+            </div>
+            <Select value={actionType} onValueChange={setActionType}>
+              <SelectTrigger className="w-[150px] bg-slate-700 border-slate-600 text-white">
+                <SelectValue placeholder="Action Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Actions</SelectItem>
+                {filterOptions?.actionTypes?.map((type) => (
+                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={actionCategory} onValueChange={setActionCategory}>
+              <SelectTrigger className="w-[150px] bg-slate-700 border-slate-600 text-white">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Categories</SelectItem>
+                {filterOptions?.actionCategories?.map((cat) => (
+                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={entityType} onValueChange={setEntityType}>
+              <SelectTrigger className="w-[150px] bg-slate-700 border-slate-600 text-white">
+                <SelectValue placeholder="Entity Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Entities</SelectItem>
+                {filterOptions?.entityTypes?.map((ent) => (
+                  <SelectItem key={ent} value={ent}>{ent}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={severity} onValueChange={setSeverity}>
+              <SelectTrigger className="w-[130px] bg-slate-700 border-slate-600 text-white">
+                <SelectValue placeholder="Severity" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Levels</SelectItem>
+                <SelectItem value="info">Info</SelectItem>
+                <SelectItem value="warning">Warning</SelectItem>
+                <SelectItem value="critical">Critical</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="rounded-lg border border-slate-700 overflow-hidden">
+            <div className="bg-slate-900/50 px-4 py-2 border-b border-slate-700 grid grid-cols-12 gap-2 text-xs font-medium text-slate-400">
+              <div className="col-span-2">Timestamp</div>
+              <div className="col-span-2">User</div>
+              <div className="col-span-1">Action</div>
+              <div className="col-span-1">Category</div>
+              <div className="col-span-1">Entity</div>
+              <div className="col-span-4">Description</div>
+              <div className="col-span-1">Severity</div>
+            </div>
+            
+            {isLoading ? (
+              <div className="p-8 text-center text-slate-400">Loading audit logs...</div>
+            ) : logsData?.logs?.length === 0 ? (
+              <div className="p-8 text-center text-slate-400">No audit logs found</div>
+            ) : (
+              <div className="divide-y divide-slate-700/50">
+                {logsData?.logs?.map((log: any) => (
+                  <div key={log.id}>
+                    <div 
+                      className="px-4 py-3 grid grid-cols-12 gap-2 text-sm hover:bg-slate-700/30 cursor-pointer transition-colors"
+                      onClick={() => setExpandedRow(expandedRow === log.id ? null : log.id)}
+                      data-testid={`audit-log-row-${log.id}`}
+                    >
+                      <div className="col-span-2 text-slate-300 text-xs">
+                        {format(new Date(log.timestamp), "dd MMM HH:mm:ss")}
+                      </div>
+                      <div className="col-span-2 text-white truncate">{log.userName}</div>
+                      <div className="col-span-1 flex items-center gap-1">
+                        {getActionIcon(log.actionType)}
+                        <span className="text-slate-300 text-xs capitalize">{log.actionType}</span>
+                      </div>
+                      <div className="col-span-1 text-slate-400 text-xs capitalize">{log.actionCategory || '-'}</div>
+                      <div className="col-span-1 text-slate-400 text-xs capitalize">{log.entityType}</div>
+                      <div className="col-span-4 text-slate-300 truncate">{log.actionDescription || '-'}</div>
+                      <div className="col-span-1 flex items-center justify-between">
+                        <Badge className={`text-xs ${getSeverityColor(log.severity)}`}>
+                          {log.severity}
+                        </Badge>
+                        {expandedRow === log.id ? (
+                          <ChevronUp className="w-4 h-4 text-slate-400" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-slate-400" />
+                        )}
+                      </div>
+                    </div>
+                    {expandedRow === log.id && (
+                      <div className="px-4 py-3 bg-slate-900/50 border-t border-slate-700/50 text-xs space-y-2">
+                        <div className="grid grid-cols-4 gap-4">
+                          <div>
+                            <span className="text-slate-500">Entity ID:</span>
+                            <span className="ml-2 text-slate-300 font-mono">{log.entityId || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">User Role:</span>
+                            <span className="ml-2 text-slate-300">{log.userRole}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">IP Address:</span>
+                            <span className="ml-2 text-slate-300 font-mono">{log.ipAddress || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Session ID:</span>
+                            <span className="ml-2 text-slate-300 font-mono">{log.sessionId?.slice(0, 8) || '-'}...</span>
+                          </div>
+                        </div>
+                        {log.changesJson && (
+                          <div>
+                            <span className="text-slate-500">Changes:</span>
+                            <pre className="mt-1 p-2 bg-slate-800 rounded text-slate-300 overflow-x-auto">
+                              {JSON.stringify(log.changesJson, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                        {log.metadataJson && (
+                          <div>
+                            <span className="text-slate-500">Metadata:</span>
+                            <pre className="mt-1 p-2 bg-slate-800 rounded text-slate-300 overflow-x-auto">
+                              {JSON.stringify(log.metadataJson, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {logsData && logsData.total > limit && (
+            <div className="flex items-center justify-between pt-2">
+              <div className="text-sm text-slate-400">
+                Showing {page * limit + 1} - {Math.min((page + 1) * limit, logsData.total)} of {logsData.total} logs
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(Math.max(0, page - 1))}
+                  disabled={page === 0}
+                  className="border-slate-600 text-slate-300"
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(page + 1)}
+                  disabled={(page + 1) * limit >= logsData.total}
+                  className="border-slate-600 text-slate-300"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

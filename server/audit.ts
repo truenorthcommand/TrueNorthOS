@@ -39,14 +39,74 @@ interface AuditLogFilters {
 }
 
 let lastLogId: string | null = null;
+let chainInitialized = false;
 
 function generateChecksum(previousLogId: string | null, timestamp: Date, userId: string, actionType: string, changes: any): string {
   const data = `${previousLogId || ""}|${timestamp.toISOString()}|${userId}|${actionType}|${JSON.stringify(changes || {})}`;
   return crypto.createHash("sha256").update(data).digest("hex");
 }
 
+async function initializeChain(): Promise<void> {
+  if (chainInitialized) return;
+  
+  try {
+    const [latestLog] = await db.select({ id: auditLogs.id })
+      .from(auditLogs)
+      .orderBy(desc(auditLogs.timestamp))
+      .limit(1);
+    
+    if (latestLog) {
+      lastLogId = latestLog.id;
+    }
+    chainInitialized = true;
+    console.log("[Audit] Chain initialized with lastLogId:", lastLogId);
+  } catch (error) {
+    console.error("[Audit] Failed to initialize chain:", error);
+    chainInitialized = true;
+  }
+}
+
+export async function verifyAuditLogIntegrity(limit = 100): Promise<{ valid: boolean; issues: string[] }> {
+  const issues: string[] = [];
+  
+  try {
+    const logs = await db.select()
+      .from(auditLogs)
+      .orderBy(desc(auditLogs.timestamp))
+      .limit(limit);
+    
+    const reversedLogs = [...logs].reverse();
+    
+    for (let i = 0; i < reversedLogs.length; i++) {
+      const log = reversedLogs[i];
+      
+      if (i > 0 && log.previousLogId !== reversedLogs[i - 1].id) {
+        issues.push(`Log ${log.id}: Chain break - previousLogId mismatch`);
+      }
+      
+      const expectedChecksum = generateChecksum(
+        log.previousLogId,
+        log.timestamp,
+        log.userId,
+        log.actionType,
+        log.changesJson
+      );
+      
+      if (log.checksum !== expectedChecksum) {
+        issues.push(`Log ${log.id}: Checksum mismatch - possible tampering`);
+      }
+    }
+    
+    return { valid: issues.length === 0, issues };
+  } catch (error) {
+    console.error("[Audit] Failed to verify integrity:", error);
+    return { valid: false, issues: ["Failed to verify integrity: " + String(error)] };
+  }
+}
+
 export async function logAuditEvent(params: AuditEventParams): Promise<string | null> {
   try {
+    await initializeChain();
     const timestamp = new Date();
     
     const changesJson = params.changesBefore || params.changesAfter ? {

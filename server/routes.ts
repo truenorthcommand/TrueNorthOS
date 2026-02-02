@@ -22,7 +22,7 @@ import { generateFormPdf } from "./form-pdf";
 import { emitEvent } from "./events";
 import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
 import { sendPortalInvitation, sendPasswordResetEmail } from "./email";
-import { logAuditEvent, logFailedAction, createUserSession, endUserSession, updateSessionActivity, logAuditLogAccess, getAuditLogs, getAuditLogById, getFailedActions, getActiveSessions, getAuditStats, getClientIp, getUserAgent } from "./audit";
+import { logAuditEvent, logFailedAction, createUserSession, endUserSession, updateSessionActivity, logAuditLogAccess, getAuditLogs, getAuditLogById, getFailedActions, getActiveSessions, getAuditStats, getClientIp, getUserAgent, verifyAuditLogIntegrity } from "./audit";
 
 function getStripeClient(): Stripe | null {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -10165,6 +10165,32 @@ Be concise and practical. Focus on real issues that affect the business.`;
     } catch (error) {
       console.error("Error fetching filter options:", error);
       res.status(500).json({ error: "Failed to fetch filter options" });
+    }
+  });
+  
+  // Verify audit log integrity - Super Admin only
+  app.get("/api/audit/verify-integrity", requireSuperAdmin, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !user.hasDirectorsSuite) {
+        return res.status(403).json({ error: "Director's Suite access required" });
+      }
+      
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
+      const result = await verifyAuditLogIntegrity(limit);
+      
+      // Log this verification access
+      await logAuditLogAccess({
+        accessedByUserId: req.session.userId!,
+        accessedByUserName: user.name,
+        accessType: "verify",
+        recordsAccessed: limit,
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error verifying audit log integrity:", error);
+      res.status(500).json({ error: "Failed to verify audit log integrity" });
     }
   });
 
