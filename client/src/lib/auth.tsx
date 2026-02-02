@@ -31,10 +31,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
       .then(userData => {
         setUser(userData);
-        localStorage.setItem("promains_user", JSON.stringify(userData));
+        localStorage.setItem("truenorth_user", JSON.stringify(userData));
       })
       .catch(() => {
-        localStorage.removeItem("promains_user");
+        localStorage.removeItem("truenorth_user");
         setUser(null);
       })
       .finally(() => {
@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const userData = await res.json();
         setUser(userData);
-        localStorage.setItem("promains_user", JSON.stringify(userData));
+        localStorage.setItem("truenorth_user", JSON.stringify(userData));
       }
     } catch {
       // Ignore errors on refresh
@@ -80,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setUser(data);
-      localStorage.setItem("promains_user", JSON.stringify(data));
+      localStorage.setItem("truenorth_user", JSON.stringify(data));
       return { success: true };
     } catch (error) {
       console.error("Login error:", error);
@@ -93,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await fetch("/api/auth/logout", { method: "POST", credentials: 'include' });
     } catch (e) {}
     setUser(null);
-    localStorage.removeItem("promains_user");
+    localStorage.removeItem("truenorth_user");
     setLocation("/auth");
   };
 

@@ -18,7 +18,7 @@ import {
   File, Image, FileSpreadsheet, ExternalLink, FolderOpen, QrCode
 } from "lucide-react";
 import QRCode from "qrcode";
-import { generateProMainCode, parseProMainCode } from "@/lib/qr-utils";
+import { generateTrueNorthCode, parseTrueNorthCode } from "@/lib/qr-utils";
 import { Scanner } from "@/components/scanner";
 import { useUpload } from "@/hooks/use-upload";
 import { apiRequest } from "@/lib/queryClient";
@@ -111,7 +111,7 @@ export default function JobDetail() {
   const [scanResult, setScanResult] = useState<{ code: string; parsed: { type: string; id: string } | null } | null>(null);
 
   const handleJobScanSuccess = (code: string) => {
-    const parsed = parseProMainCode(code);
+    const parsed = parseTrueNorthCode(code);
     setScanResult({ code, parsed });
     
     if (parsed) {
@@ -554,7 +554,7 @@ export default function JobDetail() {
     if (!job) return;
     setQrDialogOpen(true);
     try {
-      const qrContent = generateProMainCode('job', job.id);
+      const qrContent = generateTrueNorthCode('job', job.id);
       const dataUrl = await QRCode.toDataURL(qrContent, {
         width: 256,
         margin: 2,
@@ -2187,7 +2187,7 @@ export default function JobDetail() {
                   data-testid="qr-code-image"
                 />
                 <p className="text-xs text-muted-foreground mt-4 font-mono">
-                  {generateProMainCode('job', job.id)}
+                  {generateTrueNorthCode('job', job.id)}
                 </p>
               </>
             ) : (

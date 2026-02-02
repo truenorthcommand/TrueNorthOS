@@ -7,7 +7,7 @@ import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Scanner } from "@/components/scanner";
-import { parseProMainCode } from "@/lib/qr-utils";
+import { parseTrueNorthCode } from "@/lib/qr-utils";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -34,7 +34,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [adminScanDialogOpen, setAdminScanDialogOpen] = useState(false);
 
   const handleAdminScanSuccess = (code: string) => {
-    const parsed = parseProMainCode(code);
+    const parsed = parseTrueNorthCode(code);
     if (parsed) {
       setAdminScanDialogOpen(false);
       if (parsed.type === 'job') {
@@ -215,17 +215,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {!collapsed && (
           <>
             <img 
-              src="/logo-pms.png" 
+              src="/logo-truenorth-os.png" 
               alt="TrueNorth OS" 
               className="w-full max-w-[180px] h-auto object-contain mx-auto"
             />
-            <span className="text-[10px] text-muted-foreground mt-1">Powered By TrueNorth OS</span>
+            <span className="text-[10px] text-muted-foreground mt-1">Built For Trades By Trades</span>
           </>
         )}
         {collapsed && (
           <img 
-            src="/logo-pms.png" 
-            alt="PMS" 
+            src="/logo-truenorth-os.png" 
+            alt="TrueNorth OS" 
             className="w-10 h-10 object-cover mx-auto"
           />
         )}
@@ -636,7 +636,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </Sheet>
             
             <img 
-              src="/logo-pms.png" 
+              src="/logo-truenorth-os.png" 
               alt="TrueNorth OS" 
               className="h-10 max-w-[140px] w-auto object-contain"
             />

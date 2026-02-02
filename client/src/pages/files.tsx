@@ -13,7 +13,7 @@ import { useUpload } from "@/hooks/use-upload";
 import { apiRequest } from "@/lib/queryClient";
 import { FolderOpen, Upload, FileText, Image, FileSpreadsheet, File, Search, Grid, List, Trash2, Link2, ExternalLink, X, Loader2, Sparkles, Check, QrCode } from "lucide-react";
 import { Scanner } from "@/components/scanner";
-import { parseProMainCode } from "@/lib/qr-utils";
+import { parseTrueNorthCode } from "@/lib/qr-utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { FileWithRelations, Client, Job, Expense } from "@shared/schema";
 
@@ -67,7 +67,7 @@ export default function Files() {
   const [scanDialogOpen, setScanDialogOpen] = useState(false);
 
   const handleScanSuccess = (code: string) => {
-    const parsed = parseProMainCode(code);
+    const parsed = parseTrueNorthCode(code);
     if (parsed) {
       if (parsed.type === 'job') {
         const matchedJob = jobs.find(j => j.id === parsed.id);

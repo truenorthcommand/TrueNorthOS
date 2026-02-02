@@ -23,7 +23,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Scanner } from "@/components/scanner";
 import {
-  parseProMainCode,
+  parseTrueNorthCode,
   getScanHistory,
   addToScanHistory,
   clearScanHistory,
@@ -33,7 +33,7 @@ import { format } from "date-fns";
 
 interface ScanResult {
   code: string;
-  type: 'promain' | 'jobNo' | 'notFound';
+  type: 'truenorth' | 'jobNo' | 'notFound';
   resourceType?: 'job' | 'client' | 'asset';
   resourceId?: string;
   job?: any;
@@ -57,12 +57,12 @@ export default function ScanPage() {
     const updatedHistory = addToScanHistory(code);
     setHistory(updatedHistory);
 
-    const parsed = parseProMainCode(code);
+    const parsed = parseTrueNorthCode(code);
     
     if (parsed) {
       setScanResult({
         code,
-        type: 'promain',
+        type: 'truenorth',
         resourceType: parsed.type,
         resourceId: parsed.id,
       });
@@ -257,7 +257,7 @@ export default function ScanPage() {
               <p className="font-mono text-sm break-all mt-1">{scanResult.code}</p>
             </div>
 
-            {scanResult.type === 'promain' && (
+            {scanResult.type === 'truenorth' && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Badge className={getTypeBadgeColor(scanResult.resourceType)}>

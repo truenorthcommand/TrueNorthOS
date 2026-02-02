@@ -94,7 +94,7 @@ export default function FormSubmissions() {
     let y = 20;
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
-    doc.text("PRO MAIN", 20, y);
+    doc.text("TRUENORTH OS", 20, y);
     y += 10;
 
     doc.setFontSize(14);

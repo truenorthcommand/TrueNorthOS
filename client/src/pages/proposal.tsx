@@ -62,7 +62,7 @@ export default function Proposal() {
             <h3 className="font-semibold text-slate-700 mb-2">Document Details:</h3>
             <p className="text-slate-600">Date: {formatDate(today)}</p>
             <p className="text-slate-600">Valid Until: {formatDate(validUntil)}</p>
-            <p className="text-slate-600">Reference: PMS-{today.getFullYear()}-001</p>
+            <p className="text-slate-600">Reference: TNOS-{today.getFullYear()}-001</p>
           </div>
         </div>
 
