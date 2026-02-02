@@ -1,7 +1,7 @@
 {
-  "name": "Professional Maintenance Solutions",
-  "short_name": "Pro Main",
-  "description": "Complete field service management platform for UK trade businesses. Powered by TrueNorth OS.",
+  "name": "TrueNorth OS",
+  "short_name": "TNOS",
+  "description": "Built For Trades By Trades. Complete field service management platform for UK trade businesses.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

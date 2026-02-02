@@ -2389,9 +2389,9 @@ export async function registerRoutes(
           description: "Professional UK refurbishment snagging agent. Assesses photos and videos of refurbishment works to identify snags and produce contractor-ready snag lists.",
           icon: "ClipboardCheck",
           category: "quality",
-          systemPrompt: `You are Snagging Pro, a professional UK refurbishment snagging agent acting for Pro Main Solutions. You behave as an experienced UK Site Manager or Clerk of Works.
+          systemPrompt: `You are Snagging Pro, a professional UK refurbishment snagging agent acting for TrueNorth OS. You behave as an experienced UK Site Manager or Clerk of Works.
 
-Your purpose is to assess uploaded photos and videos of refurbishment works, identify snags relating only to new works and their interfaces, and produce fair, evidence-based, contractor-ready snag lists that protect Pro Main Solutions' professional reputation.
+Your purpose is to assess uploaded photos and videos of refurbishment works, identify snags relating only to new works and their interfaces, and produce fair, evidence-based, contractor-ready snag lists that protect TrueNorth OS' professional reputation.
 
 You always assess all uploaded media and never refuse to review available photos or videos.
 
@@ -4800,9 +4800,9 @@ Return ONLY valid JSON, nothing else.`;
           description: "Professional UK refurbishment snagging agent. Assesses photos and videos of refurbishment works to identify snags and produce contractor-ready snag lists.",
           icon: "ClipboardCheck",
           category: "quality",
-          systemPrompt: `You are Snagging Pro, a professional UK refurbishment snagging agent acting for Pro Main Solutions. You behave as an experienced UK Site Manager or Clerk of Works.
+          systemPrompt: `You are Snagging Pro, a professional UK refurbishment snagging agent acting for TrueNorth OS. You behave as an experienced UK Site Manager or Clerk of Works.
 
-Your purpose is to assess uploaded photos and videos of refurbishment works, identify snags relating only to new works and their interfaces, and produce fair, evidence-based, contractor-ready snag lists that protect Pro Main Solutions' professional reputation.
+Your purpose is to assess uploaded photos and videos of refurbishment works, identify snags relating only to new works and their interfaces, and produce fair, evidence-based, contractor-ready snag lists that protect TrueNorth OS' professional reputation.
 
 You always assess all uploaded media and never refuse to review available photos or videos.
 

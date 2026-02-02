@@ -45,9 +45,9 @@ export default function Proposal() {
         {/* Header */}
         <div className="text-center mb-12 pb-8 border-b-4 border-primary">
           <h1 className="text-4xl font-bold text-slate-900 mb-2">Commercial Proposal</h1>
-          <h2 className="text-2xl text-primary font-semibold mb-4">Pro Main Solutions</h2>
+          <h2 className="text-2xl text-primary font-semibold mb-4">TrueNorth OS</h2>
           <p className="text-lg text-slate-600">Field Service ERP Platform</p>
-          <p className="text-sm text-slate-500 mt-4">Powered By TrueNorth Operations Group</p>
+          <p className="text-sm text-slate-500 mt-4">Built For Trades By Trades</p>
         </div>
 
         {/* Document Info */}
@@ -75,13 +75,13 @@ export default function Proposal() {
           <Card>
             <CardContent className="pt-6">
               <p className="text-slate-700 leading-relaxed mb-4">
-                Pro Main Solutions is a comprehensive Field Service ERP platform designed specifically for UK field service 
+                TrueNorth OS is a comprehensive Field Service ERP platform designed specifically for UK field service 
                 companies. Built to replace fragmented tools and manual processes, this all-in-one solution enables your 
                 team to manage jobs, quotes, invoices, timesheets, fleet, and workforce from a single integrated platform.
               </p>
               <p className="text-slate-700 leading-relaxed">
                 With built-in AI-powered automation, UK compliance features (HMRC, VAT, Gas Safe, BS 7671), and real-time 
-                GPS tracking, Pro Main Solutions positions your business at the forefront of field service technology 
+                GPS tracking, TrueNorth OS positions your business at the forefront of field service technology 
                 while reducing administrative overhead by up to 40%.
               </p>
             </CardContent>
@@ -215,7 +215,7 @@ export default function Proposal() {
                   <thead>
                     <tr className="border-b">
                       <th className="text-left py-2 font-semibold">Feature Area</th>
-                      <th className="text-center py-2 font-semibold text-primary">Pro Main Solutions</th>
+                      <th className="text-center py-2 font-semibold text-primary">TrueNorth OS</th>
                       <th className="text-center py-2 font-semibold">ServiceTitan</th>
                       <th className="text-center py-2 font-semibold">Simpro</th>
                       <th className="text-center py-2 font-semibold">Jobber</th>

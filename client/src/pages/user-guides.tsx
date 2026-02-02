@@ -6,7 +6,7 @@ import { ArrowLeft, Printer, Download, Shield, Wrench } from "lucide-react";
 import { Link } from "wouter";
 
 const adminGuideContent = `
-<h1>Pro Main - Admin User Guide</h1>
+<h1>TrueNorth OS - Admin User Guide</h1>
 
 <h2>Getting Started</h2>
 
@@ -200,7 +200,7 @@ const adminGuideContent = `
 `;
 
 const engineerGuideContent = `
-<h1>Pro Main - Engineer User Guide</h1>
+<h1>TrueNorth OS - Engineer User Guide</h1>
 
 <h2>Getting Started</h2>
 

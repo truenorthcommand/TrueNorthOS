@@ -216,7 +216,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <>
             <img 
               src="/logo-pms.png" 
-              alt="Professional Maintenance Solutions" 
+              alt="TrueNorth OS" 
               className="w-full max-w-[180px] h-auto object-contain mx-auto"
             />
             <span className="text-[10px] text-muted-foreground mt-1">Powered By TrueNorth OS</span>
@@ -637,7 +637,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             
             <img 
               src="/logo-pms.png" 
-              alt="Professional Maintenance Solutions" 
+              alt="TrueNorth OS" 
               className="h-10 max-w-[140px] w-auto object-contain"
             />
 

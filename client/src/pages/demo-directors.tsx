@@ -580,7 +580,7 @@ export default function DemoDirectorsSuite() {
 
       <div className="text-center pt-8 border-t border-slate-700">
         <p className="text-slate-500 text-sm">
-          This is a demonstration of the Pro Main Directors Suite with sample data.
+          This is a demonstration of the TrueNorth OS Directors Suite with sample data.
         </p>
       </div>
     </div>

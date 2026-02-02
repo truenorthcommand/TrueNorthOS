@@ -49,12 +49,12 @@ export default function Login() {
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <img 
-              src="/logo-pms.png" 
-              alt="Professional Maintenance Solutions" 
+              src="/logo-truenorth-os.png" 
+              alt="TrueNorth OS" 
               className="h-16 w-auto object-contain"
             />
           </div>
-          <CardTitle className="text-2xl font-bold">Professional Maintenance Solutions</CardTitle>
+          <CardTitle className="text-2xl font-bold">TrueNorth OS</CardTitle>
           <CardDescription>
             {requires2FA ? "Enter your authentication code" : "Field Service Management"}
           </CardDescription>

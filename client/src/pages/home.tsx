@@ -185,8 +185,8 @@ export default function Home() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
               <div>
-                <h1 className="text-xl font-bold tracking-tight">Pro Main</h1>
-                <p className="text-xs text-muted-foreground">Powered by TrueNorth OS</p>
+                <h1 className="text-xl font-bold tracking-tight">TrueNorth OS</h1>
+                <p className="text-xs text-muted-foreground">Built For Trades By Trades</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -472,7 +472,7 @@ export default function Home() {
             </h3>
             <p className="text-lg opacity-90 mb-8">
               Join field service companies across the UK who are saving hours every week 
-              with Pro Main.
+              with TrueNorth OS.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               {user ? (
@@ -506,7 +506,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Pro Main Solutions</span>
+              <span className="font-semibold">TrueNorth OS</span>
             </div>
             <p className="text-sm text-muted-foreground">
               The Complete Field Service ERP Suite

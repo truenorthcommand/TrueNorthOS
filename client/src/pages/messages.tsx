@@ -813,7 +813,7 @@ export default function Messages() {
                   <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-[#25D366]/10 flex items-center justify-center">
                     <MessageCircle className="h-12 w-12 text-[#25D366]" />
                   </div>
-                  <h3 className="text-xl font-semibold text-foreground mb-2">Pro Main Messages</h3>
+                  <h3 className="text-xl font-semibold text-foreground mb-2">TrueNorth Messages</h3>
                   <p className="text-sm max-w-xs">Send and receive messages with your team. Select a conversation or start a new one.</p>
                 </div>
               </div>

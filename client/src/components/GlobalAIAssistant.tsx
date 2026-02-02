@@ -447,7 +447,7 @@ export function GlobalAIAssistant() {
             <Sparkles className="h-5 w-5 text-white" />
           )}
           <span className="font-semibold text-white">
-            {showHistory ? "Chat History" : "Pro Main AI"}
+            {showHistory ? "Chat History" : "TrueNorth AI"}
           </span>
           {!showHistory && (
             <span className="text-xs text-white/70 hidden sm:inline">

@@ -1,10 +1,10 @@
-# Pro Main (Professional Maintenance Solutions)
+# TrueNorth OS
 
-*Field Service ERP - Powered by TrueNorth OS*
+*Field Service ERP - Built For Trades By Trades*
 
 ## Overview
 
-Pro Main is a comprehensive business management platform designed for UK trade and field service companies. It aims to digitise and streamline all operational aspects, from job management, quoting, and invoicing to financial tracking, fleet management, workforce coordination, quality control, and compliance. The platform integrates seven core modules and leverages AI-powered tools to enhance efficiency, reduce costs, and improve customer experience, providing an all-in-one ERP solution tailored for the UK market.
+TrueNorth OS is a comprehensive business management platform designed for UK trade and field service companies. It aims to digitise and streamline all operational aspects, from job management, quoting, and invoicing to financial tracking, fleet management, workforce coordination, quality control, and compliance. The platform integrates seven core modules and leverages AI-powered tools to enhance efficiency, reduce costs, and improve customer experience, providing an all-in-one ERP solution tailored for the UK market.
 
 ## User Preferences
 
@@ -16,7 +16,7 @@ Pro Main is a comprehensive business management platform designed for UK trade a
 
 ## System Architecture
 
-Pro Main is built with a modern web stack.
+TrueNorth OS is built with a modern web stack.
 
 ### Frontend
 -   **Technology**: React with TypeScript.

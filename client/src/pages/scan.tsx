@@ -70,7 +70,7 @@ export default function ScanPage() {
       
       toast({
         title: "Code Recognized",
-        description: `Pro Main ${parsed.type} code detected`,
+        description: `TrueNorth OS ${parsed.type} code detected`,
       });
       return;
     }
