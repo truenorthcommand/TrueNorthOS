@@ -85,11 +85,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
     return <div className="min-h-screen bg-background">{children}</div>;
   }
 
-  const toggleSection = (section: MenuSection) => {
+  const toggleSection = (section: MenuSection, event?: React.MouseEvent) => {
+    // Prevent scroll jump
+    event?.preventDefault();
+    
+    // Accordion behavior: close all others when opening a new one
     setExpandedSections(prev => 
       prev.includes(section) 
-        ? prev.filter(s => s !== section)
-        : [...prev, section]
+        ? prev.filter(s => s !== section)  // Close this one
+        : [section]  // Close all others, open only this one
     );
   };
 
@@ -181,6 +185,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <CollapsibleTrigger asChild>
           <button
             className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-foreground hover:bg-muted rounded-lg transition-colors"
+            onClick={(e) => {
+              e.preventDefault(); // Prevent scroll jump
+              toggleSection(section, e);
+            }}
             data-testid={`menu-group-${section}`}
           >
             <Icon className="h-5 w-5" />
