@@ -51,12 +51,12 @@ export default function Login() {
             <img 
               src="/logo-truenorth-os.png" 
               alt="TrueNorth OS" 
-              className="h-16 w-auto object-contain"
+              className="h-24 w-auto object-contain"
             />
           </div>
           <CardTitle className="text-2xl font-bold">TrueNorth OS</CardTitle>
           <CardDescription>
-            {requires2FA ? "Enter your authentication code" : "Field Service Management"}
+            {requires2FA ? "Enter your authentication code" : "Field Service Management For The Trades"}
           </CardDescription>
         </CardHeader>
         <CardContent>
