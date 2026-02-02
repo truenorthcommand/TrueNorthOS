@@ -10,7 +10,20 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  // Serve static files with proper cache headers for PWA
+  app.use(express.static(distPath, {
+    maxAge: '1d',
+    setHeaders: (res, filePath) => {
+      // Set correct MIME types for PWA files
+      if (filePath.endsWith('manifest.json')) {
+        res.setHeader('Content-Type', 'application/manifest+json');
+      }
+      if (filePath.endsWith('sw.js') || filePath.endsWith('service-worker.js')) {
+        res.setHeader('Content-Type', 'application/javascript');
+        res.setHeader('Service-Worker-Allowed', '/');
+      }
+    }
+  }));
 
   // fall through to index.html if the file doesn't exist
   // but NOT for API routes - those should return 404
