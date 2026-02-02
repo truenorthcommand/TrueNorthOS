@@ -1,12 +1,13 @@
 {
   "name": "TrueNorth OS",
   "short_name": "TNOS",
-  "description": "Built For Trades By Trades. Complete field service management platform for UK trade businesses.",
+  "description": "Field Service Management For The Trades",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0F2B4C",
   "orientation": "portrait-primary",
+  "scope": "/",
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
