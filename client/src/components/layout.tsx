@@ -621,6 +621,59 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-h-screen bg-background">
+          {/* Desktop Header */}
+          <header className="sticky top-0 z-30 hidden md:flex h-14 items-center gap-4 px-6 shadow-sm border-b print:hidden bg-card border-border">
+            <div className="ml-auto flex items-center gap-3">
+              <Link href="/scan">
+                <button 
+                  className="p-2 text-muted-foreground hover:bg-muted rounded-lg"
+                  data-testid="button-scan-desktop"
+                >
+                  <QrCode className="h-5 w-5" />
+                  <span className="sr-only">Scan QR/Barcode</span>
+                </button>
+              </Link>
+              {hasRole(user, 'admin') && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button 
+                      className="p-2 text-primary hover:bg-primary/10 rounded-lg"
+                      onClick={() => setAdminScanDialogOpen(true)}
+                      data-testid="button-quick-scan-admin-desktop"
+                    >
+                      <Sparkles className="h-5 w-5" />
+                      <span className="sr-only">Quick Scan</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Quick Scan</TooltipContent>
+                </Tooltip>
+              )}
+              <button 
+                className="p-2 text-muted-foreground hover:bg-muted rounded-lg"
+                onClick={toggleTheme}
+                data-testid="button-toggle-theme-desktop"
+              >
+                {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+                <span className="sr-only">Toggle theme</span>
+              </button>
+              <button 
+                className="p-2 text-muted-foreground hover:bg-muted rounded-lg"
+                onClick={() => window.location.reload()}
+                data-testid="button-refresh-app-desktop"
+              >
+                <RefreshCw className="h-5 w-5" />
+                <span className="sr-only">Refresh app</span>
+              </button>
+              <button 
+                className="px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/10 rounded-lg"
+                onClick={logout}
+                data-testid="button-logout-desktop"
+              >
+                Sign Out
+              </button>
+            </div>
+          </header>
+
           {/* Mobile Header */}
           <header className="sticky top-0 z-30 flex h-16 items-center gap-4 px-4 shadow-sm border-b md:hidden print:hidden bg-card border-border">
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
