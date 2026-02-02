@@ -2002,6 +2002,7 @@ export default function Clients() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
+                            setExpandedClientId(client.id);
                             setEditingClient(client);
                           }}
                           className="h-8 w-8 p-0 shrink-0"
