@@ -1,0 +1,188 @@
+Implement comprehensive audit logging system for TrueNorth OS:
+
+1. CREATE FOUR DATABASE TABLES:
+
+**audit_logs table (main audit log):**
+```sql
+CREATE TABLE audit_logs (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  
+  -- When & Where
+  timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  page_route VARCHAR(255),
+  ip_address VARCHAR(45), -- IPv6 compatible
+  user_agent TEXT,
+  session_id VARCHAR(255),
+  
+  -- Who
+  user_id INT NOT NULL,
+  user_name VARCHAR(255) NOT NULL,
+  user_email VARCHAR(255),
+  user_role VARCHAR(100) NOT NULL, -- admin, dispatcher, manager, client, etc.
+  
+  -- What
+  action_type VARCHAR(50) NOT NULL, -- create, update, delete, login, export, etc.
+  action_category VARCHAR(50), -- auth, client, job, finance, settings, etc.
+  entity_type VARCHAR(100) NOT NULL, -- client, job, quote, invoice, user, etc.
+  entity_id VARCHAR(100), -- ID of affected record
+  
+  -- Details
+  action_description TEXT, -- Human-readable description
+  changes_json JSON, -- Full before/after data
+  metadata_json JSON, -- Additional context
+  
+  -- Severity & Classification
+  severity VARCHAR(20) DEFAULT 'info', -- info, warning, critical
+  is_sensitive BOOLEAN DEFAULT FALSE,
+  requires_review BOOLEAN DEFAULT FALSE,
+  
+  -- Audit trail integrity
+  previous_log_id BIGINT,
+  checksum VARCHAR(64), -- SHA-256 hash
+  
+  INDEX idx_timestamp (timestamp),
+  INDEX idx_user_id (user_id),
+  INDEX idx_action_type (action_type),
+  INDEX idx_entity_type_id (entity_type, entity_id),
+  INDEX idx_session (session_id),
+  INDEX idx_severity (severity)
+);
+```
+
+**user_sessions table:**
+```sql
+CREATE TABLE user_sessions (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  session_id VARCHAR(255) UNIQUE NOT NULL,
+  user_id INT NOT NULL,
+  login_timestamp DATETIME NOT NULL,
+  logout_timestamp DATETIME,
+  last_activity DATETIME,
+  ip_address VARCHAR(45),
+  device_info TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  
+  INDEX idx_user_id (user_id),
+  INDEX idx_session_id (session_id),
+  INDEX idx_active (is_active)
+);
+```
+
+**failed_actions_log table:**
+```sql
+CREATE TABLE failed_actions_log (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  user_id INT,
+  attempted_email VARCHAR(255),
+  action_attempted VARCHAR(255) NOT NULL,
+  failure_reason TEXT,
+  ip_address VARCHAR(45),
+  user_agent TEXT,
+  
+  INDEX idx_timestamp (timestamp),
+  INDEX idx_ip_address (ip_address),
+  INDEX idx_attempted_email (attempted_email)
+);
+```
+
+**audit_log_access table:**
+```sql
+CREATE TABLE audit_log_access (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  accessed_by_user_id INT NOT NULL,
+  accessed_by_user_name VARCHAR(255),
+  access_type VARCHAR(50), -- view, export, search
+  filters_applied JSON,
+  records_accessed INT,
+  export_format VARCHAR(20), -- csv, pdf, json
+  
+  INDEX idx_accessed_by (accessed_by_user_id),
+  INDEX idx_timestamp (timestamp)
+);
+```
+
+2. CREATE LOGGING MIDDLEWARE/SERVICE:
+- Create a central logAuditEvent() function that can be called from anywhere in the app
+- Function should accept: userId, userName, userRole, actionType, actionCategory, entityType, entityId, changesBefore, changesAfter, description, metadata, severity
+- Make it async/non-blocking so it doesn't slow down operations
+- Auto-capture: user context, timestamp, IP address, session info
+- Calculate checksum for integrity (SHA-256 of previous_log_id + timestamp + userId + actionType + changes)
+
+3. ADD LOGGING TO EVERY ACTION:
+Instrument ALL user actions that modify data:
+- Client: create, edit, delete, portal enable/disable
+- Jobs: create, edit, delete, status change, assign/reassign
+- Quotes: create, send, approve, reject, edit
+- Invoices: create, send, payment received, edit
+- Users/Team: create, edit, delete, role change, permissions
+- Schedule: create appointment, reschedule, cancel
+- Finance: payments, refunds, adjustments
+- Fleet: vehicle updates, maintenance logs
+- Documents: upload, download, delete
+- Settings: any config changes
+- Login/logout events
+- Failed login attempts
+- Password resets
+- Export/report generation
+
+4. CREATE DIRECTOR'S SUITE AUDIT VIEWER:
+- Add new "Audit Log" page in Director's Suite
+- Display filterable table with all logs
+- Filters: date range, user, action type, entity type, severity
+- Search functionality across all fields
+- Export to CSV button
+- Expandable rows showing full before/after JSON
+- Color coding by severity (info=blue, warning=yellow, critical=red)
+- Real-time updates via websocket
+- Pagination for performance
+
+5. IMPLEMENT SECURITY:
+- Audit logs CANNOT be edited or deleted by anyone except super admin
+- Even super admin deletions are logged separately
+- Logs are append-only
+- When someone views audit logs, that access is logged in audit_log_access table
+
+6. JSON STRUCTURE EXAMPLES:
+
+changes_json format:
+```json
+{
+  "before": {
+    "status": "pending",
+    "assigned_to": null,
+    "value": 1500
+  },
+  "after": {
+    "status": "approved",
+    "assigned_to": "John Smith",
+    "value": 1750
+  },
+  "changed_fields": ["status", "assigned_to", "value"]
+}
+```
+
+metadata_json format:
+```json
+{
+  "client_name": "ABC Construction",
+  "job_number": "JOB-2024-001",
+  "related_entities": {
+    "quote_id": 123,
+    "invoice_id": 456
+  },
+  "automated": false,
+  "triggered_by": "manual_user_action",
+  "files_affected": ["quote_v2.pdf"],
+  "notification_sent": true
+}
+```
+
+7. ACTION_TYPE VALUES:
+create, update, delete, login, logout, failed_login, password_reset, password_change, export, import, bulk_update, bulk_delete, approve, reject, cancel, send_email, send_sms, download, upload, share, transfer, assign, enable, disable, archive, restore
+
+8. ACTION_CATEGORY VALUES:
+auth, client, job, quote, invoice, finance, team, schedule, fleet, settings, report, document
+
+IMPLEMENT THIS ENTIRE SYSTEM NOW. Create all database tables, set up the logging middleware, add logging to all existing actions throughout the codebase, and create the audit viewer UI in the Director's Suite. Show me when complete with a summary of what was implemented.

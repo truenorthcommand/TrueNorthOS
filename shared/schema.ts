@@ -1979,3 +1979,157 @@ export type JobQueueType =
   | "email_send"
   | "sms_send"
   | "ai_request";
+
+// ==================== AUDIT LOGGING SYSTEM ====================
+
+// Main audit log table
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // When & Where
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  pageRoute: text("page_route"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  sessionId: text("session_id"),
+  
+  // Who
+  userId: varchar("user_id").notNull(),
+  userName: text("user_name").notNull(),
+  userEmail: text("user_email"),
+  userRole: text("user_role").notNull(),
+  
+  // What
+  actionType: text("action_type").notNull(), // create, update, delete, login, export, etc.
+  actionCategory: text("action_category"), // auth, client, job, finance, settings, etc.
+  entityType: text("entity_type").notNull(), // client, job, quote, invoice, user, etc.
+  entityId: text("entity_id"),
+  
+  // Details
+  actionDescription: text("action_description"),
+  changesJson: jsonb("changes_json"), // Full before/after data
+  metadataJson: jsonb("metadata_json"), // Additional context
+  
+  // Severity & Classification
+  severity: text("severity").default("info"), // info, warning, critical
+  isSensitive: boolean("is_sensitive").default(false),
+  requiresReview: boolean("requires_review").default(false),
+  
+  // Audit trail integrity
+  previousLogId: varchar("previous_log_id"),
+  checksum: text("checksum"), // SHA-256 hash
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
+  id: true,
+  timestamp: true,
+});
+
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;
+
+// User sessions table
+export const userSessions = pgTable("user_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: text("session_id").unique().notNull(),
+  userId: varchar("user_id").notNull(),
+  loginTimestamp: timestamp("login_timestamp").notNull(),
+  logoutTimestamp: timestamp("logout_timestamp"),
+  lastActivity: timestamp("last_activity"),
+  ipAddress: text("ip_address"),
+  deviceInfo: text("device_info"),
+  isActive: boolean("is_active").default(true),
+});
+
+export const insertUserSessionSchema = createInsertSchema(userSessions).omit({
+  id: true,
+});
+
+export type InsertUserSession = z.infer<typeof insertUserSessionSchema>;
+export type UserSession = typeof userSessions.$inferSelect;
+
+// Failed actions log table
+export const failedActionsLog = pgTable("failed_actions_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  userId: varchar("user_id"),
+  attemptedEmail: text("attempted_email"),
+  actionAttempted: text("action_attempted").notNull(),
+  failureReason: text("failure_reason"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+});
+
+export const insertFailedActionSchema = createInsertSchema(failedActionsLog).omit({
+  id: true,
+  timestamp: true,
+});
+
+export type InsertFailedAction = z.infer<typeof insertFailedActionSchema>;
+export type FailedAction = typeof failedActionsLog.$inferSelect;
+
+// Audit log access table - logs who viewed the audit logs
+export const auditLogAccess = pgTable("audit_log_access", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  accessedByUserId: varchar("accessed_by_user_id").notNull(),
+  accessedByUserName: text("accessed_by_user_name"),
+  accessType: text("access_type"), // view, export, search
+  filtersApplied: jsonb("filters_applied"),
+  recordsAccessed: integer("records_accessed"),
+  exportFormat: text("export_format"), // csv, pdf, json
+});
+
+export const insertAuditLogAccessSchema = createInsertSchema(auditLogAccess).omit({
+  id: true,
+  timestamp: true,
+});
+
+export type InsertAuditLogAccess = z.infer<typeof insertAuditLogAccessSchema>;
+export type AuditLogAccess = typeof auditLogAccess.$inferSelect;
+
+// Action type values
+export type AuditActionType =
+  | "create"
+  | "update"
+  | "delete"
+  | "login"
+  | "logout"
+  | "failed_login"
+  | "password_reset"
+  | "password_change"
+  | "export"
+  | "import"
+  | "bulk_update"
+  | "bulk_delete"
+  | "approve"
+  | "reject"
+  | "cancel"
+  | "send_email"
+  | "send_sms"
+  | "download"
+  | "upload"
+  | "share"
+  | "transfer"
+  | "assign"
+  | "enable"
+  | "disable"
+  | "archive"
+  | "restore"
+  | "view";
+
+// Action category values
+export type AuditActionCategory =
+  | "auth"
+  | "client"
+  | "job"
+  | "quote"
+  | "invoice"
+  | "finance"
+  | "team"
+  | "schedule"
+  | "fleet"
+  | "settings"
+  | "report"
+  | "document"
+  | "asset";
