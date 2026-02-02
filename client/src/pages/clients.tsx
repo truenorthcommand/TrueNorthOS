@@ -14,6 +14,7 @@ import { BackButton } from "@/components/back-button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { useUpload } from "@/hooks/use-upload";
 import { apiRequest } from "@/lib/queryClient";
@@ -171,20 +172,29 @@ export default function Clients() {
   const [portalLink, setPortalLink] = useState<string>("");
   const [portalClientName, setPortalClientName] = useState<string>("");
 
-  // Generate portal link for client
-  const generatePortalLink = async (clientId: string, clientName: string) => {
+  // Generate portal link for client (with optional email invitation)
+  const generatePortalLink = async (clientId: string, clientName: string, sendEmail: boolean = false) => {
     setGeneratingPortalLink(clientId);
     try {
       const res = await fetch(`/api/clients/${clientId}/generate-portal-token`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify({ sendEmail }),
       });
       if (res.ok) {
         const data = await res.json();
-        const link = `${window.location.origin}/portal/${data.portalToken}`;
+        const link = data.fullUrl || `${window.location.origin}/portal/${data.portalToken}`;
         setPortalLink(link);
         setPortalClientName(clientName);
         setPortalDialogOpen(true);
+        
+        if (data.emailSent) {
+          toast({
+            title: "Invitation Sent",
+            description: `Portal invitation email sent to ${clientName}`,
+          });
+        }
       } else {
         toast({
           title: "Error",
@@ -2010,24 +2020,37 @@ export default function Clients() {
                         >
                           <Edit2 className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            generatePortalLink(client.id, client.name);
-                          }}
-                          disabled={generatingPortalLink === client.id}
-                          className="h-8 w-8 p-0 shrink-0 text-[#0F2B4C] hover:text-[#0F2B4C] hover:bg-[#0F2B4C]/10"
-                          data-testid={`button-portal-link-${client.id}`}
-                          title="Generate Customer Portal Link"
-                        >
-                          {generatingPortalLink === client.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Link2 className="h-4 w-4" />
-                          )}
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={generatingPortalLink === client.id}
+                              className="h-8 w-8 p-0 shrink-0 text-[#0F2B4C] hover:text-[#0F2B4C] hover:bg-[#0F2B4C]/10"
+                              data-testid={`button-portal-link-${client.id}`}
+                              title="Customer Portal Options"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {generatingPortalLink === client.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Link2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                            <DropdownMenuItem onClick={() => generatePortalLink(client.id, client.name, false)}>
+                              <Link2 className="h-4 w-4 mr-2" />
+                              Get Portal Link
+                            </DropdownMenuItem>
+                            {client.email && (
+                              <DropdownMenuItem onClick={() => generatePortalLink(client.id, client.name, true)}>
+                                <Mail className="h-4 w-4 mr-2" />
+                                Send Email Invitation
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </>
                     )}
                     <Button

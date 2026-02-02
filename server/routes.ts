@@ -21,6 +21,7 @@ import { setupAuth } from "./replit_integrations/auth";
 import { generateFormPdf } from "./form-pdf";
 import { emitEvent } from "./events";
 import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
+import { sendPortalInvitation, sendPasswordResetEmail } from "./email";
 
 function getStripeClient(): Stripe | null {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -5591,6 +5592,16 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
         return res.status(404).json({ error: "Portal not found or has expired" });
       }
       
+      // Check if portal access is enabled for this client
+      if (!client.portalEnabled) {
+        return res.status(403).json({ error: "Portal access is disabled for this account. Please contact support." });
+      }
+      
+      // Check if client has password set and if authenticated
+      if (client.portalPassword && req.session?.portalClientId !== client.id) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
       const [quotes, invoices, jobs, companySettings] = await Promise.all([
         storage.getClientQuotes(client.id),
         storage.getClientInvoices(client.id),
@@ -5639,6 +5650,205 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
+  // Portal status check (for login flow)
+  app.get("/api/portal/:token/status", async (req, res) => {
+    try {
+      const client = await storage.getClientByPortalToken(req.params.token);
+      if (!client) {
+        return res.status(404).json({ error: "Portal not found" });
+      }
+      
+      if (!client.portalEnabled) {
+        return res.status(403).json({ error: "Portal access is disabled for this account" });
+      }
+      
+      const companySettings = await storage.getCompanySettings();
+      
+      res.json({
+        hasPassword: !!client.portalPassword,
+        isAuthenticated: req.session?.portalClientId === client.id,
+        companyName: companySettings?.companyName || null
+      });
+    } catch (error) {
+      console.error("Portal status error:", error);
+      res.status(500).json({ error: "Failed to check portal status" });
+    }
+  });
+
+  // Portal password setup (first time)
+  app.post("/api/portal/:token/setup", async (req, res) => {
+    try {
+      const client = await storage.getClientByPortalToken(req.params.token);
+      if (!client) {
+        return res.status(404).json({ error: "Portal not found" });
+      }
+      
+      if (!client.portalEnabled) {
+        return res.status(403).json({ error: "Portal access is disabled" });
+      }
+      
+      if (client.portalPassword) {
+        return res.status(400).json({ error: "Password already set. Please login instead." });
+      }
+      
+      const { password } = req.body;
+      if (!password || password.length < 8) {
+        return res.status(400).json({ error: "Password must be at least 8 characters" });
+      }
+      
+      // Hash password
+      const bcrypt = await import('bcryptjs');
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      await storage.updateClient(client.id, { 
+        portalPassword: hashedPassword,
+        portalPasswordSetAt: new Date()
+      });
+      
+      // Set session
+      req.session.portalClientId = client.id;
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Portal setup error:", error);
+      res.status(500).json({ error: "Failed to set password" });
+    }
+  });
+
+  // Portal login
+  app.post("/api/portal/:token/login", async (req, res) => {
+    try {
+      const client = await storage.getClientByPortalToken(req.params.token);
+      if (!client) {
+        return res.status(404).json({ error: "Portal not found" });
+      }
+      
+      if (!client.portalEnabled) {
+        return res.status(403).json({ error: "Portal access is disabled" });
+      }
+      
+      if (!client.portalPassword) {
+        return res.status(400).json({ error: "Please set up your password first" });
+      }
+      
+      const { password } = req.body;
+      if (!password) {
+        return res.status(400).json({ error: "Password is required" });
+      }
+      
+      // Verify password
+      const bcrypt = await import('bcryptjs');
+      const isValid = await bcrypt.compare(password, client.portalPassword);
+      
+      if (!isValid) {
+        return res.status(401).json({ error: "Invalid password" });
+      }
+      
+      // Set session
+      req.session.portalClientId = client.id;
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Portal login error:", error);
+      res.status(500).json({ error: "Failed to login" });
+    }
+  });
+
+  // Portal forgot password
+  app.post("/api/portal/:token/forgot-password", async (req, res) => {
+    try {
+      const client = await storage.getClientByPortalToken(req.params.token);
+      if (!client) {
+        return res.status(404).json({ error: "Portal not found" });
+      }
+      
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+      
+      // Check if email matches (case insensitive)
+      if (client.email?.toLowerCase() !== email.toLowerCase()) {
+        // Don't reveal if email matches for security
+        return res.json({ success: true });
+      }
+      
+      // Generate reset token
+      const resetToken = crypto.randomUUID();
+      const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      
+      await storage.updateClient(client.id, {
+        passwordResetToken: resetToken,
+        passwordResetExpires: resetExpires
+      });
+      
+      // Send password reset email
+      const companySettings = await storage.getCompanySettings();
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : process.env.REPLIT_DEPLOYMENT_URL || 'http://localhost:5000';
+      const resetUrl = `${baseUrl}/portal/${req.params.token}/reset/${resetToken}`;
+      
+      try {
+        await sendPasswordResetEmail(
+          client.email!,
+          client.name,
+          resetUrl,
+          companySettings?.companyName || 'Your Service Provider'
+        );
+      } catch (emailError) {
+        console.error("Failed to send password reset email:", emailError);
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Portal forgot password error:", error);
+      res.status(500).json({ error: "Failed to process request" });
+    }
+  });
+
+  // Portal password reset
+  app.post("/api/portal/:token/reset/:resetToken", async (req, res) => {
+    try {
+      const client = await storage.getClientByPortalToken(req.params.token);
+      if (!client) {
+        return res.status(404).json({ error: "Portal not found" });
+      }
+      
+      if (!client.passwordResetToken || client.passwordResetToken !== req.params.resetToken) {
+        return res.status(400).json({ error: "Invalid or expired reset link" });
+      }
+      
+      if (client.passwordResetExpires && new Date(client.passwordResetExpires) < new Date()) {
+        return res.status(400).json({ error: "Reset link has expired" });
+      }
+      
+      const { password } = req.body;
+      if (!password || password.length < 8) {
+        return res.status(400).json({ error: "Password must be at least 8 characters" });
+      }
+      
+      // Hash password
+      const bcrypt = await import('bcryptjs');
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      await storage.updateClient(client.id, { 
+        portalPassword: hashedPassword,
+        portalPasswordSetAt: new Date(),
+        passwordResetToken: null,
+        passwordResetExpires: null
+      });
+      
+      // Set session
+      req.session.portalClientId = client.id;
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Portal reset error:", error);
+      res.status(500).json({ error: "Failed to reset password" });
+    }
+  });
+
   app.post("/api/clients/:id/generate-portal-token", requireAdmin, async (req, res) => {
     try {
       const client = await storage.getClient(req.params.id);
@@ -5647,11 +5857,34 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
       }
       
       const portalToken = crypto.randomUUID();
-      const updated = await storage.updateClient(req.params.id, { portalToken });
+      await storage.updateClient(req.params.id, { portalToken });
+      
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : process.env.REPLIT_DEPLOYMENT_URL || 'http://localhost:5000';
+      const portalUrl = `${baseUrl}/portal/${portalToken}`;
+      
+      // Send invitation email if client has email and sendEmail flag is true
+      let emailSent = false;
+      if (req.body.sendEmail && client.email) {
+        try {
+          const companySettings = await storage.getCompanySettings();
+          emailSent = await sendPortalInvitation(
+            client.email,
+            client.name,
+            portalUrl,
+            companySettings?.companyName || 'Your Service Provider'
+          );
+        } catch (emailError) {
+          console.error("Failed to send portal invitation email:", emailError);
+        }
+      }
       
       res.json({ 
         portalToken,
         portalUrl: `/portal/${portalToken}`,
+        fullUrl: portalUrl,
+        emailSent
       });
     } catch (error) {
       console.error("Generate portal token error:", error);

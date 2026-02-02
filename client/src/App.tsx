@@ -220,6 +220,7 @@ function Router() {
       </Route>
       <Route path="/quote/:token" component={ClientQuote} />
       <Route path="/portal/:token" component={CustomerPortal} />
+      <Route path="/portal/:token/reset/:resetToken" component={CustomerPortal} />
       <Route path="/invoices">
         <PrivateRoute component={Invoices} />
       </Route>
