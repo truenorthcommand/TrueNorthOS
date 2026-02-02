@@ -1,0 +1,65 @@
+Complete PWA installation - manifest is ready, now create missing assets:
+
+1. Create icon files from /mnt/user-data/uploads/TrueNorth_OS_logo_design.png:
+   - Create /public/icons/ folder (if doesn't exist)
+   - Generate icon-192x192.png (192x192 pixels)
+   - Generate icon-512x512.png (512x512 pixels)
+   - Use the compass logo from the uploaded TrueNorth OS logo
+   - Ensure icons have transparent or white background to work as maskable
+
+2. Create service worker at /public/service-worker.js:
+```javascript
+   const CACHE_NAME = 'truenorth-os-v1';
+   const urlsToCache = [
+     '/',
+     '/index.html',
+     '/styles.css',
+     '/main.js',
+     '/icons/icon-192x192.png',
+     '/icons/icon-512x512.png'
+   ];
+
+   self.addEventListener('install', (event) => {
+     event.waitUntil(
+       caches.open(CACHE_NAME)
+         .then((cache) => cache.addAll(urlsToCache))
+     );
+   });
+
+   self.addEventListener('fetch', (event) => {
+     event.respondWith(
+       caches.match(event.request)
+         .then((response) => response || fetch(event.request))
+     );
+   });
+```
+
+3. Register service worker in index.html (add before </body>):
+```javascript
+   <script>
+     if ('serviceWorker' in navigator) {
+       window.addEventListener('load', () => {
+         navigator.serviceWorker.register('/service-worker.js')
+           .then(reg => console.log('Service Worker registered'))
+           .catch(err => console.log('Service Worker registration failed', err));
+       });
+     }
+   </script>
+```
+
+4. Verify index.html has all PWA meta tags:
+   - <link rel="manifest" href="/manifest.json">
+   - <meta name="theme-color" content="#0F2B4C">
+   - <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+   - <meta name="mobile-web-app-capable" content="yes">
+   - <meta name="apple-mobile-web-app-capable" content="yes">
+   - <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+5. Republish the app
+
+6. Test in Chrome:
+   - Open DevTools → Application → Manifest (should show no errors)
+   - Check Service Workers section (should show active worker)
+   - Install button should appear in address bar
+
+Show me confirmation that all files are created and PWA is installable.
