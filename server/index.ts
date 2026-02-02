@@ -5,25 +5,29 @@ import { createServer } from "http";
 import { setupNotifications } from "./notifications";
 import { storage } from "./storage";
 import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import fs from "fs";
 
 const app = express();
 
-// Serve PWA files from client/public early (before other middleware)
-const clientPublicPath = path.resolve(__dirname, "../client/public");
-app.use("/manifest.json", express.static(path.join(clientPublicPath, "manifest.json"), {
-  setHeaders: (res) => res.setHeader('Content-Type', 'application/manifest+json')
-}));
-app.use("/sw.js", express.static(path.join(clientPublicPath, "sw.js"), {
-  setHeaders: (res) => {
-    res.setHeader('Content-Type', 'application/javascript');
-    res.setHeader('Service-Worker-Allowed', '/');
-  }
-}));
-app.use("/icons", express.static(path.join(clientPublicPath, "icons")));
+// Serve PWA files - use client/public in dev, dist/public in prod
+const cwd = process.cwd();
+const devPublicPath = path.resolve(cwd, "client/public");
+const prodPublicPath = path.resolve(cwd, "dist/public");
+const publicPath = process.env.NODE_ENV === "production" && fs.existsSync(prodPublicPath) ? prodPublicPath : devPublicPath;
+
+if (fs.existsSync(publicPath)) {
+  app.use("/manifest.json", express.static(path.join(publicPath, "manifest.json"), {
+    setHeaders: (res) => res.setHeader('Content-Type', 'application/manifest+json')
+  }));
+  app.use("/sw.js", express.static(path.join(publicPath, "sw.js"), {
+    setHeaders: (res) => {
+      res.setHeader('Content-Type', 'application/javascript');
+      res.setHeader('Service-Worker-Allowed', '/');
+    }
+  }));
+  app.use("/icons", express.static(path.join(publicPath, "icons")));
+}
+
 const httpServer = createServer(app);
 
 setupNotifications(httpServer);
