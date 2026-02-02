@@ -509,6 +509,39 @@ app.use((req, res, next) => {
 
   await seedFormTemplates();
 
+  // Ensure a super admin exists
+  const seedSuperAdmin = async () => {
+    try {
+      const bcrypt = await import("bcryptjs");
+      const allUsers = await storage.getAllUsers();
+      const superAdmins = allUsers.filter(u => u.role === "super_admin");
+      
+      if (superAdmins.length === 0) {
+        log("No super admin found. Creating default super admin...");
+        const hashedPassword = bcrypt.hashSync("TrueNorth2024!", 10);
+        
+        await storage.createUser({
+          username: "superadmin",
+          password: hashedPassword,
+          name: "Super Admin",
+          email: "admin@truenorth.com",
+          role: "super_admin",
+          status: "active",
+          superAdmin: true,
+          hasDirectorsSuite: true,
+        });
+        
+        log("Default super admin created: username='superadmin'");
+      } else {
+        log(`Super admin already exists (${superAdmins.length} found)`);
+      }
+    } catch (error) {
+      console.error("Failed to seed super admin:", error);
+    }
+  };
+  
+  await seedSuperAdmin();
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
