@@ -209,7 +209,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const NavContent = ({ collapsed = false }: { collapsed?: boolean }) => (
     <div className="flex flex-col gap-2 h-full">
       <div className={cn(
-        "flex flex-col items-center gap-1 mb-6 pb-4 border-b border-border",
+        "flex flex-col items-center gap-0.5 mb-3 pb-2 border-b border-border",
         collapsed ? "justify-center" : "px-2"
       )}>
         {!collapsed && (
@@ -217,9 +217,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <img 
               src="/logo-truenorth-os.png" 
               alt="TrueNorth OS" 
-              className="w-full max-w-[180px] h-auto object-contain mx-auto"
+              className="w-full max-w-[140px] h-auto object-contain mx-auto"
             />
-            <span className="text-[10px] text-muted-foreground mt-1">Built For Trades By Trades</span>
+            <span className="text-[9px] text-muted-foreground text-center leading-tight px-1">Field Service Management For The Trades</span>
           </>
         )}
         {collapsed && (
