@@ -198,8 +198,17 @@ export async function registerRoutes(
     try {
       const { username, password, totpToken } = req.body;
       const user = await storage.getUserByUsername(username);
+      const ipAddress = getClientIp(req);
+      const userAgent = getUserAgent(req);
       
       if (!user) {
+        await logFailedAction({
+          attemptedEmail: username,
+          actionAttempted: "login",
+          failureReason: "User not found",
+          ipAddress,
+          userAgent,
+        });
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
@@ -213,6 +222,14 @@ export async function registerRoutes(
       }
 
       if (!isValidPassword) {
+        await logFailedAction({
+          userId: user.id,
+          attemptedEmail: username,
+          actionAttempted: "login",
+          failureReason: "Invalid password",
+          ipAddress,
+          userAgent,
+        });
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
@@ -241,6 +258,14 @@ export async function registerRoutes(
 
         const delta = totp.validate({ token: totpToken, window: 2 });
         if (delta === null) {
+          await logFailedAction({
+            userId: user.id,
+            attemptedEmail: username,
+            actionAttempted: "login_2fa",
+            failureReason: "Invalid 2FA code",
+            ipAddress,
+            userAgent,
+          });
           return res.status(401).json({ error: "Invalid authentication code" });
         }
       }
@@ -249,6 +274,31 @@ export async function registerRoutes(
       req.session.userRole = user.role;
 
       const userRoles = (user.roles as string[]) || [user.role];
+      
+      // Log successful login
+      const sessionId = req.sessionID;
+      await createUserSession({
+        sessionId,
+        userId: user.id,
+        ipAddress,
+        deviceInfo: userAgent,
+      });
+      
+      await logAuditEvent({
+        userId: user.id,
+        userName: user.name,
+        userEmail: user.email || undefined,
+        userRole: user.role,
+        actionType: "login",
+        actionCategory: "auth",
+        entityType: "user",
+        entityId: user.id,
+        description: `User ${user.name} logged in successfully`,
+        severity: "info",
+        ipAddress,
+        userAgent,
+        sessionId,
+      });
       
       res.json({
         id: user.id,
@@ -265,7 +315,30 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/auth/logout", (req, res) => {
+  app.post("/api/auth/logout", async (req, res) => {
+    const userId = req.session.userId;
+    const sessionId = req.sessionID;
+    
+    if (userId) {
+      const user = await storage.getUser(userId);
+      if (user) {
+        await endUserSession(sessionId);
+        await logAuditEvent({
+          userId: user.id,
+          userName: user.name,
+          userEmail: user.email || undefined,
+          userRole: user.role,
+          actionType: "logout",
+          actionCategory: "auth",
+          entityType: "user",
+          entityId: user.id,
+          description: `User ${user.name} logged out`,
+          severity: "info",
+          sessionId,
+        });
+      }
+    }
+    
     req.session.destroy((err) => {
       if (err) {
         return res.status(500).json({ error: "Logout failed" });
@@ -896,6 +969,24 @@ export async function registerRoutes(
         dayRate: dayRate || null,
       });
 
+      // Audit log: User created
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (currentUser) {
+        await logAuditEvent({
+          userId: currentUser.id,
+          userName: currentUser.name,
+          userEmail: currentUser.email || undefined,
+          userRole: currentUser.role,
+          actionType: "create",
+          actionCategory: "team",
+          entityType: "user",
+          entityId: user.id,
+          description: `Created new user: ${user.name} (${user.role})`,
+          changesAfter: { name: user.name, username: user.username, role: user.role, email: user.email },
+          severity: "info",
+        });
+      }
+
       res.status(201).json({
         id: user.id,
         name: user.name,
@@ -929,6 +1020,25 @@ export async function registerRoutes(
       }
 
       await storage.deleteUser(req.params.id);
+      
+      // Audit log: User deleted
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (currentUser) {
+        await logAuditEvent({
+          userId: currentUser.id,
+          userName: currentUser.name,
+          userEmail: currentUser.email || undefined,
+          userRole: currentUser.role,
+          actionType: "delete",
+          actionCategory: "team",
+          entityType: "user",
+          entityId: req.params.id,
+          description: `Deleted user: ${user.name}`,
+          changesBefore: { name: user.name, username: user.username, role: user.role },
+          severity: "warning",
+        });
+      }
+      
       res.json({ message: "User deleted successfully" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete user" });
@@ -982,6 +1092,26 @@ export async function registerRoutes(
       if (hasDirectorsSuite !== undefined) updates.hasDirectorsSuite = !!hasDirectorsSuite;
 
       const updatedUser = await storage.updateUser(req.params.id, updates);
+      
+      // Audit log: User updated
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (currentUser) {
+        await logAuditEvent({
+          userId: currentUser.id,
+          userName: currentUser.name,
+          userEmail: currentUser.email || undefined,
+          userRole: currentUser.role,
+          actionType: "update",
+          actionCategory: "team",
+          entityType: "user",
+          entityId: req.params.id,
+          description: `Updated user: ${updatedUser!.name}`,
+          changesBefore: { name: user.name, role: user.role, email: user.email, hasDirectorsSuite: user.hasDirectorsSuite },
+          changesAfter: { name: updatedUser!.name, role: updatedUser!.role, email: updatedUser!.email, hasDirectorsSuite: updatedUser!.hasDirectorsSuite },
+          severity: password ? "warning" : "info",
+        });
+      }
+      
       res.json({
         id: updatedUser!.id,
         name: updatedUser!.name,
@@ -1363,6 +1493,25 @@ export async function registerRoutes(
     try {
       const data = insertJobSchema.parse(req.body);
       const job = await storage.createJob(data);
+      
+      // Audit log: Job created
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (currentUser && job) {
+        await logAuditEvent({
+          userId: currentUser.id,
+          userName: currentUser.name,
+          userEmail: currentUser.email || undefined,
+          userRole: currentUser.role,
+          actionType: "create",
+          actionCategory: "job",
+          entityType: "job",
+          entityId: job.id,
+          description: `Created job: ${job.jobNo} for ${job.customerName}`,
+          changesAfter: { jobNo: job.jobNo, customerName: job.customerName, status: job.status, address: job.address },
+          metadata: { clientName: job.client },
+          severity: "info",
+        });
+      }
       
       // Check if job is scheduled for today and notify all assigned engineers
       if (job && job.date) {
@@ -1961,6 +2110,26 @@ export async function registerRoutes(
         convertedJobId: draftJob.id,
       });
       console.log("Quote created successfully:", quote.id, "with client:", client.id, "and draft job:", draftJob.id);
+      
+      // Audit log: Quote created
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (currentUser) {
+        await logAuditEvent({
+          userId: currentUser.id,
+          userName: currentUser.name,
+          userEmail: currentUser.email || undefined,
+          userRole: currentUser.role,
+          actionType: "create",
+          actionCategory: "quote",
+          entityType: "quote",
+          entityId: quote.id,
+          description: `Created quote: ${quoteNo} for ${quote.customerName} - £${quote.total}`,
+          changesAfter: { quoteNo, customerName: quote.customerName, total: quote.total, status: quote.status },
+          metadata: { clientId: client.id, draftJobId: draftJob.id },
+          severity: "info",
+        });
+      }
+      
       res.json({ ...quote, client, draftJob });
     } catch (error: any) {
       console.error("Failed to create quote:", error);
@@ -2087,6 +2256,25 @@ export async function registerRoutes(
   app.post("/api/clients", requireAdmin, async (req, res) => {
     try {
       const client = await storage.createClient(req.body);
+      
+      // Audit log: Client created
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (currentUser && client) {
+        await logAuditEvent({
+          userId: currentUser.id,
+          userName: currentUser.name,
+          userEmail: currentUser.email || undefined,
+          userRole: currentUser.role,
+          actionType: "create",
+          actionCategory: "client",
+          entityType: "client",
+          entityId: client.id,
+          description: `Created client: ${client.name}`,
+          changesAfter: { name: client.name, email: client.email, phone: client.phone, address: client.address },
+          severity: "info",
+        });
+      }
+      
       res.json(client);
     } catch (error) {
       res.status(500).json({ error: "Failed to create client" });
@@ -2095,6 +2283,8 @@ export async function registerRoutes(
 
   app.put("/api/clients/:id", requireAdmin, async (req, res) => {
     try {
+      const existingClient = await storage.getClient(req.params.id);
+      
       // Whitelist allowed fields for client updates
       const allowedFields = ['name', 'email', 'phone', 'address', 'postcode', 'contactName', 'notes', 'portalEnabled'];
       const updates: Record<string, any> = {};
@@ -2112,6 +2302,26 @@ export async function registerRoutes(
       if (!client) {
         return res.status(404).json({ error: "Client not found" });
       }
+      
+      // Audit log: Client updated
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (currentUser) {
+        await logAuditEvent({
+          userId: currentUser.id,
+          userName: currentUser.name,
+          userEmail: currentUser.email || undefined,
+          userRole: currentUser.role,
+          actionType: "update",
+          actionCategory: "client",
+          entityType: "client",
+          entityId: req.params.id,
+          description: `Updated client: ${client.name}`,
+          changesBefore: existingClient ? { name: existingClient.name, email: existingClient.email, portalEnabled: existingClient.portalEnabled } : undefined,
+          changesAfter: { name: client.name, email: client.email, portalEnabled: client.portalEnabled },
+          severity: "info",
+        });
+      }
+      
       res.json(client);
     } catch (error) {
       res.status(500).json({ error: "Failed to update client" });
@@ -2120,7 +2330,28 @@ export async function registerRoutes(
 
   app.delete("/api/clients/:id", requireAdmin, async (req, res) => {
     try {
+      const existingClient = await storage.getClient(req.params.id);
+      
       await storage.deleteClient(req.params.id);
+      
+      // Audit log: Client deleted
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (currentUser && existingClient) {
+        await logAuditEvent({
+          userId: currentUser.id,
+          userName: currentUser.name,
+          userEmail: currentUser.email || undefined,
+          userRole: currentUser.role,
+          actionType: "delete",
+          actionCategory: "client",
+          entityType: "client",
+          entityId: req.params.id,
+          description: `Deleted client: ${existingClient.name}`,
+          changesBefore: { name: existingClient.name, email: existingClient.email },
+          severity: "warning",
+        });
+      }
+      
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete client" });
@@ -2248,6 +2479,26 @@ export async function registerRoutes(
         dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
         invoiceDate: req.body.invoiceDate ? new Date(req.body.invoiceDate) : new Date(),
       });
+      
+      // Audit log: Invoice created
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (currentUser && invoice) {
+        await logAuditEvent({
+          userId: currentUser.id,
+          userName: currentUser.name,
+          userEmail: currentUser.email || undefined,
+          userRole: currentUser.role,
+          actionType: "create",
+          actionCategory: "invoice",
+          entityType: "invoice",
+          entityId: invoice.id,
+          description: `Created invoice: ${invoiceNo} for ${invoice.customerName} - £${invoice.total}`,
+          changesAfter: { invoiceNo, customerName: invoice.customerName, total: invoice.total, status: invoice.status },
+          metadata: { jobId: invoice.jobId },
+          severity: "info",
+        });
+      }
+      
       res.json(invoice);
     } catch (error) {
       console.error("Failed to create invoice:", error);
