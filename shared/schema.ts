@@ -130,6 +130,7 @@ export const clients = pgTable("clients", {
   contactName: text("contact_name"),
   notes: text("notes"),
   portalToken: text("portal_token"),
+  portalEnabled: boolean("portal_enabled").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   updatedByUserId: varchar("updated_by_user_id"),

@@ -2094,7 +2094,7 @@ export async function registerRoutes(
   app.put("/api/clients/:id", requireAdmin, async (req, res) => {
     try {
       // Whitelist allowed fields for client updates
-      const allowedFields = ['name', 'email', 'phone', 'address', 'postcode', 'contactName', 'notes'];
+      const allowedFields = ['name', 'email', 'phone', 'address', 'postcode', 'contactName', 'notes', 'portalEnabled'];
       const updates: Record<string, any> = {};
       
       for (const field of allowedFields) {

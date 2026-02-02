@@ -62,6 +62,7 @@ interface Client {
   address: string | null;
   postcode: string | null;
   notes: string | null;
+  portalEnabled: boolean | null;
 }
 
 
@@ -754,6 +755,7 @@ export default function Clients() {
           address: editingClient.address,
           postcode: editingClient.postcode,
           notes: editingClient.notes,
+          portalEnabled: editingClient.portalEnabled,
         }),
         credentials: 'include',
       });
@@ -2112,25 +2114,41 @@ export default function Clients() {
                             />
                           </div>
                         </div>
-                        <div className="flex gap-2 pt-2">
-                          <Button
-                            size="sm"
-                            onClick={handleUpdateClient}
-                            disabled={isSavingClient || !editingClient.name.trim()}
-                            data-testid={`button-save-client-${client.id}`}
-                          >
-                            <Save className="h-4 w-4 mr-1" />
-                            {isSavingClient ? "Saving..." : "Save"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setEditingClient(null)}
-                            disabled={isSavingClient}
-                            data-testid={`button-cancel-edit-client-${client.id}`}
-                          >
-                            Cancel
-                          </Button>
+                        <div className="flex items-center justify-between gap-2 pt-2">
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              id={`portal-enabled-${client.id}`}
+                              checked={editingClient.portalEnabled || false}
+                              onCheckedChange={(checked) => setEditingClient({ ...editingClient, portalEnabled: checked })}
+                              data-testid={`switch-portal-enabled-${client.id}`}
+                            />
+                            <Label 
+                              htmlFor={`portal-enabled-${client.id}`} 
+                              className="text-sm cursor-pointer"
+                            >
+                              Enable Client Portal
+                            </Label>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditingClient(null)}
+                              disabled={isSavingClient}
+                              data-testid={`button-cancel-edit-client-${client.id}`}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={handleUpdateClient}
+                              disabled={isSavingClient || !editingClient.name.trim()}
+                              data-testid={`button-save-client-${client.id}`}
+                            >
+                              <Save className="h-4 w-4 mr-1" />
+                              {isSavingClient ? "Saving..." : "Save"}
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ) : (
