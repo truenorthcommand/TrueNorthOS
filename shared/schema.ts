@@ -683,6 +683,12 @@ export const timesheets = pgTable("timesheets", {
   date: timestamp("date").notNull(),
   clockIn: timestamp("clock_in"),
   clockOut: timestamp("clock_out"),
+  clockInLatitude: doublePrecision("clock_in_latitude"),
+  clockInLongitude: doublePrecision("clock_in_longitude"),
+  clockInAddress: text("clock_in_address"),
+  clockOutLatitude: doublePrecision("clock_out_latitude"),
+  clockOutLongitude: doublePrecision("clock_out_longitude"),
+  clockOutAddress: text("clock_out_address"),
   breakMinutes: integer("break_minutes").default(0),
   totalHours: doublePrecision("total_hours"),
   jobId: varchar("job_id"), // optional link to job
