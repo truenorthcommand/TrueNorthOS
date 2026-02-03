@@ -36,10 +36,6 @@ export default function Timesheets() {
   const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
-  const { data: activeTimesheet, isLoading: activeLoading } = useQuery<TimesheetWithUser | null>({
-    queryKey: ["/api/timesheets/active"],
-  });
-
   const { data: timesheets = [], isLoading: timesheetsLoading } = useQuery<TimesheetWithUser[]>({
     queryKey: ["/api/timesheets"],
   });
@@ -47,36 +43,6 @@ export default function Timesheets() {
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
     enabled: user?.role === "admin",
-  });
-
-  const clockInMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/timesheets/clock-in", {});
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/timesheets"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/timesheets/active"] });
-      toast.success("Clocked in successfully");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || "Failed to clock in");
-    },
-  });
-
-  const clockOutMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/timesheets/clock-out", {});
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/timesheets"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/timesheets/active"] });
-      toast.success("Clocked out successfully");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || "Failed to clock out");
-    },
   });
 
   const createManualEntryMutation = useMutation({
@@ -290,50 +256,6 @@ export default function Timesheets() {
           </DialogContent>
         </Dialog>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Clock In / Out
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center gap-4">
-            {activeLoading ? (
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            ) : activeTimesheet ? (
-              <>
-                <p className="text-lg text-muted-foreground" data-testid="text-clocked-in-message">
-                  You clocked in at {formatTimeFromDate(activeTimesheet.clockIn)}
-                </p>
-                <Button
-                  size="lg"
-                  variant="destructive"
-                  className="h-16 px-8 text-lg font-semibold"
-                  onClick={() => clockOutMutation.mutate()}
-                  disabled={clockOutMutation.isPending}
-                  data-testid="button-clock-out"
-                >
-                  {clockOutMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Clock className="h-5 w-5 mr-2" />}
-                  Clock Out
-                </Button>
-              </>
-            ) : (
-              <Button
-                size="lg"
-                className="h-16 px-8 text-lg font-semibold bg-green-600 hover:bg-green-700"
-                onClick={() => clockInMutation.mutate()}
-                disabled={clockInMutation.isPending}
-                data-testid="button-clock-in"
-              >
-                {clockInMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Clock className="h-5 w-5 mr-2" />}
-                Clock In
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
       {isAdmin && (
         <Card>

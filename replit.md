@@ -50,6 +50,7 @@ TrueNorth OS is built with a modern web stack.
 -   **Two-Factor Authentication (2FA)**: TOTP-based for enhanced security.
 -   **Progressive Web App (PWA)**: Mobile-first design with offline capabilities.
 -   **File Storage**: Centralized file browser with AI-powered smart assignment and integration with Replit Object Storage.
+-   **Unified Clock In/Out System**: Dashboard-based time tracking that logs to both `time_logs` (for tracking) and `timesheets` (for finance) tables with geolocation capture.
 
 ### Global AI Assistant Architecture (Jan 2026)
 The Global AI Assistant has been optimized for production readiness:

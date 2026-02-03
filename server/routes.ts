@@ -1915,16 +1915,34 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid request data" });
       }
       const { latitude, longitude, address } = parsed.data;
-      const engineerId = req.session.userId!;
+      const userId = req.session.userId!;
 
-      const activeLog = await storage.getActiveTimeLog(engineerId);
+      const activeLog = await storage.getActiveTimeLog(userId);
       if (activeLog) {
         return res.status(400).json({ error: "Already clocked in" });
       }
 
-      const timeLog = await storage.clockIn(engineerId, latitude ?? null, longitude ?? null, address ?? null);
+      const timeLog = await storage.clockIn(userId, latitude ?? null, longitude ?? null, address ?? null);
+      
+      // Check if there's already an active timesheet for today before creating a new one
+      const existingTimesheet = await storage.getActiveClockIn(userId);
+      if (!existingTimesheet) {
+        // Only create a timesheet if one doesn't already exist for today
+        const now = new Date();
+        await storage.createTimesheet({
+          userId,
+          date: now,
+          clockIn: now,
+          clockInLatitude: latitude ?? null,
+          clockInLongitude: longitude ?? null,
+          clockInAddress: address ?? null,
+          status: "pending",
+        });
+      }
+      
       res.json(timeLog);
     } catch (error) {
+      console.error("Clock in error:", error);
       res.status(500).json({ error: "Failed to clock in" });
     }
   });
@@ -1936,14 +1954,36 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid request data" });
       }
       const { latitude, longitude, address } = parsed.data;
-      const engineerId = req.session.userId!;
+      const userId = req.session.userId!;
 
-      const timeLog = await storage.clockOut(engineerId, latitude ?? null, longitude ?? null, address ?? null);
+      // First get the active timesheet before clocking out
+      const activeTimesheet = await storage.getActiveClockIn(userId);
+
+      const timeLog = await storage.clockOut(userId, latitude ?? null, longitude ?? null, address ?? null);
       if (!timeLog) {
         return res.status(400).json({ error: "Not currently clocked in" });
       }
+      
+      // Update the timesheet record for finance tracking with clock out data and status
+      if (activeTimesheet) {
+        const clockOut = new Date();
+        const clockIn = new Date(activeTimesheet.clockIn!);
+        const breakMinutes = activeTimesheet.breakMinutes || 0;
+        const diffMs = clockOut.getTime() - clockIn.getTime();
+        const totalHours = (diffMs / (1000 * 60 * 60)) - (breakMinutes / 60);
+        await storage.updateTimesheet(activeTimesheet.id, {
+          clockOut,
+          clockOutLatitude: latitude ?? null,
+          clockOutLongitude: longitude ?? null,
+          clockOutAddress: address ?? null,
+          totalHours: Math.max(0, totalHours),
+          status: "submitted",
+        });
+      }
+      
       res.json(timeLog);
     } catch (error) {
+      console.error("Clock out error:", error);
       res.status(500).json({ error: "Failed to clock out" });
     }
   });
