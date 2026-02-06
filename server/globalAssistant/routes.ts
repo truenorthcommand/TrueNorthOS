@@ -140,9 +140,9 @@ export function registerGlobalAssistantRoutes(app: Express): void {
           if (searchData.answer) {
             webSearchResults += `\nSummary: ${searchData.answer}\n`;
           }
-          webSearchResults += `\nSources:`;
+          webSearchResults += `\nSources (USE THESE EXACT URLs - do NOT make up your own):`;
           limitedResults.forEach((result, i) => {
-            webSearchResults += `\n${i + 1}. ${result.title}\n   URL: ${result.url}\n   ${result.content.slice(0, 200)}...`;
+            webSearchResults += `\n${i + 1}. Title: ${result.title}\n   EXACT URL TO USE: ${result.url}\n   Content: ${result.content.slice(0, 200)}...`;
           });
         }
       }
