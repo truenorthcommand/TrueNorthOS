@@ -710,8 +710,23 @@ export function GlobalAIAssistant() {
                         {renderMessageContent(message.content, true)}
                       </p>
                     ) : (
-                      <div className="text-sm prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-pre:bg-gray-800 prose-pre:text-gray-100 prose-code:bg-gray-200 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-a:text-blue-600 prose-a:underline">
-                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                      <div className="text-sm prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-pre:bg-gray-800 prose-pre:text-gray-100 prose-code:bg-gray-200 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-a:text-blue-600 prose-a:underline hover:prose-a:text-blue-800">
+                        <ReactMarkdown
+                          components={{
+                            a: ({ href, children, ...props }) => (
+                              <a
+                                href={href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 underline hover:text-blue-800 inline-flex items-center gap-0.5"
+                                {...props}
+                              >
+                                {children}
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline-block ml-0.5 flex-shrink-0"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                              </a>
+                            ),
+                          }}
+                        >{message.content}</ReactMarkdown>
                       </div>
                     )}
                     {message.role === "assistant" && message.content && !message.content.includes("Sorry, I encountered an error") && (
