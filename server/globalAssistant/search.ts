@@ -26,6 +26,23 @@ export interface SearchResult {
   status?: string;
 }
 
+const UK_TRADE_SUPPLIER_DOMAINS = [
+  "screwfix.com",
+  "toolstation.com",
+  "cityplumbing.co.uk",
+  "plumbase.co.uk",
+  "wolseley.co.uk",
+  "travis-perkins.co.uk",
+  "wickes.co.uk",
+  "cef.co.uk",
+  "edmundson-electrical.co.uk",
+  "tlc-direct.co.uk",
+  "plumbworld.co.uk",
+  "victorianplumbing.co.uk",
+  "amazon.co.uk",
+  "ebay.co.uk",
+];
+
 function enhanceSearchQuery(query: string): string {
   const lowerQuery = query.toLowerCase();
   
@@ -34,11 +51,13 @@ function enhanceSearchQuery(query: string): string {
     "stockist", "supplier", "merchant", "wholesaler",
     "boiler", "radiator", "thermostat", "pump", "valve",
     "cable", "switch", "socket", "fuse", "circuit",
-    "pipe", "fitting", "tap", "toilet", "sink"
+    "pipe", "fitting", "tap", "toilet", "sink",
+    "copper", "solder", "flux", "tube", "wire",
+    "connector", "coupling", "elbow", "tee", "bend"
   ].some(term => lowerQuery.includes(term));
   
   if (isProductSearch && !lowerQuery.includes("product page")) {
-    return `${query} UK buy price product page`;
+    return `${query} UK buy price`;
   }
   
   if (lowerQuery.includes("regulation") || lowerQuery.includes("bs 7671") || 
@@ -47,6 +66,19 @@ function enhanceSearchQuery(query: string): string {
   }
   
   return query;
+}
+
+function isProductSearch(query: string): boolean {
+  const lowerQuery = query.toLowerCase();
+  return [
+    "price", "cost", "buy", "purchase", "where to get",
+    "stockist", "supplier", "merchant", "wholesaler",
+    "boiler", "radiator", "thermostat", "pump", "valve",
+    "cable", "switch", "socket", "fuse", "circuit",
+    "pipe", "fitting", "tap", "toilet", "sink",
+    "copper", "solder", "flux", "tube", "wire",
+    "connector", "coupling", "elbow", "tee", "bend"
+  ].some(term => lowerQuery.includes(term));
 }
 
 export async function searchWeb(query: string): Promise<{ results: TavilySearchResult[]; answer?: string } | null> {
@@ -60,19 +92,25 @@ export async function searchWeb(query: string): Promise<{ results: TavilySearchR
   console.log("Enhanced search query:", enhancedQuery);
 
   try {
+    const searchBody: Record<string, unknown> = {
+      api_key: apiKey,
+      query: enhancedQuery,
+      search_depth: "advanced",
+      include_answer: true,
+      include_raw_content: false,
+      max_results: 8,
+    };
+
+    if (isProductSearch(query)) {
+      searchBody.include_domains = UK_TRADE_SUPPLIER_DOMAINS;
+    }
+
     const response = await fetch("https://api.tavily.com/search", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        api_key: apiKey,
-        query: enhancedQuery,
-        search_depth: "advanced",
-        include_answer: true,
-        include_raw_content: false,
-        max_results: 8,
-      }),
+      body: JSON.stringify(searchBody),
     });
 
     if (!response.ok) {
