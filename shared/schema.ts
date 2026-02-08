@@ -2143,3 +2143,9 @@ export type AuditActionCategory =
   | "report"
   | "document"
   | "asset";
+
+export const integrationTokens = pgTable("integration_tokens", {
+  provider: text("provider").primaryKey(),
+  tokens: jsonb("tokens").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
