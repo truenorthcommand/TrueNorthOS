@@ -2199,3 +2199,21 @@ export type ChatMessage = typeof chatMessages.$inferSelect;
 export const insertSecurityEventSchema = createInsertSchema(securityEvents).omit({ id: true, createdAt: true });
 export type InsertSecurityEvent = z.infer<typeof insertSecurityEventSchema>;
 export type SecurityEvent = typeof securityEvents.$inferSelect;
+
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  type: text("type").notNull(),
+  category: text("category").notNull().default("system"),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  read: boolean("read").notNull().default(false),
+  metadata: jsonb("metadata").default({}),
+  linkUrl: text("link_url"),
+  emailSent: boolean("email_sent").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
