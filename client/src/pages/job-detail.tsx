@@ -59,29 +59,33 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 
-function AdminOverrideSection({ onConfirm }: { onConfirm: (reason: string) => void }) {
+const AdminOverrideSection: React.FC<{ onConfirm: (reason: string) => void }> = ({ onConfirm }) => {
   const [reason, setReason] = useState("");
+
   return (
-    <div className="space-y-2 w-full sm:w-auto">
+    <div className="flex flex-col gap-2 sm:items-end">
+      <label className="text-xs text-muted-foreground">
+        Admin override (logged for review)
+      </label>
       <Textarea
-        placeholder="Reason for override…"
         value={reason}
         onChange={(e) => setReason(e.target.value)}
-        className="min-h-[60px]"
+        placeholder="Why are you overriding the Quality Gate?"
+        className="min-w-[260px]"
         data-testid="input-override-reason"
       />
       <Button
-        className="w-full bg-amber-600 hover:bg-amber-700"
-        onClick={() => onConfirm(reason)}
+        variant="destructive"
+        size="sm"
         disabled={!reason.trim()}
+        onClick={() => onConfirm(reason.trim())}
         data-testid="button-override-complete"
       >
-        <AlertTriangle className="mr-2 h-4 w-4" />
-        Override & Complete
+        Override and complete anyway
       </Button>
     </div>
   );
-}
+};
 
 export default function JobDetail() {
   const { user } = useAuth();
