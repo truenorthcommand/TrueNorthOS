@@ -209,7 +209,6 @@ function Router() {
       <Route path="/" component={PublicHome} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/login" component={Login} />
-      <Route path="/auth" component={Login} />
       <Route path="/register" component={PublicRegister} />
       <Route path="/about" component={PublicAbout} />
       <Route path="/contact" component={PublicContact} />

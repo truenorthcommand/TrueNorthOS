@@ -143,6 +143,11 @@ export async function registerRoutes(
   // Setup OAuth authentication (Google via Replit OIDC)
   await setupAuth(app);
 
+  // Redirect /auth to homepage - prevents Replit deployment proxy from showing login
+  app.get("/auth", (req, res) => {
+    res.redirect(302, "/");
+  });
+
   // ==================== VERSION ENDPOINT (PUBLIC) ====================
   // Used to verify which code version is running in production
   const BUILD_VERSION = new Date().toISOString();
