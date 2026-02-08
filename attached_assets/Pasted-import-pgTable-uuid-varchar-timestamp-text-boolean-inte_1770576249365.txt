@@ -1,0 +1,110 @@
+import { pgTable, uuid, varchar, timestamp, text, boolean, integer, decimal } from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
+import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
+import { users } from './users';
+
+export const referralCodes = pgTable('referral_codes', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  ownerType: varchar('owner_type', { length: 20 }).notNull(), // 'customer' | 'merchant'
+  ownerId: uuid('owner_id').notNull(),
+  code: varchar('code', { length: 6 }).notNull().unique(),
+  landingType: varchar('landing_type', { length: 20 }).notNull(), // 'customer' | 'merchant'
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const referralEvents = pgTable('referral_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  referralCodeId: uuid('referral_code_id').notNull().references(() => referralCodes.id),
+  scannedAt: timestamp('scanned_at').defaultNow().notNull(),
+  ipHash: varchar('ip_hash', { length: 64 }).notNull(),
+  userAgentHash: varchar('user_agent_hash', { length: 64 }).notNull(),
+  geoCountry: varchar('geo_country', { length: 2 }),
+});
+
+export const referralConversions = pgTable('referral_conversions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  referralCodeId: uuid('referral_code_id').notNull().references(() => referralCodes.id),
+  referredUserId: uuid('referred_user_id').notNull().references(() => users.id),
+  status: varchar('status', { length: 20 }).notNull().default('pending'), // 'pending' | 'qualified' | 'disqualified'
+  qualifiedAt: timestamp('qualified_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const reviewRewards = pgTable('review_rewards', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  type: varchar('type', { length: 30 }).notNull(), // 'google' | 'trustpilot' | 'g2' | 'linkedin' | 'video' | 'case_study'
+  valueType: varchar('value_type', { length: 10 }).notNull(), // 'percent' | 'fixed'
+  value: decimal('value', { precision: 10, scale: 2 }).notNull(),
+  active: boolean('active').notNull().default(true),
+  verifiedAt: timestamp('verified_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const merchants = pgTable('merchants', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  slug: varchar('slug', { length: 100 }).notNull().unique(),
+  payoutMethod: varchar('payout_method', { length: 20 }).notNull(), // 'bank' | 'credit'
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const merchantEarnings = pgTable('merchant_earnings', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  merchantId: uuid('merchant_id').notNull().references(() => merchants.id),
+  sourceUserId: uuid('source_user_id').notNull().references(() => users.id),
+  amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
+  type: varchar('type', { length: 30 }).notNull(), // 'signup_bonus' | 'recurring_commission'
+  periodMonth: varchar('period_month', { length: 7 }).notNull(), // YYYY-MM
+  paid: boolean('paid').notNull().default(false),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Relations
+export const referralCodesRelations = relations(referralCodes, ({ many }) => ({
+  events: many(referralEvents),
+  conversions: many(referralConversions),
+}));
+
+export const referralEventsRelations = relations(referralEvents, ({ one }) => ({
+  referralCode: one(referralCodes, {
+    fields: [referralEvents.referralCodeId],
+    references: [referralCodes.id],
+  }),
+}));
+
+export const referralConversionsRelations = relations(referralConversions, ({ one }) => ({
+  referralCode: one(referralCodes, {
+    fields: [referralConversions.referralCodeId],
+    references: [referralCodes.id],
+  }),
+  referredUser: one(users, {
+    fields: [referralConversions.referredUserId],
+    references: [users.id],
+  }),
+}));
+
+export const reviewRewardsRelations = relations(reviewRewards, ({ one }) => ({
+  user: one(users, {
+    fields: [reviewRewards.userId],
+    references: [users.id],
+  }),
+}));
+
+export const merchantEarningsRelations = relations(merchantEarnings, ({ one }) => ({
+  merchant: one(merchants, {
+    fields: [merchantEarnings.merchantId],
+    references: [merchants.id],
+  }),
+  sourceUser: one(users, {
+    fields: [merchantEarnings.sourceUserId],
+    references: [users.id],
+  }),
+}));
+
+// Zod schemas
+export const insertReferralCodeSchema = createInsertSchema(referralCodes);
+export const selectReferralCodeSchema = createSelectSchema(referralCodes);
+export const insertReviewRewardSchema = createInsertSchema(reviewRewards);
+export const selectReviewRewardSchema = createSelectSchema(reviewRewards);

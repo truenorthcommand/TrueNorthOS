@@ -1,0 +1,83 @@
+CREATE TABLE IF NOT EXISTS "referral_codes" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+  "owner_type" varchar(20) NOT NULL,
+  "owner_id" uuid NOT NULL,
+  "code" varchar(6) NOT NULL UNIQUE,
+  "landing_type" varchar(20) NOT NULL,
+  "created_at" timestamp DEFAULT now() NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "referral_events" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+  "referral_code_id" uuid NOT NULL,
+  "scanned_at" timestamp DEFAULT now() NOT NULL,
+  "ip_hash" varchar(64) NOT NULL,
+  "user_agent_hash" varchar(64) NOT NULL,
+  "geo_country" varchar(2)
+);
+
+CREATE TABLE IF NOT EXISTS "referral_conversions" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+  "referral_code_id" uuid NOT NULL,
+  "referred_user_id" uuid NOT NULL,
+  "status" varchar(20) DEFAULT 'pending' NOT NULL,
+  "qualified_at" timestamp,
+  "created_at" timestamp DEFAULT now() NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "review_rewards" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+  "user_id" uuid NOT NULL,
+  "type" varchar(30) NOT NULL,
+  "value_type" varchar(10) NOT NULL,
+  "value" decimal(10, 2) NOT NULL,
+  "active" boolean DEFAULT true NOT NULL,
+  "verified_at" timestamp NOT NULL,
+  "created_at" timestamp DEFAULT now() NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "merchants" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+  "name" varchar(255) NOT NULL,
+  "slug" varchar(100) NOT NULL UNIQUE,
+  "payout_method" varchar(20) NOT NULL,
+  "active" boolean DEFAULT true NOT NULL,
+  "created_at" timestamp DEFAULT now() NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "merchant_earnings" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+  "merchant_id" uuid NOT NULL,
+  "source_user_id" uuid NOT NULL,
+  "amount" decimal(10, 2) NOT NULL,
+  "type" varchar(30) NOT NULL,
+  "period_month" varchar(7) NOT NULL,
+  "paid" boolean DEFAULT false NOT NULL,
+  "created_at" timestamp DEFAULT now() NOT NULL
+);
+
+ALTER TABLE "referral_events" ADD CONSTRAINT "referral_events_referral_code_id_fk" 
+  FOREIGN KEY ("referral_code_id") REFERENCES "referral_codes"("id") ON DELETE CASCADE;
+
+ALTER TABLE "referral_conversions" ADD CONSTRAINT "referral_conversions_referral_code_id_fk" 
+  FOREIGN KEY ("referral_code_id") REFERENCES "referral_codes"("id") ON DELETE CASCADE;
+
+ALTER TABLE "referral_conversions" ADD CONSTRAINT "referral_conversions_referred_user_id_fk" 
+  FOREIGN KEY ("referred_user_id") REFERENCES "users"("id") ON DELETE CASCADE;
+
+ALTER TABLE "review_rewards" ADD CONSTRAINT "review_rewards_user_id_fk" 
+  FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE;
+
+ALTER TABLE "merchant_earnings" ADD CONSTRAINT "merchant_earnings_merchant_id_fk" 
+  FOREIGN KEY ("merchant_id") REFERENCES "merchants"("id") ON DELETE CASCADE;
+
+ALTER TABLE "merchant_earnings" ADD CONSTRAINT "merchant_earnings_source_user_id_fk" 
+  FOREIGN KEY ("source_user_id") REFERENCES "users"("id") ON DELETE CASCADE;
+
+CREATE INDEX "idx_referral_codes_owner" ON "referral_codes"("owner_id");
+CREATE INDEX "idx_referral_codes_code" ON "referral_codes"("code");
+CREATE INDEX "idx_referral_conversions_user" ON "referral_conversions"("referred_user_id");
+CREATE INDEX "idx_referral_conversions_status" ON "referral_conversions"("status");
+CREATE INDEX "idx_review_rewards_user" ON "review_rewards"("user_id");
+CREATE INDEX "idx_merchant_earnings_merchant" ON "merchant_earnings"("merchant_id");
+CREATE INDEX "idx_merchant_earnings_period" ON "merchant_earnings"("period_month");
