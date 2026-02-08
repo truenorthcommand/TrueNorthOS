@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, Role } from "./types";
-import { useLocation } from "wouter";
 
 interface LoginResult {
   success: boolean;
@@ -21,7 +20,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [, setLocation] = useLocation();
 
   useEffect(() => {
     fetch("/api/auth/me", { credentials: 'include' })
@@ -94,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {}
     setUser(null);
     localStorage.removeItem("truenorth_user");
-    setLocation("/auth");
+    window.location.href = "/login";
   };
 
   return (

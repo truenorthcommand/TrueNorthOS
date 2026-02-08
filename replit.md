@@ -42,6 +42,13 @@ TrueNorth OS is built with a modern web stack.
     -   `vehicles`, `walkaround_checks`, `defects`: Fleet management.
     -   `skills`, `user_skills`: Workforce skill management.
 
+### Routing Architecture (Feb 2026)
+-   **Public Marketing Site**: Public-facing pages at root level (`/`, `/pricing`, `/about`, `/contact`, `/register`, `/checkout`, `/checkout/success`, `/privacy`, `/terms`). Uses `PublicLayout` component with shared header (nav, login/register buttons) and footer.
+-   **Authenticated App**: All private routes nested under `/app/` prefix using wouter v3's `nest` prop. Dashboard at `/app`, jobs at `/app/jobs`, etc.
+-   **Auth Flow**: Login redirects to `/app`. Logout uses `window.location.href` to navigate to `/login` (escapes nested router context). Unauthenticated access to `/app/*` redirects to `/login`.
+-   **Client-Facing Pages**: Public pages with tokens (`/quote/:token`, `/portal/:token`, `/invoice/:token`) remain at root level.
+-   **Sidebar Navigation**: Uses relative paths (`/jobs`, `/clients`, etc.) which resolve correctly under the nested `/app` base via wouter v3.
+
 ### Key Features and Design Choices
 -   **Modular Design**: Seven integrated modules for Operations, Finance, Fleet, Workforce, Quality Control, Compliance, and Intelligence.
 -   **AI Integration**: Extensive use of AI for features like job assignment, pricing advice, receipt OCR, web search, conversation memory, quality assessment, and client document scanning.

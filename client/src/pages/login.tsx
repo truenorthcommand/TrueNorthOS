@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, AlertCircle, Shield } from "lucide-react";
+import { Loader2, AlertCircle, Shield, ArrowLeft } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Login() {
@@ -26,7 +26,7 @@ export default function Login() {
     const result = await login(username, password, requires2FA ? totpToken : undefined);
     
     if (result.success) {
-      setLocation("/");
+      setLocation("/app");
     } else if (result.requiresTwoFactor) {
       setRequires2FA(true);
       setTotpToken("");
@@ -45,6 +45,14 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
+      <div className="absolute top-4 left-4">
+        <Link href="/">
+          <Button variant="ghost" size="sm" data-testid="link-back-home">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Home
+          </Button>
+        </Link>
+      </div>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
@@ -176,6 +184,13 @@ export default function Login() {
               </a>
             </>
           )}
+          
+          <div className="mt-4 text-center text-sm text-muted-foreground">
+            Don't have an account?{" "}
+            <Link href="/register" className="text-primary hover:underline font-medium" data-testid="link-register">
+              Start your free trial
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>

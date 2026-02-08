@@ -466,7 +466,7 @@ export default function UserGuides() {
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6 no-print">
-          <Link href="/home">
+          <Link href="/">
             <Button variant="ghost" data-testid="link-back">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back

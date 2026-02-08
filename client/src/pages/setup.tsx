@@ -153,7 +153,7 @@ export default function SetupPage() {
             </Button>
             
             <div className="pt-4 text-center">
-              <Button variant="link" onClick={() => setLocation('/auth')}>
+              <Button variant="link" onClick={() => setLocation('/login')}>
                 Back to Login
               </Button>
             </div>

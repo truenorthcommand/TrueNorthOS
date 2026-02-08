@@ -2,19 +2,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Scale, AlertTriangle, Ban, Shield, Globe } from "lucide-react";
 import { Link } from "wouter";
+import PublicLayout from "@/components/public-layout";
 
 export default function Terms() {
   return (
+    <PublicLayout>
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <div className="container max-w-4xl mx-auto px-4 py-8">
-        <div className="mb-6">
-          <Link href="/home">
-            <Button variant="ghost" size="sm" data-testid="button-back">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Home
-            </Button>
-          </Link>
-        </div>
 
         <Card>
           <CardHeader className="text-center border-b">
@@ -169,5 +163,6 @@ export default function Terms() {
         </Card>
       </div>
     </div>
+    </PublicLayout>
   );
 }

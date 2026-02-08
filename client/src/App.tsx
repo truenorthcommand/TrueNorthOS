@@ -86,6 +86,12 @@ import FormFill from "@/pages/forms/fill";
 import FormSubmissions from "@/pages/forms/submissions";
 import Today from "@/pages/today";
 import Exceptions from "@/pages/exceptions";
+import PublicHome from "@/pages/public-home";
+import PublicAbout from "@/pages/public-about";
+import PublicContact from "@/pages/public-contact";
+import PublicRegister from "@/pages/public-register";
+import PublicCheckout from "@/pages/public-checkout";
+import PublicCheckoutSuccess from "@/pages/public-checkout-success";
 import Assets from "@/pages/assets";
 import AssetDetail from "@/pages/asset-detail";
 import AssetForm from "@/pages/asset-form";
@@ -94,9 +100,8 @@ import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
 import { Loader2 } from "lucide-react";
 
-function PrivateRoute({ component: Component, ...rest }: any) {
+function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
-  const [location, setLocation] = useLocation();
 
   if (isLoading) {
     return (
@@ -107,235 +112,129 @@ function PrivateRoute({ component: Component, ...rest }: any) {
   }
 
   if (!user) {
-    if (location !== "/auth") {
-      setTimeout(() => setLocation("/auth"), 0);
-    }
+    window.location.replace('/login');
     return null;
   }
 
   return (
     <Layout>
-      <Component {...rest} />
+      {children}
     </Layout>
+  );
+}
+
+function AppRoutes() {
+  return (
+    <AuthGate>
+      <Switch>
+        <Route path="/" component={Dashboard} />
+        <Route path="/jobs" component={Jobs} />
+        <Route path="/jobs/:id" component={JobDetail} />
+        <Route path="/jobs/:id/sign-off" component={SignOff} />
+        <Route path="/clients" component={Clients} />
+        <Route path="/create-job-sheet" component={Clients} />
+        <Route path="/engineers" component={Engineers} />
+        <Route path="/completed-jobs" component={CompletedJobs} />
+        <Route path="/staff" component={Staff} />
+        <Route path="/calendar" component={CalendarPage} />
+        <Route path="/schedule/calendar" component={CalendarPage} />
+        <Route path="/schedule/planner" component={PlannerPage} />
+        <Route path="/map" component={MapPage} />
+        <Route path="/today" component={Today} />
+        <Route path="/time-logs" component={TimeLogs} />
+        <Route path="/timesheets" component={Timesheets} />
+        <Route path="/expenses" component={Expenses} />
+        <Route path="/payments" component={Payments} />
+        <Route path="/analytics" component={Analytics} />
+        <Route path="/directors" component={DirectorsSuite} />
+        <Route path="/subscription" component={Subscription} />
+        <Route path="/referrals" component={Referrals} />
+        <Route path="/workflows" component={Workflows} />
+        <Route path="/exceptions" component={Exceptions} />
+        <Route path="/assets" component={Assets} />
+        <Route path="/assets/new" component={AssetForm} />
+        <Route path="/assets/:id" component={AssetDetail} />
+        <Route path="/assets/:id/edit" component={AssetForm} />
+        <Route path="/quotes" component={Quotes} />
+        <Route path="/quotes/:id" component={QuoteDetail} />
+        <Route path="/invoices" component={Invoices} />
+        <Route path="/invoices/:id" component={InvoiceDetail} />
+        <Route path="/settings" component={Settings} />
+        <Route path="/integrations" component={Integrations} />
+        <Route path="/security" component={Security} />
+        <Route path="/messages" component={Messages} />
+        <Route path="/fleet" component={Fleet} />
+        <Route path="/fleet/vehicles" component={FleetVehicles} />
+        <Route path="/fleet/vehicles/:id" component={VehicleDetail} />
+        <Route path="/fleet/walkaround" component={WalkaroundCheck} />
+        <Route path="/fleet/report-defect" component={ReportDefect} />
+        <Route path="/fleet/defects/:id" component={DefectDetail} />
+        <Route path="/ai-advisors" component={AiAdvisors} />
+        <Route path="/ai-tools" component={AITools} />
+        <Route path="/voice-notes" component={VoiceNotes} />
+        <Route path="/files" component={Files} />
+        <Route path="/document-scanner" component={DocumentScanner} />
+        <Route path="/scan" component={ScanPage} />
+        <Route path="/user-guide" component={UserGuide} />
+        <Route path="/admin/advisors" component={AdminAdvisors} />
+        <Route path="/works-manager" component={WorksManagerDashboard} />
+        <Route path="/works-manager/jobs" component={WorksManagerJobs} />
+        <Route path="/works-manager/map" component={WorksManagerMap} />
+        <Route path="/works-manager/approvals" component={WorksManagerApprovals} />
+        <Route path="/inspections" component={Inspections} />
+        <Route path="/inspections/:id" component={InspectionDetail} />
+        <Route path="/snagging" component={SnaggingSheets} />
+        <Route path="/snagging/:id" component={SnaggingDetail} />
+        <Route path="/accounts" component={AccountsDashboard} />
+        <Route path="/outlook-inbox" component={OutlookInbox} />
+        <Route path="/forms/templates" component={FormTemplates} />
+        <Route path="/forms/builder/:id" component={FormBuilder} />
+        <Route path="/forms/fill/:versionId" component={FormFill} />
+        <Route path="/forms/submissions" component={FormSubmissions} />
+        <Route component={NotFound} />
+      </Switch>
+    </AuthGate>
   );
 }
 
 function Router() {
   return (
     <Switch>
-      <Route path="/home" component={Home} />
+      <Route path="/" component={PublicHome} />
       <Route path="/pricing" component={Pricing} />
-      <Route path="/guides" component={UserGuides} />
+      <Route path="/login" component={Login} />
       <Route path="/auth" component={Login} />
-      <Route path="/setup" component={Setup} />
+      <Route path="/register" component={PublicRegister} />
+      <Route path="/about" component={PublicAbout} />
+      <Route path="/contact" component={PublicContact} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
+      <Route path="/checkout/success" component={PublicCheckoutSuccess} />
+      <Route path="/checkout" component={PublicCheckout} />
+      <Route path="/setup" component={Setup} />
+      <Route path="/guides" component={UserGuides} />
+
+      <Route path="/quote/:token" component={ClientQuote} />
+      <Route path="/portal/:token/reset/:resetToken" component={CustomerPortal} />
+      <Route path="/portal/:token" component={CustomerPortal} />
+      <Route path="/invoice/:token" component={ClientInvoice} />
+
+      <Route path="/home" component={Home} />
       <Route path="/proposal" component={Proposal} />
+      <Route path="/demo/directors" component={DemoDirectorsSuite} />
+      <Route path="/pitch/investor" component={PitchInvestor} />
+      <Route path="/pitch/sales" component={PitchSales} />
+      <Route path="/pitch/onepager" component={PitchOnePager} />
       <Route path="/glass-demo" component={GlassDemo} />
       <Route path="/glass-dashboard" component={GlassDashboardDemo} />
       <Route path="/icon-styles" component={IconStylesDemo} />
       <Route path="/glow-dashboard" component={GlowDashboardDemo} />
       <Route path="/bigchange-dashboard" component={BigChangeDashboardDemo} />
-      <Route path="/pitch/investor" component={PitchInvestor} />
-      <Route path="/pitch/sales" component={PitchSales} />
-      <Route path="/pitch/onepager" component={PitchOnePager} />
-      <Route path="/demo/directors" component={DemoDirectorsSuite} />
-      <Route path="/clients">
-        <PrivateRoute component={Clients} />
-      </Route>
-      <Route path="/create-job-sheet">
-        <PrivateRoute component={Clients} />
-      </Route>
-      <Route path="/engineers">
-        <PrivateRoute component={Engineers} />
-      </Route>
-      <Route path="/completed-jobs">
-        <PrivateRoute component={CompletedJobs} />
-      </Route>
-      <Route path="/staff">
-        <PrivateRoute component={Staff} />
-      </Route>
-      <Route path="/calendar">
-        <PrivateRoute component={CalendarPage} />
-      </Route>
-      <Route path="/schedule/calendar">
-        <PrivateRoute component={CalendarPage} />
-      </Route>
-      <Route path="/schedule/planner">
-        <PrivateRoute component={PlannerPage} />
-      </Route>
-      <Route path="/map">
-        <PrivateRoute component={MapPage} />
-      </Route>
-      <Route path="/today">
-        <PrivateRoute component={Today} />
-      </Route>
-      <Route path="/time-logs">
-        <PrivateRoute component={TimeLogs} />
-      </Route>
-      <Route path="/timesheets">
-        <PrivateRoute component={Timesheets} />
-      </Route>
-      <Route path="/expenses">
-        <PrivateRoute component={Expenses} />
-      </Route>
-      <Route path="/payments">
-        <PrivateRoute component={Payments} />
-      </Route>
-      <Route path="/analytics">
-        <PrivateRoute component={Analytics} />
-      </Route>
-      <Route path="/directors">
-        <PrivateRoute component={DirectorsSuite} />
-      </Route>
-      <Route path="/subscription">
-        <PrivateRoute component={Subscription} />
-      </Route>
-      <Route path="/referrals">
-        <PrivateRoute component={Referrals} />
-      </Route>
-      <Route path="/workflows">
-        <PrivateRoute component={Workflows} />
-      </Route>
-      <Route path="/exceptions">
-        <PrivateRoute component={Exceptions} />
-      </Route>
-      <Route path="/assets">
-        <PrivateRoute component={Assets} />
-      </Route>
-      <Route path="/assets/new">
-        <PrivateRoute component={AssetForm} />
-      </Route>
-      <Route path="/assets/:id">
-        <PrivateRoute component={AssetDetail} />
-      </Route>
-      <Route path="/assets/:id/edit">
-        <PrivateRoute component={AssetForm} />
-      </Route>
-      <Route path="/quotes">
-        <PrivateRoute component={Quotes} />
-      </Route>
-      <Route path="/quotes/:id">
-        <PrivateRoute component={QuoteDetail} />
-      </Route>
-      <Route path="/quote/:token" component={ClientQuote} />
-      <Route path="/portal/:token" component={CustomerPortal} />
-      <Route path="/portal/:token/reset/:resetToken" component={CustomerPortal} />
-      <Route path="/invoices">
-        <PrivateRoute component={Invoices} />
-      </Route>
-      <Route path="/invoices/:id">
-        <PrivateRoute component={InvoiceDetail} />
-      </Route>
-      <Route path="/invoice/:token" component={ClientInvoice} />
-      <Route path="/settings">
-        <PrivateRoute component={Settings} />
-      </Route>
-      <Route path="/integrations">
-        <PrivateRoute component={Integrations} />
-      </Route>
-      <Route path="/security">
-        <PrivateRoute component={Security} />
-      </Route>
-      <Route path="/messages">
-        <PrivateRoute component={Messages} />
-      </Route>
-      <Route path="/fleet">
-        <PrivateRoute component={Fleet} />
-      </Route>
-      <Route path="/fleet/vehicles">
-        <PrivateRoute component={FleetVehicles} />
-      </Route>
-      <Route path="/fleet/vehicles/:id">
-        <PrivateRoute component={VehicleDetail} />
-      </Route>
-      <Route path="/fleet/walkaround">
-        <PrivateRoute component={WalkaroundCheck} />
-      </Route>
-      <Route path="/fleet/report-defect">
-        <PrivateRoute component={ReportDefect} />
-      </Route>
-      <Route path="/fleet/defects/:id">
-        <PrivateRoute component={DefectDetail} />
-      </Route>
-      <Route path="/ai-advisors">
-        <PrivateRoute component={AiAdvisors} />
-      </Route>
-      <Route path="/ai-tools">
-        <PrivateRoute component={AITools} />
-      </Route>
-      <Route path="/voice-notes">
-        <PrivateRoute component={VoiceNotes} />
-      </Route>
-      <Route path="/files">
-        <PrivateRoute component={Files} />
-      </Route>
-      <Route path="/document-scanner">
-        <PrivateRoute component={DocumentScanner} />
-      </Route>
-      <Route path="/scan">
-        <PrivateRoute component={ScanPage} />
-      </Route>
-      <Route path="/user-guide">
-        <PrivateRoute component={UserGuide} />
-      </Route>
-      <Route path="/admin/advisors">
-        <PrivateRoute component={AdminAdvisors} />
-      </Route>
-      <Route path="/works-manager">
-        <PrivateRoute component={WorksManagerDashboard} />
-      </Route>
-      <Route path="/works-manager/jobs">
-        <PrivateRoute component={WorksManagerJobs} />
-      </Route>
-      <Route path="/works-manager/map">
-        <PrivateRoute component={WorksManagerMap} />
-      </Route>
-      <Route path="/works-manager/approvals">
-        <PrivateRoute component={WorksManagerApprovals} />
-      </Route>
-      <Route path="/inspections">
-        <PrivateRoute component={Inspections} />
-      </Route>
-      <Route path="/inspections/:id">
-        <PrivateRoute component={InspectionDetail} />
-      </Route>
-      <Route path="/snagging">
-        <PrivateRoute component={SnaggingSheets} />
-      </Route>
-      <Route path="/snagging/:id">
-        <PrivateRoute component={SnaggingDetail} />
-      </Route>
-      <Route path="/accounts">
-        <PrivateRoute component={AccountsDashboard} />
-      </Route>
-      <Route path="/outlook-inbox">
-        <PrivateRoute component={OutlookInbox} />
-      </Route>
-      <Route path="/forms/templates">
-        <PrivateRoute component={FormTemplates} />
-      </Route>
-      <Route path="/forms/builder/:id">
-        <PrivateRoute component={FormBuilder} />
-      </Route>
-      <Route path="/forms/fill/:versionId">
-        <PrivateRoute component={FormFill} />
-      </Route>
-      <Route path="/forms/submissions">
-        <PrivateRoute component={FormSubmissions} />
-      </Route>
-      <Route path="/">
-        <PrivateRoute component={Dashboard} />
-      </Route>
-      <Route path="/jobs">
-        <PrivateRoute component={Jobs} />
-      </Route>
-      <Route path="/jobs/:id">
-        <PrivateRoute component={JobDetail} />
-      </Route>
-      <Route path="/jobs/:id/sign-off">
-        <PrivateRoute component={SignOff} />
-      </Route>
+
+      <Route path="/app" nest>
+        <AppRoutes />
+      </Route>
+
       <Route component={NotFound} />
     </Switch>
   );

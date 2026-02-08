@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Zap, Building2, Users, Crown, ArrowLeft, X } from "lucide-react";
 import { Link } from "wouter";
+import PublicLayout from "@/components/public-layout";
 
 const tiers = [
   {
@@ -126,14 +127,9 @@ const moduleComparison = [
 
 export default function Pricing() {
   return (
+    <PublicLayout>
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900">
       <div className="container mx-auto px-4 py-8">
-        <Link href="/home">
-          <Button variant="ghost" className="mb-8" data-testid="link-back-home">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Home
-          </Button>
-        </Link>
 
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4" data-testid="text-pricing-title">
@@ -196,13 +192,15 @@ export default function Pricing() {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Button 
-                  className={`w-full ${tier.popular ? "" : ""}`}
-                  variant={tier.popular ? "default" : "outline"}
-                  data-testid={`button-cta-${tier.name.toLowerCase()}`}
-                >
-                  {tier.cta}
-                </Button>
+                <Link href={tier.name === "Enterprise" ? "/contact" : `/checkout?plan=${tier.name.toLowerCase()}`} className="w-full">
+                  <Button 
+                    className="w-full"
+                    variant={tier.popular ? "default" : "outline"}
+                    data-testid={`button-cta-${tier.name.toLowerCase()}`}
+                  >
+                    {tier.cta}
+                  </Button>
+                </Link>
               </CardFooter>
             </Card>
           ))}
@@ -311,5 +309,6 @@ export default function Pricing() {
         </div>
       </div>
     </div>
+    </PublicLayout>
   );
 }
