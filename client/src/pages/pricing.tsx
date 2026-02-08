@@ -120,23 +120,6 @@ const tiers = [
   },
 ];
 
-const featureComparison = [
-  { feature: "Users", free: "1", starter: "1 (+£15/user)", pro: "1 (+£12/user)", business: "1 (+£10/user)" },
-  { feature: "Job scheduling", free: "Included", starter: "Included", pro: "Included", business: "Included" },
-  { feature: "Client database", free: "Included", starter: "Included", pro: "Included", business: "Included" },
-  { feature: "Invoicing", free: "Unlimited", starter: "Included", pro: "Included", business: "Included" },
-  { feature: "Mobile app", free: "Basic", starter: "Full", pro: "Full", business: "Full" },
-  { feature: "Client portal", free: "—", starter: "Included", pro: "Included", business: "Included" },
-  { feature: "Payment processing", free: "—", starter: "Included", pro: "Included", business: "Included" },
-  { feature: "AI assistant", free: "—", starter: "Basic", pro: "Full", business: "Full" },
-  { feature: "Auto-assign postcode", free: "—", starter: "—", pro: "Included", business: "Included" },
-  { feature: "Integrations", free: "—", starter: "Included", pro: "Included", business: "Included" },
-  { feature: "Analytics", free: "—", starter: "Basic", pro: "Included", business: "Full Suite" },
-  { feature: "Fleet management", free: "—", starter: "—", pro: "—", business: "Included" },
-  { feature: "API access", free: "—", starter: "—", pro: "—", business: "Included" },
-  { feature: "Branding", free: "TrueNorth", starter: "Remove (+£10)", pro: "Removed", business: "Removed" },
-  { feature: "White-label", free: "—", starter: "+£10/mo", pro: "+£20/mo", business: "+£30/mo" },
-];
 
 const allIncluded = [
   "Secure UK cloud hosting",
@@ -238,36 +221,6 @@ export default function Pricing() {
               </CardFooter>
             </Card>
           ))}
-        </div>
-
-        <div className="max-w-6xl mx-auto mb-16">
-          <h2 className="text-2xl font-bold text-center mb-8" data-testid="text-feature-comparison">
-            Feature Comparison
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-4 font-semibold">Feature</th>
-                  <th className="text-center py-3 px-4 font-semibold">Free</th>
-                  <th className="text-center py-3 px-4 font-semibold">Starter</th>
-                  <th className="text-center py-3 px-4 font-semibold text-primary">Pro</th>
-                  <th className="text-center py-3 px-4 font-semibold">Business</th>
-                </tr>
-              </thead>
-              <tbody>
-                {featureComparison.map((row, idx) => (
-                  <tr key={idx} className="border-b">
-                    <td className="py-3 px-4 text-sm font-medium">{row.feature}</td>
-                    <td className="text-center py-3 px-4 text-sm text-muted-foreground">{row.free}</td>
-                    <td className="text-center py-3 px-4 text-sm text-muted-foreground">{row.starter}</td>
-                    <td className="text-center py-3 px-4 text-sm bg-primary/5">{row.pro}</td>
-                    <td className="text-center py-3 px-4 text-sm text-muted-foreground">{row.business}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </div>
 
         <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-2xl p-8 max-w-5xl mx-auto mb-16 border border-emerald-200 dark:border-emerald-800" data-testid="section-referral-programme">
