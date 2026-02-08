@@ -1,0 +1,127 @@
+// server/routes.ts (or server/routes/jobs.ts if you split them)
+import { jobs } from "./db/schema/jobs";
+import { eq } from "drizzle-orm";
+
+// helper: load job with evidence
+async function getJobWithEvidence(jobId: string) {
+  return db.query.jobs.findFirst({
+    where: eq(jobs.id, jobId),
+    with: {
+      formSubmissions: true,
+      // add relations you already have for photos, signatures, etc.
+      // e.g. photos: true,
+    },
+  });
+}
+
+async function runQualityGate(job: any, user: any) {
+  const missing = {
+    photos: [] as string[],
+    fields: [] as string[],
+    forms: [] as string[],
+    signatures: [] as string[],
+  };
+
+  // EXAMPLE RULES – adjust to your real field names
+
+  // Require at least 1 photo
+  if (!job.photos || job.photos.length < 1) {
+    missing.photos.push("At least 1 evidence photo");
+  }
+
+  // Require description and work_done fields with some length
+  if (!job.description || job.description.trim().length < 10) {
+    missing.fields.push("Job description (min 10 characters)");
+  }
+  if (!job.workDone || job.workDone.trim().length < 10) {
+    missing.fields.push("Work done (min 10 characters)");
+  }
+
+  // Require a specific form template if you want (optional)
+  // if (!job.formSubmissions.some(f => f.templateKey === "boiler_service")) {
+  //   missing.forms.push("Boiler service form");
+  // }
+
+  // Require engineer + customer signatures if your schema has them
+  if (!job.engineerSignature) {
+    missing.signatures.push("Engineer signature");
+  }
+  if (!job.customerSignature) {
+    missing.signatures.push("Customer signature");
+  }
+
+  const allMissing = [
+    ...missing.photos,
+    ...missing.fields,
+    ...missing.forms,
+    ...missing.signatures,
+  ];
+
+  if (allMissing.length === 0) {
+    return { ok: true, canOverride: false, missing };
+  }
+
+  const isAdmin = user.role === "admin" || user.role === "super_admin";
+
+  await db
+    .update(jobs)
+    .set({ completionBlockedReason: allMissing.join("; ") })
+    .where(eq(jobs.id, job.id));
+
+  return {
+    ok: false,
+    canOverride: isAdmin,
+    missing,
+    message: "Job failed Quality Gate checks",
+  };
+}
+
+// POST /api/jobs/:id/complete
+router.post("/api/jobs/:id/complete", requireAuth, async (req, res) => {
+  const jobId = req.params.id;
+  const user = req.user;
+
+  const job = await getJobWithEvidence(jobId);
+  if (!job) return res.status(404).json({ error: "JOB_NOT_FOUND" });
+
+  const result = await runQualityGate(job, user);
+
+  if (!result.ok && !result.canOverride) {
+    return res.status(400).json({
+      error: "QUALITY_GATE_FAILED",
+      message: result.message,
+      missing: result.missing,
+    });
+  }
+
+  if (!result.ok && result.canOverride && !req.body.override) {
+    return res.status(409).json({
+      error: "QUALITY_GATE_CAN_OVERRIDE",
+      message: result.message,
+      missing: result.missing,
+    });
+  }
+
+  if (!result.ok && result.canOverride && req.body.override) {
+    await db
+      .update(jobs)
+      .set({
+        qualityGateStatus: "overridden",
+        qualityOverrideBy: user.id,
+        qualityOverrideReason: req.body.overrideReason ?? null,
+      })
+      .where(eq(jobs.id, jobId));
+  } else {
+    await db
+      .update(jobs)
+      .set({ qualityGateStatus: "passed" })
+      .where(eq(jobs.id, jobId));
+  }
+
+  await db
+    .update(jobs)
+    .set({ status: "completed" })
+    .where(eq(jobs.id, jobId));
+
+  return res.json({ success: true });
+});

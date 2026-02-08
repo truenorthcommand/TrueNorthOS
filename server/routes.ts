@@ -1733,6 +1733,119 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== QUALITY GATE - JOB COMPLETION ====================
+
+  app.post("/api/jobs/:id/complete", requireAuth, async (req, res) => {
+    try {
+      const jobId = req.params.id;
+      const job = await storage.getJob(jobId);
+      if (!job) {
+        return res.status(404).json({ error: "JOB_NOT_FOUND" });
+      }
+
+      if (req.session.userRole === 'engineer') {
+        const assignedIds = (job.assignedToIds as string[]) || [];
+        const isAssigned = job.assignedToId === req.session.userId || assignedIds.includes(req.session.userId!);
+        if (!isAssigned) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+
+      if (job.status === 'Signed Off' || job.status === 'Completed') {
+        return res.status(400).json({ error: "Job is already completed" });
+      }
+
+      const missing: { photos: string[]; fields: string[]; forms: string[]; signatures: string[] } = {
+        photos: [],
+        fields: [],
+        forms: [],
+        signatures: [],
+      };
+
+      const photos = (job.photos as any[]) || [];
+      const engineerPhotos = photos.filter((p: any) => !p.source || p.source === 'engineer');
+      if (engineerPhotos.length < 1) {
+        missing.photos.push("At least 1 evidence photo");
+      }
+
+      if (!job.description || job.description.trim().length < 10) {
+        missing.fields.push("Job description (min 10 characters)");
+      }
+      if (!job.worksCompleted || job.worksCompleted.trim().length < 10) {
+        missing.fields.push("Works completed (min 10 characters)");
+      }
+
+      const sigs = (job.signatures as any[]) || [];
+      if (!sigs.some((s: any) => s.type === 'engineer')) {
+        missing.signatures.push("Engineer signature");
+      }
+      if (!sigs.some((s: any) => s.type === 'customer')) {
+        missing.signatures.push("Customer signature");
+      }
+
+      const allMissing = [
+        ...missing.photos,
+        ...missing.fields,
+        ...missing.forms,
+        ...missing.signatures,
+      ];
+
+      const isAdmin = req.session.userRole === 'admin' || req.session.userRole === 'super_admin';
+
+      if (allMissing.length > 0) {
+        await storage.updateJob(jobId, { completionBlockedReason: allMissing.join("; ") });
+
+        if (!isAdmin) {
+          return res.status(400).json({
+            error: "QUALITY_GATE_FAILED",
+            message: "Job failed Quality Gate checks",
+            missing,
+          });
+        }
+
+        if (!req.body.override) {
+          return res.status(409).json({
+            error: "QUALITY_GATE_CAN_OVERRIDE",
+            message: "Job failed Quality Gate checks",
+            missing,
+          });
+        }
+
+        await storage.updateJob(jobId, {
+          qualityGateStatus: "overridden",
+          qualityOverrideBy: req.session.userId!,
+          qualityOverrideReason: req.body.overrideReason ?? null,
+        });
+      } else {
+        await storage.updateJob(jobId, { qualityGateStatus: "passed" });
+      }
+
+      const completed = await storage.updateJob(jobId, { status: "Completed" });
+
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (currentUser) {
+        await logAuditEvent({
+          userId: currentUser.id,
+          userName: currentUser.name,
+          userEmail: currentUser.email || undefined,
+          userRole: currentUser.role,
+          actionType: "update",
+          actionCategory: "job",
+          entityType: "job",
+          entityId: jobId,
+          description: `Completed job ${job.jobNo} – quality gate: ${allMissing.length === 0 ? 'passed' : 'overridden'}`,
+          changesBefore: { status: job.status, qualityGateStatus: job.qualityGateStatus },
+          changesAfter: { status: "Completed", qualityGateStatus: allMissing.length === 0 ? "passed" : "overridden" },
+        });
+      }
+
+      return res.json({ success: true, job: completed });
+    } catch (error) {
+      console.error("[quality-gate] Error completing job:", error);
+      return res.status(500).json({ error: "Failed to complete job" });
+    }
+  });
+
   // ==================== JOB BLOCKING EXCEPTIONS ====================
   
   app.get("/api/jobs/:id/blocking-exceptions", requireAuth, async (req, res) => {
