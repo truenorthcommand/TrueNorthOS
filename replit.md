@@ -58,6 +58,7 @@ TrueNorth OS is built with a modern web stack.
 -   **Progressive Web App (PWA)**: Mobile-first design with offline capabilities.
 -   **File Storage**: Centralized file browser with AI-powered smart assignment and integration with Replit Object Storage.
 -   **Unified Clock In/Out System**: Dashboard-based time tracking that logs to both `time_logs` (for tracking) and `timesheets` (for finance) tables with geolocation capture.
+-   **Workflow Automation Engine**: Rules engine with typed conditions (job_status, time_elapsed, field_missing, priority, field_value) and actions (EscalateJob, NotifyUser, BlockCompletion, CreateTask, SendNotification, UpdateEntityField, CallWebhook, EmitEvent). Multi-condition builder UI, test-against-job functionality, execution log viewer with step details. Domain events queue worker processes rules automatically.
 
 ### Global AI Assistant Architecture (Jan 2026)
 The Global AI Assistant has been optimized for production readiness:

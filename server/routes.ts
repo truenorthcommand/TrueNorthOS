@@ -9011,6 +9011,86 @@ Be concise and practical. Focus on real issues that affect the business.`;
     }
   });
 
+  // Test/evaluate a rule against a specific job
+  app.post("/api/workflows/rules/:id/test", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { jobId } = req.body;
+
+      if (!jobId) {
+        return res.status(400).json({ error: "jobId is required" });
+      }
+
+      const { evaluateRuleAgainstJob } = await import("./workflow-runner");
+      const result = await evaluateRuleAgainstJob(id, jobId);
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error testing workflow rule:", error);
+      res.status(500).json({ error: error.message || "Failed to test rule" });
+    }
+  });
+
+  // Get execution logs for a specific execution
+  app.get("/api/workflows/executions/:id/logs", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const logs = await pool.query(`
+        SELECT id, execution_id as "executionId", step_index as "stepIndex", 
+               action_type as "actionType", input, output, status, 
+               error_message as "errorMessage", duration_ms as "durationMs",
+               created_at as "createdAt"
+        FROM workflow_logs
+        WHERE execution_id = $1
+        ORDER BY step_index ASC
+      `, [id]);
+      res.json(logs.rows);
+    } catch (error) {
+      console.error("Error fetching execution logs:", error);
+      res.status(500).json({ error: "Failed to fetch execution logs" });
+    }
+  });
+
+  // Manually trigger a rule against a job (actually runs the actions)
+  app.post("/api/workflows/rules/:id/trigger", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { jobId } = req.body;
+      const userId = req.session?.userId;
+
+      if (!jobId) {
+        return res.status(400).json({ error: "jobId is required" });
+      }
+
+      const rule = await storage.getWorkflowRule(id);
+      if (!rule) {
+        return res.status(404).json({ error: "Rule not found" });
+      }
+
+      const job = await storage.getJob(jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      const { emitEvent } = await import("./events");
+      const event = await emitEvent(rule.triggerType, {
+        ...job,
+        jobId: job.id,
+        manualTrigger: true,
+        triggeredBy: userId,
+      }, {
+        causedById: userId || undefined,
+        aggregateType: "job",
+        aggregateId: jobId,
+      });
+
+      res.json({ success: true, eventId: event.id, message: "Rule triggered and queued for processing" });
+    } catch (error: any) {
+      console.error("Error triggering workflow rule:", error);
+      res.status(500).json({ error: error.message || "Failed to trigger rule" });
+    }
+  });
+
   // ==================== ADD-ONS (BOLT-ON FEATURES) ====================
 
   // Get all available add-ons

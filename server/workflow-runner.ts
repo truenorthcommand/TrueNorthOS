@@ -10,7 +10,10 @@ interface TriggerCondition {
   field: string;
   operator: "equals" | "not_equals" | "contains" | "greater_than" | "less_than" | "is_empty" | "is_not_empty";
   value?: any;
+  type?: ConditionType;
 }
+
+type ConditionType = "job_status" | "time_elapsed" | "field_missing" | "priority" | "field_value";
 
 interface WorkflowAction {
   type: ActionType;
@@ -25,7 +28,10 @@ type ActionType =
   | "CreateJobFromQuote"
   | "BlockJobClosure"
   | "CallWebhook"
-  | "EmitEvent";
+  | "EmitEvent"
+  | "EscalateJob"
+  | "NotifyUser"
+  | "BlockCompletion";
 
 interface ActionContext {
   event: DomainEvent;
@@ -141,6 +147,11 @@ async function executeWorkflow(rule: WorkflowRule, event: DomainEvent): Promise<
 
 function evaluateConditions(conditions: Record<string, TriggerCondition>, payload: Record<string, any>): boolean {
   for (const [key, condition] of Object.entries(conditions)) {
+    if (condition.type) {
+      if (!evaluateTypedCondition(condition, payload)) return false;
+      continue;
+    }
+
     const value = getNestedValue(payload, condition.field);
     
     switch (condition.operator) {
@@ -170,6 +181,60 @@ function evaluateConditions(conditions: Record<string, TriggerCondition>, payloa
   return true;
 }
 
+function evaluateTypedCondition(condition: TriggerCondition, payload: Record<string, any>): boolean {
+  switch (condition.type) {
+    case "job_status": {
+      const currentStatus = payload.status || payload.newStatus;
+      if (condition.operator === "equals") return currentStatus === condition.value;
+      if (condition.operator === "not_equals") return currentStatus !== condition.value;
+      if (condition.operator === "contains") return String(currentStatus).toLowerCase().includes(String(condition.value).toLowerCase());
+      return false;
+    }
+
+    case "time_elapsed": {
+      const createdAt = payload.createdAt ? new Date(payload.createdAt).getTime() : null;
+      if (!createdAt) return false;
+      const elapsed = Date.now() - createdAt;
+      const hours = elapsed / (1000 * 60 * 60);
+      const threshold = Number(condition.value);
+      if (condition.operator === "greater_than") return hours > threshold;
+      if (condition.operator === "less_than") return hours < threshold;
+      if (condition.operator === "equals") return Math.floor(hours) === threshold;
+      return false;
+    }
+
+    case "field_missing": {
+      const fieldName = condition.value || condition.field;
+      const fieldValue = getNestedValue(payload, fieldName);
+      return !fieldValue || fieldValue === "" || (Array.isArray(fieldValue) && fieldValue.length === 0);
+    }
+
+    case "priority": {
+      const jobPriority = payload.urgency || payload.priority;
+      if (condition.operator === "equals") return jobPriority === condition.value;
+      if (condition.operator === "not_equals") return jobPriority !== condition.value;
+      return false;
+    }
+
+    case "field_value": {
+      const value = getNestedValue(payload, condition.field);
+      switch (condition.operator) {
+        case "equals": return value === condition.value;
+        case "not_equals": return value !== condition.value;
+        case "contains": return String(value).toLowerCase().includes(String(condition.value).toLowerCase());
+        case "greater_than": return Number(value) > Number(condition.value);
+        case "less_than": return Number(value) < Number(condition.value);
+        case "is_empty": return !value || value === "";
+        case "is_not_empty": return !!value && value !== "";
+        default: return false;
+      }
+    }
+
+    default:
+      return false;
+  }
+}
+
 function getNestedValue(obj: Record<string, any>, path: string): any {
   return path.split(".").reduce((current, key) => current?.[key], obj);
 }
@@ -196,6 +261,12 @@ async function executeAction(
       return await actionCallWebhook(config, context);
     case "EmitEvent":
       return await actionEmitEvent(config, context);
+    case "EscalateJob":
+      return await actionEscalateJob(config, context);
+    case "NotifyUser":
+      return await actionNotifySpecificUser(config, context);
+    case "BlockCompletion":
+      return await actionBlockCompletion(config, context);
     default:
       throw new Error(`Unknown action type: ${type}`);
   }
@@ -414,6 +485,182 @@ async function actionEmitEvent(config: Record<string, any>, context: ActionConte
   console.log(`[Workflow Action] EmitEvent: ${eventType} -> ${event.id}`);
   
   return { success: true, eventId: event.id, eventType };
+}
+
+async function actionEscalateJob(config: Record<string, any>, context: ActionContext): Promise<Record<string, any>> {
+  const { escalateTo, reason, jobId } = config;
+
+  const resolvedJobId = resolveTemplate(jobId || "{{jobId}}", context.payload);
+  const resolvedReason = resolveTemplate(reason || "Escalated by automation rule: {{ruleName}}", { ...context.payload, ruleName: context.rule.name });
+  const resolvedEscalateTo = resolveTemplate(escalateTo || "", context.payload);
+
+  const job = resolvedJobId ? await storage.getJob(resolvedJobId) : null;
+
+  if (resolvedEscalateTo) {
+    await storage.updateJob(resolvedJobId, { assignedToId: resolvedEscalateTo, urgency: "urgent" });
+    await notifyUser(resolvedEscalateTo, {
+      type: "job_escalated",
+      title: "Job Escalated to You",
+      message: `Job ${job?.jobNo || resolvedJobId} has been escalated: ${resolvedReason}`,
+      jobId: resolvedJobId,
+      jobNo: job?.jobNo,
+      urgent: true,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  await notifyAdmins({
+    type: "job_escalated",
+    title: "Job Escalated",
+    message: `Job ${job?.jobNo || resolvedJobId} escalated: ${resolvedReason}`,
+    jobId: resolvedJobId,
+    jobNo: job?.jobNo,
+    urgent: true,
+    timestamp: new Date().toISOString(),
+  });
+
+  await createException({
+    type: "job_escalated",
+    severity: "warning",
+    title: `Job ${job?.jobNo || resolvedJobId} escalated`,
+    message: resolvedReason,
+    entityType: "job",
+    entityId: resolvedJobId,
+    context: { workflowExecutionId: context.execution.id, escalateTo: resolvedEscalateTo },
+  });
+
+  console.log(`[Workflow Action] EscalateJob: ${resolvedJobId} -> ${resolvedEscalateTo || "admins"}`);
+
+  return { success: true, jobId: resolvedJobId, escalateTo: resolvedEscalateTo, reason: resolvedReason };
+}
+
+async function actionNotifySpecificUser(config: Record<string, any>, context: ActionContext): Promise<Record<string, any>> {
+  const { userId, message, channel, urgent } = config;
+
+  const resolvedUserId = resolveTemplate(userId || "", context.payload);
+  const resolvedMessage = resolveTemplate(message || "Automated notification from {{ruleName}}", { ...context.payload, ruleName: context.rule.name });
+  const jobId = context.payload.jobId || context.payload.id;
+  const job = jobId ? await storage.getJob(jobId) : null;
+
+  if (resolvedUserId === "admins" || !resolvedUserId) {
+    const count = await notifyAdmins({
+      type: "workflow_notification",
+      title: "Automation Alert",
+      message: resolvedMessage,
+      jobId,
+      jobNo: job?.jobNo,
+      urgent: !!urgent,
+      timestamp: new Date().toISOString(),
+    });
+    return { success: true, recipients: "admins", count, message: resolvedMessage };
+  }
+
+  const count = await notifyUser(resolvedUserId, {
+    type: "workflow_notification",
+    title: "Automation Alert",
+    message: resolvedMessage,
+    jobId,
+    jobNo: job?.jobNo,
+    urgent: !!urgent,
+    timestamp: new Date().toISOString(),
+  });
+
+  console.log(`[Workflow Action] NotifyUser: ${resolvedUserId} -> "${resolvedMessage}"`);
+
+  return { success: true, recipients: resolvedUserId, count, message: resolvedMessage };
+}
+
+async function actionBlockCompletion(config: Record<string, any>, context: ActionContext): Promise<Record<string, any>> {
+  const { reason, jobId } = config;
+
+  const resolvedJobId = resolveTemplate(jobId || "{{jobId}}", context.payload);
+  const resolvedReason = resolveTemplate(reason || "Blocked by automation rule: {{ruleName}}", { ...context.payload, ruleName: context.rule.name });
+
+  await db.update(jobs)
+    .set({ completionBlockedReason: resolvedReason })
+    .where(eq(jobs.id, resolvedJobId));
+
+  const job = await storage.getJob(resolvedJobId);
+
+  await createException({
+    type: "job_completion_blocked",
+    severity: "warning",
+    title: `Job ${job?.jobNo || resolvedJobId} completion blocked`,
+    message: resolvedReason,
+    entityType: "job",
+    entityId: resolvedJobId,
+    context: { workflowExecutionId: context.execution.id },
+  });
+
+  await notifyAdmins({
+    type: "job_blocked",
+    title: "Job Completion Blocked",
+    message: `${job?.jobNo || resolvedJobId}: ${resolvedReason}`,
+    jobId: resolvedJobId,
+    jobNo: job?.jobNo,
+    urgent: true,
+    timestamp: new Date().toISOString(),
+  });
+
+  console.log(`[Workflow Action] BlockCompletion: ${resolvedJobId} -> "${resolvedReason}"`);
+
+  return { success: true, jobId: resolvedJobId, reason: resolvedReason };
+}
+
+export async function evaluateRuleAgainstJob(ruleId: string, jobId: string): Promise<{
+  matches: boolean;
+  conditionResults: { field: string; type: string; result: boolean; actual: any; expected: any }[];
+}> {
+  const rule = await storage.getWorkflowRule(ruleId);
+  if (!rule) throw new Error("Rule not found");
+
+  const job = await storage.getJob(jobId);
+  if (!job) throw new Error("Job not found");
+
+  const conditions = (rule.triggerConditions || {}) as Record<string, TriggerCondition>;
+  const payload = job as unknown as Record<string, any>;
+  const results: { field: string; type: string; result: boolean; actual: any; expected: any }[] = [];
+
+  let allMatch = true;
+  for (const [key, condition] of Object.entries(conditions)) {
+    let result: boolean;
+    let actual: any;
+
+    if (condition.type) {
+      result = evaluateTypedCondition(condition, payload);
+      switch (condition.type) {
+        case "job_status":
+          actual = payload.status;
+          break;
+        case "time_elapsed":
+          actual = payload.createdAt ? Math.round((Date.now() - new Date(payload.createdAt).getTime()) / (1000 * 60 * 60)) + "h" : "N/A";
+          break;
+        case "field_missing":
+          actual = getNestedValue(payload, condition.value || condition.field);
+          break;
+        case "priority":
+          actual = payload.urgency || payload.priority;
+          break;
+        default:
+          actual = getNestedValue(payload, condition.field);
+      }
+    } else {
+      actual = getNestedValue(payload, condition.field);
+      result = evaluateConditions({ [key]: condition }, payload);
+    }
+
+    results.push({
+      field: condition.field || condition.value || key,
+      type: condition.type || "field_value",
+      result,
+      actual,
+      expected: condition.value,
+    });
+
+    if (!result) allMatch = false;
+  }
+
+  return { matches: allMatch, conditionResults: results };
 }
 
 function resolveTemplate(template: string, payload: Record<string, any>): string {
