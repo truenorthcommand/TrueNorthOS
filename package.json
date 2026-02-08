@@ -85,7 +85,7 @@
     "html5-qrcode": "^2.3.8",
     "input-otp": "^1.4.2",
     "isomorphic-dompurify": "^3.0.0-rc.2",
-    "jspdf": "^4.0.0",
+    "jspdf": "^4.1.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.545.0",
     "memoizee": "^0.4.17",
@@ -149,5 +149,10 @@
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
+  },
+  "overrides": {
+    "fast-xml-parser": ">=5.3.4",
+    "form-data": ">=2.5.4",
+    "qs": ">=6.14.1"
   }
 }
