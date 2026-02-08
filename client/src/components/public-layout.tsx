@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
-import { GlobalAIAssistant } from "@/components/GlobalAIAssistant";
+import { PublicChatbot } from "@/components/PublicChatbot";
 
 function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -209,7 +209,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       <Header />
       <main className="flex-1">{children}</main>
       <Footer />
-      <GlobalAIAssistant />
+      <PublicChatbot />
     </div>
   );
 }
