@@ -110,6 +110,10 @@ export default function JobDetail() {
   const [scanDialogOpen, setScanDialogOpen] = useState(false);
   const [scanResult, setScanResult] = useState<{ code: string; parsed: { type: string; id: string } | null } | null>(null);
 
+  // Quality Gate state
+  const [qualityError, setQualityError] = useState<any | null>(null);
+  const [overrideReason, setOverrideReason] = useState("");
+
   const handleJobScanSuccess = (code: string) => {
     const parsed = parseTrueNorthCode(code);
     setScanResult({ code, parsed });
@@ -258,6 +262,41 @@ export default function JobDetail() {
       toast({ title: "Failed to save file", description: error.message, variant: "destructive" });
     },
   });
+
+  const completeJobMutation = useMutation({
+    mutationFn: async (payload: { override?: boolean; overrideReason?: string }) => {
+      const res = await apiRequest("POST", `/api/jobs/${jobId}/complete`, payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      setQualityError(null);
+      setOverrideReason("");
+      refreshJobs();
+      queryClient.invalidateQueries({ queryKey: [`/api/jobs/${jobId}/blocking-exceptions`] });
+      toast({ title: "Job completed", description: "Quality Gate passed — job marked as Completed." });
+    },
+    onError: async (error: any) => {
+      try {
+        const raw = error.message?.replace(/^\d+:\s*/, "") || "{}";
+        const body = JSON.parse(raw);
+        if (body.error === "QUALITY_GATE_FAILED" || body.error === "QUALITY_GATE_CAN_OVERRIDE") {
+          setQualityError(body);
+          return;
+        }
+        toast({ title: "Cannot complete job", description: body.error || body.message, variant: "destructive" });
+      } catch {
+        toast({ title: "Cannot complete job", description: error.message, variant: "destructive" });
+      }
+    },
+  });
+
+  const handleCompleteJob = () => completeJobMutation.mutate({});
+
+  const handleOverrideComplete = () => {
+    completeJobMutation.mutate({ override: true, overrideReason: overrideReason || undefined });
+  };
+
+  const canOverride = user?.role === "admin" || user?.superAdmin === true;
 
   const { uploadFile: uploadJobFile, isUploading: isUploadingJobFile, progress: uploadProgress } = useUpload({
     onSuccess: async (response) => {
@@ -853,6 +892,22 @@ export default function JobDetail() {
             Scan
           </Button>
           
+          {job.status !== "Signed Off" && (job.status as string) !== "Completed" && (
+            <Button
+              className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700"
+              onClick={handleCompleteJob}
+              disabled={completeJobMutation.isPending}
+              data-testid="button-complete-job"
+            >
+              {completeJobMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <FileCheck className="mr-2 h-4 w-4" />
+              )}
+              Complete Job
+            </Button>
+          )}
+
           {job.status !== "Signed Off" && (
             <Link href={`/jobs/${job.id}/sign-off`}>
               <Button 
@@ -2300,6 +2355,89 @@ export default function JobDetail() {
                   Done
                 </Button>
               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Quality Gate Dialog */}
+      <Dialog open={!!qualityError} onOpenChange={(open) => { if (!open) { setQualityError(null); setOverrideReason(""); } }}>
+        <DialogContent className="sm:max-w-lg" data-testid="dialog-quality-gate">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" />
+              Quality Gate — Items Missing
+            </DialogTitle>
+            <DialogDescription>
+              The following items must be completed before this job can be marked as done.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            {qualityError?.missing?.photos?.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-1">Photos</p>
+                <ul className="list-disc list-inside text-sm text-muted-foreground">
+                  {qualityError.missing.photos.map((item: string, i: number) => <li key={i}>{item}</li>)}
+                </ul>
+              </div>
+            )}
+            {qualityError?.missing?.fields?.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-1">Required Fields</p>
+                <ul className="list-disc list-inside text-sm text-muted-foreground">
+                  {qualityError.missing.fields.map((item: string, i: number) => <li key={i}>{item}</li>)}
+                </ul>
+              </div>
+            )}
+            {qualityError?.missing?.signatures?.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-1">Signatures</p>
+                <ul className="list-disc list-inside text-sm text-muted-foreground">
+                  {qualityError.missing.signatures.map((item: string, i: number) => <li key={i}>{item}</li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {canOverride && qualityError?.error === "QUALITY_GATE_CAN_OVERRIDE" && (
+            <div className="border-t pt-4 space-y-3">
+              <p className="text-sm font-medium">Admin Override</p>
+              <p className="text-xs text-muted-foreground">
+                As an admin you can override the Quality Gate. Please provide a reason — this will be recorded in the audit log.
+              </p>
+              <Textarea
+                placeholder="Reason for override…"
+                value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)}
+                className="min-h-[80px]"
+                data-testid="input-override-reason"
+              />
+              <Button
+                className="w-full bg-amber-600 hover:bg-amber-700"
+                onClick={handleOverrideComplete}
+                disabled={completeJobMutation.isPending}
+                data-testid="button-override-complete"
+              >
+                {completeJobMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                )}
+                Override & Complete
+              </Button>
+            </div>
+          )}
+
+          {qualityError && !qualityError?.missing?.photos?.length && !qualityError?.missing?.fields?.length && !qualityError?.missing?.signatures?.length && (
+            <p className="text-sm text-muted-foreground py-2">{qualityError.message || "Some quality checks were not met."}</p>
+          )}
+
+          {!canOverride && (
+            <div className="border-t pt-4">
+              <p className="text-sm text-muted-foreground">
+                Please complete the missing items above, then try again. Contact an admin if you need an override.
+              </p>
             </div>
           )}
         </DialogContent>
