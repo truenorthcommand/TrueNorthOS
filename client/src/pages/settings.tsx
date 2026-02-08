@@ -5,7 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Save, Building, CreditCard, FileText, Loader2, RefreshCw, Smartphone, Database, Send, AlertTriangle, CheckCircle, Info } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Save, Building, CreditCard, FileText, Loader2, RefreshCw, Smartphone, Database, Send, AlertTriangle, CheckCircle, Info, Zap, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 
@@ -52,6 +54,13 @@ export default function Settings() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [healthIssues, setHealthIssues] = useState<HealthIssue[]>([]);
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+
+  const [quickRules, setQuickRules] = useState<any[]>([]);
+  const [isLoadingRules, setIsLoadingRules] = useState(false);
+  const [isSavingRule, setIsSavingRule] = useState(false);
+  const [ruleCondition, setRuleCondition] = useState("");
+  const [ruleAction, setRuleAction] = useState("");
+  const [ruleName, setRuleName] = useState("");
 
   const [settings, setSettings] = useState<CompanySettings>({
     companyName: "",
@@ -229,6 +238,96 @@ export default function Settings() {
       toast({ title: "Error", description: "Failed to check database health", variant: "destructive" });
     } finally {
       setIsCheckingHealth(false);
+    }
+  };
+
+  const fetchQuickRules = async () => {
+    setIsLoadingRules(true);
+    try {
+      const res = await fetch("/api/workflows/rules", { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setQuickRules(data || []);
+      }
+    } catch (error) {
+      // silently fail
+    } finally {
+      setIsLoadingRules(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.role === "admin" || user?.superAdmin) {
+      fetchQuickRules();
+    }
+  }, [user]);
+
+  const conditionMap: Record<string, { type: string; operator: string; value: string; label: string }> = {
+    job_stalled: { type: "time_elapsed", operator: "greater_than", value: "24", label: "Job stalled for 24+ hours" },
+    field_missing: { type: "field_missing", operator: "equals", value: "assignedToId", label: "Required field missing" },
+    priority_high: { type: "priority", operator: "equals", value: "urgent", label: "High priority job created" },
+  };
+
+  const actionMap: Record<string, { type: string; config: any; label: string }> = {
+    escalate: { type: "EscalateJob", config: { reason: "Auto-escalated by automation rule" }, label: "Escalate to manager" },
+    notify: { type: "SendNotification", config: { message: "Automation alert triggered" }, label: "Send notification" },
+    block: { type: "BlockCompletion", config: { reason: "Blocked by automation rule" }, label: "Block completion" },
+  };
+
+  const saveQuickRule = async () => {
+    if (!ruleCondition || !ruleAction) {
+      toast({ title: "Missing Fields", description: "Please select both a condition and an action.", variant: "destructive" });
+      return;
+    }
+
+    const cond = conditionMap[ruleCondition];
+    const act = actionMap[ruleAction];
+    const name = ruleName.trim() || `${cond.label} → ${act.label}`;
+
+    setIsSavingRule(true);
+    try {
+      const res = await fetch("/api/workflows/rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name,
+          description: `Quick rule: ${cond.label} → ${act.label}`,
+          triggerType: ruleCondition === "priority_high" ? "job_created" : "job_status_changed",
+          conditions: [{ type: cond.type, operator: cond.operator, value: cond.value }],
+          actions: [{ type: act.type, config: act.config }],
+          isActive: true,
+          priority: 10,
+        }),
+      });
+
+      if (res.ok) {
+        toast({ title: "Rule Created", description: `"${name}" has been saved.` });
+        setRuleCondition("");
+        setRuleAction("");
+        setRuleName("");
+        fetchQuickRules();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: "Error", description: err.error || "Failed to save rule", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to save rule", variant: "destructive" });
+    } finally {
+      setIsSavingRule(false);
+    }
+  };
+
+  const deleteQuickRule = async (ruleId: string) => {
+    if (!confirm("Delete this automation rule?")) return;
+    try {
+      const res = await fetch(`/api/workflows/rules/${ruleId}`, { method: "DELETE", credentials: "include" });
+      if (res.ok) {
+        toast({ title: "Rule Deleted" });
+        fetchQuickRules();
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete rule", variant: "destructive" });
     }
   };
 
@@ -438,6 +537,103 @@ export default function Settings() {
           </div>
         </CardContent>
       </Card>
+
+      {(user?.role === "admin" || user?.superAdmin) && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="w-5 h-5" />
+                Automation Rules
+              </CardTitle>
+              <Badge variant="secondary" data-testid="badge-ops-pro">Ops Pro Feature</Badge>
+            </div>
+            <CardDescription>Set up quick automation rules to handle common scenarios</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Rule Name (optional)</Label>
+                <Input
+                  value={ruleName}
+                  onChange={(e) => setRuleName(e.target.value)}
+                  placeholder="e.g. Escalate stalled jobs"
+                  data-testid="input-quick-rule-name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>When...</Label>
+                <Select value={ruleCondition} onValueChange={setRuleCondition}>
+                  <SelectTrigger data-testid="select-rule-condition">
+                    <SelectValue placeholder="Select a trigger condition..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="job_stalled">Job stalled for 24+ hours</SelectItem>
+                    <SelectItem value="field_missing">Required field missing</SelectItem>
+                    <SelectItem value="priority_high">High priority job created</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Then...</Label>
+                <Select value={ruleAction} onValueChange={setRuleAction}>
+                  <SelectTrigger data-testid="select-rule-action">
+                    <SelectValue placeholder="Select an action..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="escalate">Escalate to manager</SelectItem>
+                    <SelectItem value="notify">Send notification</SelectItem>
+                    <SelectItem value="block">Block completion</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button
+                onClick={saveQuickRule}
+                disabled={isSavingRule || !ruleCondition || !ruleAction}
+                className="w-full"
+                data-testid="button-save-quick-rule"
+              >
+                {isSavingRule ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                Save Rule
+              </Button>
+
+              {quickRules.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground text-xs uppercase tracking-wide">Active Rules ({quickRules.length})</Label>
+                    {quickRules.map((rule: any) => (
+                      <div key={rule.id} className="flex items-center justify-between p-3 bg-muted rounded-lg" data-testid={`rule-item-${rule.id}`}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{rule.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{rule.description}</p>
+                        </div>
+                        <div className="flex items-center gap-2 ml-2">
+                          <Badge variant={rule.isActive ? "default" : "outline"} className="text-xs">
+                            {rule.isActive ? "Active" : "Disabled"}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => deleteQuickRule(rule.id)}
+                            data-testid={`button-delete-rule-${rule.id}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {user?.superAdmin && (
         <Card>
