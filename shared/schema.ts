@@ -1425,18 +1425,14 @@ export const insertSubscriptionAddOnSchema = createInsertSchema(subscriptionAddO
 export type InsertSubscriptionAddOn = z.infer<typeof insertSubscriptionAddOnSchema>;
 export type SubscriptionAddOn = typeof subscriptionAddOns.$inferSelect;
 
-// ==================== REFERRAL SYSTEM ====================
+// ==================== REFERRAL & MERCHANT SYSTEM ====================
 
 export const referralCodes = pgTable("referral_codes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  code: text("code").notNull().unique(),
-  ownerId: varchar("owner_id"),
-  companyName: text("company_name"),
-  qrCodeUrl: text("qr_code_url"),
-  isActive: boolean("is_active").notNull().default(true),
-  totalReferrals: integer("total_referrals").default(0),
-  successfulReferrals: integer("successful_referrals").default(0),
-  totalEarnings: doublePrecision("total_earnings").default(0),
+  ownerType: varchar("owner_type").notNull(), // 'customer' | 'merchant'
+  ownerId: varchar("owner_id").notNull(),
+  code: varchar("code").notNull().unique(),
+  landingType: varchar("landing_type").notNull(), // 'customer' | 'merchant'
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1444,79 +1440,94 @@ export const insertReferralCodeSchema = createInsertSchema(referralCodes).omit({
   id: true,
   createdAt: true,
 });
-
 export type InsertReferralCode = z.infer<typeof insertReferralCodeSchema>;
 export type ReferralCode = typeof referralCodes.$inferSelect;
 
-export const referrals = pgTable("referrals", {
+export const referralEvents = pgTable("referral_events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   referralCodeId: varchar("referral_code_id").notNull(),
-  referrerId: varchar("referrer_id"),
-  referredEmail: text("referred_email"),
-  referredUserId: varchar("referred_user_id"),
-  status: text("status").notNull().default("pending"),
-  convertedAt: timestamp("converted_at"),
-  subscriptionValue: doublePrecision("subscription_value"),
-  commissionEarned: doublePrecision("commission_earned"),
-  createdAt: timestamp("created_at").defaultNow(),
+  scannedAt: timestamp("scanned_at").defaultNow(),
+  ipHash: varchar("ip_hash").notNull(),
+  userAgentHash: varchar("user_agent_hash").notNull(),
+  geoCountry: varchar("geo_country"),
 });
 
-export const insertReferralSchema = createInsertSchema(referrals).omit({
+export const insertReferralEventSchema = createInsertSchema(referralEvents).omit({
   id: true,
-  createdAt: true,
+  scannedAt: true,
 });
+export type InsertReferralEvent = z.infer<typeof insertReferralEventSchema>;
+export type ReferralEvent = typeof referralEvents.$inferSelect;
 
-export type InsertReferral = z.infer<typeof insertReferralSchema>;
-export type Referral = typeof referrals.$inferSelect;
-
-export const referralRewards = pgTable("referral_rewards", {
+export const referralConversions = pgTable("referral_conversions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   referralCodeId: varchar("referral_code_id").notNull(),
-  rewardType: text("reward_type").notNull(),
-  rewardValue: doublePrecision("reward_value"),
-  description: text("description"),
-  status: text("status").notNull().default("pending"),
-  expiresAt: timestamp("expires_at"),
-  claimedAt: timestamp("claimed_at"),
-  appliedToSubscriptionId: varchar("applied_to_subscription_id"),
+  referredUserId: varchar("referred_user_id").notNull(),
+  status: varchar("status").notNull().default("pending"), // 'pending' | 'qualified' | 'disqualified'
+  qualifiedAt: timestamp("qualified_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertReferralRewardSchema = createInsertSchema(referralRewards).omit({
+export const insertReferralConversionSchema = createInsertSchema(referralConversions).omit({
   id: true,
   createdAt: true,
 });
+export type InsertReferralConversion = z.infer<typeof insertReferralConversionSchema>;
+export type ReferralConversion = typeof referralConversions.$inferSelect;
 
-export type InsertReferralReward = z.infer<typeof insertReferralRewardSchema>;
-export type ReferralReward = typeof referralRewards.$inferSelect;
-
-export const referralTiers = pgTable("referral_tiers", {
+export const reviewRewards = pgTable("review_rewards", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  requiredReferrals: integer("required_referrals").notNull(),
-  rewardType: text("reward_type").notNull(),
-  rewardValue: doublePrecision("reward_value").notNull(),
-  rewardDescription: text("reward_description"),
-  isActive: boolean("is_active").notNull().default(true),
-  displayOrder: integer("display_order").default(0),
+  userId: varchar("user_id").notNull(),
+  type: varchar("type").notNull(), // 'google' | 'trustpilot' | 'g2' | 'linkedin' | 'video' | 'case_study'
+  valueType: varchar("value_type").notNull(), // 'percent' | 'fixed'
+  value: doublePrecision("value").notNull(),
+  active: boolean("active").notNull().default(true),
+  verifiedAt: timestamp("verified_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertReferralTierSchema = createInsertSchema(referralTiers).omit({
+export const insertReviewRewardSchema = createInsertSchema(reviewRewards).omit({
   id: true,
   createdAt: true,
 });
+export type InsertReviewReward = z.infer<typeof insertReviewRewardSchema>;
+export type ReviewReward = typeof reviewRewards.$inferSelect;
 
-export type InsertReferralTier = z.infer<typeof insertReferralTierSchema>;
-export type ReferralTier = typeof referralTiers.$inferSelect;
+export const merchants = pgTable("merchants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  slug: varchar("slug").notNull().unique(),
+  email: text("email"),
+  password: text("password"),
+  payoutMethod: varchar("payout_method").notNull(), // 'bank' | 'credit'
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
-export type RewardType = 
-  | "percentage_discount"
-  | "fixed_discount"
-  | "free_month"
-  | "free_addon"
-  | "tier_upgrade"
-  | "commission";
+export const insertMerchantSchema = createInsertSchema(merchants).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertMerchant = z.infer<typeof insertMerchantSchema>;
+export type Merchant = typeof merchants.$inferSelect;
+
+export const merchantEarnings = pgTable("merchant_earnings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  merchantId: varchar("merchant_id").notNull(),
+  sourceUserId: varchar("source_user_id").notNull(),
+  amount: doublePrecision("amount").notNull(),
+  type: varchar("type").notNull(), // 'signup_bonus' | 'recurring_commission'
+  periodMonth: varchar("period_month").notNull(), // YYYY-MM
+  paid: boolean("paid").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMerchantEarningSchema = createInsertSchema(merchantEarnings).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertMerchantEarning = z.infer<typeof insertMerchantEarningSchema>;
+export type MerchantEarning = typeof merchantEarnings.$inferSelect;
 
 // Export OAuth sessions table from auth module
 export * from "./models/auth";
