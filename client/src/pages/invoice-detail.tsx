@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Send, CheckCircle, Copy, ExternalLink, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, CheckCircle, Copy, ExternalLink, Loader2, CloudUpload } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -44,6 +44,7 @@ export default function InvoiceDetail() {
 
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncingQB, setIsSyncingQB] = useState(false);
 
   useEffect(() => {
     fetchInvoice();
@@ -112,6 +113,28 @@ export default function InvoiceDetail() {
     toast({ title: "Copied", description: "Client link copied to clipboard" });
   };
 
+  const syncToQuickBooks = async () => {
+    if (!invoice) return;
+    setIsSyncingQB(true);
+    try {
+      const res = await fetch(`/api/integrations/quickbooks/sync-invoice/${invoice.id}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast({ title: "Synced to QuickBooks", description: `Invoice pushed successfully (QB ID: ${data.qbInvoiceId})` });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast({ title: "Sync Failed", description: data.error || "Could not sync to QuickBooks", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to sync invoice to QuickBooks", variant: "destructive" });
+    } finally {
+      setIsSyncingQB(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -143,6 +166,19 @@ export default function InvoiceDetail() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={syncToQuickBooks}
+            disabled={isSyncingQB}
+            data-testid="button-sync-quickbooks"
+          >
+            {isSyncingQB ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <CloudUpload className="w-4 h-4 mr-2" />
+            )}
+            Sync to QB
+          </Button>
           {invoice.status === "Draft" && (
             <Button onClick={markAsSent}>
               <Send className="w-4 h-4 mr-2" />

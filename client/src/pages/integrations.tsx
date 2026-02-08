@@ -64,8 +64,22 @@ export default function Integrations() {
     { type: 'Payments', lastSync: null, itemsSynced: 0, status: 'never' },
   ]);
 
+  const [qbConnected, setQbConnected] = useState(false);
+  const [qbConnecting, setQbConnecting] = useState(false);
+
   useEffect(() => {
     fetchXeroStatus();
+    fetchQuickBooksStatus();
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("qb") === "connected") {
+      toast({ title: "QuickBooks Connected", description: "Your QuickBooks account has been linked successfully." });
+      setQbConnected(true);
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (params.get("qb") === "error") {
+      toast({ title: "Connection Failed", description: "Could not connect to QuickBooks. Please try again.", variant: "destructive" });
+      window.history.replaceState({}, '', window.location.pathname);
+    }
   }, []);
 
   const fetchXeroStatus = async () => {
@@ -127,6 +141,50 @@ export default function Integrations() {
       toast({ title: "Error", description: "Failed to sync with Xero", variant: "destructive" });
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const fetchQuickBooksStatus = async () => {
+    try {
+      const res = await fetch("/api/integrations/quickbooks/status", { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setQbConnected(data.connected);
+      }
+    } catch (error) {
+      console.error("Error fetching QuickBooks status:", error);
+    }
+  };
+
+  const handleConnectQuickBooks = async () => {
+    setQbConnecting(true);
+    try {
+      const res = await fetch("/api/integrations/quickbooks/connect", { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        window.location.href = data.uri;
+      } else {
+        toast({ title: "Error", description: "Could not generate QuickBooks connection link. Check your API credentials.", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to initiate QuickBooks connection", variant: "destructive" });
+    } finally {
+      setQbConnecting(false);
+    }
+  };
+
+  const handleDisconnectQuickBooks = async () => {
+    try {
+      const res = await fetch("/api/integrations/quickbooks/disconnect", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.ok) {
+        setQbConnected(false);
+        toast({ title: "Disconnected", description: "QuickBooks integration has been disconnected." });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to disconnect QuickBooks", variant: "destructive" });
     }
   };
 
@@ -366,6 +424,99 @@ export default function Integrations() {
                     {getStatusBadge(status.status)}
                   </div>
                 ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* QuickBooks Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-lg bg-[#2CA01C] flex items-center justify-center">
+                  <span className="text-white font-bold text-lg">QB</span>
+                </div>
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    QuickBooks Online
+                    {qbConnected ? (
+                      <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Connected
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary">Not connected</Badge>
+                    )}
+                  </CardTitle>
+                  <CardDescription>
+                    Sync invoices, customers, and payments with QuickBooks Online
+                  </CardDescription>
+                </div>
+              </div>
+              {qbConnected ? (
+                <Button
+                  variant="outline"
+                  onClick={handleDisconnectQuickBooks}
+                  data-testid="button-disconnect-quickbooks"
+                >
+                  <Link2Off className="h-4 w-4 mr-2" />
+                  Disconnect
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleConnectQuickBooks}
+                  disabled={qbConnecting}
+                  style={{ backgroundColor: '#2CA01C' }}
+                  data-testid="button-connect-quickbooks"
+                >
+                  {qbConnecting ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Link2 className="h-4 w-4 mr-2" />
+                  )}
+                  Connect QuickBooks
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium" style={{ color: NAVY_PRIMARY }}>What Gets Synced</h4>
+                  <ul className="space-y-2 text-sm text-gray-600">
+                    <li className="flex items-start gap-2">
+                      <ArrowRight className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>Invoices pushed to QuickBooks with line items &amp; VAT</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ArrowRight className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>Customers auto-created or matched by name</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ArrowRight className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>Payments recorded against synced invoices</span>
+                    </li>
+                  </ul>
+                </div>
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium" style={{ color: NAVY_PRIMARY }}>Requirements</h4>
+                  <ul className="space-y-2 text-sm text-gray-600">
+                    <li className="flex items-start gap-2">
+                      <Shield className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                      <span>QuickBooks Online account (Simple Start or above)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Shield className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                      <span>OAuth2 keeps your data secure — revoke at any time</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Shield className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                      <span>Sync individual invoices from the Invoice Detail page</span>
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
           </CardContent>

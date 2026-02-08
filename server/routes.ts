@@ -8703,6 +8703,97 @@ Be concise and practical. Focus on real issues that affect the business.`;
     }
   });
 
+  // ==================== INTEGRATIONS (QUICKBOOKS) ====================
+
+  app.get("/api/integrations/quickbooks/status", requireAuth, async (req, res) => {
+    try {
+      const { isQuickBooksConnected } = await import('./services/quickbooks');
+      const connected = await isQuickBooksConnected();
+      res.json({ connected });
+    } catch (error) {
+      console.error("Error checking QuickBooks status:", error);
+      res.json({ connected: false });
+    }
+  });
+
+  app.get("/api/integrations/quickbooks/connect", requireAdmin, async (req, res) => {
+    try {
+      const { getOAuthUri } = await import('./services/quickbooks');
+      const uri = getOAuthUri();
+      res.json({ uri });
+    } catch (error) {
+      console.error("Error generating QuickBooks OAuth URI:", error);
+      res.status(500).json({ error: "Failed to generate QuickBooks connection link" });
+    }
+  });
+
+  app.get("/api/integrations/quickbooks/callback", async (req, res) => {
+    try {
+      const { code, realmId, state } = req.query as { code: string; realmId: string; state: string };
+      if (!code || !realmId) {
+        return res.status(400).send("Missing code or realmId from QuickBooks");
+      }
+      const { exchangeCodeForTokens } = await import('./services/quickbooks');
+      await exchangeCodeForTokens(code, realmId);
+      res.redirect("/app/integrations?qb=connected");
+    } catch (error) {
+      console.error("Error in QuickBooks callback:", error);
+      res.redirect("/app/integrations?qb=error");
+    }
+  });
+
+  app.post("/api/integrations/quickbooks/disconnect", requireAdmin, async (req, res) => {
+    try {
+      const { disconnectQuickBooks } = await import('./services/quickbooks');
+      await disconnectQuickBooks();
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error disconnecting QuickBooks:", error);
+      res.status(500).json({ error: "Failed to disconnect QuickBooks" });
+    }
+  });
+
+  app.get("/api/integrations/quickbooks/company", requireAuth, async (req, res) => {
+    try {
+      const { getQuickBooksCompanyInfo } = await import('./services/quickbooks');
+      const info = await getQuickBooksCompanyInfo();
+      res.json(info);
+    } catch (error: any) {
+      console.error("Error fetching QuickBooks company info:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch company info" });
+    }
+  });
+
+  app.post("/api/integrations/quickbooks/sync-invoice/:invoiceId", requireAdmin, async (req, res) => {
+    try {
+      const { syncInvoiceToQuickBooks } = await import('./services/quickbooks');
+      const result = await syncInvoiceToQuickBooks(req.params.invoiceId);
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error("Error syncing invoice to QuickBooks:", error);
+      res.status(500).json({ error: error.message || "Failed to sync invoice to QuickBooks" });
+    }
+  });
+
+  app.post("/api/integrations/quickbooks/sync-payment/:invoiceId", requireAdmin, async (req, res) => {
+    try {
+      const { amount, paymentDate } = req.body;
+      if (!amount) {
+        return res.status(400).json({ error: "Payment amount is required" });
+      }
+      const { syncPaymentToQuickBooks } = await import('./services/quickbooks');
+      const result = await syncPaymentToQuickBooks(
+        req.params.invoiceId,
+        amount,
+        paymentDate ? new Date(paymentDate) : new Date()
+      );
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error("Error syncing payment to QuickBooks:", error);
+      res.status(500).json({ error: error.message || "Failed to sync payment to QuickBooks" });
+    }
+  });
+
   // ==================== SUBSCRIPTION BILLING ====================
 
   // Get all subscription plans
