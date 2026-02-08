@@ -16,6 +16,7 @@ import * as outlook from "./outlook";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerGlobalAssistantRoutes } from "./globalAssistant";
 import { registerAiRoutes } from "./ai-service";
+import { registerSupportChatRoutes } from "./support-chat";
 import { insertFileSchema } from "@shared/schema";
 import { setupAuth } from "./replit_integrations/auth";
 import { generateFormPdf } from "./form-pdf";
@@ -6435,6 +6436,7 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
   registerObjectStorageRoutes(app);
   registerGlobalAssistantRoutes(app);
   registerAiRoutes(app);
+  registerSupportChatRoutes(app);
 
   app.get("/api/files", requireAuth, async (req, res) => {
     try {
