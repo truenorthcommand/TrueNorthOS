@@ -3,6 +3,8 @@ import type { Server } from 'http';
 import type { IncomingMessage } from 'http';
 import { sessionMiddleware } from './session';
 import { storage } from './storage';
+import { pool } from './db';
+import { sendEmail } from './email';
 
 interface NotificationClient {
   ws: WebSocket;
@@ -11,6 +13,14 @@ interface NotificationClient {
 }
 
 const clients: NotificationClient[] = [];
+
+const DEFAULT_NOTIFICATION_PREFERENCES = {
+  jobs: { inApp: true, email: true, push: true },
+  messages: { inApp: true, email: false, push: true },
+  expenses: { inApp: true, email: true, push: false },
+  fleet: { inApp: true, email: false, push: false },
+  system: { inApp: true, email: false, push: false },
+};
 
 export function setupNotifications(server: Server) {
   const wss = new WebSocketServer({ server, path: '/ws/notifications' });
@@ -136,69 +146,260 @@ export function sendToUsers(userIds: string[], payload: any) {
   });
 }
 
-export function notifyAdmins(notification: {
+async function getUserPreferences(userId: string): Promise<Record<string, { inApp: boolean; email: boolean; push: boolean }>> {
+  try {
+    const result = await pool.query(
+      `SELECT notification_preferences FROM users WHERE id = $1`,
+      [userId]
+    );
+    const prefs = result.rows[0]?.notification_preferences;
+    if (prefs && Object.keys(prefs).length > 0) {
+      return { ...DEFAULT_NOTIFICATION_PREFERENCES, ...prefs };
+    }
+    return DEFAULT_NOTIFICATION_PREFERENCES;
+  } catch {
+    return DEFAULT_NOTIFICATION_PREFERENCES;
+  }
+}
+
+async function persistNotification(params: {
+  userId: string;
+  type: string;
+  category: string;
+  title: string;
+  message: string;
+  metadata?: any;
+  linkUrl?: string;
+  emailSent?: boolean;
+}): Promise<string | null> {
+  try {
+    const result = await pool.query(
+      `INSERT INTO notifications (user_id, type, category, title, message, metadata, link_url, email_sent)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id`,
+      [params.userId, params.type, params.category, params.title, params.message, 
+       JSON.stringify(params.metadata || {}), params.linkUrl || null, params.emailSent || false]
+    );
+    return result.rows[0]?.id || null;
+  } catch (error) {
+    console.error('Failed to persist notification:', error);
+    return null;
+  }
+}
+
+async function sendNotificationEmail(userId: string, title: string, message: string, linkUrl?: string) {
+  try {
+    const user = await storage.getUser(userId);
+    if (!user?.email) return false;
+
+    const companyResult = await pool.query(`SELECT company_name FROM company_settings LIMIT 1`);
+    const companyName = companyResult.rows[0]?.company_name || 'TrueNorth OS';
+
+    const linkHtml = linkUrl 
+      ? `<p><a href="${linkUrl}" style="display: inline-block; background-color: #0F2B4C; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; margin: 10px 0;">View Details</a></p>`
+      : '';
+
+    const htmlBody = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #0F2B4C; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background-color: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+          .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>${companyName}</h1>
+          </div>
+          <div class="content">
+            <h2>${title}</h2>
+            <p>${message}</p>
+            ${linkHtml}
+          </div>
+          <div class="footer">
+            <p>You received this because you have email notifications enabled. You can change your notification preferences in Settings.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    return await sendEmail(user.email, `${companyName} — ${title}`, htmlBody);
+  } catch (error) {
+    console.error('Failed to send notification email:', error);
+    return false;
+  }
+}
+
+function isUserOnline(userId: string): boolean {
+  return clients.some(c => c.userId === userId && c.ws.readyState === WebSocket.OPEN);
+}
+
+export async function createNotification(params: {
+  userId: string;
+  type: string;
+  category?: string;
+  title: string;
+  message: string;
+  metadata?: any;
+  linkUrl?: string;
+  urgent?: boolean;
+}) {
+  const category = params.category || 'system';
+  const prefs = await getUserPreferences(params.userId);
+  const categoryPrefs = prefs[category] || prefs.system;
+
+  let emailSent = false;
+
+  if (categoryPrefs.email) {
+    const online = isUserOnline(params.userId);
+    if (!online || params.urgent) {
+      emailSent = await sendNotificationEmail(params.userId, params.title, params.message, params.linkUrl) || false;
+    }
+  }
+
+  if (categoryPrefs.inApp) {
+    const notifId = await persistNotification({
+      userId: params.userId,
+      type: params.type,
+      category,
+      title: params.title,
+      message: params.message,
+      metadata: params.metadata,
+      linkUrl: params.linkUrl,
+      emailSent,
+    });
+
+    sendToUsers([params.userId], {
+      type: params.type,
+      notificationId: notifId,
+      title: params.title,
+      message: params.message,
+      category,
+      linkUrl: params.linkUrl,
+      metadata: params.metadata,
+      urgent: params.urgent,
+      timestamp: new Date().toISOString(),
+    });
+  }
+}
+
+export async function notifyAdmins(notification: {
   type: string;
   title: string;
   message: string;
+  category?: string;
   jobId?: string;
   jobNo?: string;
   engineerName?: string;
   timestamp: string;
   urgent?: boolean;
+  linkUrl?: string;
 }) {
-  const adminClients = clients.filter(c => c.userRole === 'admin');
-  const payload = JSON.stringify(notification);
+  try {
+    const result = await pool.query(`SELECT id FROM users WHERE role = 'admin' AND status = 'active'`);
+    const adminIds = result.rows.map(r => r.id);
 
-  adminClients.forEach(client => {
-    if (client.ws.readyState === WebSocket.OPEN) {
-      client.ws.send(payload);
+    for (const adminId of adminIds) {
+      await createNotification({
+        userId: adminId,
+        type: notification.type,
+        category: notification.category || 'system',
+        title: notification.title,
+        message: notification.message,
+        metadata: { jobId: notification.jobId, jobNo: notification.jobNo, engineerName: notification.engineerName },
+        linkUrl: notification.linkUrl || (notification.jobId ? `/app/jobs/${notification.jobId}` : undefined),
+        urgent: notification.urgent,
+      });
     }
-  });
 
-  return adminClients.length;
+    return adminIds.length;
+  } catch (error) {
+    console.error('Failed to notify admins:', error);
+    const adminClients = clients.filter(c => c.userRole === 'admin');
+    const payload = JSON.stringify(notification);
+    adminClients.forEach(client => {
+      if (client.ws.readyState === WebSocket.OPEN) {
+        client.ws.send(payload);
+      }
+    });
+    return adminClients.length;
+  }
 }
 
-export function notifyUser(userId: string, notification: {
+export async function notifyUser(userId: string, notification: {
   type: string;
   title: string;
   message: string;
+  category?: string;
   urgent?: boolean;
   jobId?: string;
   jobNo?: string;
   expenseId?: string;
   defectId?: string;
   timestamp: string;
+  linkUrl?: string;
 }) {
-  const payload = JSON.stringify(notification);
-  let sent = 0;
-  
-  clients.forEach(client => {
-    if (client.userId === userId && client.ws.readyState === WebSocket.OPEN) {
-      client.ws.send(payload);
-      sent++;
-    }
+  await createNotification({
+    userId,
+    type: notification.type,
+    category: notification.category || 'system',
+    title: notification.title,
+    message: notification.message,
+    metadata: { 
+      jobId: notification.jobId, 
+      jobNo: notification.jobNo, 
+      expenseId: notification.expenseId, 
+      defectId: notification.defectId 
+    },
+    linkUrl: notification.linkUrl || (notification.jobId ? `/app/jobs/${notification.jobId}` : undefined),
+    urgent: notification.urgent,
   });
-
-  return sent;
 }
 
-export function notifyEngineers(notification: {
+export async function notifyEngineers(notification: {
   type: string;
   title: string;
   message: string;
+  category?: string;
   urgent?: boolean;
   jobId?: string;
   jobNo?: string;
   timestamp: string;
+  linkUrl?: string;
 }) {
-  const engineerClients = clients.filter(c => c.userRole === 'engineer');
-  const payload = JSON.stringify(notification);
+  try {
+    const result = await pool.query(`SELECT id FROM users WHERE role = 'engineer' AND status = 'active'`);
+    const engineerIds = result.rows.map(r => r.id);
 
-  engineerClients.forEach(client => {
-    if (client.ws.readyState === WebSocket.OPEN) {
-      client.ws.send(payload);
+    for (const engineerId of engineerIds) {
+      await createNotification({
+        userId: engineerId,
+        type: notification.type,
+        category: notification.category || 'jobs',
+        title: notification.title,
+        message: notification.message,
+        metadata: { jobId: notification.jobId, jobNo: notification.jobNo },
+        linkUrl: notification.linkUrl || (notification.jobId ? `/app/jobs/${notification.jobId}` : undefined),
+        urgent: notification.urgent,
+      });
     }
-  });
 
-  return engineerClients.length;
+    return engineerIds.length;
+  } catch (error) {
+    console.error('Failed to notify engineers:', error);
+    const engineerClients = clients.filter(c => c.userRole === 'engineer');
+    const payload = JSON.stringify(notification);
+    engineerClients.forEach(client => {
+      if (client.ws.readyState === WebSocket.OPEN) {
+        client.ws.send(payload);
+      }
+    });
+    return engineerClients.length;
+  }
 }

@@ -7,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Building, CreditCard, FileText, Loader2, RefreshCw, Smartphone, Database, Send, AlertTriangle, CheckCircle, Info, Zap, Plus, Trash2 } from "lucide-react";
+import { Save, Building, CreditCard, FileText, Loader2, RefreshCw, Smartphone, Database, Send, AlertTriangle, CheckCircle, Info, Zap, Plus, Trash2, Bell, Briefcase, MessageCircle, Receipt, Truck, Settings2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 
@@ -62,6 +63,16 @@ export default function Settings() {
   const [ruleAction, setRuleAction] = useState("");
   const [ruleName, setRuleName] = useState("");
 
+  const [notifPrefs, setNotifPrefs] = useState<Record<string, { inApp: boolean; email: boolean; push: boolean }>>({
+    jobs: { inApp: true, email: true, push: false },
+    messages: { inApp: true, email: false, push: false },
+    expenses: { inApp: true, email: true, push: false },
+    fleet: { inApp: true, email: false, push: false },
+    system: { inApp: true, email: true, push: false },
+  });
+  const [isLoadingNotifPrefs, setIsLoadingNotifPrefs] = useState(false);
+  const [isSavingNotifPrefs, setIsSavingNotifPrefs] = useState(false);
+
   const [settings, setSettings] = useState<CompanySettings>({
     companyName: "",
     companyAddress: "",
@@ -80,7 +91,56 @@ export default function Settings() {
 
   useEffect(() => {
     fetchSettings();
+    fetchNotifPrefs();
   }, []);
+
+  const fetchNotifPrefs = async () => {
+    setIsLoadingNotifPrefs(true);
+    try {
+      const res = await fetch("/api/notification-preferences", { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Object.keys(data).length > 0) {
+          setNotifPrefs(data);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load notification preferences");
+    } finally {
+      setIsLoadingNotifPrefs(false);
+    }
+  };
+
+  const saveNotifPrefs = async () => {
+    setIsSavingNotifPrefs(true);
+    try {
+      const res = await fetch("/api/notification-preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(notifPrefs),
+      });
+      if (res.ok) {
+        toast({ title: "Saved", description: "Notification preferences updated" });
+      } else {
+        throw new Error("Failed to save");
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to save notification preferences", variant: "destructive" });
+    } finally {
+      setIsSavingNotifPrefs(false);
+    }
+  };
+
+  const toggleNotifPref = (category: string, channel: "inApp" | "email" | "push") => {
+    setNotifPrefs(prev => ({
+      ...prev,
+      [category]: {
+        ...prev[category],
+        [channel]: !prev[category]?.[channel],
+      },
+    }));
+  };
 
   const fetchSettings = async () => {
     try {
@@ -414,6 +474,73 @@ export default function Settings() {
               />
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="w-5 h-5" />
+            Notification Preferences
+          </CardTitle>
+          <CardDescription>Control how you receive notifications for each category</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isLoadingNotifPrefs ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin" />
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-[1fr_80px_80px_80px] gap-2 items-center text-sm font-medium text-muted-foreground border-b pb-2">
+                <span>Category</span>
+                <span className="text-center">In-App</span>
+                <span className="text-center">Email</span>
+                <span className="text-center">Push</span>
+              </div>
+              {[
+                { key: "jobs", label: "Jobs & Operations", icon: Briefcase },
+                { key: "messages", label: "Messages", icon: MessageCircle },
+                { key: "expenses", label: "Expenses & Finance", icon: Receipt },
+                { key: "fleet", label: "Fleet & Vehicles", icon: Truck },
+                { key: "system", label: "System & Admin", icon: Settings2 },
+              ].map(({ key, label, icon: Icon }) => (
+                <div key={key} className="grid grid-cols-[1fr_80px_80px_80px] gap-2 items-center py-2" data-testid={`notif-pref-row-${key}`}>
+                  <div className="flex items-center gap-2">
+                    <Icon className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm">{label}</span>
+                  </div>
+                  <div className="flex justify-center">
+                    <Switch
+                      checked={notifPrefs[key]?.inApp ?? true}
+                      onCheckedChange={() => toggleNotifPref(key, "inApp")}
+                      data-testid={`switch-notif-${key}-inapp`}
+                    />
+                  </div>
+                  <div className="flex justify-center">
+                    <Switch
+                      checked={notifPrefs[key]?.email ?? false}
+                      onCheckedChange={() => toggleNotifPref(key, "email")}
+                      data-testid={`switch-notif-${key}-email`}
+                    />
+                  </div>
+                  <div className="flex justify-center">
+                    <Switch
+                      checked={notifPrefs[key]?.push ?? false}
+                      onCheckedChange={() => toggleNotifPref(key, "push")}
+                      data-testid={`switch-notif-${key}-push`}
+                    />
+                  </div>
+                </div>
+              ))}
+              <div className="flex justify-end pt-2">
+                <Button onClick={saveNotifPrefs} disabled={isSavingNotifPrefs} data-testid="button-save-notif-prefs">
+                  {isSavingNotifPrefs ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                  Save Preferences
+                </Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 

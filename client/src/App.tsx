@@ -55,6 +55,7 @@ import DirectorsSuite from "@/pages/directors-suite";
 import DemoDirectorsSuite from "@/pages/demo-directors";
 import Subscription from "@/pages/subscription";
 import Referrals from "@/pages/referrals";
+import NotificationsPage from "@/pages/notifications";
 import Workflows from "@/pages/workflows";
 import VoiceNotes from "@/pages/voice-notes";
 import DocumentScanner from "@/pages/document-scanner";
@@ -152,6 +153,7 @@ function AppRoutes() {
         <Route path="/directors" component={DirectorsSuite} />
         <Route path="/subscription" component={Subscription} />
         <Route path="/referrals" component={Referrals} />
+        <Route path="/notifications" component={NotificationsPage} />
         <Route path="/workflows" component={Workflows} />
         <Route path="/exceptions" component={Exceptions} />
         <Route path="/assets" component={Assets} />

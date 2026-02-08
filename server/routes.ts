@@ -10651,5 +10651,145 @@ Be concise and practical. Focus on real issues that affect the business.`;
     }
   });
 
+  // ============ NOTIFICATION API ROUTES ============
+
+  app.get("/api/notifications", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+      const offset = parseInt(req.query.offset as string) || 0;
+      const category = req.query.category as string;
+      const readFilter = req.query.read as string;
+
+      let query = `SELECT * FROM notifications WHERE user_id = $1`;
+      const params: any[] = [userId];
+      let paramIdx = 2;
+
+      if (category) {
+        query += ` AND category = $${paramIdx++}`;
+        params.push(category);
+      }
+      if (readFilter === 'true') {
+        query += ` AND read = true`;
+      } else if (readFilter === 'false') {
+        query += ` AND read = false`;
+      }
+
+      query += ` ORDER BY created_at DESC LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
+      params.push(limit, offset);
+
+      const result = await pool.query(query, params);
+
+      const countResult = await pool.query(
+        `SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE read = false) as unread FROM notifications WHERE user_id = $1`,
+        [userId]
+      );
+
+      res.json({
+        notifications: result.rows,
+        total: parseInt(countResult.rows[0].total),
+        unread: parseInt(countResult.rows[0].unread),
+      });
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  app.get("/api/notifications/unread-count", requireAuth, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT COUNT(*) as count FROM notifications WHERE user_id = $1 AND read = false`,
+        [req.session.userId!]
+      );
+      res.json({ count: parseInt(result.rows[0].count) });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch unread count" });
+    }
+  });
+
+  app.patch("/api/notifications/:id/read", requireAuth, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `UPDATE notifications SET read = true WHERE id = $1 AND user_id = $2 RETURNING *`,
+        [req.params.id, req.session.userId!]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ error: "Notification not found" });
+      res.json(result.rows[0]);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to mark notification as read" });
+    }
+  });
+
+  app.post("/api/notifications/read-all", requireAuth, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `UPDATE notifications SET read = true WHERE user_id = $1 AND read = false`,
+        [req.session.userId!]
+      );
+      res.json({ updated: result.rowCount });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to mark all as read" });
+    }
+  });
+
+  app.delete("/api/notifications/:id", requireAuth, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `DELETE FROM notifications WHERE id = $1 AND user_id = $2`,
+        [req.params.id, req.session.userId!]
+      );
+      if (result.rowCount === 0) return res.status(404).json({ error: "Notification not found" });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete notification" });
+    }
+  });
+
+  app.delete("/api/notifications", requireAuth, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `DELETE FROM notifications WHERE user_id = $1 AND read = true`,
+        [req.session.userId!]
+      );
+      res.json({ deleted: result.rowCount });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to clear read notifications" });
+    }
+  });
+
+  app.get("/api/notification-preferences", requireAuth, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT notification_preferences FROM users WHERE id = $1`,
+        [req.session.userId!]
+      );
+      const prefs = result.rows[0]?.notification_preferences;
+      const defaults = {
+        jobs: { inApp: true, email: true, push: true },
+        messages: { inApp: true, email: false, push: true },
+        expenses: { inApp: true, email: true, push: false },
+        fleet: { inApp: true, email: false, push: false },
+        system: { inApp: true, email: false, push: false },
+      };
+      res.json(prefs && Object.keys(prefs).length > 0 ? { ...defaults, ...prefs } : defaults);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch notification preferences" });
+    }
+  });
+
+  app.put("/api/notification-preferences", requireAuth, async (req, res) => {
+    try {
+      const preferences = req.body;
+      await pool.query(
+        `UPDATE users SET notification_preferences = $1 WHERE id = $2`,
+        [JSON.stringify(preferences), req.session.userId!]
+      );
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to save notification preferences" });
+    }
+  });
+
   return httpServer;
 }

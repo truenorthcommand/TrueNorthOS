@@ -4,7 +4,7 @@ import { useTheme } from "@/lib/theme";
 import { hasRole } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { BackButton } from "@/components/back-button";
-import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw, Mic, BookOpen, Mail, LayoutGrid, FolderOpen, Shield, Crown, Link2, Gift, Sparkles, ClipboardList, Sun, Moon, QrCode, Package, Handshake } from "lucide-react";
+import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw, Mic, BookOpen, Mail, LayoutGrid, FolderOpen, Shield, Crown, Link2, Gift, Sparkles, ClipboardList, Sun, Moon, QrCode, Package, Handshake, Bell } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Scanner } from "@/components/scanner";
@@ -63,7 +63,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
     }
   }, [refreshJobs]);
   
-  useNotifications(handleNotification);
   const { isOnline, pendingActions, syncOfflineQueue } = useOffline();
 
   const { data: unreadData } = useQuery<{ count: number } | null>({
@@ -82,6 +81,30 @@ export function Layout({ children }: { children: React.ReactNode }) {
     },
   });
   const unreadCount = unreadData?.count || 0;
+
+  const { data: notifUnreadData, refetch: refetchNotifCount } = useQuery<{ count: number } | null>({
+    queryKey: ["/api/notifications/unread-count"],
+    refetchInterval: 30000,
+    retry: false,
+    throwOnError: false,
+    queryFn: async () => {
+      try {
+        const res = await fetch("/api/notifications/unread-count", { credentials: "include" });
+        if (!res.ok) return null;
+        return await res.json();
+      } catch {
+        return null;
+      }
+    },
+  });
+  const notifUnreadCount = notifUnreadData?.count || 0;
+
+  const handleNotificationFromWS = useCallback((notification: Notification) => {
+    refetchNotifCount();
+    handleNotification(notification);
+  }, [handleNotification, refetchNotifCount]);
+
+  useNotifications(handleNotificationFromWS);
 
   if (!user) {
     return <div className="min-h-screen bg-background">{children}</div>;
@@ -652,6 +675,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <TooltipContent>Quick Scan</TooltipContent>
                 </Tooltip>
               )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link href="/notifications">
+                    <button 
+                      className="relative p-2 text-muted-foreground hover:bg-muted rounded-lg"
+                      data-testid="button-notifications-desktop"
+                    >
+                      <Bell className="h-5 w-5" />
+                      {notifUnreadCount > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 h-5 min-w-[20px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1" data-testid="badge-notification-count-desktop">
+                          {notifUnreadCount > 99 ? '99+' : notifUnreadCount}
+                        </span>
+                      )}
+                      <span className="sr-only">Notifications</span>
+                    </button>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent>Notifications{notifUnreadCount > 0 ? ` (${notifUnreadCount} unread)` : ''}</TooltipContent>
+              </Tooltip>
               <button 
                 className="p-2 text-muted-foreground hover:bg-muted rounded-lg"
                 onClick={toggleTheme}
@@ -724,6 +766,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <TooltipContent>Quick Scan</TooltipContent>
                 </Tooltip>
               )}
+              <Link href="/notifications">
+                <button 
+                  className="relative p-2 text-muted-foreground hover:bg-muted rounded-lg"
+                  data-testid="button-notifications-mobile"
+                >
+                  <Bell className="h-5 w-5" />
+                  {notifUnreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 h-5 min-w-[20px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1" data-testid="badge-notification-count-mobile">
+                      {notifUnreadCount > 99 ? '99+' : notifUnreadCount}
+                    </span>
+                  )}
+                  <span className="sr-only">Notifications</span>
+                </button>
+              </Link>
               <button 
                 className="p-2 text-muted-foreground hover:bg-muted rounded-lg"
                 onClick={toggleTheme}
