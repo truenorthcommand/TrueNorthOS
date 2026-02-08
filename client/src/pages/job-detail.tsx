@@ -264,9 +264,18 @@ export default function JobDetail() {
   });
 
   const completeJobMutation = useMutation({
-    mutationFn: async (payload: { override?: boolean; overrideReason?: string }) => {
-      const res = await apiRequest("POST", `/api/jobs/${jobId}/complete`, payload);
-      return res.json();
+    mutationFn: async (opts?: { override?: boolean; overrideReason?: string }) => {
+      const res = await fetch(`/api/jobs/${jobId}/complete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(opts ?? {}),
+      });
+
+      if (res.ok) return res.json();
+
+      const data = await res.json().catch(() => ({ error: res.statusText }));
+      throw { status: res.status, ...data };
     },
     onSuccess: () => {
       setQualityError(null);
@@ -275,18 +284,12 @@ export default function JobDetail() {
       queryClient.invalidateQueries({ queryKey: [`/api/jobs/${jobId}/blocking-exceptions`] });
       toast({ title: "Job completed", description: "Quality Gate passed — job marked as Completed." });
     },
-    onError: async (error: any) => {
-      try {
-        const raw = error.message?.replace(/^\d+:\s*/, "") || "{}";
-        const body = JSON.parse(raw);
-        if (body.error === "QUALITY_GATE_FAILED" || body.error === "QUALITY_GATE_CAN_OVERRIDE") {
-          setQualityError(body);
-          return;
-        }
-        toast({ title: "Cannot complete job", description: body.error || body.message, variant: "destructive" });
-      } catch {
-        toast({ title: "Cannot complete job", description: error.message, variant: "destructive" });
+    onError: (err: any) => {
+      if (err.error === "QUALITY_GATE_FAILED" || err.error === "QUALITY_GATE_CAN_OVERRIDE") {
+        setQualityError(err);
+        return;
       }
+      toast({ title: "Cannot complete job", description: err.error || err.message || "Something went wrong", variant: "destructive" });
     },
   });
 
