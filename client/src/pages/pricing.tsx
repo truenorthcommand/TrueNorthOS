@@ -8,9 +8,9 @@ const tiers = [
   {
     name: "Starter",
     description: "For solo tradespeople and small teams",
-    price: "£29",
-    priceNote: "per user/month",
-    additionalInfo: "Minimum 1 user",
+    price: "£99",
+    priceNote: "/month",
+    additionalInfo: "1–5 users included",
     icon: Users,
     features: [
       { name: "Job management", included: true },
@@ -20,11 +20,11 @@ const tiers = [
       { name: "Digital signatures", included: true },
       { name: "Mobile PWA", included: true },
       { name: "Basic timesheets", included: true },
+      { name: "Auto-assign by postcode", included: true },
       { name: "Expense tracking", included: false },
       { name: "Fleet management", included: false },
       { name: "Team messaging", included: false },
       { name: "AI Technical Advisors", included: false },
-      { name: "Live GPS tracking", included: false },
     ],
     cta: "Start Free Trial",
     popular: false,
@@ -32,9 +32,9 @@ const tiers = [
   {
     name: "Professional",
     description: "For growing field service teams",
-    price: "£49",
-    priceNote: "per user/month",
-    additionalInfo: "3+ users recommended",
+    price: "£149",
+    priceNote: "/month",
+    additionalInfo: "6–10 users included",
     icon: Zap,
     features: [
       { name: "Everything in Starter", included: true },
@@ -46,8 +46,8 @@ const tiers = [
       { name: "Long-running jobs", included: true },
       { name: "AI Technical Advisors", included: true },
       { name: "AI Writing Assistant", included: true },
+      { name: "AI Quality Gatekeeper", included: true },
       { name: "Fleet management", included: false },
-      { name: "Custom reports", included: false },
       { name: "API access", included: false },
     ],
     cta: "Start Free Trial",
@@ -56,9 +56,9 @@ const tiers = [
   {
     name: "Business",
     description: "For established companies",
-    price: "£79",
-    priceNote: "per user/month",
-    additionalInfo: "10+ users recommended",
+    price: "£199",
+    priceNote: "/month",
+    additionalInfo: "11–15 users included",
     icon: Building2,
     features: [
       { name: "Everything in Professional", included: true },
@@ -116,6 +116,7 @@ const allIncluded = [
 
 const moduleComparison = [
   { module: "Operations", starter: true, professional: true, business: true, enterprise: true },
+  { module: "Auto-assign by Postcode", starter: true, professional: true, business: true, enterprise: true },
   { module: "Finance - Basic", starter: true, professional: true, business: true, enterprise: true },
   { module: "Finance - Advanced", starter: false, professional: true, business: true, enterprise: true },
   { module: "Fleet Management", starter: false, professional: false, business: true, enterprise: true },
@@ -123,6 +124,7 @@ const moduleComparison = [
   { module: "Workforce - GPS & Messaging", starter: false, professional: true, business: true, enterprise: true },
   { module: "Compliance", starter: true, professional: true, business: true, enterprise: true },
   { module: "AI Intelligence", starter: false, professional: true, business: true, enterprise: true },
+  { module: "AI Quality Gatekeeper", starter: false, professional: true, business: true, enterprise: true },
 ];
 
 export default function Pricing() {
@@ -136,8 +138,8 @@ export default function Pricing() {
             Simple, Transparent Pricing
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto" data-testid="text-pricing-subtitle">
-            All-in-one platform pricing. No hidden fees, no per-feature charges. 
-            Choose the tier that fits your team size and needs.
+            Fixed monthly pricing based on team size — no per-user fees. 
+            Choose the band that fits your business and scale as you grow.
           </p>
         </div>
 
