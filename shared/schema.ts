@@ -106,6 +106,10 @@ export const jobs = pgTable("jobs", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   updatedByUserId: varchar("updated_by_user_id"),
+  qualityGateStatus: text("quality_gate_status").notNull().default("pending"),
+  completionBlockedReason: text("completion_blocked_reason"),
+  qualityOverrideBy: varchar("quality_override_by"),
+  qualityOverrideReason: text("quality_override_reason"),
 });
 
 // Job updates for long-running jobs (2 updates per day max)
