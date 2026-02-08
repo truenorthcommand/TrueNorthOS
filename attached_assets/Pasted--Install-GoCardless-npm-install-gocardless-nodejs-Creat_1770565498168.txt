@@ -1,0 +1,486 @@
+# Install GoCardless
+npm install gocardless-nodejs
+
+# Create services directory structure
+mkdir -p services/gocardless
+
+# Create redirect flow service
+cat > services/gocardless/redirectFlow.ts << 'EOF'
+import gocardless from 'gocardless-nodejs';
+import { db } from '@/db';
+import { pendingMandates } from '@/db/schema';
+
+const client = gocardless(
+  process.env.GOCARDLESS_ACCESS_TOKEN!,
+  gocardless.constants.Environments.Live
+);
+
+export const initiateSubscriptionSetup = async (
+  userId: string,
+  customerData: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    addressLine1?: string;
+    city?: string;
+    postalCode?: string;
+  }
+) => {
+  const sessionToken = `${userId}-${Date.now()}`;
+  
+  const redirectFlow = await client.redirectFlows.create({
+    description: 'TrueNorth OS Maintenance Subscription',
+    session_token: sessionToken,
+    success_redirect_url: `${process.env.APP_URL}/billing/setup-complete`,
+    prefilled_customer: {
+      email: customerData.email,
+      given_name: customerData.firstName,
+      family_name: customerData.lastName,
+      address_line1: customerData.addressLine1,
+      city: customerData.city,
+      postal_code: customerData.postalCode,
+    },
+  });
+  
+  await db.insert(pendingMandates).values({
+    userId,
+    sessionToken,
+    redirectFlowId: redirectFlow.id,
+    status: 'pending',
+    expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+  });
+  
+  return {
+    redirectUrl: redirectFlow.redirect_url,
+    sessionToken,
+  };
+};
+EOF
+
+# Create completion service
+cat > services/gocardless/completeSetup.ts << 'EOF'
+import gocardless from 'gocardless-nodejs';
+import { db } from '@/db';
+import { pendingMandates, recurringPayments } from '@/db/schema';
+import { and, eq, gt } from 'drizzle-orm';
+
+const client = gocardless(
+  process.env.GOCARDLESS_ACCESS_TOKEN!,
+  gocardless.constants.Environments.Live
+);
+
+export const completeSubscriptionSetup = async (
+  redirectFlowId: string,
+  sessionToken: string,
+  planDetails: {
+    amount: number;
+    frequency: 'monthly' | 'quarterly' | 'annually';
+  }
+) => {
+  const pending = await db.query.pendingMandates.findFirst({
+    where: and(
+      eq(pendingMandates.sessionToken, sessionToken),
+      eq(pendingMandates.redirectFlowId, redirectFlowId),
+      eq(pendingMandates.status, 'pending'),
+      gt(pendingMandates.expiresAt, new Date())
+    ),
+  });
+  
+  if (!pending) {
+    throw new Error('Invalid or expired session');
+  }
+  
+  const completedFlow = await client.redirectFlows.complete(
+    redirectFlowId,
+    { session_token: sessionToken }
+  );
+  
+  const gcCustomerId = completedFlow.links.customer;
+  const gcMandateId = completedFlow.links.mandate;
+  
+  const subscription = await client.subscriptions.create({
+    amount: planDetails.amount,
+    currency: 'GBP',
+    name: `TrueNorth OS - ${planDetails.frequency}`,
+    interval_unit: planDetails.frequency === 'annually' ? 'yearly' : 'monthly',
+    interval: planDetails.frequency === 'quarterly' ? 3 : 1,
+    metadata: {
+      user_id: pending.userId,
+    },
+    links: {
+      mandate: gcMandateId,
+    },
+  });
+  
+  const [payment] = await db.insert(recurringPayments).values({
+    customerId: pending.userId,
+    gcCustomerId,
+    gcMandateId,
+    gcSubscriptionId: subscription.id,
+    amount: planDetails.amount,
+    frequency: planDetails.frequency,
+    status: 'active',
+    nextPaymentDate: new Date(subscription.upcoming_payments[0].charge_date),
+  }).returning();
+  
+  await db.update(pendingMandates)
+    .set({ status: 'completed' })
+    .where(eq(pendingMandates.id, pending.id));
+  
+  return {
+    subscriptionId: subscription.id,
+    nextPaymentDate: subscription.upcoming_payments[0].charge_date,
+    payment,
+  };
+};
+EOF
+
+# Add to schema
+cat >> db/schema.ts << 'EOF'
+
+export const pendingMandates = pgTable('pending_mandates', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  sessionToken: text('session_token').notNull().unique(),
+  redirectFlowId: text('redirect_flow_id').notNull(),
+  status: text('status').notNull().default('pending'),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const recurringPayments = pgTable('recurring_payments', {
+  id: serial('id').primaryKey(),
+  customerId: text('customer_id').notNull(),
+  gcCustomerId: text('gc_customer_id').notNull(),
+  gcMandateId: text('gc_mandate_id').notNull(),
+  gcSubscriptionId: text('gc_subscription_id'),
+  amount: integer('amount').notNull(),
+  frequency: text('frequency').notNull(),
+  status: text('status').notNull().default('pending'),
+  nextPaymentDate: timestamp('next_payment_date'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+EOF
+
+# Create API routes
+mkdir -p app/api/billing/setup
+cat > app/api/billing/setup/route.ts << 'EOF'
+import { NextRequest, NextResponse } from 'next/server';
+import { initiateSubscriptionSetup } from '@/services/gocardless/redirectFlow';
+import { auth } from '@/lib/auth';
+
+export async function POST(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  
+  const body = await req.json();
+  
+  try {
+    const { redirectUrl, sessionToken } = await initiateSubscriptionSetup(
+      session.user.id,
+      {
+        email: session.user.email!,
+        firstName: body.firstName,
+        lastName: body.lastName,
+        addressLine1: body.addressLine1,
+        city: body.city,
+        postalCode: body.postalCode,
+      }
+    );
+    
+    return NextResponse.json({ redirectUrl, sessionToken });
+  } catch (error) {
+    console.error('GoCardless setup failed:', error);
+    return NextResponse.json(
+      { error: 'Failed to initiate setup' },
+      { status: 500 }
+    );
+  }
+}
+EOF
+
+mkdir -p app/api/billing/complete
+cat > app/api/billing/complete/route.ts << 'EOF'
+import { NextRequest, NextResponse } from 'next/server';
+import { completeSubscriptionSetup } from '@/services/gocardless/completeSetup';
+
+export async function POST(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const redirectFlowId = searchParams.get('redirect_flow_id');
+  
+  const body = await req.json();
+  const { sessionToken, amount, frequency } = body;
+  
+  if (!redirectFlowId || !sessionToken) {
+    return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+  }
+  
+  try {
+    const result = await completeSubscriptionSetup(
+      redirectFlowId,
+      sessionToken,
+      { amount, frequency }
+    );
+    
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error('GoCardless completion failed:', error);
+    return NextResponse.json(
+      { error: 'Failed to complete setup' },
+      { status: 500 }
+    );
+  }
+}
+EOF
+
+# Create component
+mkdir -p components/billing
+cat > components/billing/SubscriptionSetup.tsx << 'EOF'
+'use client';
+
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+
+export const SubscriptionSetup = () => {
+  const [loading, setLoading] = useState(false);
+  const [plan, setPlan] = useState<'monthly' | 'quarterly' | 'annually'>('monthly');
+  const [customerData, setCustomerData] = useState({
+    firstName: '',
+    lastName: '',
+    addressLine1: '',
+    city: '',
+    postalCode: '',
+  });
+  
+  const prices = {
+    monthly: 4900,
+    quarterly: 13900,
+    annually: 52900,
+  };
+  
+  const handleSetup = async () => {
+    setLoading(true);
+    
+    try {
+      const response = await fetch('/api/billing/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...customerData,
+          amount: prices[plan],
+          frequency: plan,
+        }),
+      });
+      
+      const { redirectUrl, sessionToken } = await response.json();
+      
+      localStorage.setItem('gc_session', JSON.stringify({
+        sessionToken,
+        amount: prices[plan],
+        frequency: plan,
+      }));
+      
+      window.location.href = redirectUrl;
+      
+    } catch (error) {
+      console.error('Setup failed:', error);
+      alert('Failed to start setup. Please try again.');
+      setLoading(false);
+    }
+  };
+  
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Set Up Maintenance Subscription</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div>
+          <Label>Select Plan</Label>
+          <RadioGroup value={plan} onValueChange={(v: any) => setPlan(v)}>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="monthly" id="monthly" />
+              <Label htmlFor="monthly">Monthly - £49/month</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="quarterly" id="quarterly" />
+              <Label htmlFor="quarterly">Quarterly - £139/quarter (save £8)</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="annually" id="annually" />
+              <Label htmlFor="annually">Annually - £529/year (save £59)</Label>
+            </div>
+          </RadioGroup>
+        </div>
+        
+        <div className="space-y-4">
+          <div>
+            <Label>First Name</Label>
+            <Input
+              value={customerData.firstName}
+              onChange={(e) => setCustomerData({ ...customerData, firstName: e.target.value })}
+            />
+          </div>
+          
+          <div>
+            <Label>Last Name</Label>
+            <Input
+              value={customerData.lastName}
+              onChange={(e) => setCustomerData({ ...customerData, lastName: e.target.value })}
+            />
+          </div>
+          
+          <div>
+            <Label>Address Line 1</Label>
+            <Input
+              value={customerData.addressLine1}
+              onChange={(e) => setCustomerData({ ...customerData, addressLine1: e.target.value })}
+            />
+          </div>
+          
+          <div>
+            <Label>City</Label>
+            <Input
+              value={customerData.city}
+              onChange={(e) => setCustomerData({ ...customerData, city: e.target.value })}
+            />
+          </div>
+          
+          <div>
+            <Label>Postal Code</Label>
+            <Input
+              value={customerData.postalCode}
+              onChange={(e) => setCustomerData({ ...customerData, postalCode: e.target.value })}
+            />
+          </div>
+        </div>
+        
+        <Button
+          onClick={handleSetup}
+          disabled={loading}
+          className="w-full"
+        >
+          {loading ? 'Setting up...' : 'Continue to Bank Authorization'}
+        </Button>
+        
+        <p className="text-sm text-muted-foreground">
+          You'll be redirected to authorize Direct Debit via your bank.
+          This is secure and managed by GoCardless.
+        </p>
+      </CardContent>
+    </Card>
+  );
+};
+EOF
+
+# Create return page
+mkdir -p app/billing/setup-complete
+cat > app/billing/setup-complete/page.tsx << 'EOF'
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CheckCircle, XCircle } from 'lucide-react';
+
+export default function SetupCompletePage() {
+  const searchParams = useSearchParams();
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [message, setMessage] = useState('');
+  
+  useEffect(() => {
+    const completeSetup = async () => {
+      const redirectFlowId = searchParams.get('redirect_flow_id');
+      
+      const sessionData = localStorage.getItem('gc_session');
+      if (!sessionData || !redirectFlowId) {
+        setStatus('error');
+        setMessage('Invalid session. Please try again.');
+        return;
+      }
+      
+      const { sessionToken, amount, frequency } = JSON.parse(sessionData);
+      
+      try {
+        const response = await fetch(
+          `/api/billing/complete?redirect_flow_id=${redirectFlowId}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionToken, amount, frequency }),
+          }
+        );
+        
+        if (!response.ok) throw new Error('Setup failed');
+        
+        const result = await response.json();
+        
+        setStatus('success');
+        setMessage(`Subscription active! Next payment: ${result.nextPaymentDate}`);
+        
+        localStorage.removeItem('gc_session');
+        
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 3000);
+        
+      } catch (error) {
+        setStatus('error');
+        setMessage('Failed to complete setup. Please contact support.');
+      }
+    };
+    
+    completeSetup();
+  }, [searchParams]);
+  
+  return (
+    <div className="container max-w-md mx-auto py-20">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            {status === 'loading' && 'Completing Setup...'}
+            {status === 'success' && (
+              <>
+                <CheckCircle className="text-green-500" />
+                Setup Complete
+              </>
+            )}
+            {status === 'error' && (
+              <>
+                <XCircle className="text-red-500" />
+                Setup Failed
+              </>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>{message}</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+EOF
+
+# Add env vars reminder
+cat >> .env.local << 'EOF'
+
+# GoCardless
+GOCARDLESS_ACCESS_TOKEN=your_token_here
+APP_URL=http://localhost:3000
+EOF
+
+echo "✅ GoCardless redirect flow setup complete"
+echo ""
+echo "Next steps:"
+echo "1. Add GOCARDLESS_ACCESS_TOKEN to .env.local"
+echo "2. Run: npm run db:push (to add new tables)"
+echo "3. Test in sandbox: change Environments.Live → Environments.Sandbox"
+echo "4. Add <SubscriptionSetup /> to your billing page"
