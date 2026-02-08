@@ -1,0 +1,1159 @@
+// truenorth-referrals-and-discounts.ts
+// Single-file implementation sketch for TrueNorth OS referral, discount, and merchant systems.
+// You will split this into your existing folders (db/schema, server/routes, client, jobs) in your repo.
+
+// =======================================
+// SECTION 1 – DRIZZLE SCHEMA
+// =======================================
+
+import {
+  pgTable,
+  uuid,
+  varchar,
+  timestamp,
+  boolean,
+  decimal,
+} from 'drizzle-orm/pg-core';
+import { relations, sql, and, eq, gte } from 'drizzle-orm';
+import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
+import crypto from 'crypto';
+import express from 'express';
+import Stripe from 'stripe';
+import { nanoid } from 'nanoid';
+import type { Request, Response, NextFunction } from 'express';
+import type { Session } from 'express-session';
+import React, { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import QRCode from 'qrcode';
+import { Copy, Download, DollarSign, Users, TrendingUp, Check } from 'lucide-react';
+
+// --- Assume these already exist in your app ---
+/* eslint-disable @typescript-eslint/no-namespace */
+declare module 'express-session' {
+  interface Session {
+    userId?: string;
+  }
+}
+/* eslint-enable @typescript-eslint/no-namespace */
+
+// Placeholder existing tables (replace imports with your real ones)
+const users = pgTable('users', {
+  id: uuid('id').primaryKey(),
+  plan: varchar('plan', { length: 20 }).notNull().default('free'),
+  subscriptionActive: boolean('subscription_active').notNull().default(false),
+  stripeCustomerId: varchar('stripe_customer_id', { length: 255 }),
+  stripePaymentMethodId: varchar('stripe_payment_method_id', { length: 255 }),
+});
+
+// -------- Referral-related tables --------
+
+export const referralCodes = pgTable('referral_codes', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  ownerType: varchar('owner_type', { length: 20 }).notNull(), // 'customer' | 'merchant'
+  ownerId: uuid('owner_id').notNull(),
+  code: varchar('code', { length: 6 }).notNull().unique(),
+  landingType: varchar('landing_type', { length: 20 }).notNull(), // 'customer' | 'merchant'
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const referralEvents = pgTable('referral_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  referralCodeId: uuid('referral_code_id')
+    .notNull()
+    .references(() => referralCodes.id),
+  scannedAt: timestamp('scanned_at').defaultNow().notNull(),
+  ipHash: varchar('ip_hash', { length: 64 }).notNull(),
+  userAgentHash: varchar('user_agent_hash', { length: 64 }).notNull(),
+  geoCountry: varchar('geo_country', { length: 2 }),
+});
+
+export const referralConversions = pgTable('referral_conversions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  referralCodeId: uuid('referral_code_id')
+    .notNull()
+    .references(() => referralCodes.id),
+  referredUserId: uuid('referred_user_id')
+    .notNull()
+    .references(() => users.id),
+  status: varchar('status', { length: 20 }).notNull().default('pending'), // 'pending' | 'qualified' | 'disqualified'
+  qualifiedAt: timestamp('qualified_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// -------- Review rewards --------
+
+export const reviewRewards = pgTable('review_rewards', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id),
+  type: varchar('type', { length: 30 }).notNull(), // google | trustpilot | g2 | linkedin | video | case_study
+  valueType: varchar('value_type', { length: 10 }).notNull(), // percent | fixed
+  value: decimal('value', { precision: 10, scale: 2 }).notNull(),
+  active: boolean('active').notNull().default(true),
+  verifiedAt: timestamp('verified_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// -------- Merchants / earnings --------
+
+export const merchants = pgTable('merchants', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  slug: varchar('slug', { length: 100 }).notNull().unique(),
+  payoutMethod: varchar('payout_method', { length: 20 }).notNull(), // bank | credit
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const merchantEarnings = pgTable('merchant_earnings', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  merchantId: uuid('merchant_id')
+    .notNull()
+    .references(() => merchants.id),
+  sourceUserId: uuid('source_user_id')
+    .notNull()
+    .references(() => users.id),
+  amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
+  type: varchar('type', { length: 30 }).notNull(), // signup_bonus | recurring_commission
+  periodMonth: varchar('period_month', { length: 7 }).notNull(), // YYYY-MM
+  paid: boolean('paid').notNull().default(false),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// -------- Relations (optional, for Drizzle) --------
+
+export const referralCodesRelations = relations(referralCodes, ({ many }) => ({
+  events: many(referralEvents),
+  conversions: many(referralConversions),
+}));
+
+export const referralEventsRelations = relations(referralEvents, ({ one }) => ({
+  referralCode: one(referralCodes, {
+    fields: [referralEvents.referralCodeId],
+    references: [referralCodes.id],
+  }),
+}));
+
+export const referralConversionsRelations = relations(
+  referralConversions,
+  ({ one }) => ({
+    referralCode: one(referralCodes, {
+      fields: [referralConversions.referralCodeId],
+      references: [referralCodes.id],
+    }),
+    referredUser: one(users, {
+      fields: [referralConversions.referredUserId],
+      references: [users.id],
+    }),
+  }),
+);
+
+export const reviewRewardsRelations = relations(reviewRewards, ({ one }) => ({
+  user: one(users, {
+    fields: [reviewRewards.userId],
+    references: [users.id],
+  }),
+}));
+
+export const merchantEarningsRelations = relations(
+  merchantEarnings,
+  ({ one }) => ({
+    merchant: one(merchants, {
+      fields: [merchantEarnings.merchantId],
+      references: [merchants.id],
+    }),
+    sourceUser: one(users, {
+      fields: [merchantEarnings.sourceUserId],
+      references: [users.id],
+    }),
+  }),
+);
+
+// -------- Zod schemas (if needed) --------
+
+export const insertReferralCodeSchema = createInsertSchema(referralCodes);
+export const selectReferralCodeSchema = createSelectSchema(referralCodes);
+export const insertReviewRewardSchema = createInsertSchema(reviewRewards);
+export const selectReviewRewardSchema = createSelectSchema(reviewRewards);
+
+// =======================================
+// SECTION 2 – DB CLIENT (DRIZZLE + NEON)
+// =======================================
+
+// In your real app, replace with your existing Drizzle setup.
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+export const db = drizzle(pool);
+
+// =======================================
+// SECTION 3 – AUTH MIDDLEWARE
+// =======================================
+
+export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const session = req.session as Session;
+  if (!session?.userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
+// =======================================
+// SECTION 4 – REFERRAL SERVICE
+// =======================================
+
+export class ReferralService {
+  static async createReferralCode(
+    ownerId: string,
+    ownerType: 'customer' | 'merchant',
+    landingType: 'customer' | 'merchant',
+  ) {
+    const existing = await db
+      .select()
+      .from(referralCodes)
+      .where(and(eq(referralCodes.ownerId, ownerId), eq(referralCodes.ownerType, ownerType)))
+      .limit(1);
+
+    if (existing.length > 0) return existing[0];
+
+    let code = '';
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    while (attempts < maxAttempts) {
+      code = nanoid(6).toUpperCase();
+      const dup = await db
+        .select()
+        .from(referralCodes)
+        .where(eq(referralCodes.code, code))
+        .limit(1);
+      if (dup.length === 0) break;
+      attempts += 1;
+    }
+
+    if (!code) throw new Error('Failed to generate referral code');
+
+    const [created] = await db
+      .insert(referralCodes)
+      .values({ ownerId, ownerType, landingType, code })
+      .returning();
+    return created;
+  }
+
+  static async getReferralCodeByCode(code: string) {
+    const [row] = await db
+      .select()
+      .from(referralCodes)
+      .where(eq(referralCodes.code, code.toUpperCase()))
+      .limit(1);
+    return row;
+  }
+
+  static async getUserReferralCode(ownerId: string, ownerType: 'customer' | 'merchant') {
+    const [row] = await db
+      .select()
+      .from(referralCodes)
+      .where(and(eq(referralCodes.ownerId, ownerId), eq(referralCodes.ownerType, ownerType)))
+      .limit(1);
+    return row;
+  }
+
+  static hashValue(value: string) {
+    return crypto.createHash('sha256').update(value).digest('hex');
+  }
+
+  static async logReferralEvent(
+    referralCodeId: string,
+    ip: string,
+    userAgent: string,
+    geoCountry?: string,
+  ) {
+    await db.insert(referralEvents).values({
+      referralCodeId,
+      ipHash: this.hashValue(ip),
+      userAgentHash: this.hashValue(userAgent),
+      geoCountry,
+    });
+  }
+
+  static async createConversion(referralCodeId: string, referredUserId: string) {
+    const existing = await db
+      .select()
+      .from(referralConversions)
+      .where(eq(referralConversions.referredUserId, referredUserId))
+      .limit(1);
+    if (existing.length > 0) return existing[0];
+
+    const [row] = await db
+      .insert(referralConversions)
+      .values({ referralCodeId, referredUserId, status: 'pending' })
+      .returning();
+    return row;
+  }
+}
+
+// =======================================
+// SECTION 5 – FRAUD DETECTION
+// =======================================
+
+export class FraudDetection {
+  static async checkSuspiciousActivity(
+    referralCodeId: string,
+    ip: string,
+    userAgent: string,
+  ): Promise<{ suspicious: boolean; reason?: string }> {
+    const ipHash = ReferralService.hashValue(ip);
+    const userAgentHash = ReferralService.hashValue(userAgent);
+    const oneDayAgo = new Date();
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+
+    const recentEvents = await db
+      .select()
+      .from(referralEvents)
+      .where(
+        and(
+          eq(referralEvents.referralCodeId, referralCodeId),
+          eq(referralEvents.ipHash, ipHash),
+          eq(referralEvents.userAgentHash, userAgentHash),
+          gte(referralEvents.scannedAt, oneDayAgo),
+        ),
+      );
+
+    if (recentEvents.length > 5) {
+      return { suspicious: true, reason: 'Too many scans from same IP/UA in 24h' };
+    }
+
+    const ipScans = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(referralEvents)
+      .where(and(eq(referralEvents.ipHash, ipHash), gte(referralEvents.scannedAt, oneDayAgo)));
+
+    if (Number(ipScans[0]?.count ?? 0) > 20) {
+      return { suspicious: true, reason: 'IP rate limit exceeded' };
+    }
+
+    return { suspicious: false };
+  }
+
+  static async checkDuplicatePaymentMethod(userId: string, paymentMethodId: string) {
+    const existing = await db
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.stripePaymentMethodId, paymentMethodId),
+          sql`${users.id} != ${userId}`,
+        ),
+      )
+      .limit(1);
+    return existing.length > 0;
+  }
+
+  static async disqualifyConversion(conversionId: string, reason: string) {
+    await db
+      .update(referralConversions)
+      .set({ status: 'disqualified' })
+      .where(eq(referralConversions.id, conversionId));
+    console.log('Disqualified conversion', conversionId, reason);
+  }
+}
+
+// =======================================
+// SECTION 6 – DISCOUNT ENGINE
+// =======================================
+
+export interface DiscountBreakdown {
+  reviewDiscount: number;
+  referralDiscount: number;
+  fixedMonthlyCredit: number;
+  totalPercentDiscount: number;
+  effectiveDiscount: number;
+  monthlySavings: number;
+  cappedReferrals: number;
+  creditPerCappedReferral: number;
+  totalPostCapCredit: number;
+}
+
+export class DiscountEngine {
+  private static readonly REVIEW_MAX_PERCENT = 20;
+  private static readonly REFERRAL_MAX_PERCENT = 50;
+  private static readonly COMBINED_CAP_PERCENT = 50;
+  private static readonly POST_CAP_CREDIT_PER_REFERRAL = 25;
+
+  static async calculateUserDiscount(userId: string, monthlyPrice: number): Promise<DiscountBreakdown> {
+    const reviewRows = await db
+      .select()
+      .from(reviewRewards)
+      .where(and(eq(reviewRewards.userId, userId), eq(reviewRewards.active, true)));
+
+    let reviewDiscountPercent = 0;
+    let fixedMonthlyCredit = 0;
+
+    for (const rw of reviewRows) {
+      const val = Number(rw.value);
+      if (rw.valueType === 'percent') reviewDiscountPercent += val;
+      else fixedMonthlyCredit += val;
+    }
+    reviewDiscountPercent = Math.min(reviewDiscountPercent, this.REVIEW_MAX_PERCENT);
+
+    const [userCode] = await db
+      .select()
+      .from(referralCodes)
+      .where(and(eq(referralCodes.ownerId, userId), eq(referralCodes.ownerType, 'customer')))
+      .limit(1);
+
+    let qualifiedReferralCount = 0;
+    if (userCode) {
+      const [agg] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(referralConversions)
+        .where(and(eq(referralConversions.referralCodeId, userCode.id), eq(referralConversions.status, 'qualified')));
+      qualifiedReferralCount = Number(agg?.count ?? 0);
+    }
+
+    let referralDiscountPercent = Math.min(
+      qualifiedReferralCount * 5,
+      this.REFERRAL_MAX_PERCENT,
+    );
+
+    const totalPercentBeforeCap = reviewDiscountPercent + referralDiscountPercent;
+    const effectivePercentDiscount = Math.min(
+      totalPercentBeforeCap,
+      this.COMBINED_CAP_PERCENT,
+    );
+
+    const referralsForCap = this.COMBINED_CAP_PERCENT / 5;
+    const cappedReferrals = Math.max(0, qualifiedReferralCount - referralsForCap);
+
+    const percentDiscountAmount = (monthlyPrice * effectivePercentDiscount) / 100;
+    const totalMonthlyDiscount = percentDiscountAmount + fixedMonthlyCredit;
+    const finalMonthlyDiscount = Math.min(totalMonthlyDiscount, monthlyPrice);
+    const postCapCredit = cappedReferrals * this.POST_CAP_CREDIT_PER_REFERRAL;
+
+    return {
+      reviewDiscount: reviewDiscountPercent,
+      referralDiscount: referralDiscountPercent,
+      fixedMonthlyCredit,
+      totalPercentDiscount: totalPercentBeforeCap,
+      effectiveDiscount: effectivePercentDiscount,
+      monthlySavings: finalMonthlyDiscount,
+      cappedReferrals,
+      creditPerCappedReferral: this.POST_CAP_CREDIT_PER_REFERRAL,
+      totalPostCapCredit: postCapCredit,
+    };
+  }
+}
+
+// =======================================
+// SECTION 7 – STRIPE SERVICE (NO COUPONS)
+// =======================================
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', {
+  apiVersion: '2024-11-20.acacia',
+});
+
+export class StripeService {
+  static async applyMonthlyDiscount(userId: string, customerId: string, monthlyPrice: number) {
+    const discount = await DiscountEngine.calculateUserDiscount(userId, monthlyPrice);
+    if (discount.monthlySavings > 0) {
+      await stripe.customers.update(customerId, {
+        balance: Math.round(discount.monthlySavings * -100),
+      });
+    }
+    if (discount.totalPostCapCredit > 0) {
+      await stripe.customers.update(customerId, {
+        metadata: {
+          post_cap_credit: discount.totalPostCapCredit.toString(),
+        },
+      });
+    }
+  }
+
+  static async createCreditInvoiceItem(customerId: string, amount: number, description: string) {
+    return stripe.invoiceItems.create({
+      customer: customerId,
+      amount: Math.round(amount * -100),
+      currency: 'gbp',
+      description,
+    });
+  }
+}
+
+// =======================================
+// SECTION 8 – EXPRESS ROUTES (SERVER)
+// =======================================
+
+// --- Referral API (authenticated) ---
+
+export const referralRouter = express.Router();
+
+referralRouter.post('/create', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req.session as Session).userId!;
+    const ownerType = (req.body?.ownerType ?? 'customer') as 'customer' | 'merchant';
+    const landingType = (req.body?.landingType ?? 'customer') as 'customer' | 'merchant';
+    if (!['customer', 'merchant'].includes(ownerType) || !['customer', 'merchant'].includes(landingType)) {
+      return res.status(400).json({ error: 'Invalid ownerType or landingType' });
+    }
+    const code = await ReferralService.createReferralCode(userId, ownerType, landingType);
+    res.json(code);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to create referral code' });
+  }
+});
+
+referralRouter.get('/me', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req.session as Session).userId!;
+    const type = (req.query.type ?? 'customer') as 'customer' | 'merchant';
+    const code = await ReferralService.getUserReferralCode(userId, type);
+    if (!code) return res.status(404).json({ error: 'No referral code' });
+    res.json(code);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to fetch referral code' });
+  }
+});
+
+referralRouter.get('/stats', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req.session as Session).userId!;
+    const code = await ReferralService.getUserReferralCode(userId, 'customer');
+    if (!code) return res.status(404).json({ error: 'No referral code' });
+
+    const [scanAgg] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(referralEvents)
+      .where(eq(referralEvents.referralCodeId, code.id));
+    const [convAgg] = await db
+      .select({
+        total: sql<number>`count(*)`,
+        qualified: sql<number>`sum(case when status = 'qualified' then 1 else 0 end)`,
+      })
+      .from(referralConversions)
+      .where(eq(referralConversions.referralCodeId, code.id));
+
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    const planPrices: Record<string, number> = {
+      free: 0,
+      starter: 35,
+      pro: 60,
+      business: 150,
+    };
+    const monthlyPrice = planPrices[user.plan] ?? 0;
+    const discount = await DiscountEngine.calculateUserDiscount(userId, monthlyPrice);
+
+    res.json({
+      code: code.code,
+      totalScans: Number(scanAgg?.count ?? 0),
+      totalSignups: Number(convAgg?.total ?? 0),
+      qualifiedReferrals: Number(convAgg?.qualified ?? 0),
+      currentDiscount: discount.effectiveDiscount,
+      monthlySavings: discount.monthlySavings,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to fetch referral stats' });
+  }
+});
+
+// --- Public routes (no auth) for QR and merchants ---
+
+export const publicRouter = express.Router();
+
+publicRouter.get('/r/:code', async (req: Request, res: Response) => {
+  try {
+    const { code } = req.params;
+    const referralCode = await ReferralService.getReferralCodeByCode(code);
+    if (!referralCode) return res.redirect('/signup?error=invalid_referral');
+
+    const ip = (req.headers['x-forwarded-for'] as string) || req.ip || 'unknown';
+    const ua = (req.headers['user-agent'] as string) || 'unknown';
+    const geoCountry = (req.headers['cf-ipcountry'] as string) || undefined;
+
+    const fraud = await FraudDetection.checkSuspiciousActivity(referralCode.id, ip, ua);
+    if (!fraud.suspicious) {
+      await ReferralService.logReferralEvent(referralCode.id, ip, ua, geoCountry);
+    }
+
+    res.cookie('tn_referral', referralCode.code, {
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    });
+
+    res.redirect(`/signup?ref=${encodeURIComponent(referralCode.code)}`);
+  } catch (e) {
+    console.error(e);
+    res.redirect('/signup');
+  }
+});
+
+publicRouter.get('/partners/:slug', async (req: Request, res: Response) => {
+  try {
+    const { slug } = req.params;
+    const [merchant] = await db
+      .select()
+      .from(merchants)
+      .where(eq(merchants.slug, slug))
+      .limit(1);
+    if (!merchant || !merchant.active) return res.redirect('/signup?error=invalid_merchant');
+
+    const code = await ReferralService.getUserReferralCode(merchant.id, 'merchant');
+    if (!code) return res.redirect('/signup?error=no_referral_code');
+
+    const ip = (req.headers['x-forwarded-for'] as string) || req.ip || 'unknown';
+    const ua = (req.headers['user-agent'] as string) || 'unknown';
+    const geoCountry = (req.headers['cf-ipcountry'] as string) || undefined;
+
+    const fraud = await FraudDetection.checkSuspiciousActivity(code.id, ip, ua);
+    if (!fraud.suspicious) {
+      await ReferralService.logReferralEvent(code.id, ip, ua, geoCountry);
+    }
+
+    res.cookie('tn_referral', code.code, {
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    });
+
+    res.redirect(`/signup?partner=${encodeURIComponent(slug)}`);
+  } catch (e) {
+    console.error(e);
+    res.redirect('/signup');
+  }
+});
+
+// --- Billing discount summary ---
+
+export const billingRouter = express.Router();
+
+billingRouter.get('/discount-summary', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req.session as Session).userId!;
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const planPrices: Record<string, number> = {
+      free: 0,
+      starter: 35,
+      pro: 60,
+      business: 150,
+    };
+    const monthlyPrice = planPrices[user.plan] ?? 0;
+    const discount = await DiscountEngine.calculateUserDiscount(userId, monthlyPrice);
+
+    res.json({
+      currentPlan: user.plan,
+      monthlyPrice,
+      discount,
+      finalPrice: monthlyPrice - discount.monthlySavings,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to calculate discount' });
+  }
+});
+
+// --- Merchant stats + payout request ---
+
+export const merchantRouter = express.Router();
+
+merchantRouter.get('/stats', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const merchantId = (req.session as Session).userId!;
+    const code = await ReferralService.getUserReferralCode(merchantId, 'merchant');
+    if (!code) return res.status(404).json({ error: 'No merchant referral code' });
+
+    const [scansAgg] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(referralEvents)
+      .where(eq(referralEvents.referralCodeId, code.id));
+
+    const [activeCustomersAgg] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(referralConversions)
+      .innerJoin(users, eq(referralConversions.referredUserId, users.id))
+      .where(and(eq(referralConversions.referralCodeId, code.id), eq(users.subscriptionActive, true)));
+
+    const [monthlyAgg] = await db
+      .select({ sum: sql<number>`coalesce(sum(amount),0)` })
+      .from(merchantEarnings)
+      .where(eq(merchantEarnings.merchantId, merchantId));
+
+    const [unpaidAgg] = await db
+      .select({ sum: sql<number>`coalesce(sum(amount),0)` })
+      .from(merchantEarnings)
+      .where(and(eq(merchantEarnings.merchantId, merchantId), eq(merchantEarnings.paid, false)));
+
+    res.json({
+      totalScans: Number(scansAgg?.count ?? 0),
+      totalSignups: Number(activeCustomersAgg?.count ?? 0),
+      activeCustomers: Number(activeCustomersAgg?.count ?? 0),
+      monthlyCommission: Number(monthlyAgg?.sum ?? 0),
+      lifetimeEarnings: Number(monthlyAgg?.sum ?? 0),
+      unpaidEarnings: Number(unpaidAgg?.sum ?? 0),
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to fetch merchant stats' });
+  }
+});
+
+merchantRouter.post('/request-payout', requireAuth, async (req: Request, res: Response) => {
+  // Manual admin workflow in your existing admin tools.
+  res.json({ ok: true });
+});
+
+// =======================================
+// SECTION 9 – MONTHLY COMMISSION JOB
+// =======================================
+
+export async function processMonthlyCommissions() {
+  const now = new Date();
+  const periodMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  console.log('Processing merchant commissions for', periodMonth);
+
+  const threeMonthsAgo = new Date();
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+  const qualifiedMerchantConversions = await db
+    .select({
+      conv: referralConversions,
+      code: referralCodes,
+      user,
+    })
+    .from(referralConversions)
+    .innerJoin(referralCodes, eq(referralConversions.referralCodeId, referralCodes.id))
+    .innerJoin(users, eq(referralConversions.referredUserId, users.id))
+    .where(
+      and(
+        eq(referralConversions.status, 'qualified'),
+        eq(referralCodes.ownerType, 'merchant'),
+        gte(referralConversions.qualifiedAt!, threeMonthsAgo),
+      ),
+    );
+
+  for (const row of qualifiedMerchantConversions) {
+    const { conv, code, user } = row as any;
+    const existing = await db
+      .select()
+      .from(merchantEarnings)
+      .where(
+        and(
+          eq(merchantEarnings.merchantId, code.ownerId),
+          eq(merchantEarnings.sourceUserId, user.id),
+          eq(merchantEarnings.type, 'signup_bonus'),
+        ),
+      )
+      .limit(1);
+    if (existing.length === 0) {
+      await db.insert(merchantEarnings).values({
+        merchantId: code.ownerId,
+        sourceUserId: user.id,
+        amount: '10.00',
+        type: 'signup_bonus',
+        periodMonth,
+        paid: false,
+      });
+    }
+  }
+
+  const planPrices: Record<string, number> = {
+    starter: 35,
+    pro: 60,
+    business: 150,
+  };
+
+  const recurring = await db
+    .select({
+      conv: referralConversions,
+      code: referralCodes,
+      user,
+    })
+    .from(referralConversions)
+    .innerJoin(referralCodes, eq(referralConversions.referralCodeId, referralCodes.id))
+    .innerJoin(users, eq(referralConversions.referredUserId, users.id))
+    .where(
+      and(
+        eq(referralConversions.status, 'qualified'),
+        eq(referralCodes.ownerType, 'merchant'),
+        eq(users.subscriptionActive, true),
+      ),
+    );
+
+  for (const row of recurring) {
+    const { code, user } = row as any;
+    const price = planPrices[user.plan] ?? 0;
+    if (!price) continue;
+    const commission = price * 0.05;
+
+    const existing = await db
+      .select()
+      .from(merchantEarnings)
+      .where(
+        and(
+          eq(merchantEarnings.merchantId, code.ownerId),
+          eq(merchantEarnings.sourceUserId, user.id),
+          eq(merchantEarnings.type, 'recurring_commission'),
+          eq(merchantEarnings.periodMonth, periodMonth),
+        ),
+      )
+      .limit(1);
+    if (existing.length === 0) {
+      await db.insert(merchantEarnings).values({
+        merchantId: code.ownerId,
+        sourceUserId: user.id,
+        amount: commission.toFixed(2),
+        type: 'recurring_commission',
+        periodMonth,
+        paid: false,
+      });
+    }
+  }
+}
+
+// =======================================
+// SECTION 10 – REACT COMPONENTS (CLIENT)
+// =======================================
+
+// --- shadcn/ui component placeholders (replace with your actual imports) ---
+
+type CardProps = { children: React.ReactNode; className?: string };
+export function Card({ children, className }: CardProps) {
+  return <div className={`rounded-lg border bg-background p-4 ${className ?? ''}`}>{children}</div>;
+}
+export function CardHeader({ children }: CardProps) {
+  return <div className="mb-2">{children}</div>;
+}
+export function CardTitle({ children }: CardProps) {
+  return <h3 className="font-semibold">{children}</h3>;
+}
+export function CardDescription({ children }: CardProps) {
+  return <p className="text-sm text-muted-foreground">{children}</p>;
+}
+export function CardContent({ children }: CardProps) {
+  return <div>{children}</div>;
+}
+export function Button(
+  props: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string; size?: string },
+) {
+  return (
+    <button
+      {...props}
+      className={`inline-flex items-center justify-center rounded-md border px-3 py-1 text-sm ${
+        props.className ?? ''
+      }`}
+    />
+  );
+}
+
+// --- Customer Referral Dashboard ---
+
+interface ReferralStats {
+  code: string;
+  totalScans: number;
+  totalSignups: number;
+  qualifiedReferrals: number;
+  currentDiscount: number;
+  monthlySavings: number;
+}
+
+export function CustomerReferralDashboard() {
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const { data: stats } = useQuery<ReferralStats>({
+    queryKey: ['referral-stats'],
+    queryFn: async () => {
+      const res = await fetch('/api/referrals/stats');
+      if (!res.ok) throw new Error('Failed to fetch referral stats');
+      return res.json();
+    },
+  });
+
+  const referralUrl = stats ? `${window.location.origin}/r/${stats.code}` : '';
+
+  useEffect(() => {
+    if (!referralUrl || !canvasRef.current) return;
+    QRCode.toCanvas(canvasRef.current, referralUrl, { width: 200, margin: 2 });
+    QRCode.toDataURL(referralUrl, { width: 400 }).then(setQrDataUrl);
+  }, [referralUrl]);
+
+  const copyLink = () => {
+    if (!referralUrl) return;
+    navigator.clipboard.writeText(referralUrl).catch(() => {});
+  };
+
+  const downloadQR = () => {
+    if (!qrDataUrl) return;
+    const a = document.createElement('a');
+    a.href = qrDataUrl;
+    a.download = 'truenorth-referral.png';
+    a.click();
+  };
+
+  if (!stats) return <div>Loading...</div>;
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold">Referral Dashboard</h2>
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Total Scans</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{stats.totalScans}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Signups</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{stats.totalSignups}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Qualified Referrals</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{stats.qualifiedReferrals}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Monthly Savings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-green-600">
+              £{stats.monthlySavings.toFixed(2)}
+            </div>
+            <p className="text-sm text-muted-foreground">{stats.currentDiscount}% discount</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Referral Link</CardTitle>
+          <CardDescription>Share this link or QR code</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2 mb-4">
+            <code className="flex-1 rounded bg-muted px-3 py-2 text-sm">{referralUrl}</code>
+            <Button onClick={copyLink}>
+              <Copy className="mr-1 h-4 w-4" /> Copy
+            </Button>
+          </div>
+          <div className="flex items-center gap-4">
+            <canvas ref={canvasRef} />
+            <Button onClick={downloadQR}>
+              <Download className="mr-1 h-4 w-4" /> Download QR
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// --- Merchant Portal ---
+
+interface MerchantStats {
+  totalScans: number;
+  totalSignups: number;
+  activeCustomers: number;
+  monthlyCommission: number;
+  lifetimeEarnings: number;
+  unpaidEarnings: number;
+}
+
+export function MerchantPortal() {
+  const { data: stats } = useQuery<MerchantStats>({
+    queryKey: ['merchant-stats'],
+    queryFn: async () => {
+      const res = await fetch('/api/merchants/stats');
+      if (!res.ok) throw new Error('Failed to fetch merchant stats');
+      return res.json();
+    },
+  });
+
+  const requestPayout = async () => {
+    await fetch('/api/merchants/request-payout', { method: 'POST' });
+  };
+
+  if (!stats) return <div>Loading...</div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">Merchant Portal</h2>
+        <Button disabled={stats.unpaidEarnings <= 0} onClick={requestPayout}>
+          Request Payout (£{stats.unpaidEarnings.toFixed(2)})
+        </Button>
+      </div>
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="flex items-center justify-between">
+            <CardTitle>Total Scans</CardTitle>
+            <Users className="h-4 w-4" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalScans}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex items-center justify-between">
+            <CardTitle>Active Customers</CardTitle>
+            <Users className="h-4 w-4" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.activeCustomers}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex items-center justify-between">
+            <CardTitle>Monthly Commission</CardTitle>
+            <TrendingUp className="h-4 w-4" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">£{stats.monthlyCommission.toFixed(2)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex items-center justify-between">
+            <CardTitle>Lifetime Earnings</CardTitle>
+            <DollarSign className="h-4 w-4" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">£{stats.lifetimeEarnings.toFixed(2)}</div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// --- Pricing Page (explanatory only, no stateful calculators) ---
+
+const plans = [
+  { name: 'Free', price: 0, lowestPrice: 0, features: ['Basic features', '1 user'] },
+  { name: 'Starter', price: 35, lowestPrice: 17.5, features: ['All Free features', '5 users'] },
+  { name: 'Pro', price: 60, lowestPrice: 30, features: ['All Starter features', 'Unlimited users'] },
+  { name: 'Business', price: 150, lowestPrice: 75, features: ['All Pro features', 'Dedicated support'] },
+];
+
+export function PricingPage() {
+  return (
+    <div className="container mx-auto px-4 py-16 space-y-10">
+      <div className="text-center space-y-4">
+        <h1 className="text-4xl font-bold">Simple, Transparent Pricing</h1>
+        <p className="text-muted-foreground">
+          Review discounts up to 20%. Referral discounts up to 50%. Combined cap 50%.
+          Post-cap referrals earn £25 credit each.
+        </p>
+        <Card className="max-w-2xl mx-auto">
+          <CardHeader>
+            <CardTitle>How discounts work</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-left">
+            <div className="flex gap-2">
+              <Check className="h-4 w-4 text-green-600 mt-1" />
+              <div>
+                <p className="font-semibold">Review discounts: up to 20%</p>
+                <p className="text-sm text-muted-foreground">
+                  Verified reviews on Google, Trustpilot, G2, LinkedIn, video, and case studies.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Check className="h-4 w-4 text-green-600 mt-1" />
+              <div>
+                <p className="font-semibold">Referral discounts: up to 50%</p>
+                <p className="text-sm text-muted-foreground">
+                  Each qualified customer (3+ months) gives 5% off, capped at 50%.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Check className="h-4 w-4 text-green-600 mt-1" />
+              <div>
+                <p className="font-semibold">Combined cap: 50%</p>
+                <p className="text-sm text-muted-foreground">
+                  Total discount (reviews + referrals) can never exceed half your plan price.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Check className="h-4 w-4 text-green-600 mt-1" />
+              <div>
+                <p className="font-semibold">Post-cap referrals: £25 each</p>
+                <p className="text-sm text-muted-foreground">
+                  After you hit 50%, every additional qualified referral earns £25 in account credit.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      <div className="grid gap-6 md:grid-cols-4">
+        {plans.map((plan) => (
+          <Card key={plan.name} className={plan.name === 'Pro' ? 'border-primary' : ''}>
+            <CardHeader>
+              <CardTitle>{plan.name}</CardTitle>
+              <CardDescription>
+                <span className="text-3xl font-bold">£{plan.price}</span>
+                {plan.price > 0 && <span>/month</span>}
+              </CardDescription>
+              {plan.price > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Lowest possible: £{plan.lowestPrice.toFixed(2)} per month with max discounts.
+                  For example, Starter £35 → £17.50.
+                </p>
+              )}
+            </CardHeader>
+            <CardContent>
+              <Button className="w-full mb-3">Get started</Button>
+              <ul className="space-y-1 text-sm">
+                {plan.features.map((f) => (
+                  <li key={f} className="flex gap-2">
+                    <Check className="h-3 w-3 mt-1" /> <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// =======================================
+// SECTION 11 – EXPRESS APP WIRING (ENTRY)
+// =======================================
+
+export function createServer() {
+  const app = express();
+  app.use(express.json());
+
+  // session middleware already configured in your real app
+  // app.use(session(...));
+
+  app.use('/', publicRouter);
+  app.use('/api/referrals', referralRouter);
+  app.use('/api/billing', billingRouter);
+  app.use('/api/merchants', merchantRouter);
+
+  return app;
+}
