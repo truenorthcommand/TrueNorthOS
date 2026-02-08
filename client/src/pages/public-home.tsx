@@ -97,7 +97,6 @@ const testimonials = [
   },
 ];
 
-const certBadges = ["Gas Safe Registered", "NICEIC", "City & Guilds", "CIPHE"];
 
 export default function PublicHome() {
   return (
@@ -143,22 +142,11 @@ export default function PublicHome() {
         </div>
       </section>
 
-      <section className="py-10 bg-slate-50 border-b" data-testid="section-trusted-by">
+      <section className="py-12 bg-slate-50 border-b" data-testid="section-trusted-by">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-sm text-muted-foreground font-medium mb-6" data-testid="text-trusted-by">
-            Trusted by 500+ trade businesses across the UK
-          </p>
-          <div className="flex flex-wrap justify-center gap-4">
-            {certBadges.map((badge) => (
-              <span
-                key={badge}
-                className="inline-flex items-center px-5 py-2.5 rounded-full bg-white border text-sm font-medium text-slate-700 shadow-sm"
-                data-testid={`badge-${badge.toLowerCase().replace(/\s+/g, "-")}`}
-              >
-                {badge}
-              </span>
-            ))}
-          </div>
+          <h2 className="text-2xl md:text-3xl font-bold text-slate-800" data-testid="text-trusted-by">
+            Trusted by trades across the UK
+          </h2>
         </div>
       </section>
 
