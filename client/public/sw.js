@@ -1,4 +1,4 @@
-const CACHE_NAME = 'truenorth-fieldview-v8';
+const CACHE_NAME = 'truenorth-fieldview-v9';
 const API_CACHE_NAME = 'truenorth-api-cache-v2';
 const OFFLINE_QUEUE_NAME = 'truenorth-offline-queue';
 
