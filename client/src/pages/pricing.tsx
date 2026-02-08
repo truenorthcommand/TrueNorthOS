@@ -1,106 +1,141 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Zap, Building2, Users, Crown, ArrowLeft, X } from "lucide-react";
+import { Check, Zap, Building2, Users, Crown, X, Gift, Star, Share2 } from "lucide-react";
 import { Link } from "wouter";
 import PublicLayout from "@/components/public-layout";
+import { Badge } from "@/components/ui/badge";
 
 const tiers = [
   {
-    name: "Starter",
-    description: "For solo tradespeople and small teams",
-    price: "£99",
+    name: "Free",
+    description: "Get started with the essentials",
+    price: "£0",
     priceNote: "/month",
-    additionalInfo: "1–5 users included",
+    additionalInfo: "1 user included",
+    extraUsers: null,
     icon: Users,
     features: [
-      { name: "Job management", included: true },
-      { name: "Quoting & invoicing", included: true },
-      { name: "Client CRM", included: true },
-      { name: "Photo evidence", included: true },
-      { name: "Digital signatures", included: true },
-      { name: "Mobile PWA", included: true },
-      { name: "Basic timesheets", included: true },
-      { name: "Auto-assign by postcode", included: true },
-      { name: "Expense tracking", included: false },
-      { name: "Fleet management", included: false },
-      { name: "Team messaging", included: false },
-      { name: "AI Technical Advisors", included: false },
-    ],
-    cta: "Start Free Trial",
-    popular: false,
-  },
-  {
-    name: "Professional",
-    description: "For growing field service teams",
-    price: "£149",
-    priceNote: "/month",
-    additionalInfo: "6–10 users included",
-    icon: Zap,
-    features: [
-      { name: "Everything in Starter", included: true },
-      { name: "Expense tracking with mileage", included: true },
-      { name: "Payment collection", included: true },
-      { name: "Team messaging", included: true },
-      { name: "Live GPS tracking", included: true },
-      { name: "Weekly planner", included: true },
-      { name: "Long-running jobs", included: true },
-      { name: "AI Technical Advisors", included: true },
-      { name: "AI Writing Assistant", included: true },
-      { name: "AI Quality Gatekeeper", included: true },
+      { name: "Job scheduling", included: true },
+      { name: "Client database", included: true },
+      { name: "Unlimited invoicing", included: true },
+      { name: "Basic mobile app", included: true },
+      { name: "Client portal", included: false },
+      { name: "Payment processing", included: false },
+      { name: "AI assistant", included: false },
+      { name: "Auto-assign postcode", included: false },
+      { name: "Integrations", included: false },
+      { name: "Analytics", included: false },
       { name: "Fleet management", included: false },
       { name: "API access", included: false },
     ],
+    branding: "TrueNorth branding",
+    whiteLabel: null,
+    cta: "Get Started Free",
+    ctaLink: "/register",
+    popular: false,
+  },
+  {
+    name: "Starter",
+    description: "For solo tradespeople growing their business",
+    price: "£35",
+    priceNote: "/month",
+    additionalInfo: "1 user included",
+    extraUsers: "+£15/additional user",
+    icon: Zap,
+    features: [
+      { name: "Job scheduling", included: true },
+      { name: "Client database", included: true },
+      { name: "Unlimited invoicing", included: true },
+      { name: "Full mobile app", included: true },
+      { name: "Client portal", included: true },
+      { name: "Payment processing", included: true },
+      { name: "Basic AI assistant", included: true },
+      { name: "Auto-assign postcode", included: false },
+      { name: "Integrations", included: true },
+      { name: "Basic analytics", included: true },
+      { name: "Fleet management", included: false },
+      { name: "API access", included: false },
+    ],
+    branding: "Remove branding (+£10/mo)",
+    whiteLabel: "+£10/mo",
     cta: "Start Free Trial",
+    ctaLink: "/checkout?plan=starter",
+    popular: false,
+  },
+  {
+    name: "Pro",
+    description: "For growing field service teams",
+    price: "£60",
+    priceNote: "/month",
+    additionalInfo: "1 user included",
+    extraUsers: "+£12/additional user",
+    icon: Building2,
+    features: [
+      { name: "Job scheduling", included: true },
+      { name: "Client database", included: true },
+      { name: "Unlimited invoicing", included: true },
+      { name: "Full mobile app", included: true },
+      { name: "Client portal", included: true },
+      { name: "Payment processing", included: true },
+      { name: "Full AI assistant", included: true },
+      { name: "Auto-assign postcode", included: true },
+      { name: "Integrations", included: true },
+      { name: "Full analytics", included: true },
+      { name: "Fleet management", included: false },
+      { name: "API access", included: false },
+    ],
+    branding: "Branding removed",
+    whiteLabel: "+£20/mo",
+    cta: "Start Free Trial",
+    ctaLink: "/checkout?plan=pro",
     popular: true,
   },
   {
     name: "Business",
-    description: "For established companies",
-    price: "£199",
+    description: "For established companies and larger teams",
+    price: "£150",
     priceNote: "/month",
-    additionalInfo: "11–15 users included",
-    icon: Building2,
-    features: [
-      { name: "Everything in Professional", included: true },
-      { name: "Fleet management", included: true },
-      { name: "Vehicle walkaround checks", included: true },
-      { name: "Defect tracking workflow", included: true },
-      { name: "Advanced reporting", included: true },
-      { name: "Custom AI advisors", included: true },
-      { name: "Client portal access", included: true },
-      { name: "API access", included: true },
-      { name: "Priority support", included: true },
-      { name: "White-label options", included: false },
-      { name: "Custom integrations", included: false },
-      { name: "Dedicated account manager", included: false },
-    ],
-    cta: "Start Free Trial",
-    popular: false,
-  },
-  {
-    name: "Enterprise",
-    description: "Custom solutions for large organisations",
-    price: "Custom",
-    priceNote: "contact us",
-    additionalInfo: "Unlimited users",
+    additionalInfo: "1 user included",
+    extraUsers: "+£10/additional user",
     icon: Crown,
     features: [
-      { name: "Everything in Business", included: true },
-      { name: "Unlimited users", included: true },
-      { name: "White-label options", included: true },
-      { name: "Custom integrations", included: true },
-      { name: "On-premise deployment", included: true },
-      { name: "SSO / SAML", included: true },
-      { name: "Dedicated account manager", included: true },
-      { name: "SLA guarantee", included: true },
-      { name: "24/7 premium support", included: true },
-      { name: "Custom training", included: true },
-      { name: "Data migration support", included: true },
-      { name: "Bespoke development", included: true },
+      { name: "Job scheduling", included: true },
+      { name: "Client database", included: true },
+      { name: "Unlimited invoicing", included: true },
+      { name: "Full mobile app", included: true },
+      { name: "Client portal", included: true },
+      { name: "Payment processing", included: true },
+      { name: "Full AI assistant", included: true },
+      { name: "Auto-assign postcode", included: true },
+      { name: "Integrations", included: true },
+      { name: "Full suite analytics", included: true },
+      { name: "Fleet management", included: true },
+      { name: "API access", included: true },
     ],
-    cta: "Contact Sales",
+    branding: "Branding removed",
+    whiteLabel: "+£30/mo",
+    cta: "Start Free Trial",
+    ctaLink: "/checkout?plan=business",
     popular: false,
   },
+];
+
+const featureComparison = [
+  { feature: "Users", free: "1", starter: "1 (+£15/user)", pro: "1 (+£12/user)", business: "1 (+£10/user)" },
+  { feature: "Job scheduling", free: "Included", starter: "Included", pro: "Included", business: "Included" },
+  { feature: "Client database", free: "Included", starter: "Included", pro: "Included", business: "Included" },
+  { feature: "Invoicing", free: "Unlimited", starter: "Included", pro: "Included", business: "Included" },
+  { feature: "Mobile app", free: "Basic", starter: "Full", pro: "Full", business: "Full" },
+  { feature: "Client portal", free: "—", starter: "Included", pro: "Included", business: "Included" },
+  { feature: "Payment processing", free: "—", starter: "Included", pro: "Included", business: "Included" },
+  { feature: "AI assistant", free: "—", starter: "Basic", pro: "Full", business: "Full" },
+  { feature: "Auto-assign postcode", free: "—", starter: "—", pro: "Included", business: "Included" },
+  { feature: "Integrations", free: "—", starter: "Included", pro: "Included", business: "Included" },
+  { feature: "Analytics", free: "—", starter: "Basic", pro: "Included", business: "Full Suite" },
+  { feature: "Fleet management", free: "—", starter: "—", pro: "—", business: "Included" },
+  { feature: "API access", free: "—", starter: "—", pro: "—", business: "Included" },
+  { feature: "Branding", free: "TrueNorth", starter: "Remove (+£10)", pro: "Removed", business: "Removed" },
+  { feature: "White-label", free: "—", starter: "+£10/mo", pro: "+£20/mo", business: "+£30/mo" },
 ];
 
 const allIncluded = [
@@ -111,20 +146,7 @@ const allIncluded = [
   "Regular updates",
   "Email support",
   "Data export",
-  "Mobile app access",
-];
-
-const moduleComparison = [
-  { module: "Operations", starter: true, professional: true, business: true, enterprise: true },
-  { module: "Auto-assign by Postcode", starter: true, professional: true, business: true, enterprise: true },
-  { module: "Finance - Basic", starter: true, professional: true, business: true, enterprise: true },
-  { module: "Finance - Advanced", starter: false, professional: true, business: true, enterprise: true },
-  { module: "Fleet Management", starter: false, professional: false, business: true, enterprise: true },
-  { module: "Workforce - Basic", starter: true, professional: true, business: true, enterprise: true },
-  { module: "Workforce - GPS & Messaging", starter: false, professional: true, business: true, enterprise: true },
-  { module: "Compliance", starter: true, professional: true, business: true, enterprise: true },
-  { module: "AI Intelligence", starter: false, professional: true, business: true, enterprise: true },
-  { module: "AI Quality Gatekeeper", starter: false, professional: true, business: true, enterprise: true },
+  "14-day free trial",
 ];
 
 export default function Pricing() {
@@ -138,8 +160,7 @@ export default function Pricing() {
             Simple, Transparent Pricing
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto" data-testid="text-pricing-subtitle">
-            Fixed monthly pricing based on team size — no per-user fees. 
-            Choose the band that fits your business and scale as you grow.
+            Start free, then scale as you grow. Add team members at a simple per-user rate — no hidden fees, no lock-in contracts.
           </p>
         </div>
 
@@ -176,10 +197,13 @@ export default function Pricing() {
                     {tier.price}
                   </span>
                   <span className="text-muted-foreground block text-sm">{tier.priceNote}</span>
-                  <span className="text-primary text-sm font-medium">{tier.additionalInfo}</span>
+                  <span className="text-primary text-sm font-medium block">{tier.additionalInfo}</span>
+                  {tier.extraUsers && (
+                    <span className="text-muted-foreground text-xs block mt-1">{tier.extraUsers}</span>
+                  )}
                 </div>
                 <ul className="space-y-2">
-                  {tier.features.slice(0, 9).map((feature, idx) => (
+                  {tier.features.map((feature, idx) => (
                     <li key={idx} className="flex items-start gap-2">
                       {feature.included ? (
                         <Check className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
@@ -192,9 +216,17 @@ export default function Pricing() {
                     </li>
                   ))}
                 </ul>
+                {tier.branding && (
+                  <div className="mt-3 pt-3 border-t">
+                    <p className="text-xs text-muted-foreground">{tier.branding}</p>
+                  </div>
+                )}
+                {tier.whiteLabel && (
+                  <p className="text-xs text-muted-foreground mt-1">White-label: {tier.whiteLabel}</p>
+                )}
               </CardContent>
               <CardFooter>
-                <Link href={tier.name === "Enterprise" ? "/contact" : `/checkout?plan=${tier.name.toLowerCase()}`} className="w-full">
+                <Link href={tier.ctaLink} className="w-full">
                   <Button 
                     className="w-full"
                     variant={tier.popular ? "default" : "outline"}
@@ -208,41 +240,97 @@ export default function Pricing() {
           ))}
         </div>
 
-        <div className="max-w-5xl mx-auto mb-16">
-          <h2 className="text-2xl font-bold text-center mb-8" data-testid="text-module-comparison">
-            Module Comparison
+        <div className="max-w-6xl mx-auto mb-16">
+          <h2 className="text-2xl font-bold text-center mb-8" data-testid="text-feature-comparison">
+            Feature Comparison
           </h2>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-3 px-4 font-semibold">Module</th>
+                  <th className="text-left py-3 px-4 font-semibold">Feature</th>
+                  <th className="text-center py-3 px-4 font-semibold">Free</th>
                   <th className="text-center py-3 px-4 font-semibold">Starter</th>
-                  <th className="text-center py-3 px-4 font-semibold text-primary">Professional</th>
+                  <th className="text-center py-3 px-4 font-semibold text-primary">Pro</th>
                   <th className="text-center py-3 px-4 font-semibold">Business</th>
-                  <th className="text-center py-3 px-4 font-semibold">Enterprise</th>
                 </tr>
               </thead>
               <tbody>
-                {moduleComparison.map((row, idx) => (
+                {featureComparison.map((row, idx) => (
                   <tr key={idx} className="border-b">
-                    <td className="py-3 px-4 text-sm">{row.module}</td>
-                    <td className="text-center py-3 px-4">
-                      {row.starter ? <Check className="h-4 w-4 text-green-500 inline" /> : <X className="h-4 w-4 text-slate-300 inline" />}
-                    </td>
-                    <td className="text-center py-3 px-4 bg-primary/5">
-                      {row.professional ? <Check className="h-4 w-4 text-green-500 inline" /> : <X className="h-4 w-4 text-slate-300 inline" />}
-                    </td>
-                    <td className="text-center py-3 px-4">
-                      {row.business ? <Check className="h-4 w-4 text-green-500 inline" /> : <X className="h-4 w-4 text-slate-300 inline" />}
-                    </td>
-                    <td className="text-center py-3 px-4">
-                      {row.enterprise ? <Check className="h-4 w-4 text-green-500 inline" /> : <X className="h-4 w-4 text-slate-300 inline" />}
-                    </td>
+                    <td className="py-3 px-4 text-sm font-medium">{row.feature}</td>
+                    <td className="text-center py-3 px-4 text-sm text-muted-foreground">{row.free}</td>
+                    <td className="text-center py-3 px-4 text-sm text-muted-foreground">{row.starter}</td>
+                    <td className="text-center py-3 px-4 text-sm bg-primary/5">{row.pro}</td>
+                    <td className="text-center py-3 px-4 text-sm text-muted-foreground">{row.business}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-2xl p-8 max-w-5xl mx-auto mb-16 border border-emerald-200 dark:border-emerald-800" data-testid="section-referral-programme">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-4 py-1.5 rounded-full text-sm font-medium mb-4">
+              <Gift className="h-4 w-4" />
+              Referral Programme
+            </div>
+            <h2 className="text-2xl font-bold mb-2">Save Up to 50% on Your Subscription</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Refer other trade businesses to TrueNorth OS and earn discounts on your monthly bill. Stack referral and review rewards for maximum savings.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-white dark:bg-slate-900 rounded-xl p-6 text-center shadow-sm" data-testid="card-referral-earn">
+              <div className="mx-auto mb-3 h-12 w-12 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center">
+                <Share2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <h3 className="font-semibold mb-2">5% Off Per Referral</h3>
+              <p className="text-sm text-muted-foreground">
+                Share your unique referral link. For each business that signs up, you get 5% off your monthly bill — up to 50%.
+              </p>
+            </div>
+            <div className="bg-white dark:bg-slate-900 rounded-xl p-6 text-center shadow-sm" data-testid="card-referral-reviews">
+              <div className="mx-auto mb-3 h-12 w-12 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center">
+                <Star className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+              </div>
+              <h3 className="font-semibold mb-2">Review Rewards</h3>
+              <p className="text-sm text-muted-foreground">
+                Leave reviews on Google, Trustpilot, G2, or LinkedIn and earn up to an additional 20% discount that stacks with referrals.
+              </p>
+            </div>
+            <div className="bg-white dark:bg-slate-900 rounded-xl p-6 text-center shadow-sm" data-testid="card-referral-credit">
+              <div className="mx-auto mb-3 h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                <Gift className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h3 className="font-semibold mb-2">£25 Credit Overflow</h3>
+              <p className="text-sm text-muted-foreground">
+                Already at the 50% cap? Each additional referral earns you £25 account credit instead. Your loyalty always pays off.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-white/60 dark:bg-slate-900/60 rounded-lg p-4 mb-6">
+            <div className="flex flex-wrap items-center justify-center gap-3 text-sm">
+              <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">1 referral = 5% off</Badge>
+              <span className="text-muted-foreground">→</span>
+              <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">5 referrals = 25% off</Badge>
+              <span className="text-muted-foreground">→</span>
+              <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">10 referrals = 50% off</Badge>
+              <span className="text-muted-foreground">→</span>
+              <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">11+ = £25 credit each</Badge>
+            </div>
+          </div>
+
+          <div className="text-center">
+            <Link href="/register">
+              <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white" data-testid="button-join-referral">
+                Sign Up &amp; Start Referring
+              </Button>
+            </Link>
+            <p className="text-xs text-muted-foreground mt-2">Combined referral + review discount capped at 50%</p>
           </div>
         </div>
 
@@ -266,15 +354,19 @@ export default function Pricing() {
           </h2>
           <p className="text-muted-foreground mb-6 max-w-xl mx-auto">
             Our team can help you find the right plan for your business. 
-            We offer a 14-day free trial on all plans — no credit card required.
+            Start with a 14-day free trial on any paid plan — no credit card required.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" data-testid="button-start-trial">
-              Start 14-Day Free Trial
-            </Button>
-            <Button size="lg" variant="outline" data-testid="button-contact-sales">
-              Contact Sales
-            </Button>
+            <Link href="/register">
+              <Button size="lg" data-testid="button-start-trial">
+                Start 14-Day Free Trial
+              </Button>
+            </Link>
+            <Link href="/contact">
+              <Button size="lg" variant="outline" data-testid="button-contact-sales">
+                Contact Sales
+              </Button>
+            </Link>
           </div>
         </div>
 
@@ -290,6 +382,12 @@ export default function Pricing() {
               </p>
             </div>
             <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-4">
+              <h4 className="font-medium mb-2">How does per-user pricing work?</h4>
+              <p className="text-sm text-muted-foreground">
+                Each plan includes 1 user. Additional team members can be added at the per-user rate shown — £15/user on Starter, £12/user on Pro, and £10/user on Business.
+              </p>
+            </div>
+            <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-4">
               <h4 className="font-medium mb-2">Is there a contract?</h4>
               <p className="text-sm text-muted-foreground">
                 No long-term contracts. All plans are billed monthly and you can cancel anytime.
@@ -299,6 +397,12 @@ export default function Pricing() {
               <h4 className="font-medium mb-2">What payment methods do you accept?</h4>
               <p className="text-sm text-muted-foreground">
                 We accept all major credit cards, debit cards, and bank transfers for annual plans.
+              </p>
+            </div>
+            <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-4">
+              <h4 className="font-medium mb-2">How does the referral programme work?</h4>
+              <p className="text-sm text-muted-foreground">
+                Once you sign up, you'll get a unique referral link. Share it with other trade businesses — each one that signs up earns you 5% off your bill. You can also earn review rewards by leaving reviews on Google, Trustpilot, and more. Discounts stack up to a 50% cap.
               </p>
             </div>
             <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-4">
