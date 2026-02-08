@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
+import { GlobalAIAssistant } from "@/components/GlobalAIAssistant";
 
 function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -57,7 +58,7 @@ function Header() {
 
           <div className="hidden md:flex items-center gap-3">
             <Link href="/login">
-              <Button variant="ghost" data-testid="button-login">
+              <Button variant="outline" data-testid="button-login">
                 Login
               </Button>
             </Link>
@@ -208,6 +209,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       <Header />
       <main className="flex-1">{children}</main>
       <Footer />
+      <GlobalAIAssistant />
     </div>
   );
 }
