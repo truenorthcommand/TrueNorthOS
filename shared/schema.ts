@@ -1499,6 +1499,7 @@ export const merchants = pgTable("merchants", {
   slug: varchar("slug").notNull().unique(),
   email: text("email"),
   password: text("password"),
+  commissionRate: doublePrecision("commission_rate").notNull().default(5),
   payoutMethod: varchar("payout_method").notNull(), // 'bank' | 'credit'
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),

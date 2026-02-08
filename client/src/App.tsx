@@ -96,6 +96,8 @@ import PublicCheckoutSuccess from "@/pages/public-checkout-success";
 import Assets from "@/pages/assets";
 import AssetDetail from "@/pages/asset-detail";
 import AssetForm from "@/pages/asset-form";
+import MerchantPortal from "@/pages/merchant-portal";
+import AdminMerchants from "@/pages/admin-merchants";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -178,6 +180,7 @@ function AppRoutes() {
         <Route path="/scan" component={ScanPage} />
         <Route path="/user-guide" component={UserGuide} />
         <Route path="/admin/advisors" component={AdminAdvisors} />
+        <Route path="/admin/merchants" component={AdminMerchants} />
         <Route path="/works-manager" component={WorksManagerDashboard} />
         <Route path="/works-manager/jobs" component={WorksManagerJobs} />
         <Route path="/works-manager/map" component={WorksManagerMap} />
@@ -232,6 +235,8 @@ function Router() {
       <Route path="/icon-styles" component={IconStylesDemo} />
       <Route path="/glow-dashboard" component={GlowDashboardDemo} />
       <Route path="/bigchange-dashboard" component={BigChangeDashboardDemo} />
+
+      <Route path="/merchant" component={MerchantPortal} />
 
       <Route path="/app" nest>
         <AppRoutes />
