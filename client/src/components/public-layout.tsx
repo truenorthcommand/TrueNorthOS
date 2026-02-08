@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Compass, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 
 function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -24,7 +24,11 @@ function Header() {
         <div className="flex items-center justify-between h-16">
           <Link href="/">
             <div className="flex items-center gap-2 cursor-pointer" data-testid="link-logo">
-              <Compass className="h-7 w-7 text-primary" />
+              <img 
+                src="/logo-truenorth-os.png" 
+                alt="TrueNorth OS" 
+                className="h-10 w-auto object-contain"
+              />
               <div>
                 <span className="text-xl font-bold tracking-tight">TrueNorth OS</span>
                 <p className="text-[10px] leading-tight text-muted-foreground hidden sm:block">

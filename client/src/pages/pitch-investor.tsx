@@ -569,8 +569,8 @@ const slides = [
           </div>
         </div>
         <div className="space-y-2 text-blue-100">
-          <p className="text-lg">contact@truenorthtrade.com</p>
-          <p className="text-lg">www.truenorthtrade.com</p>
+          <p className="text-lg">info@truenorthoperationsgroup.com</p>
+          <p className="text-sm">Unit 2 Meadow View Industrial Estate, Ashford, Kent, TN26 2NR</p>
         </div>
       </div>
     ),

@@ -407,7 +407,8 @@ export default function Proposal() {
         <div className="text-center text-sm text-slate-500 border-t pt-8">
           <p className="font-semibold">TrueNorth Operations Group</p>
           <p>Professional Field Service Solutions</p>
-          <p className="mt-2">www.truenorth.ops | contact@truenorth.ops</p>
+          <p className="mt-2">info@truenorthoperationsgroup.com</p>
+          <p>Unit 2 Meadow View Industrial Estate, Ashford, Kent, TN26 2NR</p>
         </div>
       </div>
 

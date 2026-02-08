@@ -177,29 +177,11 @@ export default function PublicContact() {
                 <div>
                   <h3 className="font-semibold text-sm">Email</h3>
                   <a
-                    href="mailto:hello@truenorthos.com"
+                    href="mailto:info@truenorthoperationsgroup.com"
                     className="text-sm text-muted-foreground hover:text-primary transition-colors"
                     data-testid="link-email"
                   >
-                    hello@truenorthos.com
-                  </a>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-contact-phone">
-              <CardContent className="pt-6 flex items-start gap-4">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <Phone className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-sm">Phone</h3>
-                  <a
-                    href="tel:+4408001234567"
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                    data-testid="link-phone"
-                  >
-                    +44 0800 123 4567
+                    info@truenorthoperationsgroup.com
                   </a>
                 </div>
               </CardContent>
@@ -213,7 +195,8 @@ export default function PublicContact() {
                 <div>
                   <h3 className="font-semibold text-sm">Address</h3>
                   <p className="text-sm text-muted-foreground">
-                    Manchester, UK
+                    Unit 2 Meadow View Industrial Estate,<br />
+                    Ashford, Kent, TN26 2NR
                   </p>
                 </div>
               </CardContent>

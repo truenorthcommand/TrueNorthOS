@@ -1,4 +1,4 @@
-import { Wrench, Calculator, Truck, Users, Shield, FileText, Zap, Globe, CheckCircle, ArrowRight, Phone, Mail, Building } from "lucide-react";
+import { Wrench, Calculator, Truck, Users, Shield, FileText, Zap, Globe, CheckCircle, ArrowRight, Mail, Building } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function PitchOnePager() {
@@ -28,8 +28,8 @@ export default function PitchOnePager() {
                 </div>
               </div>
               <div className="text-right text-sm">
-                <p className="text-blue-200">hello@truenorthtrade.com</p>
-                <p className="text-blue-200">www.truenorthtrade.com</p>
+                <p className="text-blue-200">info@truenorthoperationsgroup.com</p>
+                <p className="text-blue-200">Ashford, Kent, TN26 2NR</p>
               </div>
             </div>
           </div>
@@ -174,16 +174,12 @@ export default function PitchOnePager() {
           <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-t">
             <div className="flex items-center gap-6 text-sm text-gray-600">
               <div className="flex items-center gap-2">
-                <Phone className="w-4 h-4" />
-                <span>0800 XXX XXXX</span>
-              </div>
-              <div className="flex items-center gap-2">
                 <Mail className="w-4 h-4" />
-                <span>hello@truenorthtrade.com</span>
+                <span>info@truenorthoperationsgroup.com</span>
               </div>
               <div className="flex items-center gap-2">
                 <Building className="w-4 h-4" />
-                <span>www.truenorthtrade.com</span>
+                <span>Unit 2 Meadow View Industrial Estate, Ashford, Kent, TN26 2NR</span>
               </div>
             </div>
             <div className="flex items-center gap-2 text-sm font-medium text-[#0F2B4C]">

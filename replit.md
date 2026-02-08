@@ -6,6 +6,13 @@
 
 TrueNorth OS is a comprehensive business management platform designed for UK trade and field service companies. It aims to digitise and streamline all operational aspects, from job management, quoting, and invoicing to financial tracking, fleet management, workforce coordination, quality control, and compliance. The platform integrates seven core modules and leverages AI-powered tools to enhance efficiency, reduce costs, and improve customer experience, providing an all-in-one ERP solution tailored for the UK market.
 
+## Company Details
+
+-   **Contact Email**: info@truenorthoperationsgroup.com
+-   **Address**: Unit 2 Meadow View Industrial Estate, Ashford, Kent, TN26 2NR
+-   **Phone**: Not displayed publicly (user preference)
+-   **Logo**: `/client/public/logo-truenorth-os.png` — used in sidebar, login page, public header, mobile header
+
 ## User Preferences
 
 - I prefer clear and concise communication.
@@ -13,6 +20,7 @@ TrueNorth OS is a comprehensive business management platform designed for UK tra
 - I prefer an iterative development approach.
 - I expect the agent to ask for confirmation before making significant architectural changes.
 - Ensure all AI-powered features are highlighted and explained clearly.
+- No phone number displayed in public-facing contact sections.
 
 ## System Architecture
 

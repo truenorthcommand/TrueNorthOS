@@ -136,9 +136,9 @@ export default function Privacy() {
               </p>
               <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg mt-4">
                 <p className="text-muted-foreground">
-                  <strong>Email:</strong> privacy@truenorthfieldview.com<br />
-                  <strong>Address:</strong> TrueNorth Field View Ltd, Data Protection Officer<br />
-                  United Kingdom
+                  <strong>Email:</strong> info@truenorthoperationsgroup.com<br />
+                  <strong>Address:</strong> TrueNorth Operations Group, Unit 2 Meadow View Industrial Estate,<br />
+                  Ashford, Kent, TN26 2NR
                 </p>
               </div>
             </section>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Clock, Wrench, Truck, FileText, Calculator, Users, Zap, Shield, Globe, CheckCircle, ArrowRight, Phone, Mail } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Wrench, Truck, FileText, Calculator, Users, Zap, Shield, Globe, CheckCircle, ArrowRight, Mail, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const slides = [
@@ -412,12 +412,12 @@ const slides = [
         
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2 text-white">
-            <Phone className="w-5 h-5" />
-            <span className="text-lg">0800 XXX XXXX</span>
+            <Mail className="w-5 h-5" />
+            <span className="text-lg">info@truenorthoperationsgroup.com</span>
           </div>
           <div className="flex items-center gap-2 text-white">
-            <Mail className="w-5 h-5" />
-            <span className="text-lg">hello@truenorthtrade.com</span>
+            <MapPin className="w-5 h-5" />
+            <span className="text-sm">Unit 2 Meadow View Industrial Estate, Ashford, Kent, TN26 2NR</span>
           </div>
         </div>
       </div>
