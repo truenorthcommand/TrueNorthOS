@@ -89,6 +89,7 @@ import Exceptions from "@/pages/exceptions";
 import PublicHome from "@/pages/public-home";
 import PublicAbout from "@/pages/public-about";
 import PublicContact from "@/pages/public-contact";
+import PublicBlog from "@/pages/public-blog";
 import PublicRegister from "@/pages/public-register";
 import PublicCheckout from "@/pages/public-checkout";
 import PublicCheckoutSuccess from "@/pages/public-checkout-success";
@@ -207,6 +208,7 @@ function Router() {
       <Route path="/register" component={PublicRegister} />
       <Route path="/about" component={PublicAbout} />
       <Route path="/contact" component={PublicContact} />
+      <Route path="/blog" component={PublicBlog} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
       <Route path="/checkout/success" component={PublicCheckoutSuccess} />
