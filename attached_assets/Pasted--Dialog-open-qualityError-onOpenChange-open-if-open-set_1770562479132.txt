@@ -1,0 +1,77 @@
+<Dialog
+  open={!!qualityError}
+  onOpenChange={(open) => {
+    if (!open) setQualityError(null);
+  }}
+>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Quality Gatekeeper stopped this job</DialogTitle>
+      <DialogDescription>
+        To prevent repeat visits, this job must meet your quality standards before it can be completed.
+      </DialogDescription>
+    </DialogHeader>
+
+    {qualityError?.missing && (
+      <div className="space-y-3 text-sm">
+        {qualityError.missing.photos?.length > 0 && (
+          <div>
+            <div className="font-medium">Photos</div>
+            <ul className="list-disc ml-4">
+              {qualityError.missing.photos.map((m: string) => (
+                <li key={m}>{m}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {qualityError.missing.fields?.length > 0 && (
+          <div>
+            <div className="font-medium">Required fields</div>
+            <ul className="list-disc ml-4">
+              {qualityError.missing.fields.map((m: string) => (
+                <li key={m}>{m}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {qualityError.missing.forms?.length > 0 && (
+          <div>
+            <div className="font-medium">Forms</div>
+            <ul className="list-disc ml-4">
+              {qualityError.missing.forms.map((m: string) => (
+                <li key={m}>{m}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {qualityError.missing.signatures?.length > 0 && (
+          <div>
+            <div className="font-medium">Signatures</div>
+            <ul className="list-disc ml-4">
+              {qualityError.missing.signatures.map((m: string) => (
+                <li key={m}>{m}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    )}
+
+    <DialogFooter className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mt-4">
+      <Button variant="outline" onClick={() => setQualityError(null)}>
+        I’ll fix these now
+      </Button>
+
+      {canOverride && qualityError?.error === "QUALITY_GATE_CAN_OVERRIDE" && (
+        <AdminOverrideSection
+          onConfirm={(reason) =>
+            completeJobMutation.mutate({ override: true, overrideReason: reason })
+          }
+        />
+      )}
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
