@@ -157,6 +157,7 @@ export default function Clients() {
   });
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [isSavingClient, setIsSavingClient] = useState(false);
+  const [editClientDialogOpen, setEditClientDialogOpen] = useState(false);
   
   // Client files state
   const [clientFiles, setClientFiles] = useState<Record<string, FileWithRelations[]>>({});
@@ -771,6 +772,7 @@ export default function Clients() {
       if (res.ok) {
         toast({ title: "Success", description: "Client updated successfully." });
         setEditingClient(null);
+        setEditClientDialogOpen(false);
         const clientsRes = await fetch('/api/clients', { credentials: 'include' });
         if (clientsRes.ok) {
           setClients(await clientsRes.json());
@@ -2010,8 +2012,8 @@ export default function Clients() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setExpandedClientId(client.id);
                             setEditingClient(client);
+                            setEditClientDialogOpen(true);
                           }}
                           className="h-8 w-8 p-0 shrink-0"
                           data-testid={`button-edit-client-${client.id}`}
@@ -2068,113 +2070,6 @@ export default function Clients() {
 
                 {expandedClientId === client.id && (
                   <CardContent className="border-t space-y-6 pt-6">
-                    {editingClient?.id === client.id ? (
-                      <div className="bg-muted p-4 rounded-lg space-y-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Edit2 className="h-4 w-4 text-primary" />
-                          <p className="text-sm font-semibold">Edit Client</p>
-                        </div>
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label className="text-sm">Company Name</Label>
-                            <Input
-                              value={editingClient.name}
-                              onChange={(e) => setEditingClient({ ...editingClient, name: e.target.value })}
-                              data-testid={`input-edit-client-name-${client.id}`}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm">Contact Name</Label>
-                            <Input
-                              value={editingClient.contactName || ""}
-                              onChange={(e) => setEditingClient({ ...editingClient, contactName: e.target.value })}
-                              data-testid={`input-edit-client-contactName-${client.id}`}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm">Email</Label>
-                            <Input
-                              type="email"
-                              value={editingClient.email || ""}
-                              onChange={(e) => setEditingClient({ ...editingClient, email: e.target.value })}
-                              data-testid={`input-edit-client-email-${client.id}`}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm">Phone</Label>
-                            <Input
-                              value={editingClient.phone || ""}
-                              onChange={(e) => setEditingClient({ ...editingClient, phone: e.target.value })}
-                              data-testid={`input-edit-client-phone-${client.id}`}
-                            />
-                          </div>
-                          <div className="space-y-2 md:col-span-2">
-                            <Label className="text-sm">Address</Label>
-                            <Textarea
-                              value={editingClient.address || ""}
-                              onChange={(e) => setEditingClient({ ...editingClient, address: e.target.value })}
-                              className="min-h-[80px]"
-                              data-testid={`input-edit-client-address-${client.id}`}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm">Postcode</Label>
-                            <Input
-                              value={editingClient.postcode || ""}
-                              onChange={(e) => setEditingClient({ ...editingClient, postcode: e.target.value })}
-                              data-testid={`input-edit-client-postcode-${client.id}`}
-                            />
-                          </div>
-                          <div className="space-y-2 md:col-span-2">
-                            <Label className="text-sm">Notes</Label>
-                            <Textarea
-                              value={editingClient.notes || ""}
-                              onChange={(e) => setEditingClient({ ...editingClient, notes: e.target.value })}
-                              className="min-h-[80px]"
-                              placeholder="Additional notes about this client..."
-                              data-testid={`input-edit-client-notes-${client.id}`}
-                            />
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between gap-2 pt-2">
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              id={`portal-enabled-${client.id}`}
-                              checked={editingClient.portalEnabled || false}
-                              onCheckedChange={(checked) => setEditingClient({ ...editingClient, portalEnabled: checked })}
-                              data-testid={`switch-portal-enabled-${client.id}`}
-                            />
-                            <Label 
-                              htmlFor={`portal-enabled-${client.id}`} 
-                              className="text-sm cursor-pointer"
-                            >
-                              Enable Client Portal
-                            </Label>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setEditingClient(null)}
-                              disabled={isSavingClient}
-                              data-testid={`button-cancel-edit-client-${client.id}`}
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={handleUpdateClient}
-                              disabled={isSavingClient || !editingClient.name.trim()}
-                              data-testid={`button-save-client-${client.id}`}
-                            >
-                              <Save className="h-4 w-4 mr-1" />
-                              {isSavingClient ? "Saving..." : "Save"}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
                     <div className="grid md:grid-cols-2 gap-4">
                       {client.email && (
                         <div>
@@ -2532,8 +2427,6 @@ export default function Clients() {
                         </CollapsibleContent>
                       </Collapsible>
                     </div>
-                      </>
-                    )}
                   </CardContent>
                 )}
               </Card>
@@ -2552,6 +2445,183 @@ export default function Clients() {
           )}
         </div>
       )}
+
+      {/* Edit Client Dialog */}
+      <Dialog open={editClientDialogOpen} onOpenChange={(open) => {
+        setEditClientDialogOpen(open);
+        if (!open) setEditingClient(null);
+      }}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-edit-client">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit2 className="h-5 w-5 text-primary" />
+              Edit Client
+            </DialogTitle>
+            <DialogDescription>
+              Update client details and manage portal access.
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingClient && (
+            <div className="space-y-6">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm">Company Name</Label>
+                  <Input
+                    value={editingClient.name}
+                    onChange={(e) => setEditingClient({ ...editingClient, name: e.target.value })}
+                    data-testid="input-edit-client-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Contact Name</Label>
+                  <Input
+                    value={editingClient.contactName || ""}
+                    onChange={(e) => setEditingClient({ ...editingClient, contactName: e.target.value })}
+                    data-testid="input-edit-client-contactName"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Email</Label>
+                  <Input
+                    type="email"
+                    value={editingClient.email || ""}
+                    onChange={(e) => setEditingClient({ ...editingClient, email: e.target.value })}
+                    data-testid="input-edit-client-email"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Phone</Label>
+                  <Input
+                    value={editingClient.phone || ""}
+                    onChange={(e) => setEditingClient({ ...editingClient, phone: e.target.value })}
+                    data-testid="input-edit-client-phone"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label className="text-sm">Address</Label>
+                  <Textarea
+                    value={editingClient.address || ""}
+                    onChange={(e) => setEditingClient({ ...editingClient, address: e.target.value })}
+                    className="min-h-[80px]"
+                    data-testid="input-edit-client-address"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Postcode</Label>
+                  <Input
+                    value={editingClient.postcode || ""}
+                    onChange={(e) => setEditingClient({ ...editingClient, postcode: e.target.value })}
+                    data-testid="input-edit-client-postcode"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label className="text-sm">Notes</Label>
+                  <Textarea
+                    value={editingClient.notes || ""}
+                    onChange={(e) => setEditingClient({ ...editingClient, notes: e.target.value })}
+                    className="min-h-[80px]"
+                    placeholder="Additional notes about this client..."
+                    data-testid="input-edit-client-notes"
+                  />
+                </div>
+              </div>
+
+              <div className="border rounded-lg p-4 space-y-4">
+                <div className="flex items-center gap-2">
+                  <Link2 className="h-4 w-4 text-[#0F2B4C]" />
+                  <p className="text-sm font-semibold">Custom Portal</p>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="edit-portal-enabled" className="text-sm cursor-pointer">
+                      Enable Client Portal
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Allow this client to access their portal for quotes, invoices, and jobs
+                    </p>
+                  </div>
+                  <Switch
+                    id="edit-portal-enabled"
+                    checked={editingClient.portalEnabled || false}
+                    onCheckedChange={(checked) => setEditingClient({ ...editingClient, portalEnabled: checked })}
+                    data-testid="switch-edit-portal-enabled"
+                  />
+                </div>
+
+                {editingClient.portalEnabled && (
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-xs font-medium text-emerald-600">Portal Active</span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="bg-[#0F2B4C] hover:bg-[#1a3d63] gap-2"
+                        onClick={() => generatePortalLink(editingClient.id, editingClient.name, false)}
+                        disabled={generatingPortalLink === editingClient.id}
+                        data-testid="button-generate-portal-link"
+                      >
+                        {generatingPortalLink === editingClient.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Link2 className="h-4 w-4" />
+                        )}
+                        Generate Portal Link
+                      </Button>
+
+                      {editingClient.email && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="gap-2 border-[#0F2B4C] text-[#0F2B4C] hover:bg-[#0F2B4C]/10"
+                          onClick={() => generatePortalLink(editingClient.id, editingClient.name, true)}
+                          disabled={generatingPortalLink === editingClient.id}
+                          data-testid="button-send-portal-email"
+                        >
+                          {generatingPortalLink === editingClient.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Mail className="h-4 w-4" />
+                          )}
+                          Send Email Invitation
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditClientDialogOpen(false);
+                    setEditingClient(null);
+                  }}
+                  disabled={isSavingClient}
+                  data-testid="button-cancel-edit-client"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUpdateClient}
+                  disabled={isSavingClient || !editingClient.name.trim()}
+                  data-testid="button-save-edit-client"
+                >
+                  <Save className="h-4 w-4 mr-1" />
+                  {isSavingClient ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Portal Link Dialog */}
       <Dialog open={portalDialogOpen} onOpenChange={setPortalDialogOpen}>

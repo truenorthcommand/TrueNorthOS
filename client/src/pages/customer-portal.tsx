@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { 
   Loader2, XCircle, Phone, Mail, FileText, Receipt, 
   Briefcase, CheckCircle, Clock, AlertTriangle, ExternalLink,
-  Building2, MapPin, Calendar, Lock, Eye, EyeOff, KeyRound
+  Building2, MapPin, Calendar, Lock, Eye, EyeOff, KeyRound, Shield
 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";

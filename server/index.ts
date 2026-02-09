@@ -518,7 +518,6 @@ app.use((req, res, next) => {
           templateId: created.id,
           version: 1,
           schema: template.schema,
-          status: 'published',
           publishedAt: new Date(),
         });
       }

@@ -9897,11 +9897,11 @@ Be concise and practical. Focus on real issues that affect the business.`;
         // Get entity info
         let entityInfo: { type: string; name?: string } | undefined;
         if (submission.entityType === "job" && submission.entityId) {
-          const job = await storage.getJob(parseInt(submission.entityId));
-          entityInfo = { type: "Job", name: job?.jobNumber };
+          const job = await storage.getJob(submission.entityId);
+          entityInfo = { type: "Job", name: job?.jobNo ?? undefined };
         } else if (submission.entityType === "client" && submission.entityId) {
-          const client = await storage.getClient(parseInt(submission.entityId));
-          entityInfo = { type: "Client", name: client?.companyName || client?.contactName };
+          const client = await storage.getClient(submission.entityId);
+          entityInfo = { type: "Client", name: client?.name || client?.contactName };
         } else if (submission.entityType === "quote" && submission.entityId) {
           entityInfo = { type: "Quote", name: `#${submission.entityId}` };
         }
@@ -9912,7 +9912,7 @@ Be concise and practical. Focus on real issues that affect the business.`;
             templateName,
             version,
             submission,
-            submittedBy: submitter ? `${submitter.firstName} ${submitter.lastName}` : undefined,
+            submittedBy: submitter ? submitter.name : undefined,
             entityInfo,
           });
           
@@ -9931,13 +9931,11 @@ Be concise and practical. Focus on real issues that affect the business.`;
           // Create file record if entity is a job
           if (submission.entityType === "job" && submission.entityId) {
             await storage.createFile({
-              fileName,
-              fileType: "application/pdf",
-              filePath: objectPath,
-              folderId: null,
-              uploadedBy: submission.submittedBy || undefined,
-              entityType: "job",
-              entityId: submission.entityId,
+              name: fileName,
+              objectPath,
+              mimeType: "application/pdf",
+              jobId: submission.entityId,
+              uploadedById: submission.submittedBy || undefined,
             });
           }
           
@@ -10617,14 +10615,14 @@ Be concise and practical. Focus on real issues that affect the business.`;
         return res.status(403).json({ error: "Director's Suite access required" });
       }
       
-      const users = await storage.getUsers();
+      const allUsers = await storage.getAllUsers();
       
       res.json({
         actionTypes: ["create", "update", "delete", "login", "logout", "failed_login", "password_reset", "password_change", "export", "import", "bulk_update", "bulk_delete", "approve", "reject", "cancel", "send_email", "send_sms", "download", "upload", "share", "transfer", "assign", "enable", "disable", "archive", "restore", "view"],
         actionCategories: ["auth", "client", "job", "quote", "invoice", "finance", "team", "schedule", "fleet", "settings", "report", "document", "asset"],
         entityTypes: ["user", "client", "job", "quote", "invoice", "payment", "expense", "timesheet", "vehicle", "walkaround_check", "defect", "asset", "file", "settings", "form", "workflow"],
         severities: ["info", "warning", "critical"],
-        users: users.map(u => ({ id: u.id, name: u.name })),
+        users: allUsers.map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })),
       });
     } catch (error) {
       console.error("Error fetching filter options:", error);
