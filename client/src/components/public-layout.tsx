@@ -8,12 +8,13 @@ function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [location] = useLocation();
 
-  const navLinks = [
+  const navLinks: { href: string; label: string; mobileOnly?: boolean }[] = [
     { href: "/", label: "Home" },
     { href: "/pricing", label: "Pricing" },
     { href: "/blog", label: "Blog" },
     { href: "/about", label: "About" },
     { href: "/contact", label: "Contact" },
+    { href: "/login", label: "Login", mobileOnly: true },
   ];
 
   const isActive = (href: string) =>
@@ -40,7 +41,7 @@ function Header() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-1" data-testid="nav-desktop">
-            {navLinks.map((link) => (
+            {navLinks.filter((l) => !l.mobileOnly).map((link) => (
               <Link key={link.href} href={link.href}>
                 <button
                   className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
@@ -103,8 +104,7 @@ function Header() {
             <div className="pt-4 border-t space-y-2">
               <Link href="/login">
                 <Button
-                  variant="outline"
-                  className="w-full"
+                  className="w-full bg-[#0F2B4C] hover:bg-[#1a3d63] text-white font-medium"
                   onClick={() => setMobileMenuOpen(false)}
                   data-testid="button-mobile-login"
                 >
