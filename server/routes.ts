@@ -6197,9 +6197,9 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
       
       // Send password reset email
       const companySettings = await storage.getCompanySettings();
-      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-        : process.env.REPLIT_DEPLOYMENT_URL || 'http://localhost:5000';
+      const baseUrl = process.env.REPLIT_DEPLOYMENT_URL
+        || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : '')
+        || `${req.protocol}://${req.get('host')}`;
       const resetUrl = `${baseUrl}/portal/${req.params.token}/reset/${resetToken}`;
       
       try {
@@ -6270,15 +6270,15 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
       }
       
       const portalToken = crypto.randomUUID();
-      await storage.updateClient(req.params.id, { portalToken });
+      await storage.updateClient(req.params.id, { portalToken, portalEnabled: true });
       
-      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-        : process.env.REPLIT_DEPLOYMENT_URL || 'http://localhost:5000';
+      const baseUrl = process.env.REPLIT_DEPLOYMENT_URL
+        || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : '')
+        || `${req.protocol}://${req.get('host')}`;
       const portalUrl = `${baseUrl}/portal/${portalToken}`;
       
-      // Send invitation email if client has email and sendEmail flag is true
       let emailSent = false;
+      let emailError = '';
       if (req.body.sendEmail && client.email) {
         try {
           const companySettings = await storage.getCompanySettings();
@@ -6288,16 +6288,23 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
             portalUrl,
             companySettings?.companyName || 'Your Service Provider'
           );
-        } catch (emailError) {
-          console.error("Failed to send portal invitation email:", emailError);
+          if (!emailSent) {
+            emailError = 'Email service returned failure. Check Outlook integration connection.';
+          }
+        } catch (err: any) {
+          console.error("Failed to send portal invitation email:", err);
+          emailError = err?.message || 'Failed to send email';
         }
+      } else if (req.body.sendEmail && !client.email) {
+        emailError = 'Client has no email address on file';
       }
       
       res.json({ 
         portalToken,
         portalUrl: `/portal/${portalToken}`,
         fullUrl: portalUrl,
-        emailSent
+        emailSent,
+        emailError
       });
     } catch (error) {
       console.error("Generate portal token error:", error);

@@ -1,4 +1,5 @@
 // Email utility using Outlook integration
+// Reference: Replit Outlook connection (conn_outlook_01KFNZ30YV9C8B9ETQSBSZXMBG)
 import { Client } from '@microsoft/microsoft-graph-client';
 
 let connectionSettings: any;
@@ -15,11 +16,15 @@ async function getAccessToken() {
     ? 'depl ' + process.env.WEB_REPL_RENEWAL 
     : null;
 
-  if (!xReplitToken || !hostname) {
-    throw new Error('Outlook integration not configured');
+  if (!xReplitToken) {
+    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
   }
 
-  connectionSettings = await fetch(
+  if (!hostname) {
+    throw new Error('REPLIT_CONNECTORS_HOSTNAME not configured');
+  }
+
+  const response = await fetch(
     'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=outlook',
     {
       headers: {
@@ -27,17 +32,26 @@ async function getAccessToken() {
         'X_REPLIT_TOKEN': xReplitToken
       }
     }
-  ).then(res => res.json()).then(data => data.items?.[0]);
+  );
+
+  if (!response.ok) {
+    throw new Error(`Connector API returned ${response.status}: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  connectionSettings = data.items?.[0];
 
   const accessToken = connectionSettings?.settings?.access_token || connectionSettings?.settings?.oauth?.credentials?.access_token;
 
   if (!connectionSettings || !accessToken) {
-    throw new Error('Outlook not connected');
+    throw new Error('Outlook not connected - no valid access token found');
   }
   return accessToken;
 }
 
-async function getOutlookClient() {
+// WARNING: Never cache this client.
+// Access tokens expire, so a new client must be created each time.
+async function getUncachableOutlookClient() {
   const accessToken = await getAccessToken();
 
   return Client.initWithMiddleware({
@@ -49,7 +63,7 @@ async function getOutlookClient() {
 
 export async function sendEmail(to: string, subject: string, htmlBody: string): Promise<boolean> {
   try {
-    const client = await getOutlookClient();
+    const client = await getUncachableOutlookClient();
     
     await client.api('/me/sendMail').post({
       message: {
@@ -68,9 +82,16 @@ export async function sendEmail(to: string, subject: string, htmlBody: string): 
       }
     });
     
+    console.log(`Email sent successfully to ${to}`);
     return true;
-  } catch (error) {
-    console.error('Failed to send email:', error);
+  } catch (error: any) {
+    console.error('Failed to send email:', error?.message || error);
+    if (error?.statusCode) {
+      console.error('Status code:', error.statusCode);
+    }
+    if (error?.body) {
+      console.error('Error body:', JSON.stringify(error.body));
+    }
     return false;
   }
 }

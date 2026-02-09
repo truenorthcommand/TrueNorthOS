@@ -82,32 +82,43 @@ class AuthStorage implements IAuthStorage {
       };
     }
     
-    // Create new user from Google OAuth
     const fullName = [userData.firstName, userData.lastName].filter(Boolean).join(' ') || 'Google User';
-    const username = (userData.email?.split('@')[0] || `google_${Date.now()}`).toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const baseUsername = (userData.email?.split('@')[0] || `google_${Date.now()}`).toLowerCase().replace(/[^a-z0-9]/g, '_');
     
-    const [newUser] = await db
-      .insert(users)
-      .values({
-        username: username,
-        password: '', // No password for OAuth users
-        name: fullName,
-        email: userData.email,
-        googleId: userData.id,
-        profileImageUrl: userData.profileImageUrl,
-        role: 'engineer',
-        roles: ['engineer'],
-        status: 'active',
-      })
-      .returning();
-    
-    return {
-      id: newUser.id,
-      email: newUser.email,
-      firstName: fullName.split(' ')[0] || null,
-      lastName: fullName.split(' ').slice(1).join(' ') || null,
-      profileImageUrl: newUser.profileImageUrl,
-    };
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const username = attempt === 0 ? baseUsername : `${baseUsername}_${Date.now()}`;
+        
+        const [newUser] = await db
+          .insert(users)
+          .values({
+            username,
+            password: '',
+            name: fullName,
+            email: userData.email,
+            googleId: userData.id,
+            profileImageUrl: userData.profileImageUrl,
+            role: 'engineer',
+            roles: ['engineer'],
+            status: 'active',
+          })
+          .returning();
+        
+        return {
+          id: newUser.id,
+          email: newUser.email,
+          firstName: fullName.split(' ')[0] || null,
+          lastName: fullName.split(' ').slice(1).join(' ') || null,
+          profileImageUrl: newUser.profileImageUrl,
+        };
+      } catch (err: any) {
+        if (err?.code === '23505' && attempt < 2) {
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw new Error('Failed to create user after multiple attempts');
   }
 }
 

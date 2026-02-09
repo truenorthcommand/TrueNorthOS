@@ -189,11 +189,19 @@ export default function Clients() {
         setPortalClientName(clientName);
         setPortalDialogOpen(true);
         
-        if (data.emailSent) {
-          toast({
-            title: "Invitation Sent",
-            description: `Portal invitation email sent to ${clientName}`,
-          });
+        if (sendEmail) {
+          if (data.emailSent) {
+            toast({
+              title: "Invitation Sent",
+              description: `Portal invitation email sent to ${clientName}`,
+            });
+          } else {
+            toast({
+              title: "Email Not Sent",
+              description: data.emailError || "Could not send invitation email. The portal link has still been generated - you can copy and share it manually.",
+              variant: "destructive",
+            });
+          }
         }
       } else {
         toast({
