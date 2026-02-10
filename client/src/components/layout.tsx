@@ -4,7 +4,7 @@ import { useTheme } from "@/lib/theme";
 import { hasRole } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { BackButton } from "@/components/back-button";
-import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw, Mic, BookOpen, Mail, LayoutGrid, FolderOpen, Shield, Crown, Link2, Gift, Sparkles, ClipboardList, Sun, Moon, QrCode, Package, Handshake, Bell } from "lucide-react";
+import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw, Mic, BookOpen, Mail, LayoutGrid, FolderOpen, Shield, Crown, Link2, Gift, Sparkles, ClipboardList, Sun, Moon, QrCode, Package, Handshake, Bell, Newspaper } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Scanner } from "@/components/scanner";
@@ -467,6 +467,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <NavLink href="/ai-tools" icon={Sparkles}>AI Assistant</NavLink>
           <NavLink href="/ai-advisors" icon={Bot}>Technical Advisers</NavLink>
           <NavLink href="/voice-notes" icon={Mic}>Voice Notes</NavLink>
+          <NavLink href="/blog" icon={Newspaper}>Blog Manager</NavLink>
         </MenuGroup>
 
         {/* File Storage Section - Admin and above */}

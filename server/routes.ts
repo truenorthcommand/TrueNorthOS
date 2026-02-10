@@ -8,7 +8,7 @@ import QRCode from "qrcode";
 import Stripe from "stripe";
 import { storage } from "./storage";
 import { pool } from "./db";
-import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalkaroundCheckSchema, insertCheckItemSchema, insertDefectSchema, insertDefectUpdateSchema, insertTimesheetSchema, insertExpenseSchema, insertPaymentSchema } from "@shared/schema";
+import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalkaroundCheckSchema, insertCheckItemSchema, insertDefectSchema, insertDefectUpdateSchema, insertTimesheetSchema, insertExpenseSchema, insertPaymentSchema, insertBlogPostSchema } from "@shared/schema";
 import { z } from "zod";
 import { notifyAdmins, notifyUser } from "./notifications";
 import { sessionMiddleware } from "./session";
@@ -6309,6 +6309,80 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     } catch (error) {
       console.error("Generate portal token error:", error);
       res.status(500).json({ error: "Failed to generate portal token" });
+    }
+  });
+
+  // ==================== BLOG POSTS ROUTES ====================
+  
+  app.get("/api/blog-posts", async (req, res) => {
+    try {
+      const posts = await storage.getPublishedBlogPosts();
+      res.json(posts);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch blog posts" });
+    }
+  });
+  
+  app.get("/api/admin/blog-posts", requireAdmin, async (req, res) => {
+    try {
+      const posts = await storage.getAllBlogPosts();
+      res.json(posts);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch blog posts" });
+    }
+  });
+  
+  app.post("/api/admin/blog-posts", requireAdmin, async (req, res) => {
+    try {
+      const data = { ...req.body };
+      if (data.publishedAt) {
+        data.publishedAt = new Date(data.publishedAt);
+      }
+      const post = await storage.createBlogPost(data);
+      res.json(post);
+    } catch (error) {
+      console.error("Create blog post error:", error);
+      res.status(500).json({ error: "Failed to create blog post" });
+    }
+  });
+  
+  app.put("/api/admin/blog-posts/:id", requireAdmin, async (req, res) => {
+    try {
+      const updates = { ...req.body };
+      if (updates.publishedAt !== undefined) {
+        updates.publishedAt = updates.publishedAt ? new Date(updates.publishedAt) : null;
+      }
+      updates.updatedAt = new Date();
+      const post = await storage.updateBlogPost(req.params.id, updates);
+      if (!post) {
+        return res.status(404).json({ error: "Blog post not found" });
+      }
+      res.json(post);
+    } catch (error) {
+      console.error("Update blog post error:", error);
+      res.status(500).json({ error: "Failed to update blog post" });
+    }
+  });
+  
+  app.delete("/api/admin/blog-posts/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteBlogPost(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete blog post error:", error);
+      res.status(500).json({ error: "Failed to delete blog post" });
+    }
+  });
+
+  app.post("/api/admin/blog-posts/upload-image", requireAdmin, async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+      res.json({ uploadURL, objectPath });
+    } catch (error) {
+      console.error("Blog image upload error:", error);
+      res.status(500).json({ error: "Failed to generate upload URL" });
     }
   });
 

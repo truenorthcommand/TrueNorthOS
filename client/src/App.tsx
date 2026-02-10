@@ -99,6 +99,7 @@ import AssetDetail from "@/pages/asset-detail";
 import AssetForm from "@/pages/asset-form";
 import MerchantPortal from "@/pages/merchant-portal";
 import AdminMerchants from "@/pages/admin-merchants";
+import AdminBlog from "@/pages/admin-blog";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -183,6 +184,7 @@ function AppRoutes() {
         <Route path="/user-guide" component={UserGuide} />
         <Route path="/admin/advisors" component={AdminAdvisors} />
         <Route path="/admin/merchants" component={AdminMerchants} />
+        <Route path="/blog" component={AdminBlog} />
         <Route path="/works-manager" component={WorksManagerDashboard} />
         <Route path="/works-manager/jobs" component={WorksManagerJobs} />
         <Route path="/works-manager/map" component={WorksManagerMap} />

@@ -67,6 +67,7 @@ TrueNorth OS is built with a modern web stack.
 -   **File Storage**: Centralized file browser with AI-powered smart assignment and integration with Replit Object Storage.
 -   **Unified Clock In/Out System**: Dashboard-based time tracking that logs to both `time_logs` (for tracking) and `timesheets` (for finance) tables with geolocation capture.
 -   **Workflow Automation Engine**: Rules engine with typed conditions (job_status, time_elapsed, field_missing, priority, field_value) and actions (EscalateJob, NotifyUser, BlockCompletion, CreateTask, SendNotification, UpdateEntityField, CallWebhook, EmitEvent). Multi-condition builder UI, test-against-job functionality, execution log viewer with step details. Domain events queue worker processes rules automatically.
+-   **Blog Management System**: Admin CRUD interface at `/app/blog` for creating, editing, and publishing blog posts. Supports cover image upload via Object Storage, HTML content, categories, and draft/published workflow. Public blog page at `/blog` displays published posts. Database-backed with `blog_posts` table.
 
 ### Global AI Assistant Architecture (Jan 2026)
 The Global AI Assistant has been optimized for production readiness:

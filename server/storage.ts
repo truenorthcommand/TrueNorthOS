@@ -51,6 +51,7 @@ import {
   type WorkflowLog, type InsertWorkflowLog,
   type Asset, type InsertAsset,
   type AssetHistory, type InsertAssetHistory,
+  type BlogPost, type InsertBlogPost,
   users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, clientContacts, clientProperties, jobUpdates,
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
@@ -62,7 +63,8 @@ import {
   formTemplates, formTemplateVersions, formSubmissions, formAssets,
   featureFlags, exceptions, domainEvents, webhookSubscriptions, webhookDeliveries, aiRequests,
   workflowRules, workflowExecutions, workflowLogs,
-  assets, assetHistory
+  assets, assetHistory,
+  blogPosts
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and, ne, inArray, gt, asc } from "drizzle-orm";
@@ -413,6 +415,15 @@ export interface IStorage {
   // Asset History
   getAssetHistory(assetId: string): Promise<AssetHistory[]>;
   createAssetHistory(data: InsertAssetHistory): Promise<AssetHistory>;
+
+  // Blog Posts
+  getAllBlogPosts(): Promise<BlogPost[]>;
+  getPublishedBlogPosts(): Promise<BlogPost[]>;
+  getBlogPost(id: string): Promise<BlogPost | undefined>;
+  getBlogPostBySlug(slug: string): Promise<BlogPost | undefined>;
+  createBlogPost(post: InsertBlogPost): Promise<BlogPost>;
+  updateBlogPost(id: string, updates: Partial<BlogPost>): Promise<BlogPost | undefined>;
+  deleteBlogPost(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3095,6 +3106,44 @@ export class DatabaseStorage implements IStorage {
   async createAssetHistory(data: InsertAssetHistory): Promise<AssetHistory> {
     const [history] = await db.insert(assetHistory).values(data).returning();
     return history;
+  }
+
+  // ==================== BLOG POSTS ====================
+  async getAllBlogPosts(): Promise<BlogPost[]> {
+    return db.select().from(blogPosts).orderBy(desc(blogPosts.createdAt));
+  }
+
+  async getPublishedBlogPosts(): Promise<BlogPost[]> {
+    return db.select().from(blogPosts)
+      .where(eq(blogPosts.status, 'published'))
+      .orderBy(desc(blogPosts.publishedAt));
+  }
+
+  async getBlogPost(id: string): Promise<BlogPost | undefined> {
+    const [post] = await db.select().from(blogPosts).where(eq(blogPosts.id, id));
+    return post;
+  }
+
+  async getBlogPostBySlug(slug: string): Promise<BlogPost | undefined> {
+    const [post] = await db.select().from(blogPosts).where(eq(blogPosts.slug, slug));
+    return post;
+  }
+
+  async createBlogPost(post: InsertBlogPost): Promise<BlogPost> {
+    const [created] = await db.insert(blogPosts).values(post).returning();
+    return created;
+  }
+
+  async updateBlogPost(id: string, updates: Partial<BlogPost>): Promise<BlogPost | undefined> {
+    const [updated] = await db.update(blogPosts)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(blogPosts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteBlogPost(id: string): Promise<void> {
+    await db.delete(blogPosts).where(eq(blogPosts.id, id));
   }
 }
 
