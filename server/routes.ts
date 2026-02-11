@@ -1241,8 +1241,10 @@ export async function registerRoutes(
   app.get("/api/sub-skills", requireAuth, async (req, res) => {
     try {
       const subSkillsList = await storage.getAllSubSkills();
+      console.log(`[API] GET /api/sub-skills returned ${subSkillsList.length} items`);
       res.json(subSkillsList);
     } catch (error) {
+      console.error('[API] GET /api/sub-skills error:', error);
       res.status(500).json({ error: "Failed to fetch sub-skills" });
     }
   });
