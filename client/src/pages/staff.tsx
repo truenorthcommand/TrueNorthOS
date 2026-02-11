@@ -1148,73 +1148,81 @@ export default function Staff() {
                   const isExpanded = newStaffExpandedSkillId === skill.id;
 
                   return (
-                    <div key={skill.id} className="border rounded-lg p-2">
+                    <div key={skill.id} className="border rounded-lg overflow-hidden">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          {skillSubSkills.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => setNewStaffExpandedSkillId(isExpanded ? null : skill.id)}
-                              className="hover:bg-muted rounded p-0.5"
-                              data-testid={`button-expand-new-skill-${skill.id}`}
-                            >
-                              {isExpanded ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                            </button>
-                          )}
+                        <div
+                          className={`flex-1 flex items-center gap-2 p-3 ${skillSubSkills.length > 0 ? 'cursor-pointer hover:bg-muted/50 transition-colors' : 'p-3'}`}
+                          onClick={() => {
+                            if (skillSubSkills.length > 0) {
+                              setNewStaffExpandedSkillId(isExpanded ? null : skill.id);
+                            }
+                          }}
+                          data-testid={`button-expand-new-skill-${skill.id}`}
+                        >
+                          {skillSubSkills.length > 0 ? (
+                            isExpanded ? (
+                              <ChevronDown className="h-5 w-5 text-primary" />
+                            ) : (
+                              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                            )
+                          ) : null}
                           <Badge variant="secondary" className="flex items-center gap-1">
                             {skill.name}
-                            {selectedSubSkillIds.length > 0 && (
-                              <span className="ml-1 text-xs bg-primary/20 px-1.5 py-0.5 rounded-full">
-                                {selectedSubSkillIds.length} sub-skill{selectedSubSkillIds.length > 1 ? 's' : ''}
-                              </span>
-                            )}
                           </Badge>
+                          {selectedSubSkillIds.length > 0 && (
+                            <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-medium">
+                              {selectedSubSkillIds.length} sub-skill{selectedSubSkillIds.length > 1 ? 's' : ''} selected
+                            </span>
+                          )}
+                          {skillSubSkills.length > 0 && !isExpanded && selectedSubSkillIds.length === 0 && (
+                            <span className="text-xs text-muted-foreground italic">Click to view {skillSubSkills.length} sub-skills</span>
+                          )}
                         </div>
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setNewStaffSkills(newStaffSkills.filter(s => s.id !== skill.id));
                             const updated = { ...newStaffSubSkills };
                             delete updated[skill.id];
                             setNewStaffSubSkills(updated);
                           }}
-                          className="hover:bg-destructive/20 rounded p-1"
+                          className="hover:bg-destructive/20 rounded p-2 mr-1"
                           data-testid={`button-remove-new-skill-${skill.id}`}
                         >
-                          <X className="h-3 w-3" />
+                          <X className="h-4 w-4" />
                         </button>
                       </div>
 
                       {isExpanded && skillSubSkills.length > 0 && (
-                        <div className="mt-2 ml-6 pl-2 border-l-2 border-muted space-y-1">
-                          {skillSubSkills.map(subSkill => (
-                            <label
-                              key={subSkill.id}
-                              className="flex items-center gap-2 text-sm hover:bg-muted/50 p-1 rounded cursor-pointer"
-                            >
-                              <Checkbox
-                                checked={selectedSubSkillIds.includes(subSkill.id)}
-                                onCheckedChange={() => {
-                                  const current = newStaffSubSkills[skill.id] || [];
-                                  const newIds = current.includes(subSkill.id)
-                                    ? current.filter(id => id !== subSkill.id)
-                                    : [...current, subSkill.id];
-                                  setNewStaffSubSkills({ ...newStaffSubSkills, [skill.id]: newIds });
-                                }}
-                                data-testid={`checkbox-new-subskill-${subSkill.id}`}
-                              />
-                              <span>{subSkill.name}</span>
-                            </label>
-                          ))}
+                        <div className="px-3 pb-3 pt-1 bg-muted/30 border-t">
+                          <p className="text-xs text-muted-foreground mb-2 font-medium">Select applicable sub-skills:</p>
+                          <div className="space-y-1">
+                            {skillSubSkills.map(subSkill => (
+                              <label
+                                key={subSkill.id}
+                                className="flex items-center gap-2 text-sm hover:bg-background p-1.5 rounded cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={selectedSubSkillIds.includes(subSkill.id)}
+                                  onCheckedChange={() => {
+                                    const current = newStaffSubSkills[skill.id] || [];
+                                    const newIds = current.includes(subSkill.id)
+                                      ? current.filter(id => id !== subSkill.id)
+                                      : [...current, subSkill.id];
+                                    setNewStaffSubSkills({ ...newStaffSubSkills, [skill.id]: newIds });
+                                  }}
+                                  data-testid={`checkbox-new-subskill-${subSkill.id}`}
+                                />
+                                <span>{subSkill.name}</span>
+                              </label>
+                            ))}
+                          </div>
                         </div>
                       )}
 
                       {skillSubSkills.length === 0 && (
-                        <p className="mt-1 ml-6 text-xs text-muted-foreground">No sub-skills available</p>
+                        <p className="px-3 pb-2 text-xs text-muted-foreground">No sub-skills available</p>
                       )}
                     </div>
                   );
@@ -1564,65 +1572,75 @@ export default function Staff() {
                     const isExpanded = expandedSkillId === skill.id;
                     
                     return (
-                      <div key={skill.id} className="border rounded-lg p-2">
+                      <div key={skill.id} className="border rounded-lg overflow-hidden">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            {skillSubSkills.length > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => setExpandedSkillId(isExpanded ? null : skill.id)}
-                                className="hover:bg-muted rounded p-0.5"
-                                data-testid={`button-expand-skill-${skill.id}`}
-                              >
-                                {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
-                                )}
-                              </button>
-                            )}
+                          <div
+                            className={`flex-1 flex items-center gap-2 p-3 ${skillSubSkills.length > 0 ? 'cursor-pointer hover:bg-muted/50 transition-colors' : 'p-3'}`}
+                            onClick={() => {
+                              if (skillSubSkills.length > 0) {
+                                setExpandedSkillId(isExpanded ? null : skill.id);
+                              }
+                            }}
+                            data-testid={`button-expand-skill-${skill.id}`}
+                          >
+                            {skillSubSkills.length > 0 ? (
+                              isExpanded ? (
+                                <ChevronDown className="h-5 w-5 text-primary" />
+                              ) : (
+                                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                              )
+                            ) : null}
                             <Badge variant="secondary" className="flex items-center gap-1">
                               {skill.name}
-                              {selectedSubSkillIds.length > 0 && (
-                                <span className="ml-1 text-xs bg-primary/20 px-1.5 py-0.5 rounded-full">
-                                  {selectedSubSkillIds.length} sub-skill{selectedSubSkillIds.length > 1 ? 's' : ''}
-                                </span>
-                              )}
                             </Badge>
+                            {selectedSubSkillIds.length > 0 && (
+                              <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-medium">
+                                {selectedSubSkillIds.length} sub-skill{selectedSubSkillIds.length > 1 ? 's' : ''} selected
+                              </span>
+                            )}
+                            {skillSubSkills.length > 0 && !isExpanded && selectedSubSkillIds.length === 0 && (
+                              <span className="text-xs text-muted-foreground italic">Click to view {skillSubSkills.length} sub-skills</span>
+                            )}
                           </div>
                           <button
                             type="button"
-                            onClick={() => handleRemoveSkill(skill.id)}
-                            className="hover:bg-destructive/20 rounded p-1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveSkill(skill.id);
+                            }}
+                            className="hover:bg-destructive/20 rounded p-2 mr-1"
                             data-testid={`button-remove-skill-${skill.id}`}
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-4 w-4" />
                           </button>
                         </div>
                         
                         {isExpanded && skillSubSkills.length > 0 && (
-                          <div className="mt-2 ml-6 pl-2 border-l-2 border-muted space-y-1">
-                            {skillSubSkills.map(subSkill => (
-                              <label
-                                key={subSkill.id}
-                                className="flex items-center gap-2 text-sm hover:bg-muted/50 p-1 rounded cursor-pointer"
-                              >
-                                <Checkbox
-                                  checked={selectedSubSkillIds.includes(subSkill.id)}
-                                  onCheckedChange={() => toggleSubSkill(skill.id, subSkill.id)}
-                                  data-testid={`checkbox-subskill-${subSkill.id}`}
-                                />
-                                <span>{subSkill.name}</span>
-                                {subSkill.description && (
-                                  <span className="text-muted-foreground">- {subSkill.description}</span>
-                                )}
-                              </label>
-                            ))}
+                          <div className="px-3 pb-3 pt-1 bg-muted/30 border-t">
+                            <p className="text-xs text-muted-foreground mb-2 font-medium">Select applicable sub-skills:</p>
+                            <div className="space-y-1">
+                              {skillSubSkills.map(subSkill => (
+                                <label
+                                  key={subSkill.id}
+                                  className="flex items-center gap-2 text-sm hover:bg-background p-1.5 rounded cursor-pointer"
+                                >
+                                  <Checkbox
+                                    checked={selectedSubSkillIds.includes(subSkill.id)}
+                                    onCheckedChange={() => toggleSubSkill(skill.id, subSkill.id)}
+                                    data-testid={`checkbox-subskill-${subSkill.id}`}
+                                  />
+                                  <span>{subSkill.name}</span>
+                                  {subSkill.description && (
+                                    <span className="text-muted-foreground">- {subSkill.description}</span>
+                                  )}
+                                </label>
+                              ))}
+                            </div>
                           </div>
                         )}
                         
                         {skillSubSkills.length === 0 && (
-                          <p className="mt-1 ml-6 text-xs text-muted-foreground">No sub-skills available</p>
+                          <p className="px-3 pb-2 text-xs text-muted-foreground">No sub-skills available</p>
                         )}
                       </div>
                     );
