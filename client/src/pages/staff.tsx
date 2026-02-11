@@ -116,6 +116,8 @@ export default function Staff() {
   });
   const [editSkills, setEditSkills] = useState<Skill[]>([]);
   const [newStaffSkills, setNewStaffSkills] = useState<Skill[]>([]);
+  const [newStaffSubSkills, setNewStaffSubSkills] = useState<Record<string, string[]>>({});
+  const [newStaffExpandedSkillId, setNewStaffExpandedSkillId] = useState<string | null>(null);
   const [newStaffVehicleId, setNewStaffVehicleId] = useState<string>("");
   const [editVehicleId, setEditVehicleId] = useState<string>("");
   const [showEditPassword, setShowEditPassword] = useState(false);
@@ -319,6 +321,7 @@ export default function Staff() {
       setIsVerified(true);
       fetchStaff();
       fetchSkills();
+      fetchSubSkills();
       fetchWorksManagers();
       fetchVehicles();
     } else {
@@ -509,7 +512,7 @@ export default function Staff() {
         throw new Error(data.error || 'Failed to create staff member');
       }
 
-      // Assign selected skills to the new user
+      // Assign selected skills and sub-skills to the new user
       const assignedSkills: Skill[] = [];
       for (const skill of newStaffSkills) {
         try {
@@ -521,6 +524,15 @@ export default function Staff() {
           });
           if (skillRes.ok) {
             assignedSkills.push(skill);
+            const subSkillIds = newStaffSubSkills[skill.id];
+            if (subSkillIds && subSkillIds.length > 0) {
+              await fetch(`/api/users/${data.id}/skills/${skill.id}/sub-skills`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ subSkillIds }),
+              });
+            }
           }
         } catch (e) {
           console.error('Failed to assign skill:', skill.name, e);
@@ -549,6 +561,8 @@ export default function Staff() {
         dayRate: ""
       });
       setNewStaffSkills([]);
+      setNewStaffSubSkills({});
+      setNewStaffExpandedSkillId(null);
       setNewStaffVehicleId("");
       setShowPassword(false);
       fetchVehicles(); // Refresh available vehicles
@@ -1126,25 +1140,85 @@ export default function Staff() {
             </div>
 
             <div className="border-t pt-4 mt-4">
-              <Label className="text-base font-medium mb-3 block">Trade Skills (Optional)</Label>
-              <div className="flex flex-wrap gap-2 mb-3">
-                {newStaffSkills.map(skill => (
-                  <Badge 
-                    key={skill.id} 
-                    variant="secondary"
-                    className="flex items-center gap-1 pr-1"
-                  >
-                    {skill.name}
-                    <button
-                      type="button"
-                      onClick={() => setNewStaffSkills(newStaffSkills.filter(s => s.id !== skill.id))}
-                      className="ml-1 hover:bg-destructive/20 rounded p-0.5"
-                      data-testid={`button-remove-new-skill-${skill.id}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
+              <Label className="text-base font-medium mb-3 block">Trade Skills & Sub-Skills (Optional)</Label>
+              <div className="space-y-2 mb-3">
+                {newStaffSkills.map(skill => {
+                  const skillSubSkills = getSubSkillsForSkill(skill.id);
+                  const selectedSubSkillIds = newStaffSubSkills[skill.id] || [];
+                  const isExpanded = newStaffExpandedSkillId === skill.id;
+
+                  return (
+                    <div key={skill.id} className="border rounded-lg p-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {skillSubSkills.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setNewStaffExpandedSkillId(isExpanded ? null : skill.id)}
+                              className="hover:bg-muted rounded p-0.5"
+                              data-testid={`button-expand-new-skill-${skill.id}`}
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </button>
+                          )}
+                          <Badge variant="secondary" className="flex items-center gap-1">
+                            {skill.name}
+                            {selectedSubSkillIds.length > 0 && (
+                              <span className="ml-1 text-xs bg-primary/20 px-1.5 py-0.5 rounded-full">
+                                {selectedSubSkillIds.length} sub-skill{selectedSubSkillIds.length > 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </Badge>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewStaffSkills(newStaffSkills.filter(s => s.id !== skill.id));
+                            const updated = { ...newStaffSubSkills };
+                            delete updated[skill.id];
+                            setNewStaffSubSkills(updated);
+                          }}
+                          className="hover:bg-destructive/20 rounded p-1"
+                          data-testid={`button-remove-new-skill-${skill.id}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+
+                      {isExpanded && skillSubSkills.length > 0 && (
+                        <div className="mt-2 ml-6 pl-2 border-l-2 border-muted space-y-1">
+                          {skillSubSkills.map(subSkill => (
+                            <label
+                              key={subSkill.id}
+                              className="flex items-center gap-2 text-sm hover:bg-muted/50 p-1 rounded cursor-pointer"
+                            >
+                              <Checkbox
+                                checked={selectedSubSkillIds.includes(subSkill.id)}
+                                onCheckedChange={() => {
+                                  const current = newStaffSubSkills[skill.id] || [];
+                                  const newIds = current.includes(subSkill.id)
+                                    ? current.filter(id => id !== subSkill.id)
+                                    : [...current, subSkill.id];
+                                  setNewStaffSubSkills({ ...newStaffSubSkills, [skill.id]: newIds });
+                                }}
+                                data-testid={`checkbox-new-subskill-${subSkill.id}`}
+                              />
+                              <span>{subSkill.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+
+                      {skillSubSkills.length === 0 && (
+                        <p className="mt-1 ml-6 text-xs text-muted-foreground">No sub-skills available</p>
+                      )}
+                    </div>
+                  );
+                })}
                 {newStaffSkills.length === 0 && (
                   <span className="text-sm text-muted-foreground">No skills selected</span>
                 )}
