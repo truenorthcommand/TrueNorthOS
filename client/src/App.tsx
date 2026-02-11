@@ -126,6 +126,7 @@ function AppRoutes() {
         <Route path="/jobs/:id" component={JobDetail} />
         <Route path="/jobs/:id/sign-off" component={SignOff} />
         <Route path="/clients" component={Clients} />
+        <Route path="/clients/:id" component={Clients} />
         <Route path="/create-job-sheet" component={Clients} />
         <Route path="/engineers" component={Engineers} />
         <Route path="/completed-jobs" component={CompletedJobs} />

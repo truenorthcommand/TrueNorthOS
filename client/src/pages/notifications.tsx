@@ -110,7 +110,10 @@ export default function NotificationsPage() {
       markAsRead(notification.id);
     }
     if (notification.link_url) {
-      setLocation(notification.link_url);
+      const url = notification.link_url.startsWith('/app/') 
+        ? notification.link_url.replace('/app/', '/') 
+        : notification.link_url;
+      setLocation(url);
     }
   };
 
