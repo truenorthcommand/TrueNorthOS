@@ -44,7 +44,7 @@ export const users = pgTable("users", {
 
 export const skills = pgTable("skills", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull().unique(),
+  name: text("name").notNull(),
   category: text("category").notNull().default("trade"),
   icon: text("icon"),
   isActive: boolean("is_active").notNull().default(true),
@@ -547,7 +547,7 @@ export type MessageWithSender = Message & {
 // Fleet Maintenance - Vehicles
 export const vehicles = pgTable("vehicles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  registration: text("registration").notNull().unique(),
+  registration: text("registration").notNull(),
   make: text("make"),
   model: text("model"),
   year: integer("year"),
@@ -1201,7 +1201,7 @@ export type EngineerAssignmentPattern = {
 // AI User Preferences - Remember individual team member preferences
 export const aiUserPreferences = pgTable("ai_user_preferences", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().unique(),
+  userId: varchar("user_id").notNull(),
   communicationStyle: text("communication_style").default("professional"), // professional, casual, brief
   preferredActions: jsonb("preferred_actions").default([]), // Common tasks they perform
   shortcuts: jsonb("shortcuts").default([]), // Custom shortcuts they've created
@@ -1238,7 +1238,7 @@ export type UserShortcut = {
 export const subscriptionPlans = pgTable("subscription_plans", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
-  slug: text("slug").notNull().unique(),
+  slug: text("slug").notNull(),
   description: text("description"),
   monthlyPrice: doublePrecision("monthly_price").notNull(),
   yearlyPrice: doublePrecision("yearly_price"),
@@ -1388,7 +1388,7 @@ export type ActionType =
 export const addOns = pgTable("add_ons", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
-  slug: text("slug").notNull().unique(),
+  slug: text("slug").notNull(),
   description: text("description"),
   monthlyPrice: doublePrecision("monthly_price").notNull(),
   icon: text("icon"),
@@ -1431,7 +1431,7 @@ export const referralCodes = pgTable("referral_codes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   ownerType: varchar("owner_type").notNull(), // 'customer' | 'merchant'
   ownerId: varchar("owner_id").notNull(),
-  code: varchar("code").notNull().unique(),
+  code: varchar("code").notNull(),
   landingType: varchar("landing_type").notNull(), // 'customer' | 'merchant'
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -1496,7 +1496,7 @@ export type ReviewReward = typeof reviewRewards.$inferSelect;
 export const merchants = pgTable("merchants", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
-  slug: varchar("slug").notNull().unique(),
+  slug: varchar("slug").notNull(),
   email: text("email"),
   password: text("password"),
   commissionRate: doublePrecision("commission_rate").notNull().default(5),
@@ -1698,7 +1698,7 @@ export type FormSchemaDefinition = z.infer<typeof formSchemaDefinition>;
 // Feature flags for tenant-level feature toggles
 export const featureFlags = pgTable("feature_flags", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  key: text("key").notNull().unique(),
+  key: text("key").notNull(),
   name: text("name").notNull(),
   description: text("description"),
   isEnabled: boolean("is_enabled").notNull().default(false),
@@ -2053,7 +2053,7 @@ export type AuditLog = typeof auditLogs.$inferSelect;
 // User sessions table
 export const userSessions = pgTable("user_sessions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  sessionId: text("session_id").unique().notNull(),
+  sessionId: text("session_id").notNull(),
   userId: varchar("user_id").notNull(),
   loginTimestamp: timestamp("login_timestamp").notNull(),
   logoutTimestamp: timestamp("logout_timestamp"),
@@ -2165,7 +2165,7 @@ export const integrationTokens = pgTable("integration_tokens", {
 export const chatThreads = pgTable("chat_threads", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
-  threadId: text("thread_id").notNull().unique(),
+  threadId: text("thread_id").notNull(),
   title: text("title").default("New conversation"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -2221,7 +2221,7 @@ export type Notification = typeof notifications.$inferSelect;
 export const blogPosts = pgTable("blog_posts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
-  slug: text("slug").notNull().unique(),
+  slug: text("slug").notNull(),
   category: text("category").notNull().default("Operations"),
   excerpt: text("excerpt").notNull(),
   content: text("content").notNull().default(""),
