@@ -8,7 +8,7 @@ import QRCode from "qrcode";
 import Stripe from "stripe";
 import { storage } from "./storage";
 import { pool } from "./db";
-import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalkaroundCheckSchema, insertCheckItemSchema, insertDefectSchema, insertDefectUpdateSchema, insertTimesheetSchema, insertExpenseSchema, insertPaymentSchema, insertBlogPostSchema } from "@shared/schema";
+import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalkaroundCheckSchema, insertCheckItemSchema, insertDefectSchema, insertDefectUpdateSchema, insertTimesheetSchema, insertExpenseSchema, insertPaymentSchema, insertBlogPostSchema, insertFeedbackSchema } from "@shared/schema";
 import { z } from "zod";
 import { notifyAdmins, notifyUser } from "./notifications";
 import { sessionMiddleware } from "./session";
@@ -6383,6 +6383,73 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     } catch (error) {
       console.error("Blog image upload error:", error);
       res.status(500).json({ error: "Failed to generate upload URL" });
+    }
+  });
+
+  // ==================== FEEDBACK ROUTES ====================
+
+  app.post("/api/feedback", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const bodySchema = z.object({
+        category: z.enum(["bug", "improvement", "feature", "other"]).default("bug"),
+        subject: z.string().min(1, "Subject is required").max(200),
+        description: z.string().min(1, "Description is required").max(5000),
+        page: z.string().nullable().optional(),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten().fieldErrors });
+      }
+      const data = {
+        userId: String(user.id),
+        userName: user.name || user.username || "Unknown",
+        userRole: user.role || "user",
+        status: "new" as const,
+        ...parsed.data,
+      };
+      const item = await storage.createFeedback(data);
+      res.json(item);
+    } catch (error) {
+      console.error("Create feedback error:", error);
+      res.status(500).json({ error: "Failed to submit feedback" });
+    }
+  });
+
+  app.get("/api/admin/feedback", requireSuperAdmin, async (req, res) => {
+    try {
+      const items = await storage.getAllFeedback();
+      res.json(items);
+    } catch (error) {
+      console.error("Get feedback error:", error);
+      res.status(500).json({ error: "Failed to fetch feedback" });
+    }
+  });
+
+  app.put("/api/admin/feedback/:id", requireSuperAdmin, async (req, res) => {
+    try {
+      const updateSchema = z.object({
+        status: z.enum(["new", "in_progress", "resolved", "dismissed"]).optional(),
+        adminNotes: z.string().max(5000).optional(),
+      });
+      const parsed = updateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten().fieldErrors });
+      }
+      const updates: Record<string, any> = {};
+      if (parsed.data.status !== undefined) updates.status = parsed.data.status;
+      if (parsed.data.adminNotes !== undefined) updates.adminNotes = parsed.data.adminNotes;
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: "No valid fields to update" });
+      }
+      const updated = await storage.updateFeedback(req.params.id, updates);
+      if (!updated) {
+        return res.status(404).json({ error: "Feedback not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Update feedback error:", error);
+      res.status(500).json({ error: "Failed to update feedback" });
     }
   });
 

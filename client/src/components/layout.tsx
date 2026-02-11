@@ -20,6 +20,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useStore } from "@/lib/store";
 import { GlobalAIAssistant } from "@/components/GlobalAIAssistant";
 import { SupportChat } from "@/components/support-chat";
+import { FeedbackButton } from "@/components/feedback-button";
 
 type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools' | 'fleet' | 'assets' | 'finance' | 'clients' | 'files' | 'settings';
 
@@ -882,6 +883,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </TooltipContent>
               </Tooltip>
             )}
+            <FeedbackButton />
             <Tooltip>
               <TooltipTrigger asChild>
                 <button

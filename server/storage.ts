@@ -52,6 +52,7 @@ import {
   type Asset, type InsertAsset,
   type AssetHistory, type InsertAssetHistory,
   type BlogPost, type InsertBlogPost,
+  type Feedback, type InsertFeedback,
   users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, clientContacts, clientProperties, jobUpdates,
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
@@ -64,7 +65,8 @@ import {
   featureFlags, exceptions, domainEvents, webhookSubscriptions, webhookDeliveries, aiRequests,
   workflowRules, workflowExecutions, workflowLogs,
   assets, assetHistory,
-  blogPosts
+  blogPosts,
+  feedback
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and, ne, inArray, gt, asc } from "drizzle-orm";
@@ -424,6 +426,11 @@ export interface IStorage {
   createBlogPost(post: InsertBlogPost): Promise<BlogPost>;
   updateBlogPost(id: string, updates: Partial<BlogPost>): Promise<BlogPost | undefined>;
   deleteBlogPost(id: string): Promise<void>;
+
+  // Feedback
+  getAllFeedback(): Promise<Feedback[]>;
+  createFeedback(data: InsertFeedback): Promise<Feedback>;
+  updateFeedback(id: string, updates: Partial<Feedback>): Promise<Feedback | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3144,6 +3151,23 @@ export class DatabaseStorage implements IStorage {
 
   async deleteBlogPost(id: string): Promise<void> {
     await db.delete(blogPosts).where(eq(blogPosts.id, id));
+  }
+
+  async getAllFeedback(): Promise<Feedback[]> {
+    return db.select().from(feedback).orderBy(desc(feedback.createdAt));
+  }
+
+  async createFeedback(data: InsertFeedback): Promise<Feedback> {
+    const [created] = await db.insert(feedback).values(data).returning();
+    return created;
+  }
+
+  async updateFeedback(id: string, updates: Partial<Feedback>): Promise<Feedback | undefined> {
+    const [updated] = await db.update(feedback)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(feedback.id, id))
+      .returning();
+    return updated;
   }
 }
 

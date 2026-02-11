@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Building, CreditCard, FileText, Loader2, RefreshCw, Smartphone, Database, Send, AlertTriangle, CheckCircle, Info, Zap, Plus, Trash2, Bell, Briefcase, MessageCircle, Receipt, Truck, Settings2 } from "lucide-react";
+import { Save, Building, CreditCard, FileText, Loader2, RefreshCw, Smartphone, Database, Send, AlertTriangle, CheckCircle, Info, Zap, Plus, Trash2, Bell, Briefcase, MessageCircle, Receipt, Truck, Settings2, MessageSquarePlus, Bug, Lightbulb, Star, HelpCircle } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
@@ -860,6 +860,202 @@ export default function Settings() {
           </CardContent>
         </Card>
       )}
+
+      {user?.superAdmin && (
+        <FeedbackViewer />
+      )}
     </div>
+  );
+}
+
+const categoryIcons: Record<string, React.ReactNode> = {
+  bug: <Bug className="w-4 h-4" />,
+  improvement: <Lightbulb className="w-4 h-4" />,
+  feature: <Star className="w-4 h-4" />,
+  other: <HelpCircle className="w-4 h-4" />,
+};
+
+const statusColors: Record<string, string> = {
+  new: "bg-blue-100 text-blue-800",
+  in_progress: "bg-yellow-100 text-yellow-800",
+  resolved: "bg-green-100 text-green-800",
+  dismissed: "bg-gray-100 text-gray-600",
+};
+
+function FeedbackViewer() {
+  const { toast } = useToast();
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [filter, setFilter] = useState("all");
+  const [editingNotes, setEditingNotes] = useState<Record<string, string>>({});
+
+  const loadFeedback = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/feedback", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      setItems(data);
+    } catch {
+      toast({ title: "Failed to load feedback", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadFeedback(); }, []);
+
+  const updateStatus = async (id: string, status: string) => {
+    try {
+      const res = await fetch(`/api/admin/feedback/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const updated = await res.json();
+      setItems(prev => prev.map(i => i.id === id ? updated : i));
+      toast({ title: `Status updated to ${status.replace("_", " ")}` });
+    } catch {
+      toast({ title: "Failed to update", variant: "destructive" });
+    }
+  };
+
+  const saveNotes = async (id: string) => {
+    try {
+      const res = await fetch(`/api/admin/feedback/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ adminNotes: editingNotes[id] || "" }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const updated = await res.json();
+      setItems(prev => prev.map(i => i.id === id ? updated : i));
+      toast({ title: "Notes saved" });
+    } catch {
+      toast({ title: "Failed to save notes", variant: "destructive" });
+    }
+  };
+
+  const filtered = filter === "all" ? items : items.filter(i => i.status === filter);
+  const counts = { all: items.length, new: 0, in_progress: 0, resolved: 0, dismissed: 0 };
+  items.forEach(i => { if (counts[i.status as keyof typeof counts] !== undefined) counts[i.status as keyof typeof counts]++; });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2" data-testid="text-feedback-title">
+          <MessageSquarePlus className="w-5 h-5" />
+          User Feedback
+          {counts.new > 0 && (
+            <Badge variant="destructive" className="ml-2" data-testid="badge-feedback-new-count">{counts.new} new</Badge>
+          )}
+        </CardTitle>
+        <CardDescription>Review and manage feedback submitted by users</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          {(["all", "new", "in_progress", "resolved", "dismissed"] as const).map(s => (
+            <Button
+              key={s}
+              variant={filter === s ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilter(s)}
+              data-testid={`button-filter-feedback-${s}`}
+            >
+              {s === "all" ? "All" : s === "in_progress" ? "In Progress" : s.charAt(0).toUpperCase() + s.slice(1)}
+              <span className="ml-1 text-xs">({counts[s]})</span>
+            </Button>
+          ))}
+          <Button variant="outline" size="sm" onClick={loadFeedback} disabled={loading} className="ml-auto" data-testid="button-refresh-feedback">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+          </Button>
+        </div>
+
+        {loading && items.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+            Loading feedback...
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground" data-testid="text-no-feedback">
+            No feedback items{filter !== "all" ? ` with status "${filter.replace("_", " ")}"` : ""}.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filtered.map(item => (
+              <div
+                key={item.id}
+                className="border rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => {
+                  setExpandedId(expandedId === item.id ? null : item.id);
+                  if (!editingNotes[item.id]) setEditingNotes(prev => ({ ...prev, [item.id]: item.adminNotes || "" }));
+                }}
+                data-testid={`card-feedback-${item.id}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {categoryIcons[item.category] || categoryIcons.other}
+                    <span className="font-medium truncate">{item.subject}</span>
+                    <Badge variant="outline" className="capitalize text-xs flex-shrink-0">{item.category}</Badge>
+                  </div>
+                  <Badge className={`text-xs flex-shrink-0 ${statusColors[item.status] || statusColors.new}`}>
+                    {item.status === "in_progress" ? "In Progress" : item.status}
+                  </Badge>
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground flex gap-3">
+                  <span>{item.userName} ({item.userRole})</span>
+                  <span>{new Date(item.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                  {item.page && <span>Page: {item.page}</span>}
+                </div>
+
+                {expandedId === item.id && (
+                  <div className="mt-3 space-y-3" onClick={e => e.stopPropagation()}>
+                    <Separator />
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Description</Label>
+                      <p className="text-sm whitespace-pre-wrap mt-1">{item.description}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Status</Label>
+                      <Select value={item.status} onValueChange={(v) => updateStatus(item.id, v)}>
+                        <SelectTrigger className="w-48 mt-1" data-testid={`select-feedback-status-${item.id}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="new">New</SelectItem>
+                          <SelectItem value="in_progress">In Progress</SelectItem>
+                          <SelectItem value="resolved">Resolved</SelectItem>
+                          <SelectItem value="dismissed">Dismissed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Admin Notes</Label>
+                      <div className="flex gap-2 mt-1">
+                        <Textarea
+                          value={editingNotes[item.id] ?? item.adminNotes ?? ""}
+                          onChange={(e) => setEditingNotes(prev => ({ ...prev, [item.id]: e.target.value }))}
+                          placeholder="Add internal notes about this feedback..."
+                          rows={2}
+                          className="flex-1"
+                          data-testid={`input-feedback-notes-${item.id}`}
+                        />
+                        <Button size="sm" onClick={() => saveNotes(item.id)} data-testid={`button-save-notes-${item.id}`}>
+                          <Save className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
