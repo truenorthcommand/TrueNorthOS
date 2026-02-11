@@ -6390,7 +6390,10 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
   app.post("/api/feedback", requireAuth, async (req, res) => {
     try {
-      const user = req.user as any;
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
       const bodySchema = z.object({
         category: z.enum(["bug", "improvement", "feature", "other"]).default("bug"),
         subject: z.string().min(1, "Subject is required").max(200),
