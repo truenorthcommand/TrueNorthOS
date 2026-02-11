@@ -4,6 +4,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { setupNotifications } from "./notifications";
 import { storage } from "./storage";
+import { ensureSessionTable } from "./session";
 import path from "path";
 import fs from "fs";
 
@@ -87,6 +88,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  await ensureSessionTable();
   await registerRoutes(httpServer, app);
 
   const seedDefaultSkills = async () => {
