@@ -664,9 +664,20 @@ export default function Clients() {
     }
   };
 
+  const [clientFormErrors, setClientFormErrors] = useState<{name?: boolean; postcode?: boolean}>({});
+
   const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreatedPortalLink(null);
+    const errors: {name?: boolean; postcode?: boolean} = {};
+    if (!newClient.name?.trim()) errors.name = true;
+    if (!newClient.postcode?.trim()) errors.postcode = true;
+    if (Object.keys(errors).length > 0) {
+      setClientFormErrors(errors);
+      toast({ title: "Missing required fields", description: "Please fill in Company/Client Name and Postcode.", variant: "destructive" });
+      return;
+    }
+    setClientFormErrors({});
     try {
       const res = await fetch('/api/clients', {
         method: 'POST',
@@ -1663,11 +1674,12 @@ export default function Clients() {
               <form onSubmit={handleAddClient} className="space-y-4">
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Company Name</Label>
+                    <Label>Company/Client Name <span className="text-red-500">*</span></Label>
                     <Input
-                      placeholder="e.g., BuildTech Solutions"
+                      placeholder="e.g., BuildTech Solutions or John Smith"
                       value={newClient.name}
-                      onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
+                      onChange={(e) => { setNewClient({ ...newClient, name: e.target.value }); if (e.target.value.trim()) setClientFormErrors(prev => ({ ...prev, name: false })); }}
+                      className={clientFormErrors.name ? "border-red-500 ring-red-500 focus-visible:ring-red-500" : ""}
                       data-testid="input-company-name"
                     />
                   </div>
@@ -1716,11 +1728,12 @@ export default function Clients() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Postcode</Label>
+                    <Label>Postcode <span className="text-red-500">*</span></Label>
                     <Input
                       placeholder="e.g., SW1A 1AA"
                       value={newClient.postcode}
-                      onChange={(e) => setNewClient({ ...newClient, postcode: e.target.value })}
+                      onChange={(e) => { setNewClient({ ...newClient, postcode: e.target.value }); if (e.target.value.trim()) setClientFormErrors(prev => ({ ...prev, postcode: false })); }}
+                      className={clientFormErrors.postcode ? "border-red-500 ring-red-500 focus-visible:ring-red-500" : ""}
                       data-testid="input-postcode"
                     />
                   </div>
@@ -2474,7 +2487,7 @@ export default function Clients() {
             <div className="space-y-6">
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-sm">Company Name</Label>
+                  <Label className="text-sm">Company/Client Name</Label>
                   <Input
                     value={editingClient.name}
                     onChange={(e) => setEditingClient({ ...editingClient, name: e.target.value })}

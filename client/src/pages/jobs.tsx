@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2, Pencil, Users, Loader2 } from "lucide-react";
+import { Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2, Pencil, Users, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
@@ -112,12 +112,6 @@ export default function Jobs() {
           </p>
         </div>
         
-        {user.role === "admin" && (
-          <Button size="lg" className="w-full sm:w-auto" onClick={handleCreateJob} data-testid="button-new-job">
-            <Plus className="mr-2 h-5 w-5" />
-            New Job Sheet
-          </Button>
-        )}
       </div>
 
       <div className="flex items-center space-x-2 bg-card p-2 rounded-lg border shadow-sm">
