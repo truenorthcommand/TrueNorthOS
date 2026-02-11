@@ -302,7 +302,7 @@ export async function notifyAdmins(notification: {
   linkUrl?: string;
 }) {
   try {
-    const result = await pool.query(`SELECT id FROM users WHERE role = 'admin' AND status = 'active'`);
+    const result = await pool.query(`SELECT id FROM users WHERE (role = 'admin' OR super_admin = true) AND status = 'active'`);
     const adminIds = result.rows.map(r => r.id);
 
     for (const adminId of adminIds) {

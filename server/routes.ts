@@ -1519,6 +1519,17 @@ export async function registerRoutes(
           metadata: { clientName: job.client },
           severity: "info",
         });
+
+        notifyAdmins({
+          type: 'job_created',
+          title: 'New Job Created',
+          message: `${currentUser.name} created job ${job.jobNo || ''} for ${job.customerName || 'Unknown Customer'}`,
+          category: 'jobs',
+          jobId: job.id,
+          jobNo: job.jobNo || undefined,
+          timestamp: new Date().toISOString(),
+          linkUrl: `/app/jobs/${job.id}`,
+        });
       }
       
       // Check if job is scheduled for today and notify all assigned engineers
@@ -1614,7 +1625,8 @@ export async function registerRoutes(
         }
       }
 
-      // Track if date is being changed
+      // Track status and date changes
+      const oldStatus = existingJob.status;
       const oldDate = existingJob.date;
       const newDate = updates.date;
       const isDateChanging = newDate !== undefined && newDate !== null;
@@ -1625,6 +1637,35 @@ export async function registerRoutes(
       }
 
       const job = await storage.updateJob(req.params.id, updates);
+
+      if (job && updates.status && updates.status !== oldStatus) {
+        notifyAdmins({
+          type: 'job_status_changed',
+          title: 'Job Status Updated',
+          message: `Job ${job.jobNo || ''} changed from ${oldStatus} to ${updates.status}`,
+          category: 'jobs',
+          jobId: job.id,
+          jobNo: job.jobNo || undefined,
+          timestamp: new Date().toISOString(),
+          linkUrl: `/app/jobs/${job.id}`,
+        });
+
+        const assignedIds = Array.isArray(job.assignedToIds) && job.assignedToIds.length > 0
+          ? job.assignedToIds as string[]
+          : job.assignedToId ? [job.assignedToId] : [];
+        for (const engineerId of assignedIds) {
+          notifyUser(engineerId, {
+            type: 'job_status_changed',
+            title: 'Job Status Updated',
+            message: `Job ${job.jobNo || ''} for ${job.customerName || 'Customer'} is now ${updates.status}`,
+            category: 'jobs',
+            jobId: job.id,
+            jobNo: job.jobNo || undefined,
+            timestamp: new Date().toISOString(),
+            linkUrl: `/app/jobs/${job.id}`,
+          });
+        }
+      }
       
       // Check if job was rescheduled to today and notify all assigned engineers
       if (job && isDateChanging) {
@@ -2167,6 +2208,16 @@ export async function registerRoutes(
         status: "Accepted",
         acceptedAt: new Date(),
       });
+
+      notifyAdmins({
+        type: 'quote_accepted',
+        title: 'Quote Accepted',
+        message: `Quote ${quote.quoteNo || ''} for ${quote.customerName || 'Customer'} (£${quote.total || 0}) has been accepted by the client`,
+        category: 'jobs',
+        timestamp: new Date().toISOString(),
+        linkUrl: `/app/quotes`,
+      });
+
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to accept quote" });
@@ -2188,6 +2239,16 @@ export async function registerRoutes(
         declinedAt: new Date(),
         declineReason: reason || null,
       });
+
+      notifyAdmins({
+        type: 'quote_declined',
+        title: 'Quote Declined',
+        message: `Quote ${quote.quoteNo || ''} for ${quote.customerName || 'Customer'} has been declined${reason ? ': ' + reason : ''}`,
+        category: 'jobs',
+        timestamp: new Date().toISOString(),
+        linkUrl: `/app/quotes`,
+      });
+
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to decline quote" });
@@ -2433,6 +2494,15 @@ export async function registerRoutes(
           description: `Created client: ${client.name}`,
           changesAfter: { name: client.name, email: client.email, phone: client.phone, address: client.address },
           severity: "info",
+        });
+
+        notifyAdmins({
+          type: 'client_created',
+          title: 'New Client Added',
+          message: `${currentUser.name} added a new client: ${client.name}`,
+          category: 'system',
+          timestamp: new Date().toISOString(),
+          linkUrl: `/app/clients/${client.id}`,
         });
       }
       
@@ -6566,9 +6636,18 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
             paidAt: new Date(),
           });
 
-          await storage.updateInvoice(invoiceId, {
+          const paidInvoice = await storage.updateInvoice(invoiceId, {
             status: "Paid",
             paidAt: new Date(),
+          });
+
+          notifyAdmins({
+            type: 'invoice_paid',
+            title: 'Invoice Paid',
+            message: `Invoice ${paidInvoice?.invoiceNo || invoiceId} for ${paidInvoice?.customerName || 'Customer'} (£${(paymentIntent.amount / 100).toFixed(2)}) has been paid via card`,
+            category: 'expenses',
+            timestamp: new Date().toISOString(),
+            linkUrl: `/app/invoices`,
           });
 
           console.log(`Payment recorded for invoice ${invoiceId}`);
