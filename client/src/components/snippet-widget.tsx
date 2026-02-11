@@ -161,7 +161,7 @@ export function SnippetWidget() {
 
   return (
     <>
-      <div className="fixed bottom-20 right-6 z-50 print:hidden" data-testid="snippet-widget">
+      <div className="fixed bottom-[15rem] right-6 z-50 print:hidden" data-testid="snippet-widget">
         <AnimatePresence>
           {isExpanded && (
             <motion.div

@@ -415,7 +415,7 @@ export function GlobalAIAssistant() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-24 right-6 z-50 h-14 w-14 rounded-full bg-[#0F2B4C] hover:bg-[#1a3a5c] text-white shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center group"
+        className="fixed bottom-[5.5rem] right-6 z-50 h-12 w-12 rounded-full bg-[#0F2B4C] hover:bg-[#1a3a5c] text-white shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center group"
         data-testid="button-open-global-ai"
       >
         <Sparkles className="h-6 w-6 group-hover:animate-pulse" />

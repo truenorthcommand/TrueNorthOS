@@ -867,7 +867,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Dialog>
           
           {/* Floating Buttons - Desktop */}
-          <div className="fixed bottom-6 right-6 hidden md:flex flex-col gap-3 print:hidden z-40">
+          <div className="fixed bottom-[9.5rem] right-6 hidden md:flex flex-col gap-3 print:hidden z-40">
             {hasRole(user, 'admin') && (
               <Tooltip>
                 <TooltipTrigger asChild>
