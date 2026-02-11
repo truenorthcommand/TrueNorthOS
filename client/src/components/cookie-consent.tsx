@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Cookie, X } from "lucide-react";
-import { Link } from "wouter";
 
 export function CookieConsent() {
   const [isVisible, setIsVisible] = useState(false);
@@ -47,10 +46,7 @@ export function CookieConsent() {
               <h3 className="font-semibold text-sm">Cookie Preferences</h3>
               <p className="text-sm text-muted-foreground">
                 We use cookies to improve your experience. Essential cookies are required for the app to function. 
-                Analytics cookies help us improve our service.{" "}
-                <Link href="/privacy" className="text-primary underline">
-                  Learn more
-                </Link>
+                Analytics cookies help us improve our service.
               </p>
             </div>
           </div>

@@ -17,11 +17,9 @@ import Clients from "@/pages/clients";
 import Engineers from "@/pages/engineers";
 import CompletedJobs from "@/pages/completed-jobs";
 import Staff from "@/pages/staff";
-import Home from "@/pages/home";
 import CalendarPage from "@/pages/schedule/calendar";
 import PlannerPage from "@/pages/schedule/planner";
 import MapPage from "@/pages/map";
-import Pricing from "@/pages/pricing";
 import AiAdvisors from "@/pages/ai-advisors";
 import AdminAdvisors from "@/pages/admin-advisors";
 import AITools from "@/pages/ai-tools";
@@ -39,8 +37,6 @@ import Settings from "@/pages/settings";
 import Integrations from "@/pages/integrations";
 import Security from "@/pages/security";
 import Messages from "@/pages/messages";
-import Privacy from "@/pages/privacy";
-import Terms from "@/pages/terms";
 import Fleet from "@/pages/fleet";
 import FleetVehicles from "@/pages/fleet-vehicles";
 import VehicleDetail from "@/pages/vehicle-detail";
@@ -87,13 +83,6 @@ import FormFill from "@/pages/forms/fill";
 import FormSubmissions from "@/pages/forms/submissions";
 import Today from "@/pages/today";
 import Exceptions from "@/pages/exceptions";
-import PublicHome from "@/pages/public-home";
-import PublicAbout from "@/pages/public-about";
-import PublicContact from "@/pages/public-contact";
-import PublicBlog from "@/pages/public-blog";
-import PublicRegister from "@/pages/public-register";
-import PublicCheckout from "@/pages/public-checkout";
-import PublicCheckoutSuccess from "@/pages/public-checkout-success";
 import Assets from "@/pages/assets";
 import AssetDetail from "@/pages/asset-detail";
 import AssetForm from "@/pages/asset-form";
@@ -205,20 +194,16 @@ function AppRoutes() {
   );
 }
 
+function RedirectToLogin() {
+  window.location.replace('/login');
+  return null;
+}
+
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={PublicHome} />
-      <Route path="/pricing" component={Pricing} />
+      <Route path="/" component={RedirectToLogin} />
       <Route path="/login" component={Login} />
-      <Route path="/register" component={PublicRegister} />
-      <Route path="/about" component={PublicAbout} />
-      <Route path="/contact" component={PublicContact} />
-      <Route path="/blog" component={PublicBlog} />
-      <Route path="/privacy" component={Privacy} />
-      <Route path="/terms" component={Terms} />
-      <Route path="/checkout/success" component={PublicCheckoutSuccess} />
-      <Route path="/checkout" component={PublicCheckout} />
       <Route path="/setup" component={Setup} />
       <Route path="/guides" component={UserGuides} />
 
@@ -227,7 +212,6 @@ function Router() {
       <Route path="/portal/:token" component={CustomerPortal} />
       <Route path="/invoice/:token" component={ClientInvoice} />
 
-      <Route path="/home" component={Home} />
       <Route path="/proposal" component={Proposal} />
       <Route path="/demo/directors" component={DemoDirectorsSuite} />
       <Route path="/pitch/investor" component={PitchInvestor} />

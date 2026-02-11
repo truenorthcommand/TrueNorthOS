@@ -8,7 +8,6 @@ import { Shield, Key, Loader2, Check, X, Eye, EyeOff, Download, Trash2, FileText
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Link } from "wouter";
 import {
   Dialog,
   DialogContent,
@@ -539,18 +538,6 @@ export default function Security() {
         </CardContent>
       </Card>
 
-      <Card className="mt-4">
-        <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-4 text-sm">
-            <Link href="/privacy" className="text-primary underline" data-testid="link-privacy-policy">
-              Privacy Policy
-            </Link>
-            <Link href="/terms" className="text-primary underline" data-testid="link-terms">
-              Terms of Service
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
 
       <Dialog open={showDisableDialog} onOpenChange={setShowDisableDialog}>
         <DialogContent>
