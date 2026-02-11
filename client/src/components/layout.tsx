@@ -480,7 +480,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Settings Section */}
         <MenuGroup title="Settings" icon={Settings} section="settings">
-          <NavLink href="/security" icon={Shield}>Security</NavLink>
+          {user?.superAdmin && (
+            <NavLink href="/security" icon={Shield}>Security</NavLink>
+          )}
           {hasRole(user, 'admin') && (
             <>
               <NavLink href="/forms/templates" icon={ClipboardList}>Form Templates</NavLink>
@@ -491,9 +493,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <>
               <NavLink href="/integrations" icon={Link2}>Integrations</NavLink>
               <NavLink href="/admin/advisors" icon={Bot}>Advisor Settings</NavLink>
+              <NavLink href="/subscription" icon={CreditCard}>Subscription & Billing</NavLink>
             </>
           )}
-          <NavLink href="/subscription" icon={CreditCard}>Subscription & Billing</NavLink>
           <NavLink href="/referrals" icon={Gift}>Referrals</NavLink>
           {user?.superAdmin && (
             <>
