@@ -68,7 +68,7 @@ const PORTAL_CONFIGS: PortalConfig[] = [
 
 function RolePortals({ user, setLocation }: { user: any; setLocation: (path: string) => void }) {
   const userRoles = user.roles && user.roles.length > 0 ? user.roles : [user.role];
-  const isAdminUser = user.role === 'super_admin' || user.role === 'admin' || user.superAdmin;
+  const isAdminUser = hasRole(user, 'admin');
   
   const availablePortals = PORTAL_CONFIGS.filter(portal => {
     if (isAdminUser) return true;

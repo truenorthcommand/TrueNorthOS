@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
+import { hasRole } from "@/lib/types";
 import { Link } from "wouter";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +27,7 @@ export default function CompletedJobs() {
         (job.address?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
         (job.client?.toLowerCase() || "").includes(searchTerm.toLowerCase());
 
-      const matchesRole = user.role === "admin" || job.assignedToId === user.id || (job.assignedToIds || []).includes(user.id);
+      const matchesRole = hasRole(user, 'admin') || job.assignedToId === user.id || (job.assignedToIds || []).includes(user.id);
 
       return matchesSearch && matchesRole;
     })

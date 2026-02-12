@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
+import { hasRole } from "@/lib/types";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -167,7 +168,7 @@ export default function Payments() {
   const failedPayments = payments.filter((p) => p.status === "failed");
   const failedTotal = failedPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
 
-  const isAdmin = user?.role === "admin";
+  const isAdmin = hasRole(user, 'admin');
 
   if (!isAdmin) {
     return (

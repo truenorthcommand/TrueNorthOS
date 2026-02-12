@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { useAuth } from "@/lib/auth";
+import { hasRole } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,7 +34,7 @@ export default function Engineers() {
       const data = await res.json();
       return data.filter((u: any) => u.role === 'engineer');
     },
-    enabled: user?.role === 'admin',
+    enabled: hasRole(user, 'admin'),
   });
 
   const jobsByEngineer = useMemo(() => {
@@ -64,7 +65,7 @@ export default function Engineers() {
     return jobsByEngineer.get(engineerId) || { total: 0, completed: 0, inProgress: 0, allJobs: [] };
   }, [jobsByEngineer]);
 
-  if (!user || user.role !== "admin") {
+  if (!user || !hasRole(user, 'admin')) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh]">
         <AlertCircle className="h-12 w-12 text-destructive mb-4" />

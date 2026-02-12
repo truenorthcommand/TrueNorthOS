@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { hasRole } from "@/lib/types";
 import { 
   Bot, 
   ClipboardCheck, 
@@ -220,7 +221,7 @@ export default function AiAdvisors() {
             <p className="text-muted-foreground text-center max-w-md mb-4">
               Technical advisors haven't been configured yet.
             </p>
-            {user?.role === "admin" && (
+            {hasRole(user, 'admin') && (
               <Button 
                 onClick={() => seedMutation.mutate()}
                 disabled={seedMutation.isPending}
@@ -239,7 +240,7 @@ export default function AiAdvisors() {
                 )}
               </Button>
             )}
-            {user?.role !== "admin" && (
+            {!hasRole(user, 'admin') && (
               <p className="text-muted-foreground text-sm">
                 Contact your administrator to set them up.
               </p>

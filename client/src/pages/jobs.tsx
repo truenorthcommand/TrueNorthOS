@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { apiRequest } from "@/lib/queryClient";
-import { Job, JobStatus } from "@/lib/types";
+import { Job, JobStatus, hasRole } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -82,7 +82,7 @@ export default function Jobs() {
       job.jobNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (job.address || "").toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesRole = user.role === "admin" || job.assignedToId === user.id || (job.assignedToIds || []).includes(user.id);
+    const matchesRole = hasRole(user, 'admin') || job.assignedToId === user.id || (job.assignedToIds || []).includes(user.id);
 
     return matchesSearch && matchesRole;
   });
@@ -108,7 +108,7 @@ export default function Jobs() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight" data-testid="text-jobs-title">Jobs in Progress</h1>
           <p className="text-muted-foreground">
-            {user.role === "admin" ? "Track all field operations and completion status" : "Track your assigned jobs"}
+            {hasRole(user, 'admin') ? "Track all field operations and completion status" : "Track your assigned jobs"}
           </p>
         </div>
         
@@ -144,7 +144,7 @@ export default function Jobs() {
                  key={job.id} 
                  job={job} 
                  statusColor={getStatusColor(job.status)} 
-                 isAdmin={user.role === 'admin'}
+                 isAdmin={hasRole(user, 'admin')}
                  isSelected={selectedJobIds.has(job.id)}
                  onToggleSelection={toggleJobSelection}
                  users={users}
@@ -164,7 +164,7 @@ export default function Jobs() {
                 key={job.id} 
                 job={job} 
                 statusColor={getStatusColor(job.status)} 
-                isAdmin={user.role === 'admin'}
+                isAdmin={hasRole(user, 'admin')}
                 isSelected={selectedJobIds.has(job.id)}
                 onToggleSelection={toggleJobSelection}
                 users={users}
@@ -185,7 +185,7 @@ export default function Jobs() {
                  key={job.id} 
                  job={job} 
                  statusColor={getStatusColor(job.status)} 
-                 isAdmin={user.role === 'admin'}
+                 isAdmin={hasRole(user, 'admin')}
                  isSelected={selectedJobIds.has(job.id)}
                  onToggleSelection={toggleJobSelection}
                  users={users}
@@ -205,7 +205,7 @@ export default function Jobs() {
                  key={job.id} 
                  job={job} 
                  statusColor={getStatusColor(job.status)} 
-                 isAdmin={user.role === 'admin'}
+                 isAdmin={hasRole(user, 'admin')}
                  isSelected={selectedJobIds.has(job.id)}
                  onToggleSelection={toggleJobSelection}
                  users={users}
@@ -215,7 +215,7 @@ export default function Jobs() {
         </TabsContent>
       </Tabs>
 
-      {user.role === "admin" && selectedJobIds.size > 0 && (
+      {hasRole(user, 'admin') && selectedJobIds.size > 0 && (
         <div className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg p-4 z-50">
           <div className="container mx-auto flex items-center justify-between gap-4 flex-wrap">
             <span className="text-sm font-medium" data-testid="text-jobs-selected-count">

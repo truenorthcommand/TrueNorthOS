@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
+import { hasRole } from "@/lib/types";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -408,7 +409,7 @@ export default function OutlookInbox() {
 
   const displayEmails = searchQuery.length >= 2 ? searchResults : emails;
 
-  if (user?.role !== "admin") {
+  if (!hasRole(user, 'admin')) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <Card className="p-6">

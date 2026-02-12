@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
+import { hasRole } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -1433,7 +1434,7 @@ export default function Clients() {
               </div>
             </div>
 
-            {assignOption === 'assign' && user?.role === 'admin' && engineers.length > 0 && (
+            {assignOption === 'assign' && hasRole(user, 'admin') && engineers.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label>Select Engineers</Label>
@@ -2076,7 +2077,7 @@ export default function Clients() {
                         </p>
                       </div>
                     </div>
-                    {(user.role === 'admin' || (user.role as string) === 'super_admin') && (
+                    {(hasRole(user, 'admin')) && (
                       <>
                         <Button
                           variant="ghost"

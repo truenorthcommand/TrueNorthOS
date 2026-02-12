@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
+import { hasRole } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -59,7 +60,7 @@ export default function TimeLogs() {
     fetchData();
   }, []);
 
-  if (!user || user.role !== "admin") {
+  if (!user || !hasRole(user, 'admin')) {
     return <Redirect to="/dashboard" />;
   }
 

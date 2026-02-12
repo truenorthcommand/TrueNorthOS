@@ -49,7 +49,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ActionPriority, JobUpdate, Photo } from "@/lib/types";
+import { ActionPriority, JobUpdate, Photo, hasRole } from "@/lib/types";
 import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format } from "date-fns";
@@ -234,7 +234,7 @@ export default function JobDetail() {
   const [uploadingJobFile, setUploadingJobFile] = useState<File | null>(null);
 
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (hasRole(user, 'admin')) {
       fetch('/api/users', { credentials: 'include' })
         .then(res => res.json())
         .then(data => setEngineers(data.map((u: any) => ({ id: u.id, name: u.name }))))
@@ -337,7 +337,7 @@ export default function JobDetail() {
     completeJobMutation.mutate({});
   };
 
-  const canOverride = user?.role === "admin" || user?.superAdmin === true;
+  const canOverride = hasRole(user, 'admin');
 
   const { uploadFile: uploadJobFile, isUploading: isUploadingJobFile, progress: uploadProgress } = useUpload({
     onSuccess: async (response) => {
@@ -806,7 +806,7 @@ export default function JobDetail() {
   }, {} as Record<string, JobUpdate[]>);
 
   const isReadOnly = job.status === "Signed Off";
-  const isAdmin = user?.role === "admin";
+  const isAdmin = hasRole(user, 'admin');
   const isAdminFieldReadOnly = isReadOnly || !isAdmin;
   
   // Set initial view mode based on user role
@@ -1198,7 +1198,7 @@ export default function JobDetail() {
                     </SelectContent>
                   </Select>
                 </div>
-                {user?.role === "admin" && (
+                {hasRole(user, 'admin') && (
                   <div className="space-y-2 flex-1">
                     <Label>Job Order</Label>
                     <Input 
@@ -1222,7 +1222,7 @@ export default function JobDetail() {
             </div>
 
             {/* Engineer Assignment (Admin Only) */}
-            {user?.role === "admin" && (
+            {hasRole(user, 'admin') && (
               <div className="space-y-2 border-t pt-6 mt-6">
                 <Label className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
@@ -1409,7 +1409,7 @@ export default function JobDetail() {
             )}
 
             {/* Long-running Job Toggle (Admin Only) */}
-            {user?.role === "admin" && (
+            {hasRole(user, 'admin') && (
               <div className="flex items-center justify-between p-4 border rounded-lg mt-6 bg-muted">
                 <div className="space-y-0.5">
                   <Label htmlFor="long-running-toggle" className="flex items-center gap-2">
@@ -1733,7 +1733,7 @@ export default function JobDetail() {
           <CardHeader className="bg-blue-50 dark:bg-blue-900/20 print:bg-transparent print:p-0 print:mb-4">
              <div className="flex justify-between items-center">
               <CardTitle className="text-lg">Reference Photos (Admin)</CardTitle>
-              {user?.role === 'admin' && !isReadOnly && (
+              {isAdmin && !isReadOnly && (
                 <Button 
                   size="sm" 
                   variant="outline" 
@@ -1764,7 +1764,7 @@ export default function JobDetail() {
                  {(job.photos || []).filter(p => p.source === 'admin').map((photo) => (
                    <div key={photo.id} className="relative group aspect-square bg-muted rounded-md overflow-hidden border">
                      <img src={photo.url} alt="Reference photo" className="w-full h-full object-cover" />
-                     {user?.role === 'admin' && !isReadOnly && (
+                     {isAdmin && !isReadOnly && (
                        <Button
                         variant="destructive"
                         size="icon"

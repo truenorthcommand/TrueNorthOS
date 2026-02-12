@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Clock, ChevronLeft, ChevronRight, Plus, CalendarIcon, Check, X, Loader2 } from "lucide-react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, parseISO, isSameDay } from "date-fns";
 import { toast } from "sonner";
+import { hasRole } from "@/lib/types";
 import type { TimesheetWithUser, User } from "@shared/schema";
 
 export default function Timesheets() {
@@ -42,7 +43,7 @@ export default function Timesheets() {
 
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
-    enabled: user?.role === "admin",
+    enabled: hasRole(user, 'admin'),
   });
 
   const createManualEntryMutation = useMutation({
@@ -145,7 +146,7 @@ export default function Timesheets() {
     const inWeek = tsDate >= weekStart && tsDate <= weekEnd;
     if (!inWeek) return false;
 
-    if (user?.role === "admin" && viewAllStaff) {
+    if (hasRole(user, 'admin') && viewAllStaff) {
       if (selectedUserId !== "all" && ts.userId !== selectedUserId) return false;
       return true;
     }
@@ -165,7 +166,7 @@ export default function Timesheets() {
     return format(date, "HH:mm");
   };
 
-  const isAdmin = user?.role === "admin";
+  const isAdmin = hasRole(user, 'admin');
 
   return (
     <div className="container mx-auto p-4 pb-24 md:pb-4 space-y-6">

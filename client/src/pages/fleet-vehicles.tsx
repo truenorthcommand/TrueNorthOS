@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, Truck, ChevronRight, AlertTriangle, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/lib/auth";
+import { hasRole } from "@/lib/types";
 import type { VehicleWithStats } from "@shared/schema";
 
 export default function FleetVehicles() {
@@ -20,7 +21,7 @@ export default function FleetVehicles() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = hasRole(user, 'admin');
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [registration, setRegistration] = useState("");

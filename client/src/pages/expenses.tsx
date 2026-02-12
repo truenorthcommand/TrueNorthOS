@@ -21,6 +21,7 @@ import { ReceiptPhotoCapture } from "@/components/receipt-photo-capture";
 import { useUpload } from "@/hooks/use-upload";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { toast } from "sonner";
+import { hasRole } from "@/lib/types";
 import type { ExpenseWithDetails, User, Job, FileWithRelations } from "@shared/schema";
 
 function getFileIcon(mimeType: string | null) {
@@ -122,7 +123,7 @@ export default function Expenses() {
 
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
-    enabled: user?.role === "admin",
+    enabled: hasRole(user, 'admin'),
   });
 
   const { data: jobs = [] } = useQuery<Job[]>({
@@ -381,7 +382,7 @@ export default function Expenses() {
   };
 
   const filteredExpenses = expenses.filter((exp) => {
-    if (user?.role === "admin" && viewAllStaff) {
+    if (hasRole(user, 'admin') && viewAllStaff) {
       if (selectedUserId !== "all" && exp.userId !== selectedUserId) return false;
       return true;
     }
@@ -412,7 +413,7 @@ export default function Expenses() {
     })
     .reduce((sum, exp) => sum + (exp.amount || 0), 0);
 
-  const isAdmin = user?.role === "admin";
+  const isAdmin = hasRole(user, 'admin');
 
   const pendingExpenses = filteredExpenses.filter((exp) => exp.status === "pending");
   const allPendingSelected = pendingExpenses.length > 0 && pendingExpenses.every((exp) => selectedExpenseIds.has(exp.id));

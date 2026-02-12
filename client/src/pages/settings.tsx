@@ -11,6 +11,7 @@ import { Save, Building, CreditCard, FileText, Loader2, RefreshCw, Smartphone, D
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { hasRole } from "@/lib/types";
 
 type CompanySettings = {
   companyName: string;
@@ -317,7 +318,7 @@ export default function Settings() {
   };
 
   useEffect(() => {
-    if (user?.role === "admin" || user?.superAdmin) {
+    if (hasRole(user, 'admin')) {
       fetchQuickRules();
     }
   }, [user]);
@@ -665,7 +666,7 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      {(user?.role === "admin" || user?.superAdmin) && (
+      {hasRole(user, 'admin') && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
