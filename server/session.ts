@@ -1,5 +1,4 @@
-Please apply the fix discussed: in server/index.ts, add app.set('trust proxy', 1); before the session middleware is used. This is necessary because the app is running behind Replit's reverse proxy and using secure session cookies.
-  import session from "express-session";
+import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
 
@@ -13,7 +12,7 @@ declare module "express-session" {
 
 const PgSession = connectPgSimple(session);
 
-const isProduction = process.env.NODE_ENV === 'production';
+const isProduction = process.env.NODE_ENV === "production";
 const isReplit = !!process.env.REPL_ID;
 
 export async function ensureSessionTable() {
@@ -27,9 +26,13 @@ export async function ensureSessionTable() {
       );
       CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
     `);
-    const check = await pool.query(`SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = 'session' AND table_schema = 'public') as exists`);
+    const check = await pool.query(
+      `SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = 'session' AND table_schema = 'public') as exists`,
+    );
     if (!check.rows[0]?.exists) {
-      throw new Error("Session table verification failed after creation attempt");
+      throw new Error(
+        "Session table verification failed after creation attempt",
+      );
     }
     console.log("Session table verified/created successfully");
   } catch (error) {
@@ -41,17 +44,17 @@ export async function ensureSessionTable() {
 export const sessionMiddleware = session({
   store: new PgSession({
     pool: pool as any,
-    tableName: 'session',
+    tableName: "session",
     createTableIfMissing: true,
   }),
-  secret: process.env.SESSION_SECRET || 'promains-field-view-secret-key-2024',
+  secret: process.env.SESSION_SECRET || "promains-field-view-secret-key-2024",
   resave: false,
   saveUninitialized: false,
   proxy: isReplit,
   cookie: {
     secure: isReplit || isProduction,
     httpOnly: true,
-    sameSite: isReplit ? 'none' : 'lax',
+    sameSite: isReplit ? "none" : "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000,
-  }
+  },
 });
