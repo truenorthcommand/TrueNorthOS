@@ -1,0 +1,82 @@
+Build an Outlook-style email composition and sending feature for the TrueNorth OS client portal invitation system.
+
+CONTEXT:
+- Currently, clicking "Send Email Invitation" shows error "Email Not Sent - Email service returned failure. Check Outlook integration connection"
+- The app has Microsoft Outlook integration already configured
+- Need to create a rich email composer modal that uses Outlook's API to send emails with AI writing assistance
+
+REQUIRED FUNCTIONALITY:
+
+1. EMAIL COMPOSER MODAL
+- Opens when "Send Email Invitation" button is clicked from the Edit Client dialog
+- Pre-populated with:
+  * To: client's email from the form
+  * Subject: "Your Customer Portal Access - [Company Name]"
+  * Body: Template with portal link and instructions
+- Rich text editor with formatting toolbar (bold, italic, underline, lists, links)
+- AI Writing Assistant button that uses OpenAI to improve/rewrite email content
+- Send button that actually sends via Microsoft Graph API
+- Cancel/Close button
+
+2. MICROSOFT GRAPH API INTEGRATION (server/routes/outlook.ts)
+- POST /api/outlook/send-email endpoint
+- Uses existing Outlook OAuth token from user's session
+- Sends email via Microsoft Graph API: POST https://graph.microsoft.com/v1.0/me/sendMail
+- Proper error handling with specific error messages
+- Success confirmation
+
+3. AI WRITING ASSISTANT
+- Button in composer toolbar (sparkle icon)
+- Opens dropdown with options:
+  * "Improve Writing" - enhances clarity and professionalism
+  * "Make Friendlier" - warmer tone
+  * "Make Formal" - business tone
+  * "Fix Grammar" - corrections only
+- Uses OpenAI API to transform the email body
+- Replaces content in editor with improved version
+
+4. EMAIL TEMPLATE
+Default body should include:
+- Personalized greeting using contact name
+- Brief explanation of the portal
+- The secure portal link (already generated)
+- What they can access (quotes, invoices, job status)
+- Support contact info
+- Professional signature
+
+FILE STRUCTURE:
+- client/src/components/clients/EmailComposerModal.tsx (new)
+- client/src/components/clients/AIWritingAssistant.tsx (new)
+- client/src/hooks/useOutlookEmail.ts (new)
+- server/routes/outlook.ts (modify existing)
+- Update client/src/components/clients/EditClientDialog.tsx to use new modal
+
+TECHNICAL REQUIREMENTS:
+- Use Shadcn/UI Dialog component for modal
+- Use Tiptap or similar for rich text editing (or simple textarea with formatting toolbar)
+- TanStack Query for API mutations
+- Zod validation for email payload
+- Error toasts using existing toast system
+- Loading states during send operation
+- Success message: "Email invitation sent successfully to [email]"
+
+DEPENDENCIES TO ADD (if needed):
+- @tiptap/react @tiptap/starter-kit (rich text editor)
+- OR use a simpler approach with textarea + basic formatting buttons
+
+SUCCESS CRITERIA:
+1. Modal opens with pre-filled email template
+2. User can edit content with basic formatting
+3. AI assistant can improve the email text
+4. Send button calls Microsoft Graph API successfully
+5. Error handling shows specific messages (token expired, network error, etc.)
+6. Success confirmation closes modal and shows toast
+7. Email actually arrives in recipient's inbox via Outlook
+
+INTEGRATION POINTS:
+- Reuse existing Outlook OAuth tokens from session
+- Use existing OpenAI integration for AI features
+- Follow existing error handling patterns from other API routes
+- Match styling of other modals in the app (Edit Client dialog style)
+
+Start by creating the EmailComposerModal component and the API endpoint, then add AI features.
