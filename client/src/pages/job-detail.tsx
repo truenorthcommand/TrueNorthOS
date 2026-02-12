@@ -225,6 +225,8 @@ export default function JobDetail() {
     notes: "",
   });
   const [formInitialized, setFormInitialized] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [uploadingPhotos, setUploadingPhotos] = useState<string[]>([]);
 
   // Files state
   const queryClient = useQueryClient();
@@ -320,7 +322,20 @@ export default function JobDetail() {
     },
   });
 
-  const handleCompleteJob = () => completeJobMutation.mutate({});
+  const handleCompleteJob = async () => {
+    if (uploadingPhotos.length > 0) {
+      toast({ 
+        title: "Photos Still Uploading", 
+        description: "Please wait for all photos to finish uploading before completing the job.",
+        variant: "destructive" 
+      });
+      return;
+    }
+    if (hasUnsavedChanges) {
+      await handleUpdateJob();
+    }
+    completeJobMutation.mutate({});
+  };
 
   const canOverride = user?.role === "admin" || user?.superAdmin === true;
 
@@ -393,15 +408,7 @@ export default function JobDetail() {
 
   const handleFieldChange = (field: keyof typeof formData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleFieldBlur = async (field: keyof typeof formData) => {
-    if (!job) return;
-    let valueToSave: string | Date = formData[field];
-    if (field === 'date' && formData.date) {
-      valueToSave = new Date(formData.date).toISOString();
-    }
-    await updateJob(job.id, { [field]: valueToSave });
+    setHasUnsavedChanges(true);
   };
 
   if (!job) {
@@ -445,22 +452,56 @@ export default function JobDetail() {
       worksCompleted: formData.worksCompleted,
       notes: formData.notes,
     });
+    setHasUnsavedChanges(false);
     toast({ title: "Job Updated", description: "All changes have been saved." });
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, source: 'admin' | 'engineer' = 'engineer') => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, source: 'admin' | 'engineer' = 'engineer') => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        addPhoto(job.id, reader.result as string, source);
-        toast({ 
-          title: "Photo Uploaded", 
-          description: source === 'admin' ? "Reference photo added." : "Evidence photo added." 
-        });
-      };
-      reader.readAsDataURL(file);
+    if (!file || !job) return;
+    
+    const uploadId = `upload-${Date.now()}`;
+    setUploadingPhotos(prev => [...prev, uploadId]);
+    
+    try {
+      const response = await fetch("/api/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: file.name,
+          size: file.size,
+          contentType: file.type || "image/jpeg",
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await response.json();
+
+      await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type || "image/jpeg" },
+      });
+
+      await addPhoto(job.id, objectPath, source);
+      
+      toast({ 
+        title: "Photo Uploaded", 
+        description: source === 'admin' ? "Reference photo saved to storage." : "Evidence photo saved to storage." 
+      });
+    } catch (error) {
+      console.error("Photo upload failed:", error);
+      toast({ 
+        title: "Upload Failed", 
+        description: "Photo could not be saved. Please try again.",
+        variant: "destructive" 
+      });
+    } finally {
+      setUploadingPhotos(prev => prev.filter(id => id !== uploadId));
     }
+    
+    e.target.value = "";
   };
 
   const handleUpdatePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -890,9 +931,9 @@ export default function JobDetail() {
             </Button>
           )}
           {!isReadOnly && (
-            <Button variant="outline" onClick={handleUpdateJob} className="flex-1 sm:flex-none" data-testid="button-update-job">
+            <Button variant={hasUnsavedChanges ? "default" : "outline"} onClick={handleUpdateJob} className="flex-1 sm:flex-none" data-testid="button-update-job">
               <Save className="mr-2 h-4 w-4" />
-              Update
+              {hasUnsavedChanges ? "Save Changes" : "Update"}
             </Button>
           )}
           <Button variant="outline" onClick={handlePrint} className="flex-1 sm:flex-none">
@@ -1010,7 +1051,6 @@ export default function JobDetail() {
                 <Input 
                   value={formData.client} 
                   onChange={(e) => handleFieldChange('client', e.target.value)}
-                  onBlur={() => handleFieldBlur('client')}
                   disabled={isAdminFieldReadOnly}
                   className="print:border-none print:p-0 print:font-semibold"
                   placeholder="Your company name"
@@ -1021,7 +1061,6 @@ export default function JobDetail() {
                 <Input 
                   value={formData.customerName} 
                   onChange={(e) => handleFieldChange('customerName', e.target.value)}
-                  onBlur={() => handleFieldBlur('customerName')}
                   disabled={isAdminFieldReadOnly}
                   className="print:border-none print:p-0 print:font-bold"
                 />
@@ -1031,7 +1070,6 @@ export default function JobDetail() {
                 <Input 
                   value={formData.propertyName} 
                   onChange={(e) => handleFieldChange('propertyName', e.target.value)}
-                  onBlur={() => handleFieldBlur('propertyName')}
                   disabled={isAdminFieldReadOnly}
                   className="print:border-none print:p-0 print:font-semibold"
                   placeholder="Property or site name"
@@ -1042,7 +1080,6 @@ export default function JobDetail() {
                 <Textarea 
                   value={formData.address} 
                   onChange={(e) => handleFieldChange('address', e.target.value)}
-                  onBlur={() => handleFieldBlur('address')}
                   disabled={isAdminFieldReadOnly}
                   className="min-h-[80px] print:border-none print:p-0"
                 />
@@ -1052,7 +1089,6 @@ export default function JobDetail() {
                 <Input 
                   value={formData.postcode} 
                   onChange={(e) => handleFieldChange('postcode', e.target.value)}
-                  onBlur={() => handleFieldBlur('postcode')}
                   disabled={isAdminFieldReadOnly}
                   className="print:border-none print:p-0"
                 />
@@ -1083,7 +1119,6 @@ export default function JobDetail() {
                   <Input 
                     value={formData.contactName} 
                     onChange={(e) => handleFieldChange('contactName', e.target.value)}
-                    onBlur={() => handleFieldBlur('contactName')}
                     disabled={isAdminFieldReadOnly}
                     className="pl-9 print:pl-0 print:border-none"
                     placeholder="Contact Name"
@@ -1102,7 +1137,6 @@ export default function JobDetail() {
                     <Input 
                       value={formData.contactPhone} 
                       onChange={(e) => handleFieldChange('contactPhone', e.target.value)}
-                      onBlur={() => handleFieldBlur('contactPhone')}
                       disabled={isAdminFieldReadOnly}
                       className="pl-9 print:pl-0 print:border-none"
                       placeholder="Phone Number"
@@ -1123,7 +1157,6 @@ export default function JobDetail() {
                     <Input 
                       value={formData.contactEmail} 
                       onChange={(e) => handleFieldChange('contactEmail', e.target.value)}
-                      onBlur={() => handleFieldBlur('contactEmail')}
                       disabled={isAdminFieldReadOnly}
                       className="pl-9 print:pl-0 print:border-none"
                       placeholder="Email Address"
@@ -1141,7 +1174,6 @@ export default function JobDetail() {
                       type="date"
                       value={formData.date}
                       onChange={(e) => handleFieldChange('date', e.target.value)}
-                      onBlur={() => handleFieldBlur('date')}
                       disabled={isAdminFieldReadOnly}
                       className="pl-9 print:pl-0 print:border-none"
                     />
@@ -1412,7 +1444,6 @@ export default function JobDetail() {
               <AITextarea 
                 value={formData.description} 
                 onChange={(e) => handleFieldChange('description', e.target.value)}
-                onBlur={() => handleFieldBlur('description')}
                 disabled={isAdminFieldReadOnly}
                 className="min-h-[120px] text-base print:border-none print:p-0"
                 placeholder="Describe the work to be carried out..."
@@ -1428,7 +1459,6 @@ export default function JobDetail() {
               <AITextarea 
                 value={formData.worksCompleted} 
                 onChange={(e) => handleFieldChange('worksCompleted', e.target.value)}
-                onBlur={() => handleFieldBlur('worksCompleted')}
                 disabled={isReadOnly}
                 className="min-h-[120px] text-base print:border-none print:p-0 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800"
                 placeholder="Describe the work that has been completed..."
@@ -1443,7 +1473,6 @@ export default function JobDetail() {
               <AITextarea 
                 value={formData.notes} 
                 onChange={(e) => handleFieldChange('notes', e.target.value)}
-                onBlur={() => handleFieldBlur('notes')}
                 disabled={isReadOnly}
                 className="min-h-[80px] print:hidden"
                 placeholder="Access codes, parking info, etc."
@@ -1779,7 +1808,11 @@ export default function JobDetail() {
                 onChange={(e) => handleFileUpload(e, 'engineer')}
               />
             </div>
-            <p className="text-sm text-muted-foreground">Photos taken by engineers as proof of work completed</p>
+            <p className="text-sm text-muted-foreground">
+              {uploadingPhotos.length > 0 
+                ? `Uploading ${uploadingPhotos.length} photo${uploadingPhotos.length > 1 ? 's' : ''}...` 
+                : "Photos taken by engineers as proof of work completed"}
+            </p>
           </CardHeader>
           <CardContent className="pt-6 print:pt-0">
              {(job.photos || []).filter(p => !p.source || p.source === 'engineer').length === 0 ? (
