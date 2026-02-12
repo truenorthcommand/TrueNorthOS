@@ -1,0 +1,223 @@
+## Root Cause
+The form is triggering auto-save on every field blur/change event, but optimistic updates aren't being properly reconciled when the final save fails due to missing required fields or photos being lost from cache.
+
+## Why This Happened
+The mobile app is likely using `onBlur` or `onChange` handlers that fire individual PATCH requests to update job fields. When photos are taken via camera API, they're stored in memory/temp storage but not properly uploaded to Replit Object Storage before the job completion validation runs. The form state shows data locally, but the backend validation fails because required fields or photos never persisted.
+
+## The Fix
+
+### 1. Stop auto-saving individual fields on mobile
+**File: `client/src/pages/JobSheet.tsx` (or similar job form component)**
+
+Remove individual field auto-save. Only save on explicit "Save Draft" or "Complete Job" actions:
+
+```typescript
+// REMOVE this pattern:
+const handleFieldChange = async (field: string, value: any) => {
+  setFormData(prev => ({ ...prev, [field]: value }));
+  await updateJobMutation.mutateAsync({ id: jobId, [field]: value }); // ❌ Delete this
+};
+
+// REPLACE with:
+const handleFieldChange = (field: string, value: any) => {
+  setFormData(prev => ({ ...prev, [field]: value }));
+  setHasUnsavedChanges(true); // Track dirty state
+};
+
+const handleSaveDraft = async () => {
+  try {
+    await updateJobMutation.mutateAsync({ id: jobId, ...formData });
+    setHasUnsavedChanges(false);
+    toast.success("Draft saved");
+  } catch (error) {
+    toast.error("Failed to save draft");
+  }
+};
+```
+
+### 2. Upload photos immediately after capture
+**File: `client/src/components/CameraCapture.tsx` (or photo handler)**
+
+```typescript
+const handlePhotoCapture = async (photoBlob: Blob) => {
+  try {
+    // Show loading state
+    setUploadingPhoto(true);
+    
+    // Upload to Replit Object Storage immediately
+    const formData = new FormData();
+    formData.append('file', photoBlob, `job-${jobId}-${Date.now()}.jpg`);
+    formData.append('jobId', jobId);
+    formData.append('type', 'evidence'); // or 'reference'
+    
+    const response = await fetch('/api/jobs/upload-photo', {
+      method: 'POST',
+      body: formData,
+      credentials: 'include'
+    });
+    
+    if (!response.ok) throw new Error('Upload failed');
+    
+    const { photoUrl } = await response.json();
+    
+    // Add to local state with server URL
+    setPhotos(prev => [...prev, { url: photoUrl, uploaded: true }]);
+    
+  } catch (error) {
+    toast.error("Photo upload failed. Please try again.");
+    console.error(error);
+  } finally {
+    setUploadingPhoto(false);
+  }
+};
+```
+
+### 3. Create the photo upload endpoint
+**File: `server/routes/jobs.ts`**
+
+```typescript
+import { storage } from '../storage'; // Replit Object Storage client
+import multer from 'multer';
+
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
+
+app.post('/api/jobs/upload-photo', upload.single('file'), async (req, res) => {
+  try {
+    const { jobId, type } = req.body;
+    const file = req.file;
+    
+    if (!file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    
+    // Verify job exists and user has access
+    const job = await db.query.jobs.findFirst({
+      where: eq(jobs.id, parseInt(jobId))
+    });
+    
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+    
+    // Upload to Replit Object Storage
+    const key = `jobs/${jobId}/${type}/${Date.now()}-${file.originalname}`;
+    await storage.upload(key, file.buffer);
+    
+    const photoUrl = await storage.getPublicUrl(key);
+    
+    // Save photo reference to database
+    await db.insert(jobPhotos).values({
+      jobId: parseInt(jobId),
+      type, // 'evidence' or 'reference'
+      url: photoUrl,
+      storageKey: key,
+      uploadedAt: new Date()
+    });
+    
+    res.json({ photoUrl, key });
+    
+  } catch (error) {
+    console.error('Photo upload error:', error);
+    res.status(500).json({ error: 'Upload failed' });
+  }
+});
+```
+
+### 4. Fix validation to check database state, not form state
+**File: `server/routes/jobs.ts` - complete job endpoint**
+
+```typescript
+app.patch('/api/jobs/:id/complete', async (req, res) => {
+  try {
+    const jobId = parseInt(req.params.id);
+    
+    // Fetch current job state from DB (not from request body)
+    const job = await db.query.jobs.findFirst({
+      where: eq(jobs.id, jobId),
+      with: {
+        photos: true,
+        materials: true
+      }
+    });
+    
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+    
+    // Validate required fields from DB
+    const errors = [];
+    
+    if (!job.workCompleted || job.workCompleted.trim() === '') {
+      errors.push('Work completed details required');
+    }
+    
+    const evidencePhotos = job.photos.filter(p => p.type === 'evidence');
+    if (evidencePhotos.length === 0) {
+      errors.push('At least one evidence photo required');
+    }
+    
+    if (errors.length > 0) {
+      return res.status(400).json({ 
+        error: 'Validation failed', 
+        details: errors 
+      });
+    }
+    
+    // Update job status
+    await db.update(jobs)
+      .set({ 
+        status: 'completed',
+        completedAt: new Date()
+      })
+      .where(eq(jobs.id, jobId));
+    
+    res.json({ success: true });
+    
+  } catch (error) {
+    console.error('Job completion error:', error);
+    res.status(500).json({ error: 'Failed to complete job' });
+  }
+});
+```
+
+### 5. Add database schema for job photos (if missing)
+**File: `db/schema.ts`**
+
+```typescript
+export const jobPhotos = pgTable('job_photos', {
+  id: serial('id').primaryKey(),
+  jobId: integer('job_id').references(() => jobs.id).notNull(),
+  type: text('type').notNull(), // 'evidence' | 'reference'
+  url: text('url').notNull(),
+  storageKey: text('storage_key').notNull(),
+  uploadedAt: timestamp('uploaded_at').defaultNow().notNull(),
+  uploadedBy: integer('uploaded_by').references(() => users.id)
+});
+```
+
+Run migration:
+```bash
+npm run db:push
+```
+
+## Watch Out For
+
+1. **Service Worker Cache Conflicts**: If using PWA offline mode, ensure photos aren't cached in service worker before upload completes. Add upload completion check before allowing offline mode.
+
+2. **Session Expiration on Mobile**: Long-running jobs might hit session timeout. Add session refresh logic or switch to JWT tokens for mobile.
+
+3. **Network Race Conditions**: If user taps "Complete" while photos are still uploading, add a check:
+```typescript
+if (photos.some(p => !p.uploaded)) {
+  toast.error("Please wait for photos to finish uploading");
+  return;
+}
+```
+
+4. **Memory Leaks from Camera API**: Ensure you revoke blob URLs after upload:
+```typescript
+URL.revokeObjectURL(localPhotoUrl);
+```
