@@ -1,0 +1,83 @@
+## Root Cause
+The agent is context-switching instead of executing a focused database comparison audit because the task lacks structured constraints and clear output requirements.
+
+## Why This Happened
+Replit's agent interprets vague instructions like "forensic audit" as open-ended exploration rather than a deterministic comparison task. Without explicit schema mapping, comparison criteria, and output format, it will keep "investigating" instead of executing.
+
+## The Fix
+
+**Give the agent this EXACT prompt:**
+
+```
+TASK: Database Schema & Data Comparison Audit
+CONSTRAINT: Do NOT deviate from these steps. Execute sequentially.
+
+STEP 1: Schema Validation
+- Connect to BOTH databases (dev & prod)
+- Run this query on BOTH:
+  SELECT table_name, column_name, data_type, is_nullable 
+  FROM information_schema.columns 
+  WHERE table_schema = 'public' 
+  ORDER BY table_name, ordinal_position;
+- Output differences to: audit_schema_diff.json
+
+STEP 2: Row Count Comparison (exclude demo data)
+- For EACH table, run on BOTH databases:
+  SELECT COUNT(*) FROM [table] WHERE created_by != 'demo_seed';
+- Output to: audit_row_counts.json
+- Flag tables with >10% variance
+
+STEP 3: Critical Fields Audit
+- For tables: users, jobs, quotes, invoices, engineers, fleet, workflow_rules
+- Compare THESE fields only: id, created_at, updated_at, status, [primary business field]
+- Exclude WHERE: email LIKE '%demo%' OR created_by = 'demo_seed'
+- Sample 100 most recent rows from each table
+- Output mismatches to: audit_data_mismatches.json
+
+STEP 4: Session & Auth Check
+- Verify connect-pg-simple sessions table exists in prod
+- Check last 50 sessions: SELECT sess, expire FROM session ORDER BY expire DESC LIMIT 50;
+- Output to: audit_sessions.json
+
+OUTPUT FORMAT:
+Create /audit_report.md with:
+1. Schema differences (breaking changes in RED)
+2. Row count variances >10%
+3. Data mismatches with row IDs
+4. Session validity status
+5. ACTIONABLE next steps ranked by severity
+
+DO NOT:
+- Explain concepts
+- Suggest exploratory queries
+- Ask clarifying questions
+- Run migrations automatically
+
+EXECUTE NOW. Respond with file paths when complete.
+```
+
+**Then add this to your `.replit` or agent config:**
+
+```toml
+[interpreter.command]
+strict_mode = true
+max_context_switches = 0
+```
+
+## Watch Out For
+
+1. **Connection String Mismatch**: Agent might use same DB URL for both. Verify `DATABASE_URL` vs `PROD_DATABASE_URL` in secrets
+2. **Demo Data Leakage**: Your exclusion logic assumes `created_by` field exists. If some tables use `is_demo` or `seed_data` flag, update Step 2/3
+3. **Session Store Config**: If sessions are broken, check `server/index.ts` for `store: new pgSession({...})` pointing to PROD pool
+4. **Migration State**: Prod might be behind on Drizzle migrations. After audit, check `drizzle-kit check` output
+5. **Mobile App Write Failures**: Likely a CORS/session cookie issue (trust proxy not set) OR validation failing silently. Check network tab for 401/403s
+
+**Immediate triage while audit runs:**
+```bash
+# Check if prod is even receiving writes
+tail -f /var/log/replit/app.log | grep "POST\|PUT\|PATCH"
+
+# Verify session cookie settings in server/index.ts
+grep -A 10 "session({" server/index.ts
+# Should have: proxy: true, cookie: { secure: true, sameSite: 'none' }
+```
