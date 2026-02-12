@@ -1,0 +1,136 @@
+// In your main routing component
+import { Route, Switch } from 'wouter';
+
+import ClientPortal from './pages/ClientPortal'; // You'll need to create this
+
+
+
+function App() {
+
+  return (
+
+    <Switch>
+
+      {/* Existing routes */}
+
+      <Route path="/login" component={Login} />
+
+      <Route path="/app/*" component={Dashboard} />
+
+      
+
+      {/* Add this portal route BEFORE the catch-all */}
+
+      <Route path="/portal/:portalId" component={ClientPortal} />
+
+      
+
+      {/* Other routes */}
+
+    </Switch>
+
+  );
+
+}
+
+2. Create the ClientPortal component (src/pages/ClientPortal.tsx)
+
+import { useRoute } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
+
+
+
+export default function ClientPortal() {
+
+  const [, params] = useRoute('/portal/:portalId');
+
+  const portalId = params?.portalId;
+
+
+
+  const { data: portalData, isLoading } = useQuery({
+
+    queryKey: ['portal', portalId],
+
+    queryFn: async () => {
+
+      const res = await fetch(/api/portal/${portalId});
+
+      if (!res.ok) throw new Error('Portal not found');
+
+      return res.json();
+
+    },
+
+  });
+
+
+
+  if (isLoading) return <div>Loading portal...</div>;
+
+  
+
+  return (
+
+    <div className="min-h-screen bg-gray-50">
+
+      {/* Your portal UI - jobs, invoices, quotes for this client */}
+
+      <h1>Welcome to Your Portal</h1>
+
+      {/* Display client-specific data */}
+
+    </div>
+
+  );
+
+}
+
+3. Add the backend API endpoint (server/routes.ts)
+
+// Add this route handler
+app.get('/api/portal/:portalId', async (req, res) => {
+
+  const { portalId } = req.params;
+
+  
+
+  try {
+
+    // Query your clients table for this portal ID
+
+    const client = await db.query.clients.findFirst({
+
+      where: eq(clients.portalId, portalId),
+
+      with: {
+
+        jobs: true,
+
+        invoices: true,
+
+        quotes: true,
+
+      },
+
+    });
+
+
+
+    if (!client) {
+
+      return res.status(404).json({ error: 'Portal not found' });
+
+    }
+
+
+
+    res.json(client);
+
+  } catch (error) {
+
+    res.status(500).json({ error: 'Failed to load portal' });
+
+  }
+
+});
