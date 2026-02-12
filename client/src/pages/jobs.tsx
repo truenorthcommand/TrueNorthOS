@@ -135,11 +135,11 @@ export default function Jobs() {
         
         <TabsContent value="active" className="mt-6">
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredJobs.filter(j => j.status === "In Progress" || j.status === "Draft").length === 0 ? (
+            {filteredJobs.filter(j => j.status === "In Progress" || j.status === "Draft" || j.status === "Ready").length === 0 ? (
               <div className="col-span-full text-center py-12 text-muted-foreground">
                 No active jobs. Great work!
               </div>
-            ) : filteredJobs.filter(j => j.status === "In Progress" || j.status === "Draft").map(job => (
+            ) : filteredJobs.filter(j => j.status === "In Progress" || j.status === "Draft" || j.status === "Ready").map(job => (
                <JobCard 
                  key={job.id} 
                  job={job} 

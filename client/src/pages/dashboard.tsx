@@ -319,7 +319,7 @@ function AdminDashboard() {
     queryKey: ["/api/expenses/pending"],
   });
 
-  const activeJobs = jobs.filter(j => j.status === "In Progress" || j.status === "Draft");
+  const activeJobs = jobs.filter(j => j.status === "In Progress" || j.status === "Draft" || j.status === "Ready");
   const awaitingSignature = jobs.filter(j => j.status === "Awaiting Signatures");
   const completedJobs = jobs.filter(j => j.status === "Signed Off");
   const todayJobs = jobs.filter(j => j.date && isToday(parseISO(j.date)));
@@ -773,7 +773,7 @@ function EngineerDashboard() {
   );
 
   const activeJobs = useMemo(() => 
-    myJobs.filter(job => job.status === "In Progress" || job.status === "Draft").sort(sortByOrder),
+    myJobs.filter(job => job.status === "In Progress" || job.status === "Draft" || job.status === "Ready").sort(sortByOrder),
     [myJobs]
   );
   

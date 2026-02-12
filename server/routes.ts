@@ -308,15 +308,21 @@ export async function registerRoutes(
         sessionId,
       });
       
-      res.json({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        roles: userRoles,
-        username: user.username,
-        superAdmin: user.superAdmin,
-        twoFactorEnabled: user.twoFactorEnabled,
+      req.session.save((saveErr) => {
+        if (saveErr) {
+          console.error('Session save error:', saveErr);
+          return res.status(500).json({ error: "Session save failed" });
+        }
+        res.json({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          roles: userRoles,
+          username: user.username,
+          superAdmin: user.superAdmin,
+          twoFactorEnabled: user.twoFactorEnabled,
+        });
       });
     } catch (error) {
       res.status(500).json({ error: "Login failed" });
