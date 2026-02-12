@@ -6949,6 +6949,111 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
     }
   });
 
+  app.post("/api/outlook/send-email", requireRoles('admin'), async (req, res) => {
+    try {
+      const { to, subject, body, isHtml } = req.body;
+      if (!to || !subject || !body) {
+        return res.status(400).json({ error: "Missing required fields: to, subject, body" });
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(to)) {
+        return res.status(400).json({ error: "Invalid email address format" });
+      }
+
+      let currentUser;
+      try {
+        currentUser = await outlook.getCurrentUser();
+      } catch (err: any) {
+        console.error("Failed to get Outlook user:", err);
+        return res.status(401).json({ 
+          error: "Outlook not connected. Please reconnect your Outlook account.",
+          code: "OUTLOOK_NOT_CONNECTED"
+        });
+      }
+
+      if (!currentUser?.email) {
+        return res.status(401).json({ 
+          error: "Could not determine your Outlook email address. Please reconnect your Outlook account.",
+          code: "OUTLOOK_NO_USER" 
+        });
+      }
+
+      await outlook.sendEmail(currentUser.email, {
+        subject,
+        body,
+        toRecipients: [to],
+        isHtml: isHtml !== false,
+      });
+
+      res.json({ success: true, message: `Email sent successfully to ${to}` });
+    } catch (error: any) {
+      console.error("Send email error:", error);
+      const statusCode = error?.statusCode;
+      if (statusCode === 401 || statusCode === 403) {
+        return res.status(401).json({ 
+          error: "Outlook token expired or permissions insufficient. Please reconnect your Outlook account.",
+          code: "OUTLOOK_AUTH_ERROR"
+        });
+      }
+      if (statusCode === 429) {
+        return res.status(429).json({ 
+          error: "Too many emails sent. Please wait a moment and try again.",
+          code: "RATE_LIMIT"
+        });
+      }
+      res.status(500).json({ 
+        error: error.message || "Failed to send email. Please check your Outlook connection.",
+        code: "SEND_FAILED"
+      });
+    }
+  });
+
+  app.post("/api/ai/improve-email", requireRoles('admin'), async (req, res) => {
+    try {
+      const { content, style } = req.body;
+      if (!content || !style) {
+        return res.status(400).json({ error: "Missing required fields: content, style" });
+      }
+
+      const validStyles = ['improve', 'friendly', 'formal', 'grammar'];
+      if (!validStyles.includes(style)) {
+        return res.status(400).json({ error: `Invalid style. Must be one of: ${validStyles.join(', ')}` });
+      }
+
+      const OpenAI = (await import('openai')).default;
+      const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+      const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+      if (!apiKey || !baseURL) {
+        return res.status(503).json({ error: "AI integration not configured" });
+      }
+
+      const openai = new OpenAI({ apiKey, baseURL });
+
+      const styleInstructions: Record<string, string> = {
+        improve: "Improve the clarity, professionalism and readability of this email. Keep the same meaning and tone but make it more polished. Preserve any HTML formatting tags.",
+        friendly: "Rewrite this email in a warmer, friendlier tone while keeping it professional. Make it feel more personal and approachable. Preserve any HTML formatting tags.",
+        formal: "Rewrite this email in a formal business tone. Make it more corporate and professional. Preserve any HTML formatting tags.",
+        grammar: "Fix any grammar, spelling, or punctuation errors in this email. Make minimal changes - only correct mistakes. Preserve any HTML formatting tags.",
+      };
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: `You are a UK business email writing assistant. ${styleInstructions[style]} Return ONLY the improved email body text, no subject line, no explanations. Use UK English spelling (colour, organise, etc.).` },
+          { role: "user", content: content }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000,
+      });
+
+      const improved = response.choices[0]?.message?.content || content;
+      res.json({ improved });
+    } catch (error: any) {
+      console.error("AI email improvement error:", error);
+      res.status(500).json({ error: "Failed to improve email text. Please try again." });
+    }
+  });
+
   app.get("/api/outlook/emails/:userEmail", requireRoles('admin'), async (req, res) => {
     try {
       const { userEmail } = req.params;
