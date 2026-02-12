@@ -1,4 +1,5 @@
-import session from "express-session";
+Please apply the fix discussed: in server/index.ts, add app.set('trust proxy', 1); before the session middleware is used. This is necessary because the app is running behind Replit's reverse proxy and using secure session cookies.
+  import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
 
