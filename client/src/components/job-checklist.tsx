@@ -45,6 +45,7 @@ interface JobChecklistProps {
     status: string;
     description?: string | null;
     worksCompleted?: string | null;
+    worksCompletedLocked?: boolean;
     photos?: Array<{ source?: string }>;
     signatures?: Array<{ type: string }>;
     signOffLat?: number | null;
@@ -70,7 +71,7 @@ export function JobChecklist({
   className 
 }: JobChecklistProps) {
   const hasDescription = !!(job.description && job.description.trim().length > 0);
-  const hasWorksCompleted = !!(job.worksCompleted && job.worksCompleted.trim().length > 0);
+  const hasWorksCompleted = !!job.worksCompletedLocked;
   const evidencePhotos = (job.photos || []).filter(p => !p.source || p.source === 'engineer');
   const hasPhotos = evidencePhotos.length > 0;
   const hasEngineerSignature = (job.signatures || []).some(s => s.type === 'engineer');
@@ -95,7 +96,7 @@ export function JobChecklist({
     {
       id: 'works-completed',
       label: 'Works Completed',
-      description: 'Document what work was completed',
+      description: hasWorksCompleted ? 'Locked and ready' : 'Save and lock works completed',
       completed: hasWorksCompleted,
       required: true,
       icon: <ClipboardList className="h-4 w-4" />,

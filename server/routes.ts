@@ -1616,7 +1616,7 @@ export async function registerRoutes(
       let updates = req.body;
 
       if (req.session.userRole === 'engineer') {
-        const engineerAllowedFields = ['worksCompleted', 'notes', 'materials', 'photos', 'signatures', 'furtherActions'];
+        const engineerAllowedFields = ['worksCompleted', 'worksCompletedLocked', 'notes', 'materials', 'photos', 'signatures', 'furtherActions'];
         const requestedFields = Object.keys(updates);
         const disallowedFields = requestedFields.filter(key => !engineerAllowedFields.includes(key));
         
@@ -1826,8 +1826,8 @@ export async function registerRoutes(
       if (!job.description || job.description.trim().length < 10) {
         missing.fields.push("Job description (min 10 characters)");
       }
-      if (!job.worksCompleted || job.worksCompleted.trim().length < 10) {
-        missing.fields.push("Works completed (min 10 characters)");
+      if (!job.worksCompletedLocked) {
+        missing.fields.push("Works completed (must be saved and locked)");
       }
 
       const sigs = (job.signatures as any[]) || [];

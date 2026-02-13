@@ -15,7 +15,8 @@ import {
   MapPin, Phone, Mail, Calendar, Upload, X, FileCheck,
   AlertCircle, AlertTriangle, AlertOctagon, Users, ChevronDown, ClipboardList,
   Sparkles, Loader2, Briefcase, User, Navigation, FileText,
-  File, Image, FileSpreadsheet, ExternalLink, FolderOpen, QrCode
+  File, Image, FileSpreadsheet, ExternalLink, FolderOpen, QrCode,
+  Edit, CheckCircle2
 } from "lucide-react";
 import QRCode from "qrcode";
 import { generateTrueNorthCode, parseTrueNorthCode } from "@/lib/qr-utils";
@@ -1072,6 +1073,7 @@ export default function JobDetail() {
             status: job.status,
             description: job.description,
             worksCompleted: job.worksCompleted,
+            worksCompletedLocked: job.worksCompletedLocked,
             photos: job.photos,
             signatures: job.signatures,
             signOffLat: job.signOffLat,
@@ -1502,17 +1504,84 @@ export default function JobDetail() {
               <Label className="flex items-center gap-2">
                 Works Completed
                 <Badge variant="outline" className="text-xs font-normal">Engineer</Badge>
+                {job.worksCompletedLocked && (
+                  <Badge variant="default" className="text-xs font-normal bg-green-600">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Locked
+                  </Badge>
+                )}
               </Label>
-              <AITextarea 
-                value={formData.worksCompleted} 
-                onChange={(e) => handleFieldChange('worksCompleted', e.target.value)}
-                disabled={isReadOnly}
-                className="min-h-[120px] text-base print:border-none print:p-0 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800"
-                placeholder="Describe the work that has been completed..."
-                data-testid="input-works-completed"
-                aiContext="engineer work completed notes and observations"
-              />
-              <p className="text-xs text-muted-foreground">Enter details of all work completed on this job</p>
+              <div className="relative">
+                <AITextarea 
+                  value={formData.worksCompleted} 
+                  onChange={(e) => handleFieldChange('worksCompleted', e.target.value)}
+                  disabled={isReadOnly || job.worksCompletedLocked}
+                  className={cn(
+                    "min-h-[120px] text-base print:border-none print:p-0",
+                    job.worksCompletedLocked 
+                      ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800" 
+                      : "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800"
+                  )}
+                  placeholder="Describe the work that has been completed..."
+                  data-testid="input-works-completed"
+                  aiContext="engineer work completed notes and observations"
+                />
+                {!isReadOnly && (
+                  <div className="absolute top-2 right-2 flex gap-1">
+                    {!job.worksCompletedLocked ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={async () => {
+                          if (!formData.worksCompleted || formData.worksCompleted.trim().length < 10) {
+                            toast({
+                              title: "Cannot Lock",
+                              description: "Works completed must be at least 10 characters.",
+                              variant: "destructive"
+                            });
+                            return;
+                          }
+                          await updateJob(job.id, {
+                            worksCompleted: formData.worksCompleted,
+                            worksCompletedLocked: true
+                          });
+                          toast({
+                            title: "Works Completed Locked",
+                            description: "This field is now locked and ready for quality gate."
+                          });
+                        }}
+                        title="Save and lock works completed"
+                      >
+                        <Save className="h-4 w-4 text-green-600" />
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={async () => {
+                          await updateJob(job.id, { worksCompletedLocked: false });
+                          toast({
+                            title: "Works Completed Unlocked",
+                            description: "You can now edit this field."
+                          });
+                        }}
+                        title="Unlock to edit"
+                      >
+                        <Edit className="h-4 w-4 text-amber-600" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {job.worksCompletedLocked 
+                  ? "This field is locked. Click the edit icon to make changes." 
+                  : "Enter details of all work completed, then click the save icon to lock it."}
+              </p>
             </div>
             
             <div className="space-y-2">

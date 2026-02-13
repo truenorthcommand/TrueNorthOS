@@ -87,6 +87,7 @@ export const jobs = pgTable("jobs", {
   orderNumber: integer("order_number"),
   description: text("description"),
   worksCompleted: text("works_completed"),
+  worksCompletedLocked: boolean("works_completed_locked").default(false),
   notes: text("notes"),
   status: text("status").notNull().default("Draft"),
   assignedToId: varchar("assigned_to_id"),
