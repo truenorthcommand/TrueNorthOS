@@ -1,41 +1,21 @@
-import type { Express } from "express";
+import type { Express, RequestHandler } from "express";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 
 /**
  * Register object storage routes for file uploads.
  *
- * This provides example routes for the presigned URL upload flow:
- * 1. POST /api/uploads/request-url - Get a presigned URL for uploading
- * 2. The client then uploads directly to the presigned URL
- *
- * IMPORTANT: These are example routes. Customize based on your use case:
- * - Add authentication middleware for protected uploads
- * - Add file metadata storage (save to database after upload)
- * - Add ACL policies for access control
+ * @param app - Express application
+ * @param requireAuth - Optional authentication middleware for protected uploads
  */
-export function registerObjectStorageRoutes(app: Express): void {
+export function registerObjectStorageRoutes(app: Express, requireAuth?: RequestHandler): void {
   const objectStorageService = new ObjectStorageService();
 
   /**
    * Request a presigned URL for file upload.
-   *
-   * Request body (JSON):
-   * {
-   *   "name": "filename.jpg",
-   *   "size": 12345,
-   *   "contentType": "image/jpeg"
-   * }
-   *
-   * Response:
-   * {
-   *   "uploadURL": "https://storage.googleapis.com/...",
-   *   "objectPath": "/objects/uploads/uuid"
-   * }
-   *
-   * IMPORTANT: The client should NOT send the file to this endpoint.
-   * Send JSON metadata only, then upload the file directly to uploadURL.
+   * Requires authentication when requireAuth middleware is provided.
    */
-  app.post("/api/uploads/request-url", async (req, res) => {
+  const uploadMiddleware: RequestHandler[] = requireAuth ? [requireAuth] : [];
+  app.post("/api/uploads/request-url", ...uploadMiddleware, async (req, res) => {
     try {
       const { name, size, contentType } = req.body;
 
@@ -58,7 +38,14 @@ export function registerObjectStorageRoutes(app: Express): void {
       });
     } catch (error) {
       console.error("Error generating upload URL:", error);
-      res.status(500).json({ error: "Failed to generate upload URL" });
+      console.error("PRIVATE_OBJECT_DIR:", process.env.PRIVATE_OBJECT_DIR || 'NOT SET');
+      console.error("Error details:", error instanceof Error ? error.message : String(error));
+      res.status(500).json({ 
+        error: "Failed to generate upload URL",
+        detail: process.env.NODE_ENV !== 'production' 
+          ? (error instanceof Error ? error.message : String(error))
+          : undefined
+      });
     }
   });
 

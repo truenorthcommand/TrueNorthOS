@@ -1614,10 +1614,7 @@ export async function registerRoutes(
       }
 
       let updates = req.body;
-      
-      // Track who made the update
-      updates.updatedByUserId = req.session.userId;
-      
+
       if (req.session.userRole === 'engineer') {
         const engineerAllowedFields = ['worksCompleted', 'notes', 'materials', 'photos', 'signatures', 'furtherActions'];
         const requestedFields = Object.keys(updates);
@@ -1630,6 +1627,9 @@ export async function registerRoutes(
           });
         }
       }
+
+      // Track who made the update — AFTER whitelist check so it doesn't get flagged
+      updates.updatedByUserId = req.session.userId;
 
       // Track status and date changes
       const oldStatus = existingJob.status;
@@ -2041,23 +2041,8 @@ export async function registerRoutes(
   });
 
   // ==================== LOCATION TRACKING ====================
-
-  app.post("/api/users/:id/location", requireAuth, async (req, res) => {
-    try {
-      const { latitude, longitude, accuracy } = req.body;
-      const userId = req.params.id;
-
-      if (req.session.userId !== userId && req.session.userRole !== 'admin') {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      await storage.updateEngineerLocation(userId, latitude, longitude);
-
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to update location" });
-    }
-  });
+  // NOTE: POST /api/users/:id/location is registered earlier in the file (around line 1165)
+  // with full location history tracking. This section only has the admin GET endpoint.
 
   app.get("/api/engineers/locations", requireAdmin, async (req, res) => {
     try {
@@ -6676,7 +6661,7 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
   // ==================== FILE STORAGE ROUTES ====================
   
-  registerObjectStorageRoutes(app);
+  registerObjectStorageRoutes(app, requireAuth);
   registerGlobalAssistantRoutes(app);
   registerAiRoutes(app);
   registerSupportChatRoutes(app);

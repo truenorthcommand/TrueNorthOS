@@ -464,37 +464,84 @@ export default function JobDetail() {
     setUploadingPhotos(prev => [...prev, uploadId]);
     
     try {
+      // Step 1: Compress image to reduce file size and improve reliability on mobile
+      let fileToUpload = file;
+      if (file.type.startsWith('image/')) {
+        try {
+          const { compressImage, blobToFile, formatFileSize } = await import('@/lib/image-utils');
+          const originalSize = file.size;
+          const compressedBlob = await compressImage(file, 1920, 1920, 0.8);
+          fileToUpload = blobToFile(compressedBlob, file.name);
+          console.log(`Image compressed: ${formatFileSize(originalSize)} → ${formatFileSize(fileToUpload.size)}`);
+        } catch (compressError) {
+          console.warn('Image compression failed, using original:', compressError);
+          // Continue with original file if compression fails
+        }
+      }
+
+      // Step 2: Request upload URL with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+      
       const response = await fetch("/api/uploads/request-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
+        signal: controller.signal,
         body: JSON.stringify({
-          name: file.name,
-          size: file.size,
-          contentType: file.type || "image/jpeg",
+          name: fileToUpload.name,
+          size: fileToUpload.size,
+          contentType: fileToUpload.type || "image/jpeg",
         }),
       });
+      clearTimeout(timeoutId);
 
-      if (!response.ok) throw new Error("Failed to get upload URL");
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Upload URL request failed: ${response.status} ${errorText}`);
+      }
+      
       const { uploadURL, objectPath } = await response.json();
 
-      await fetch(uploadURL, {
+      // Step 3: Upload file to storage with timeout
+      const uploadController = new AbortController();
+      const uploadTimeoutId = setTimeout(() => uploadController.abort(), 60000); // 60s timeout for upload
+      
+      const uploadResponse = await fetch(uploadURL, {
         method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type || "image/jpeg" },
+        body: fileToUpload,
+        headers: { "Content-Type": fileToUpload.type || "image/jpeg" },
+        signal: uploadController.signal,
       });
+      clearTimeout(uploadTimeoutId);
+      
+      if (!uploadResponse.ok) {
+        throw new Error(`File upload failed: ${uploadResponse.status}`);
+      }
 
+      // Step 4: Save photo reference to job
       await addPhoto(job.id, objectPath, source);
       
       toast({ 
         title: "Photo Uploaded", 
         description: source === 'admin' ? "Reference photo saved to storage." : "Evidence photo saved to storage." 
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Photo upload failed:", error);
+      
+      let errorMessage = "Photo could not be saved. Please try again.";
+      
+      if (error.name === 'AbortError') {
+        errorMessage = "Upload timed out. Please check your connection and try again.";
+      } else if (error.message?.includes('Failed to fetch')) {
+        errorMessage = "Network error. Please check your internet connection.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({ 
         title: "Upload Failed", 
-        description: "Photo could not be saved. Please try again.",
+        description: errorMessage,
         variant: "destructive" 
       });
     } finally {

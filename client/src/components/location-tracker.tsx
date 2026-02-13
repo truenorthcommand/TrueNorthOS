@@ -26,7 +26,8 @@ export function LocationTracker() {
   const lastPositionRef = useRef<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
-    if (!user || user.role !== 'engineer') {
+    const userRoles = user?.roles || (user?.role ? [user.role] : []);
+    if (!user || !userRoles.includes('engineer')) {
       return;
     }
 
