@@ -11122,5 +11122,105 @@ Be concise and practical. Focus on real issues that affect the business.`;
     }
   });
 
+  // ==================== EXTERNAL INTAKE (WEBHOOK API) ====================
+  // Protected by Bearer token only — no session required.
+  // Used by external sites (e.g. ASG Website) to push leads directly into TrueNorthOS.
+
+  const requireWebhookSecret = (req: any, res: any, next: any) => {
+    const expectedSecret = process.env.INBOUND_WEBHOOK_SECRET;
+    if (!expectedSecret) {
+      console.error("[Webhook] INBOUND_WEBHOOK_SECRET is not configured.");
+      return res.status(500).json({ error: "Webhook integration not configured on this server." });
+    }
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ") || authHeader.split(" ")[1] !== expectedSecret) {
+      console.warn("[Webhook] Unauthorized intake attempt blocked.");
+      return res.status(401).json({ error: "Invalid or missing webhook secret" });
+    }
+    next();
+  };
+
+  app.post("/api/external/intake/job", requireWebhookSecret, async (req: any, res: any) => {
+    try {
+      const {
+        customerName,
+        contactEmail,
+        contactPhone,
+        address,
+        postcode,
+        description,
+        urgency,
+        source,
+      } = req.body;
+
+      // 1. Validate required fields
+      if (!customerName || !contactEmail || !contactPhone || !address || !postcode || !description || !urgency) {
+        return res.status(400).json({ error: "Missing required fields: customerName, contactEmail, contactPhone, address, postcode, description, urgency are all required." });
+      }
+      if (urgency !== "high" && urgency !== "normal") {
+        return res.status(400).json({ error: "urgency must be 'high' or 'normal'." });
+      }
+
+      // 2. CRM: Find or create the client record (TrueNorth Source of Truth)
+      const client = await storage.findOrCreateClient({
+        name: customerName,
+        email: contactEmail,
+        phone: contactPhone,
+        address: address,
+        postcode: postcode,
+      });
+
+      // 3. Generate a robust, collision-resistant Job Number
+      const year = new Date().getFullYear();
+      const timestamp = Date.now().toString(36).toUpperCase();
+      const jobNo = `J-${year}-${timestamp}`;
+
+      // 4. Create the Job, linked to the resolved client
+      const job = await storage.createJob({
+        jobNo,
+        customerName,
+        contactPhone: contactPhone || undefined,
+        contactEmail: contactEmail || undefined,
+        address: address || undefined,
+        postcode: postcode || undefined,
+        description: `[Source: ${source || 'ASG Website'}]\n\n${description}`,
+        urgency: urgency || "normal",
+        status: "Draft",
+        client: client.id,
+        customerId: client.id,
+      });
+
+      // 5. Emit domain event so the workflow engine picks it up
+      await emitEvent("job_created", {
+        jobId: job.id,
+        jobNo: job.jobNo,
+        customerName: job.customerName,
+        urgency: job.urgency,
+        source: source || "ASG Website",
+        clientId: client.id,
+      });
+
+      // 6. Direct admin notification — immediate alert to Works Manager
+      notifyAdmins({
+        type: 'job_created',
+        title: urgency === 'high' ? 'URGENT: New Website Intake' : 'New Website Intake',
+        message: `New job ${job.jobNo} created from ${source || 'ASG Website'} for ${job.customerName}`,
+        category: 'jobs',
+        jobId: job.id,
+        jobNo: job.jobNo || undefined,
+        timestamp: new Date().toISOString(),
+        linkUrl: `/app/jobs/${job.id}`,
+      });
+
+      console.log(`[Webhook Intake] Job ${job.jobNo} created for client ${client.id} (${customerName}) from ${source || 'ASG Website'}`);
+
+      return res.status(201).json({ success: true, jobId: job.id, jobNo: job.jobNo });
+
+    } catch (error: any) {
+      console.error("[Webhook Intake Error]:", error);
+      return res.status(500).json({ error: "Failed to process intake webhook" });
+    }
+  });
+
   return httpServer;
 }
