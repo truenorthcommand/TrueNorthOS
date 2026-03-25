@@ -20,6 +20,7 @@ import { registerSupportChatRoutes } from "./support-chat";
 import { registerPublicChatbotRoutes } from "./public-chatbot";
 import { insertFileSchema } from "@shared/schema";
 import { setupAuth } from "./replit_integrations/auth";
+import { registerInviteRoutes } from "./invite";
 import { generateFormPdf } from "./form-pdf";
 import { emitEvent } from "./events";
 import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
@@ -140,10 +141,13 @@ export async function registerRoutes(
   // Use shared session middleware (also used by WebSocket notifications)
   app.use(sessionMiddleware);
   
-  // Setup OAuth authentication (Google via Replit OIDC)
+  // Setup Google OAuth 2.0 authentication
   await setupAuth(app);
 
-  // Redirect /auth to homepage - prevents Replit deployment proxy from showing login
+  // Register invite-based onboarding routes (/invite/:token and /api/users/invite)
+  registerInviteRoutes(app);
+
+  // Redirect /auth to homepage
   app.get("/auth", (req, res) => {
     res.redirect(302, "/");
   });

@@ -39,6 +39,7 @@ export const users = pgTable("users", {
   negativeSkillIds: jsonb("negative_skill_ids").default([]),
   googleId: text("google_id"),
   profileImageUrl: text("profile_image_url"),
+  inviteToken: text("invite_token"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

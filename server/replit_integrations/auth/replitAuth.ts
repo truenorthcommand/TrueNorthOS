@@ -1,171 +1,139 @@
-import * as client from "openid-client";
-import { Strategy, type VerifyFunction } from "openid-client/passport";
+/**
+ * TrueNorthOS — Google OAuth 2.0 Authentication
+ *
+ * Replaces Replit OIDC with a standard, VPS-deployable Google OAuth flow.
+ * Uses passport-google-oauth20 strategy.
+ *
+ * Required env vars:
+ *   GOOGLE_CLIENT_ID      — from Google Cloud Console
+ *   GOOGLE_CLIENT_SECRET  — from Google Cloud Console
+ *   APP_URL               — public base URL e.g. https://erp.truenorthops.co.uk
+ *
+ * Flow:
+ *   GET /api/oauth/google        → redirects to Google consent screen
+ *   GET /api/oauth/callback      → Google redirects back here
+ *   On success: session.userId is set, user redirected to /app
+ *   On failure: redirected to /login?error=oauth_failed
+ *
+ * Access control:
+ *   - Existing users: matched by email or googleId
+ *   - New users: must have a valid invite token (from /invite/:token)
+ *   - Unauthorised Google accounts: redirected to /login?error=not_authorised
+ */
 
 import passport from "passport";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import type { Express, RequestHandler } from "express";
-import memoize from "memoizee";
-import { authStorage } from "./storage";
-import { pool } from "../../db";
-
-const getOidcConfig = memoize(
-  async () => {
-    return await client.discovery(
-      new URL(process.env.ISSUER_URL ?? "https://replit.com/oidc"),
-      process.env.REPL_ID!
-    );
-  },
-  { maxAge: 3600 * 1000 }
-);
-
-function updateUserSession(
-  user: any,
-  tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers
-) {
-  user.claims = tokens.claims();
-  user.access_token = tokens.access_token;
-  user.refresh_token = tokens.refresh_token;
-  user.expires_at = user.claims?.exp;
-}
-
-async function upsertUser(claims: any) {
-  return await authStorage.upsertUser({
-    id: claims["sub"],
-    email: claims["email"],
-    firstName: claims["first_name"],
-    lastName: claims["last_name"],
-    profileImageUrl: claims["profile_image_url"],
-  });
-}
-
-// Find user by Google ID or email
-async function findUserByGoogleOrEmail(googleId: string, email: string | null) {
-  // First try by googleId
-  const byGoogle = await pool.query(
-    `SELECT * FROM users WHERE google_id = $1`,
-    [googleId]
-  );
-  if (byGoogle.rows.length > 0) {
-    return byGoogle.rows[0];
-  }
-  
-  // Then try by email
-  if (email) {
-    const byEmail = await pool.query(
-      `SELECT * FROM users WHERE email = $1`,
-      [email]
-    );
-    if (byEmail.rows.length > 0) {
-      // Link Google account to existing user
-      await pool.query(
-        `UPDATE users SET google_id = $1 WHERE id = $2`,
-        [googleId, byEmail.rows[0].id]
-      );
-      return byEmail.rows[0];
-    }
-  }
-  
-  return null;
-}
+import { resolveInviteOrLink } from "../../invite";
 
 export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
-  
-  // Initialize passport without its own session (we use TrueNorth's session)
   app.use(passport.initialize());
 
-  const config = await getOidcConfig();
+  const clientID = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const appUrl = process.env.APP_URL || "http://localhost:5000";
 
-  const verify: VerifyFunction = async (
-    tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
-    verified: passport.AuthenticateCallback
-  ) => {
-    const claims = tokens.claims();
-    const user = { claims };
-    updateUserSession(user, tokens);
-    
-    // Upsert user and get their ID for TrueNorth session
-    const tnUser = await upsertUser(claims);
-    (user as any).tnUserId = tnUser.id;
-    
-    verified(null, user);
-  };
+  if (!clientID || !clientSecret) {
+    console.warn(
+      "[Auth] WARNING: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is not set. " +
+      "Google OAuth will be unavailable. Username/password login will still work."
+    );
+    return;
+  }
 
-  // Keep track of registered strategies
-  const registeredStrategies = new Set<string>();
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID,
+        clientSecret,
+        callbackURL: `${appUrl}/api/oauth/callback`,
+        scope: ["openid", "email", "profile"],
+        passReqToCallback: true,
+      },
+      async (req: any, _accessToken, _refreshToken, profile, done) => {
+        try {
+          const email = profile.emails?.[0]?.value ?? null;
+          const googleId = profile.id;
 
-  // Helper function to ensure strategy exists for a domain
-  const ensureStrategy = (domain: string) => {
-    const strategyName = `replitauth:${domain}`;
-    if (!registeredStrategies.has(strategyName)) {
-      const strategy = new Strategy(
-        {
-          name: strategyName,
-          config,
-          scope: "openid email profile offline_access",
-          callbackURL: `https://${domain}/api/oauth/callback`,
-        },
-        verify
-      );
-      passport.use(strategy);
-      registeredStrategies.add(strategyName);
-    }
-  };
+          // Resolve user via invite token or existing email/googleId match
+          const userId = await resolveInviteOrLink(req, googleId, email);
 
-  passport.serializeUser((user: Express.User, cb) => cb(null, user));
-  passport.deserializeUser((user: Express.User, cb) => cb(null, user));
+          if (!userId) {
+            // Google account is not authorised — no invite, no existing account
+            console.warn(`[Auth] Unauthorised Google login attempt: ${email} (${googleId})`);
+            return done(null, false);
+          }
 
-  // Google OAuth login - redirects to Replit OIDC
-  app.get("/api/oauth/google", (req, res, next) => {
-    ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      prompt: "login consent",
-      scope: ["openid", "email", "profile", "offline_access"],
-    })(req, res, next);
-  });
-
-  // OAuth callback - logs user into TrueNorth session
-  app.get("/api/oauth/callback", (req, res, next) => {
-    ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      session: false, // Don't use passport session
-      failureRedirect: "/?error=oauth_failed",
-    }, async (err: any, user: any) => {
-      if (err || !user) {
-        console.error("OAuth error:", err);
-        return res.redirect("/?error=oauth_failed");
-      }
-      
-      try {
-        // Log user into TrueNorth's session system
-        if (user.tnUserId && req.session) {
-          req.session.userId = user.tnUserId;
-          req.session.save((saveErr) => {
-            if (saveErr) {
-              console.error("Session save error:", saveErr);
-              return res.redirect("/?error=session_failed");
-            }
-            return res.redirect("/");
-          });
-        } else {
-          return res.redirect("/?error=user_not_found");
+          return done(null, { id: userId });
+        } catch (err) {
+          console.error("[Auth] Google strategy error:", err);
+          return done(err as Error);
         }
-      } catch (error) {
-        console.error("OAuth callback error:", error);
-        return res.redirect("/?error=oauth_failed");
       }
-    })(req, res, next);
-  });
+    )
+  );
+
+  // Passport serialization — not used for session (we use TrueNorth's own session)
+  passport.serializeUser((user: any, cb) => cb(null, user));
+  passport.deserializeUser((user: any, cb) => cb(null, user));
+
+  // ── OAuth Routes ──────────────────────────────────────────────────────────
+
+  // Step 1: Redirect to Google consent screen
+  app.get(
+    "/api/oauth/google",
+    passport.authenticate("google", {
+      scope: ["openid", "email", "profile"],
+      prompt: "select_account",
+    })
+  );
+
+  // Step 2: Google redirects back here after consent
+  app.get(
+    "/api/oauth/callback",
+    passport.authenticate("google", {
+      session: false,
+      failureRedirect: "/login?error=not_authorised",
+    }),
+    async (req: any, res) => {
+      try {
+        const user = req.user as { id: string } | undefined;
+
+        if (!user?.id) {
+          console.error("[Auth] OAuth callback: no user resolved.");
+          return res.redirect("/login?error=not_authorised");
+        }
+
+        // Set TrueNorthOS session
+        req.session.userId = user.id;
+        req.session.save((err: any) => {
+          if (err) {
+            console.error("[Auth] Session save error:", err);
+            return res.redirect("/login?error=session_failed");
+          }
+          return res.redirect("/app");
+        });
+      } catch (err) {
+        console.error("[Auth] OAuth callback error:", err);
+        return res.redirect("/login?error=oauth_failed");
+      }
+    }
+  );
 }
 
-export const isAuthenticated: RequestHandler = async (req, res, next) => {
-  // Check TrueNorth session first
-  if (req.session?.userId) {
+/**
+ * requireAuth middleware — checks TrueNorthOS session.
+ * Provider-agnostic: works for both Google OAuth and username/password logins.
+ */
+export const isAuthenticated: RequestHandler = (req, res, next) => {
+  if ((req as any).session?.userId) {
     return next();
   }
   return res.status(401).json({ message: "Unauthorized" });
 };
 
-// Re-export getSession for other uses (not needed for this integration)
+/** No-op — retained for interface compatibility */
 export function getSession() {
-  return (req: any, res: any, next: any) => next();
+  return (_req: any, _res: any, next: any) => next();
 }
