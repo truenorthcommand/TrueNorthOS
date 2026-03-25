@@ -11174,10 +11174,10 @@ Be concise and practical. Focus on real issues that affect the business.`;
         postcode: postcode,
       });
 
-      // 3. Generate a robust, collision-resistant Job Number
+      // 3. Generate a sequential Job Number consistent with internal jobs
+      const jobCount = (await storage.getAllJobs()).length + 1;
       const year = new Date().getFullYear();
-      const timestamp = Date.now().toString(36).toUpperCase();
-      const jobNo = `J-${year}-${timestamp}`;
+      const jobNo = `J-${year}-${String(jobCount).padStart(3, '0')}`;
 
       // 4. Create the Job, linked to the resolved client
       const job = await storage.createJob({
