@@ -9,12 +9,6 @@ const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   }
   next();
 };
-const requireAuth = (req: Request, res: Response, next: NextFunction) => {
-  if (!req.session.userId) {
-    return res.status(401).json({ error: "Authentication required" });
-  }
-  next();
-};
 
 interface JobNotesResponse {
   summary: string;
