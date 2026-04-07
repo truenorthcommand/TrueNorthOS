@@ -1,16 +1,14 @@
 import type { Express, Request, Response, NextFunction } from "express";
-import OpenAI from "openai";
 import { storage } from "./storage";
 import type { Job } from "@shared/schema";
+import * as aiService from "./services/ai-service";
 
-const gemini = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
-});
-
-const MODEL = "gemini-2.5-flash";
-const PROVIDER = "gemini";
-
+const requireAuth = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  next();
+};
 const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   if (!req.session.userId) {
     return res.status(401).json({ error: "Authentication required" });
