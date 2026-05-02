@@ -242,16 +242,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <>
             <img 
               src="/logo-truenorth-os.png" 
-              alt="TrueNorth OS" 
+              alt="Adapt Services Group" 
               className="w-full max-w-[170px] h-auto object-contain mx-auto"
             />
-            <span className="text-[11px] text-muted-foreground text-center leading-[1.2] -mt-0.5">Field Service Management For The Trades</span>
+            <span className="text-[11px] text-muted-foreground text-center leading-[1.2] -mt-0.5">Professional Field Service Management</span>
           </>
         )}
         {collapsed && (
           <img 
             src="/logo-truenorth-os.png" 
-            alt="TrueNorth OS" 
+            alt="Adapt Services Group" 
             className="w-10 h-10 object-cover mx-auto"
           />
         )}

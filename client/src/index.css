@@ -42,40 +42,40 @@
 }
 
 :root {
-  /* Slate-ish Blue Theme - Professional & Clean */
-  --background: 210 20% 98%;
-  --foreground: 222 47% 11%;
+  /* ASG Brand Theme - Green & Professional */
+  --background: 60 20% 95%;
+  --foreground: 217 31% 14%;
 
   --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
+  --card-foreground: 217 31% 14%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
+  --popover-foreground: 217 31% 14%;
 
-  --primary: 221 83% 53%; /* Vivid Blue */
+  --primary: 143 55% 23%; /* ASG Dark Green */
   --primary-foreground: 210 40% 98%;
 
   --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222 47% 11.2%;
+  --secondary-foreground: 217 31% 14%;
 
   --muted: 210 40% 96.1%;
   --muted-foreground: 215.4 16.3% 46.9%;
 
   --accent: 210 40% 96.1%;
-  --accent-foreground: 222 47% 11.2%;
+  --accent-foreground: 217 31% 14%;
 
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 210 40% 98%;
 
   --border: 214.3 31.8% 91.4%;
   --input: 214.3 31.8% 91.4%;
-  --ring: 221 83% 53%;
+  --ring: 143 55% 23%;
 
   --radius: 0.5rem;
 
   /* Status Colors */
   --status-draft: 215 16% 47%;
-  --status-progress: 221 83% 53%;
+  --status-progress: 143 55% 23%;
   --status-review: 35 90% 50%;
   --status-done: 142 76% 36%;
 }

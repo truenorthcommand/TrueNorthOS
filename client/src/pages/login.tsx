@@ -65,15 +65,15 @@ export default function Login() {
           <div className="flex justify-center mb-4">
             <img
               src="/logo-truenorth-os.png"
-              alt="TrueNorth OS"
+              alt="Adapt Services Group"
               className="h-24 w-auto object-contain"
             />
           </div>
-          <CardTitle className="text-2xl font-bold">TrueNorth OS</CardTitle>
+          <CardTitle className="text-2xl font-bold">Adapt Services Group</CardTitle>
           <CardDescription>
             {requires2FA
               ? "Enter your authentication code"
-              : "Field Service Management For The Trades"}
+              : "Professional Field Service Management"}
           </CardDescription>
         </CardHeader>
 
@@ -86,7 +86,7 @@ export default function Login() {
                 {oauthError === "oauth_failed"
                   ? "Google sign-in failed. Please try again or contact your administrator."
                   : oauthError === "user_not_found"
-                  ? "Your Google account is not linked to a TrueNorth OS account. Contact your administrator for access."
+                  ? "Your Google account is not linked to an Adapt Services Group account. Contact your administrator for access."
                   : "An authentication error occurred. Please try again."}
               </AlertDescription>
             </Alert>
@@ -221,7 +221,7 @@ export default function Login() {
           {/* Powered By footer */}
           <p className="text-center text-xs text-muted-foreground pt-2">
             Powered by{" "}
-            <span className="font-semibold text-foreground">TrueNorth Operations Group</span>
+            <span className="font-semibold text-foreground">Adapt Services Group</span>
           </p>
         </CardContent>
       </Card>

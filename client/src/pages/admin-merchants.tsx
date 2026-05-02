@@ -164,7 +164,7 @@ export default function AdminMerchants() {
         <div>
           <h2 className="text-2xl font-bold" data-testid="text-page-title">Merchant Partners</h2>
           <p className="text-muted-foreground mt-1">
-            Manage merchant partners who refer customers to TrueNorth OS
+            Manage merchant partners who refer customers to Adapt Services Group
           </p>
         </div>
 

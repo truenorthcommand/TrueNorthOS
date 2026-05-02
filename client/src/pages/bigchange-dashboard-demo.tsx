@@ -45,7 +45,7 @@ export default function BigChangeDashboardDemo() {
       <aside className="w-64 bg-slate-800 text-white flex flex-col">
         {/* Logo */}
         <div className="p-4 border-b border-slate-700">
-          <h1 className="text-xl font-bold text-white">TrueNorth</h1>
+          <h1 className="text-xl font-bold text-white">Adapt Services Group</h1>
           <p className="text-slate-400 text-xs">Trade OS</p>
         </div>
         

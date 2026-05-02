@@ -60,7 +60,7 @@ function MerchantLogin({ onLogin }: { onLogin: (merchant: MerchantUser) => void 
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 p-4">
       <Card className="w-full max-w-md" data-testid="card-merchant-login">
         <CardHeader className="text-center">
-          <img src="/logo-truenorth-os.png" alt="TrueNorth OS" className="h-12 mx-auto mb-4" />
+          <img src="/logo-truenorth-os.png" alt="Adapt Services Group" className="h-12 mx-auto mb-4" />
           <CardTitle className="text-2xl">Merchant Portal</CardTitle>
           <CardDescription>Sign in to view your referral earnings and stats</CardDescription>
         </CardHeader>
@@ -152,7 +152,7 @@ function MerchantDashboard({ merchant, onLogout }: { merchant: MerchantUser; onL
       <header className="bg-white dark:bg-gray-900 border-b px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/logo-truenorth-os.png" alt="TrueNorth OS" className="h-8" />
+            <img src="/logo-truenorth-os.png" alt="Adapt Services Group" className="h-8" />
             <div>
               <h1 className="text-lg font-bold" data-testid="text-merchant-name">{merchant.name}</h1>
               <p className="text-xs text-muted-foreground">Merchant Partner</p>
@@ -231,7 +231,7 @@ function MerchantDashboard({ merchant, onLogout }: { merchant: MerchantUser; onL
             <Card data-testid="card-merchant-partner-link">
               <CardHeader>
                 <CardTitle>Your Partner Link</CardTitle>
-                <CardDescription>Share this link with potential TrueNorth OS customers</CardDescription>
+                <CardDescription>Share this link with potential Adapt Services Group customers</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-2">

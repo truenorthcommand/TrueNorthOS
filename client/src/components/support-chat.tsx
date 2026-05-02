@@ -84,7 +84,7 @@ export function SupportChat() {
       setMessages([
         {
           role: "assistant",
-          content: `Hi${user?.name ? " " + user.name.split(" ")[0] : ""}! 👋 I'm here to help with any questions about TrueNorth OS. What can I help you with today?`,
+          content: `Hi${user?.name ? " " + user.name.split(" ")[0] : ""}! 👋 I'm here to help with any questions about Adapt Services Group. What can I help you with today?`,
         },
       ]);
     } catch (error: any) {
@@ -227,7 +227,7 @@ export function SupportChat() {
               </div>
               <div>
                 <h3 className="font-semibold text-sm" data-testid="text-support-chat-title">
-                  TrueNorth Support
+                  ASG Support
                 </h3>
                 <p className="text-xs opacity-90">Usually replies instantly</p>
               </div>
