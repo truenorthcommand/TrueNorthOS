@@ -305,45 +305,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </MenuGroup>
         )}
 
-        {/* Email - Admin Only */}
-        {hasRole(user, 'admin') && (
-          collapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link href="/outlook-inbox">
-                  <button
-                    className={cn(
-                      "w-10 h-10 flex items-center justify-center rounded-lg transition-colors",
-                      location === "/outlook-inbox" 
-                        ? "bg-primary/10 text-primary" 
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    )}
-                    data-testid="nav-email"
-                  >
-                    <Mail className="h-5 w-5" />
-                  </button>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">Email</TooltipContent>
-            </Tooltip>
-          ) : (
-            <Link href="/outlook-inbox">
-              <button
-                className={cn(
-                  "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors",
-                  location === "/outlook-inbox" 
-                    ? "bg-primary/10 text-primary" 
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}
-                onClick={() => setIsOpen(false)}
-                data-testid="nav-email"
-              >
-                <Mail className="h-5 w-5" />
-                Email
-              </button>
-            </Link>
-          )
-        )}
 
         {/* Sales Section - Admin & Surveyor */}
         {hasRole(user, 'admin', 'surveyor') && (

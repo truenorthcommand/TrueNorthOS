@@ -67,7 +67,6 @@ import InspectionDetail from "@/pages/inspection-detail";
 import SnaggingSheets from "@/pages/snagging-sheets";
 import SnaggingDetail from "@/pages/snagging-detail";
 import AccountsDashboard from "@/pages/accounts-dashboard";
-import OutlookInbox from "@/pages/outlook-inbox";
 import Files from "@/pages/files";
 import GlassDemo from "@/pages/glass-demo";
 import GlassDashboardDemo from "@/pages/glass-dashboard-demo";
@@ -184,7 +183,6 @@ function AppRoutes() {
         <Route path="/snagging" component={SnaggingSheets} />
         <Route path="/snagging/:id" component={SnaggingDetail} />
         <Route path="/accounts" component={AccountsDashboard} />
-        <Route path="/outlook-inbox" component={OutlookInbox} />
         <Route path="/forms/templates" component={FormTemplates} />
         <Route path="/forms/builder/:id" component={FormBuilder} />
         <Route path="/forms/fill/:versionId" component={FormFill} />

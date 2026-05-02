@@ -74,7 +74,6 @@ Key topics you help with:
 
 ### Integrations
 - Accounting: Xero, QuickBooks, Sage, FreshBooks
-- Calendar: Outlook sync available
 - Mobile: PWA with offline mode
 
 Always be friendly, professional, concise but thorough. If you can't answer something, offer to connect them with human support at support@truenorthoperationsgroup.com`;

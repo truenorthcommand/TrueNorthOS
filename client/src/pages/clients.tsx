@@ -22,7 +22,6 @@ import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { FileWithRelations } from "@shared/schema";
-import EmailComposerModal, { generateDefaultTemplate } from "@/components/EmailComposerModal";
 
 interface JobPhoto {
   id: string;
@@ -174,72 +173,8 @@ export default function Clients() {
   const [portalLink, setPortalLink] = useState<string>("");
   const [portalClientName, setPortalClientName] = useState<string>("");
 
-  // Email composer state
-  const [emailComposerOpen, setEmailComposerOpen] = useState(false);
-  const [emailComposerData, setEmailComposerData] = useState({
-    to: "",
-    subject: "",
-    body: "",
-    clientName: "",
-  });
-
-  // Open the email composer for a client (generates portal link first, then opens composer)
-  const openEmailComposer = async (clientId: string, clientName: string, clientEmail: string) => {
-    setGeneratingPortalLink(clientId);
-    try {
-      const res = await fetch(`/api/clients/${clientId}/generate-portal-token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ sendEmail: false }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const link = data.fullUrl || `${window.location.origin}/portal/${data.portalToken}`;
-
-        let companyName = "Your Service Provider";
-        try {
-          const settingsRes = await fetch("/api/company-settings", { credentials: "include" });
-          if (settingsRes.ok) {
-            const settings = await settingsRes.json();
-            companyName = settings.companyName || companyName;
-          }
-        } catch {}
-
-        const emailBody = generateDefaultTemplate(clientName, link, companyName);
-        setEmailComposerData({
-          to: clientEmail,
-          subject: `Your Customer Portal Access - ${companyName}`,
-          body: emailBody,
-          clientName,
-        });
-        setEmailComposerOpen(true);
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to generate portal link",
-          variant: "destructive",
-        });
-      }
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to generate portal link",
-        variant: "destructive",
-      });
-    } finally {
-      setGeneratingPortalLink(null);
-    }
-  };
-
   // Generate portal link for client (link only, no email)
   const generatePortalLink = async (clientId: string, clientName: string, sendEmail: boolean = false) => {
-    if (sendEmail) {
-      const client = clients.find((c: any) => c.id === clientId);
-      if (client?.email) {
-        return openEmailComposer(clientId, clientName, client.email);
-      }
-    }
     setGeneratingPortalLink(clientId);
     try {
       const res = await fetch(`/api/clients/${clientId}/generate-portal-token`, {
@@ -2646,24 +2581,6 @@ export default function Clients() {
                         Generate Portal Link
                       </Button>
 
-                      {editingClient.email && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="gap-2 border-[#0F2B4C] text-[#0F2B4C] hover:bg-[#0F2B4C]/10"
-                          onClick={() => openEmailComposer(editingClient.id, editingClient.name, editingClient.email || "")}
-                          disabled={generatingPortalLink === editingClient.id}
-                          data-testid="button-send-portal-email"
-                        >
-                          {generatingPortalLink === editingClient.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Mail className="h-4 w-4" />
-                          )}
-                          Send Email Invitation
-                        </Button>
-                      )}
                     </div>
                   </div>
                 )}
@@ -2836,17 +2753,6 @@ export default function Clients() {
         </DialogContent>
       </Dialog>
 
-      <EmailComposerModal
-        open={emailComposerOpen}
-        onClose={() => setEmailComposerOpen(false)}
-        defaultTo={emailComposerData.to}
-        defaultSubject={emailComposerData.subject}
-        defaultBody={emailComposerData.body}
-        clientName={emailComposerData.clientName}
-        onSuccess={() => {
-          setEmailComposerOpen(false);
-        }}
-      />
     </div>
   );
 }

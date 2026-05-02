@@ -1054,23 +1054,6 @@ export const insertSnippetSchema = createInsertSchema(snippets).omit({
 export type InsertSnippet = z.infer<typeof insertSnippetSchema>;
 export type Snippet = typeof snippets.$inferSelect;
 
-export const outlookSettings = pgTable("outlook_settings", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  defaultUserEmail: text("default_user_email"),
-  syncEnabled: boolean("sync_enabled").notNull().default(false),
-  autoExtract: boolean("auto_extract").notNull().default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export const insertOutlookSettingsSchema = createInsertSchema(outlookSettings).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export type InsertOutlookSettings = z.infer<typeof insertOutlookSettingsSchema>;
-export type OutlookSettings = typeof outlookSettings.$inferSelect;
 
 // Files - Uploaded files with optional assignment to clients, jobs, or expenses
 export const files = pgTable("files", {
