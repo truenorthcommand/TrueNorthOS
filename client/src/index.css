@@ -190,3 +190,73 @@ input[type="submit"]:active,
 input[type="button"]:active {
   animation: button-bounce 0.15s ease-out;
 }
+
+/* Tradify-Inspired Component Patterns */
+
+/* Tradify Card Styling */
+.tradify-card {
+  @apply bg-card border border-border rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200;
+  padding: 1.25rem; /* 20px - Tradify spacing */
+}
+
+/* Tradify Job Card */
+.tradify-job-card {
+  @apply bg-card border border-border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer;
+  border-left: 4px solid hsl(var(--primary));
+}
+
+/* Tradify Status Badge */
+.tradify-badge {
+  @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-medium;
+}
+
+/* Tradify Filter Button */
+.tradify-filter {
+  @apply px-4 py-2 text-sm font-medium border border-border rounded-md bg-card hover:bg-muted transition-colors;
+}
+
+.tradify-filter.active {
+  @apply bg-primary text-primary-foreground border-primary;
+}
+
+/* Tradify Input Styling */
+.tradify-input {
+  @apply w-full px-3 py-2 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all;
+}
+
+/* Tradify Section Spacing */
+.tradify-section {
+  @apply space-y-4;
+}
+
+/* Tradify Grid Layout */
+.tradify-grid {
+  @apply grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+}
+
+/* Tradify List Layout */
+.tradify-list {
+  @apply space-y-2;
+}
+
+/* Tradify Dashboard Widget */
+.tradify-widget {
+  @apply bg-card border border-border rounded-lg p-5 shadow-sm hover:shadow-md transition-shadow;
+}
+
+.tradify-widget-title {
+  @apply text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3;
+}
+
+.tradify-widget-value {
+  @apply text-3xl font-bold text-foreground;
+}
+
+/* Tradify Button Enhancements */
+.tradify-btn-primary {
+  @apply bg-primary text-primary-foreground px-4 py-2 rounded-md font-medium hover:bg-primary/90 shadow-sm hover:shadow-md transition-all;
+}
+
+.tradify-btn-secondary {
+  @apply bg-card text-foreground border border-border px-4 py-2 rounded-md font-medium hover:bg-muted transition-all;
+}
