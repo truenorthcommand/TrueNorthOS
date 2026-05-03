@@ -390,6 +390,27 @@ export default function MapPage() {
     toast({ title: 'Map refreshed', description: 'Latest positions loaded' });
   }
 
+  const [geocoding, setGeocoding] = useState(false);
+  async function handleGeocodeAll() {
+    setGeocoding(true);
+    try {
+      const res = await fetch('/api/gps/geocode-all-jobs', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: 'Geocoding Complete', description: data.message });
+      } else {
+        toast({ title: 'Geocoding Failed', description: data.error || 'Unknown error', variant: 'destructive' });
+      }
+    } catch (error: any) {
+      toast({ title: 'Geocoding Failed', description: error.message, variant: 'destructive' });
+    } finally {
+      setGeocoding(false);
+    }
+  }
+
   function handleMarkerClick(marker: MapMarker) {
     setMapCenter({ lat: marker.lat, lng: marker.lng });
     toast({
@@ -491,6 +512,16 @@ export default function MapPage() {
             </div>
           </div>
 
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleGeocodeAll} 
+            disabled={geocoding}
+            className="h-8 text-xs"
+          >
+            {geocoding ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <MapPin className="h-3 w-3 mr-1" />}
+            {geocoding ? 'Geocoding...' : 'Geocode All Jobs'}
+          </Button>
           <Button variant="ghost" size="icon" onClick={handleRefresh} className="h-8 w-8">
             <RefreshCw className="h-4 w-4" />
           </Button>
