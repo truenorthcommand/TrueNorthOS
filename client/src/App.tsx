@@ -16,6 +16,7 @@ import SignOff from "@/pages/sign-off";
 import Clients from "@/pages/clients";
 import ClientDetail from "@/pages/client-detail";
 import Engineers from "@/pages/engineers";
+// Force rebuild - client detail route fix
 import CompletedJobs from "@/pages/completed-jobs";
 import Staff from "@/pages/staff";
 import CalendarPage from "@/pages/schedule/calendar";
