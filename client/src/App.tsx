@@ -32,6 +32,7 @@ import TimeLogs from "@/pages/time-logs";
 import Quotes from "@/pages/quotes";
 import QuoteDetail from "@/pages/quote-detail";
 import ClientQuote from "@/pages/client-quote";
+import CreateQuote from "@/pages/create-quote";
 import CustomerPortal from "@/pages/customer-portal";
 import Invoices from "@/pages/invoices";
 import InvoiceDetail from "@/pages/invoice-detail";
@@ -156,6 +157,7 @@ function AppRoutes() {
         <Route path="/assets/:id" component={AssetDetail} />
         <Route path="/assets/:id/edit" component={AssetForm} />
         <Route path="/quotes" component={Quotes} />
+        <Route path="/quotes/new" component={CreateQuote} />
         <Route path="/quotes/:id" component={QuoteDetail} />
         <Route path="/invoices" component={Invoices} />
         <Route path="/invoices/:id" component={InvoiceDetail} />

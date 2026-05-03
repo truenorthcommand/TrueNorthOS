@@ -66,7 +66,8 @@ import {
   workflowRules, workflowExecutions, workflowLogs,
   assets, assetHistory,
   blogPosts,
-  feedback
+  feedback,
+  quoteTemplates
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, sql, isNull, and, ne, inArray, gt, asc } from "drizzle-orm";
@@ -666,6 +667,30 @@ export class DatabaseStorage implements IStorage {
     const count = Number(result[0]?.count || 0) + 1;
     const year = new Date().getFullYear();
     return `Q-${year}-${String(count).padStart(4, '0')}`;
+  }
+
+  // Quote Templates
+  async getAllQuoteTemplates(): Promise<any[]> {
+    return db.select().from(quoteTemplates).orderBy(desc(quoteTemplates.createdAt));
+  }
+
+  async getQuoteTemplate(id: string): Promise<any | undefined> {
+    const [template] = await db.select().from(quoteTemplates).where(eq(quoteTemplates.id, id));
+    return template;
+  }
+
+  async createQuoteTemplate(data: any): Promise<any> {
+    const [template] = await db.insert(quoteTemplates).values(data).returning();
+    return template;
+  }
+
+  async updateQuoteTemplate(id: string, data: any): Promise<any | undefined> {
+    const [template] = await db.update(quoteTemplates).set({ ...data, updatedAt: new Date() }).where(eq(quoteTemplates.id, id)).returning();
+    return template;
+  }
+
+  async deleteQuoteTemplate(id: string): Promise<void> {
+    await db.delete(quoteTemplates).where(eq(quoteTemplates.id, id));
   }
 
   async getInvoice(id: string): Promise<Invoice | undefined> {

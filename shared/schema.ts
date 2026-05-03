@@ -353,13 +353,19 @@ export type TimeLog = typeof timeLogs.$inferSelect;
 // Quote line item type
 export type QuoteLineItem = {
   id: string;
+  type: 'material' | 'labour' | 'custom';
   itemCode?: string;
   description: string;
   quantity: number;
+  unit?: string; // e.g., 'm²', 'hours', 'days', 'each', 'metres', 'litres'
   unitCost: number;
-  discount: number;
-  amount: number;
+  markup: number; // percentage markup (0-100)
+  discount: number; // percentage discount (0-100)
+  vatRate: number; // 20, 5, or 0
+  amount: number; // calculated: (quantity * unitCost * (1 + markup/100)) * (1 - discount/100)
 };
+
+export type PaymentTerms = 'Net 7' | 'Net 14' | 'Net 30' | 'Net 60' | 'Due on Receipt' | 'Custom';
 
 export type QuoteStatus = 'Draft' | 'Sent' | 'Accepted' | 'Declined' | 'Expired' | 'Converted';
 
@@ -390,7 +396,9 @@ export const quotes = pgTable("quotes", {
   declinedAt: timestamp("declined_at"),
   sentAt: timestamp("sent_at"),
   accessToken: text("access_token"),
-  convertedJobId: varchar("converted_job_id"),
+  paymentTerms: text("payment_terms").default("Net 30"),
+  customPaymentTerms: text("custom_payment_terms"),
+  markupPercentage: doublePrecision("markup_percentage").default(0),
   createdById: varchar("created_by_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -410,6 +418,25 @@ export const insertQuoteSchema = createInsertSchema(quotes, {
 
 export type InsertQuote = z.infer<typeof insertQuoteSchema>;
 export type Quote = typeof quotes.$inferSelect;
+
+// Quote Templates
+export const quoteTemplates = pgTable("quote_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category"), // e.g., 'plumbing', 'electrical', 'tiling', etc.
+  lineItems: jsonb("line_items").default([]),
+  terms: text("terms"),
+  paymentTerms: text("payment_terms").default("Net 30"),
+  notes: text("notes"),
+  isDefault: boolean("is_default").default(false),
+  createdById: varchar("created_by_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type QuoteTemplate = typeof quoteTemplates.$inferSelect;
+export type InsertQuoteTemplate = typeof quoteTemplates.$inferInsert;
 
 export type InvoiceStatus = 'Draft' | 'Sent' | 'Paid' | 'Overdue' | 'Cancelled';
 

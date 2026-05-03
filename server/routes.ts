@@ -2703,6 +2703,97 @@ export async function registerRoutes(
     }
   });
 
+
+  // ==================== QUOTE TEMPLATES ROUTES ====================
+
+  app.get("/api/quote-templates", requireAdmin, async (req, res) => {
+    try {
+      const templates = await storage.getAllQuoteTemplates();
+      res.json(templates);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch quote templates" });
+    }
+  });
+
+  app.post("/api/quote-templates", requireAdmin, async (req, res) => {
+    try {
+      const template = await storage.createQuoteTemplate({
+        ...req.body,
+        createdById: req.session.userId,
+      });
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create quote template" });
+    }
+  });
+
+  app.delete("/api/quote-templates/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteQuoteTemplate(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete quote template" });
+    }
+  });
+
+  // Clone a quote
+  app.post("/api/quotes/:id/clone", requireAdmin, async (req, res) => {
+    try {
+      const original = await storage.getQuote(req.params.id);
+      if (!original) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      const quoteNo = await storage.getNextQuoteNumber();
+      const crypto = await import('crypto');
+      const clonedQuote = await storage.createQuote({
+        quoteNo,
+        customerId: original.customerId,
+        customerName: original.customerName,
+        customerEmail: original.customerEmail,
+        customerPhone: original.customerPhone,
+        siteAddress: original.siteAddress,
+        sitePostcode: original.sitePostcode,
+        reference: original.reference ? `${original.reference} (copy)` : null,
+        description: original.description,
+        lineItems: original.lineItems,
+        subtotal: original.subtotal,
+        discountTotal: original.discountTotal,
+        vatRate: original.vatRate,
+        vatAmount: original.vatAmount,
+        total: original.total,
+        terms: original.terms,
+        notes: original.notes,
+        paymentTerms: (original as any).paymentTerms || 'Net 30',
+        status: 'Draft',
+        accessToken: crypto.randomUUID(),
+        createdById: req.session.userId,
+      });
+      res.json(clonedQuote);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to clone quote" });
+    }
+  });
+
+  // Generate PDF for a quote
+  app.get("/api/quotes/:id/pdf", requireAdmin, async (req, res) => {
+    try {
+      const quote = await storage.getQuote(req.params.id);
+      if (!quote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      const settings = await storage.getCompanySettings();
+
+      // Return quote data formatted for PDF generation (client-side PDF)
+      res.json({
+        quote,
+        companySettings: settings,
+        generatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to generate quote PDF data" });
+    }
+  });
+
   // ==================== INVOICES ROUTES ====================
 
   // PUBLIC routes first (specific paths before :id parameter)
