@@ -402,85 +402,174 @@ export default function CreateQuote() {
         const { jsPDF } = await import('jspdf');
         const doc = new jsPDF();
         const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
         
-        // Header
-        doc.setFontSize(20);
-        doc.setTextColor(15, 43, 76); // #0F2B4C
-        doc.text('QUOTATION', pageWidth / 2, 20, { align: 'center' });
-        
-        // Company info
-        doc.setFontSize(10);
-        doc.setTextColor(100);
-        doc.text('Adapt Services Group', 14, 35);
-        
-        // Quote details
-        doc.setFontSize(10);
-        doc.setTextColor(0);
-        doc.text(`Quote Ref: ${quoteRef}`, pageWidth - 14, 35, { align: 'right' });
-        doc.text(`Date: ${new Date().toLocaleDateString('en-GB')}`, pageWidth - 14, 41, { align: 'right' });
-        if (expiryDate) {
-          doc.text(`Expires: ${new Date(expiryDate).toLocaleDateString('en-GB')}`, pageWidth - 14, 47, { align: 'right' });
+        // Load logo
+        try {
+          const logoResponse = await fetch('/logo.png');
+          const logoBlob = await logoResponse.blob();
+          const logoBase64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(logoBlob);
+          });
+          doc.addImage(logoBase64, 'PNG', 14, 10, 40, 16);
+        } catch {
+          // Fallback if logo fails to load
+          doc.setFontSize(14);
+          doc.setTextColor(15, 43, 76);
+          doc.text('Adapt Services Group', 14, 20);
         }
         
-        // Client info
-        doc.setFontSize(11);
+        // Company address (right side)
+        doc.setFontSize(9);
+        doc.setTextColor(80);
+        doc.text('Adapt Services Group', pageWidth - 14, 12, { align: 'right' });
+        doc.text('Unit 2 Meadow View Industrial Estate', pageWidth - 14, 17, { align: 'right' });
+        doc.text('Ruckinge, Ashford, Kent', pageWidth - 14, 22, { align: 'right' });
+        doc.text('TN26 2NR', pageWidth - 14, 27, { align: 'right' });
+        doc.text('info@adaptservicesgroup.co.uk', pageWidth - 14, 32, { align: 'right' });
+        
+        // QUOTATION title
+        doc.setFontSize(22);
         doc.setTextColor(15, 43, 76);
-        doc.text('Client:', 14, 55);
-        doc.setTextColor(0);
+        doc.text('QUOTATION', 14, 42);
+        
+        // Divider line
+        doc.setDrawColor(232, 165, 75); // #E8A54B amber
+        doc.setLineWidth(1);
+        doc.line(14, 45, pageWidth - 14, 45);
+        
+        // Quote details (left)
         doc.setFontSize(10);
-        doc.text(customerName || 'N/A', 14, 62);
-        if (siteAddress) doc.text(siteAddress, 14, 68);
-        if (sitePostcode) doc.text(sitePostcode, 14, 74);
+        doc.setTextColor(0);
+        doc.text(`Quote Ref: ${quoteRef}`, 14, 54);
+        doc.text(`Date: ${new Date().toLocaleDateString('en-GB')}`, 14, 60);
+        if (expiryDate) {
+          doc.text(`Valid Until: ${new Date(expiryDate).toLocaleDateString('en-GB')}`, 14, 66);
+        }
+        doc.text(`Payment Terms: ${paymentTerms === 'Custom' ? customPaymentTerms : paymentTerms}`, 14, 72);
+        
+        // Client info (right)
+        doc.setFontSize(10);
+        doc.setTextColor(15, 43, 76);
+        doc.text('QUOTED TO:', pageWidth - 80, 54);
+        doc.setTextColor(0);
+        doc.text(customerName || 'N/A', pageWidth - 80, 60);
+        if (siteAddress) doc.text(siteAddress, pageWidth - 80, 66);
+        if (sitePostcode) doc.text(sitePostcode, pageWidth - 80, 72);
         
         // Line items table header
-        let y = 88;
+        let y = 85;
         doc.setFillColor(15, 43, 76);
         doc.rect(14, y - 5, pageWidth - 28, 8, 'F');
         doc.setTextColor(255);
-        doc.setFontSize(9);
+        doc.setFontSize(8);
         doc.text('Description', 16, y);
-        doc.text('Qty', 110, y);
+        doc.text('Qty', 100, y);
+        doc.text('Unit', 115, y);
         doc.text('Unit Cost', 130, y);
         doc.text('VAT', 155, y);
         doc.text('Amount', pageWidth - 16, y, { align: 'right' });
         
         // Line items
-        y += 10;
+        y += 8;
         doc.setTextColor(0);
-        lineItems.forEach((item) => {
-          if (y > 270) {
+        doc.setFontSize(9);
+        lineItems.forEach((item, index) => {
+          if (y > 250) {
             doc.addPage();
             y = 20;
           }
-          doc.text(item.description || 'Item', 16, y);
-          doc.text(String(item.quantity), 110, y);
+          // Alternating row background
+          if (index % 2 === 0) {
+            doc.setFillColor(248, 249, 250);
+            doc.rect(14, y - 4, pageWidth - 28, 7, 'F');
+          }
+          const typeLabel = item.type === 'material' ? '[M]' : item.type === 'labour' ? '[L]' : '[C]';
+          doc.text(`${typeLabel} ${item.description || 'Item'}`, 16, y);
+          doc.text(String(item.quantity), 100, y);
+          doc.text(item.unit || 'each', 115, y);
           doc.text(`£${item.unitCost.toFixed(2)}`, 130, y);
           doc.text(`${item.vatRate}%`, 155, y);
           doc.text(`£${item.amount.toFixed(2)}`, pageWidth - 16, y, { align: 'right' });
           y += 7;
         });
         
-        // Totals
-        y += 10;
+        // Totals section
+        y += 8;
         doc.setDrawColor(200);
-        doc.line(120, y - 5, pageWidth - 14, y - 5);
+        doc.line(120, y - 3, pageWidth - 14, y - 3);
         doc.setFontSize(10);
+        y += 4;
         doc.text('Subtotal:', 130, y);
         doc.text(`£${calculations.subtotal.toFixed(2)}`, pageWidth - 16, y, { align: 'right' });
-        y += 7;
-        doc.text('VAT:', 130, y);
-        doc.text(`£${calculations.totalVat.toFixed(2)}`, pageWidth - 16, y, { align: 'right' });
-        y += 7;
-        doc.setFontSize(12);
+        if (calculations.discountAmount > 0) {
+          y += 7;
+          doc.text('Discount:', 130, y);
+          doc.text(`-£${calculations.discountAmount.toFixed(2)}`, pageWidth - 16, y, { align: 'right' });
+        }
+        // VAT breakdown
+        Object.entries(calculations.vatBreakdown).forEach(([rate, data]: [string, any]) => {
+          if (data.amount > 0) {
+            y += 7;
+            doc.text(`VAT @ ${rate}%:`, 130, y);
+            doc.text(`£${data.amount.toFixed(2)}`, pageWidth - 16, y, { align: 'right' });
+          }
+        });
+        y += 10;
+        doc.setFontSize(13);
         doc.setTextColor(15, 43, 76);
         doc.text('TOTAL:', 130, y);
         doc.text(`£${calculations.grandTotal.toFixed(2)}`, pageWidth - 16, y, { align: 'right' });
         
-        // Payment terms
-        y += 15;
-        doc.setFontSize(9);
-        doc.setTextColor(100);
-        doc.text(`Payment Terms: ${paymentTerms}`, 14, y);
+        // Terms and Conditions
+        y += 18;
+        if (y > 200) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.setDrawColor(232, 165, 75);
+        doc.setLineWidth(0.5);
+        doc.line(14, y - 3, pageWidth - 14, y - 3);
+        y += 5;
+        doc.setFontSize(11);
+        doc.setTextColor(15, 43, 76);
+        doc.text('Terms & Conditions', 14, y);
+        y += 8;
+        doc.setFontSize(8);
+        doc.setTextColor(60);
+        
+        // Split terms into lines and render
+        const termsLines = termsText.split('\n');
+        termsLines.forEach((line) => {
+          if (y > pageHeight - 20) {
+            doc.addPage();
+            y = 20;
+          }
+          if (line.trim()) {
+            // Wrap long lines
+            const wrappedLines = doc.splitTextToSize(line, pageWidth - 28);
+            wrappedLines.forEach((wl: string) => {
+              doc.text(wl, 14, y);
+              y += 4.5;
+            });
+          } else {
+            y += 3;
+          }
+        });
+        
+        // Footer
+        const totalPages = doc.getNumberOfPages();
+        for (let i = 1; i <= totalPages; i++) {
+          doc.setPage(i);
+          doc.setFontSize(7);
+          doc.setTextColor(150);
+          doc.text(
+            `Adapt Services Group | Unit 2 Meadow View Industrial Estate, Ruckinge, Ashford, Kent, TN26 2NR | Page ${i} of ${totalPages}`,
+            pageWidth / 2, pageHeight - 8, { align: 'center' }
+          );
+        }
         
         // Save PDF
         doc.save(`${quoteRef}.pdf`);
