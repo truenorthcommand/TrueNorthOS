@@ -12,6 +12,7 @@ import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import Jobs from "@/pages/jobs";
 import JobDetail from "@/pages/job-detail";
+import CreateJob from "@/pages/create-job";
 import SignOff from "@/pages/sign-off";
 import Clients from "@/pages/clients";
 import ClientDetail from "@/pages/client-detail";
@@ -127,6 +128,7 @@ function AppRoutes() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/jobs" component={Jobs} />
+        <Route path="/jobs/new" component={CreateJob} />
         <Route path="/jobs/:id" component={JobDetail} />
         <Route path="/jobs/:id/sign-off" component={SignOff} />
         <Route path="/clients" component={Clients} />

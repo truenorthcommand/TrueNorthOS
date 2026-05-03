@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2, Pencil, Users, Loader2 } from "lucide-react";
+import { Search, Calendar, MapPin, User, ArrowRight, Camera, Signature, CheckCircle2, Pencil, Users, Loader2, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
@@ -99,7 +99,7 @@ export default function Jobs() {
   };
 
   const handleCreateJob = () => {
-    setLocation("/clients");
+    setLocation("/jobs/new");
   };
 
   return (
@@ -111,7 +111,12 @@ export default function Jobs() {
             {hasRole(user, 'admin') ? "Track all field operations and completion status" : "Track your assigned jobs"}
           </p>
         </div>
-        
+        {hasRole(user, 'admin') && (
+          <Button onClick={handleCreateJob} className="bg-[#0F2B4C] hover:bg-[#0F2B4C]/90">
+            <Plus className="w-4 h-4 mr-2" />
+            Create Job
+          </Button>
+        )}
       </div>
 
       <div className="flex items-center space-x-2 bg-card p-2 rounded-lg border shadow-sm">
