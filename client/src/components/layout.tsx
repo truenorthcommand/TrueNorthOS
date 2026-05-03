@@ -454,13 +454,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <>
               <NavLink href="/integrations" icon={Link2}>Integrations</NavLink>
               <NavLink href="/admin/advisors" icon={Bot}>Advisor Settings</NavLink>
-              <NavLink href="/subscription" icon={CreditCard}>Subscription & Billing</NavLink>
             </>
           )}
-          <NavLink href="/referrals" icon={Gift}>Referrals</NavLink>
           {user?.superAdmin && (
             <>
-              <NavLink href="/admin/merchants" icon={Handshake}>Merchant Partners</NavLink>
               <NavLink href="/settings" icon={Settings}>Business Settings</NavLink>
             </>
           )}
