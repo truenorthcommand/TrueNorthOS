@@ -529,6 +529,7 @@ export default function JobDetail() {
   }
 
   const isAdmin = hasRole(user, 'admin', 'works_manager');
+  const isEngineer = user?.role === 'engineer' && !hasRole(user, 'admin');
   const assignedEngineer = engineers.find(e => e.id === job.assignedToId);
 
   // --- Render functions ---
@@ -561,30 +562,52 @@ export default function JobDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Select value={job.status} onValueChange={handleStatusChange}>
-              <SelectTrigger className="w-[160px] h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.map(s => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="sm" onClick={handleGenerateQR}>
-              <QrCode className="h-4 w-4 mr-1" /> QR
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => window.print()}>
-              <Printer className="h-4 w-4 mr-1" /> Print
-            </Button>
-            <Button size="sm" onClick={handleSave} disabled={saving || !hasUnsavedChanges}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
-              Save
-            </Button>
-            {isAdmin && (
-              <Button variant="destructive" size="sm" onClick={() => setDeleteDialogOpen(true)}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
+            {isEngineer ? (
+              <>
+                {job.siteAddress && (
+                  <Button variant="outline" size="sm" onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.siteAddress)}`, '_blank')}>
+                    <Navigation className="h-4 w-4 mr-1" /> Navigate
+                  </Button>
+                )}
+                {(job.status === 'Ready' || job.status === 'Draft') && (
+                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => handleStatusChange('In Progress')}>
+                    <Play className="h-4 w-4 mr-1" /> Start Job
+                  </Button>
+                )}
+                {job.status === 'In Progress' && (
+                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => navigate(`/jobs/${job.id}/complete`)}>
+                    <CheckCircle2 className="h-4 w-4 mr-1" /> Complete Job
+                  </Button>
+                )}
+              </>
+            ) : (
+              <>
+                <Select value={job.status} onValueChange={handleStatusChange}>
+                  <SelectTrigger className="w-[160px] h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map(s => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" size="sm" onClick={handleGenerateQR}>
+                  <QrCode className="h-4 w-4 mr-1" /> QR
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => window.print()}>
+                  <Printer className="h-4 w-4 mr-1" /> Print
+                </Button>
+                <Button size="sm" onClick={handleSave} disabled={saving || !hasUnsavedChanges}>
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+                  Save
+                </Button>
+                {isAdmin && (
+                  <Button variant="destructive" size="sm" onClick={() => setDeleteDialogOpen(true)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -594,6 +617,13 @@ export default function JobDetail() {
 
   function renderTabDetails() {
     return (
+      <fieldset disabled={isEngineer} className={isEngineer ? 'opacity-75' : ''}>
+      {isEngineer && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+          <Shield className="h-4 w-4 text-amber-600" />
+          <span className="text-sm text-amber-700 font-medium">View Only — Contact your manager to make changes</span>
+        </div>
+      )}
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader><CardTitle className="text-base">Client & Site</CardTitle></CardHeader>
@@ -658,6 +688,7 @@ export default function JobDetail() {
           </CardContent>
         </Card>
       </div>
+      </fieldset>
     );
   }
 
