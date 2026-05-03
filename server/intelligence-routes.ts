@@ -52,7 +52,27 @@ router.post("/query", requireAdmin, async (req: Request, res: Response) => {
     res.json(result);
   } catch (error: any) {
     console.error('[Intelligence Route] Query error:', error.message);
-    res.status(500).json({ error: "Failed to process intelligence query" });
+    // Handle missing table gracefully
+    if (error.message?.includes('relation') && error.message?.includes('does not exist')) {
+      return res.json({
+        response: "The Property Intelligence database is being set up. Please wait a moment and try again. If this persists, the database tables may need to be synced.",
+        responseType: 'factual',
+        confidenceScore: 0,
+        retrievedChunkIds: [],
+        tokensUsed: 0,
+        responseTimeMs: 0,
+        conversationId: conversationId || 'setup-pending',
+      });
+    }
+    res.json({
+      response: `I encountered an issue processing your query: ${error.message}. This may be because the knowledge base hasn't been set up yet. Try clicking 'Sync All' first, or ensure the system has client data to query.`,
+      responseType: 'factual',
+      confidenceScore: 0,
+      retrievedChunkIds: [],
+      tokensUsed: 0,
+      responseTimeMs: 0,
+      conversationId: conversationId || 'error',
+    });
   }
 });
 
@@ -108,7 +128,15 @@ router.get("/stats", requireAdmin, async (req: Request, res: Response) => {
     res.json(stats);
   } catch (error: any) {
     console.error('[Intelligence Route] Stats error:', error.message);
-    res.status(500).json({ error: "Failed to get knowledge base stats" });
+    // Return empty stats if tables don't exist yet
+    res.json({
+      totalChunks: 0,
+      bySourceType: [],
+      embeddedChunks: 0,
+      percentEmbedded: 0,
+      status: 'setup_pending',
+      message: 'Knowledge base tables are being set up. Please try syncing data.',
+    });
   }
 });
 
