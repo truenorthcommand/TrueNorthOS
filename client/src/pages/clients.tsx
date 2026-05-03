@@ -2019,7 +2019,7 @@ export default function Clients() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setLocation(`/clients/${client.id}`);
+                            setLocation(`/app/clients/${client.id}`);
                           }}
                           className="h-8 w-8 p-0 shrink-0"
                           title="View Details"
