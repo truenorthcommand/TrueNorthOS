@@ -438,6 +438,25 @@ export const quoteTemplates = pgTable("quote_templates", {
 export type QuoteTemplate = typeof quoteTemplates.$inferSelect;
 export type InsertQuoteTemplate = typeof quoteTemplates.$inferInsert;
 
+// AI Pricing - Material Prices Learning Database
+export const materialPrices = pgTable("material_prices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  trade: text("trade").notNull(), // plumbing, electrical, tiling, etc.
+  category: text("category").notNull(), // materials, labour
+  itemName: text("item_name").notNull(),
+  unit: text("unit").notNull(), // m², metres, each, litres, hours, days
+  avgUnitCost: doublePrecision("avg_unit_cost").notNull(),
+  minUnitCost: doublePrecision("min_unit_cost"),
+  maxUnitCost: doublePrecision("max_unit_cost"),
+  wastagePercent: doublePrecision("wastage_percent").default(10),
+  dataPoints: integer("data_points").default(1), // how many quotes contributed
+  lastUpdated: timestamp("last_updated").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type MaterialPrice = typeof materialPrices.$inferSelect;
+export type InsertMaterialPrice = typeof materialPrices.$inferInsert;
+
 export type InvoiceStatus = 'Draft' | 'Sent' | 'Paid' | 'Overdue' | 'Cancelled';
 
 export const invoices = pgTable("invoices", {

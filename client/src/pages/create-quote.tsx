@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
+import { AIPricingWizard } from '@/components/ai-pricing-wizard';
 import {
   ArrowLeft,
   ArrowRight,
@@ -30,6 +31,7 @@ import {
   Building2,
   CheckCircle2,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 
 // Types
@@ -167,6 +169,7 @@ export default function CreateQuote() {
   const [lineItems, setLineItems] = useState<QuoteLineItem[]>([createEmptyLineItem()]);
   const [templates, setTemplates] = useState<QuoteTemplate[]>([]);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showAIWizard, setShowAIWizard] = useState(false);
 
   // Step 3: Pricing
   const [globalMarkup, setGlobalMarkup] = useState(0);
@@ -322,6 +325,37 @@ export default function CreateQuote() {
 
   const addLineItem = () => {
     setLineItems(prev => [...prev, createEmptyLineItem()]);
+  };
+
+  const handleAIImportItems = (items: Array<{
+    type: 'material' | 'labour' | 'custom';
+    description: string;
+    quantity: number;
+    unit: string;
+    unitCost: number;
+    markup: number;
+    discount: number;
+    vatRate: number;
+  }>) => {
+    const newItems: QuoteLineItem[] = items.map(item => ({
+      id: Math.random().toString(36).substr(2, 9),
+      type: item.type,
+      description: item.description,
+      quantity: item.quantity,
+      unit: item.unit,
+      unitCost: item.unitCost,
+      markup: item.markup || 0,
+      discount: item.discount || 0,
+      vatRate: item.vatRate,
+      amount: item.quantity * item.unitCost * (1 + (item.markup || 0) / 100) * (1 - (item.discount || 0) / 100),
+    }));
+    // Remove empty initial line items and add AI items
+    setLineItems(prev => {
+      const existingWithContent = prev.filter(i => i.description.trim() !== '');
+      return [...existingWithContent, ...newItems];
+    });
+    setShowAIWizard(false);
+    toast({ title: 'Items Imported', description: `${newItems.length} line items added from AI Pricing Wizard` });
   };
 
   const removeLineItem = (id: string) => {
@@ -845,6 +879,15 @@ export default function CreateQuote() {
           >
             <BookTemplate className="w-4 h-4 mr-1" />
             Load Template
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAIWizard(true)}
+            className="text-[#E8A54B] border-[#E8A54B] hover:bg-[#E8A54B]/10"
+          >
+            <Sparkles className="w-4 h-4 mr-1" />
+            AI Pricing Wizard
           </Button>
         </div>
       </CardHeader>
@@ -1478,6 +1521,7 @@ export default function CreateQuote() {
   };
 
   return (
+    <>
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-40">
@@ -1546,5 +1590,13 @@ export default function CreateQuote() {
         </div>
       </div>
     </div>
+
+      {/* AI Pricing Wizard Modal */}
+      <AIPricingWizard
+        open={showAIWizard}
+        onClose={() => setShowAIWizard(false)}
+        onImportItems={handleAIImportItems}
+      />
+    </>
   );
 }

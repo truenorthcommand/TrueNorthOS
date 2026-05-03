@@ -32,6 +32,24 @@ export async function runMigrations() {
       );
     `);
 
+    // Create material_prices table (AI learning database)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS material_prices (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        trade text NOT NULL,
+        category text NOT NULL,
+        item_name text NOT NULL,
+        unit text NOT NULL,
+        avg_unit_cost double precision NOT NULL,
+        min_unit_cost double precision,
+        max_unit_cost double precision,
+        wastage_percent double precision DEFAULT 10,
+        data_points integer DEFAULT 1,
+        last_updated timestamp DEFAULT now(),
+        created_at timestamp DEFAULT now()
+      );
+    `);
+
     console.log("Database migrations completed successfully");
   } catch (error) {
     console.error("Migration error (non-fatal):", error);

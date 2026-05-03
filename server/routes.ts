@@ -28,6 +28,7 @@ import { logAuditEvent, logFailedAction, createUserSession, endUserSession, upda
 import { ReferralService, FraudDetection, DiscountEngine } from "./referral-service";
 import intelligenceRoutes from "./intelligence-routes";
 import seedRoutes from "./seed-routes";
+import aiPricingRoutes from "./ai-pricing-routes";
 
 function getStripeClient(): Stripe | null {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -6819,6 +6820,9 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
   // Database Seeding (Admin Only)
   app.use('/api/seed', populateUserMiddleware, seedRoutes);
+
+  // AI Pricing Wizard
+  app.use('/api/ai', populateUserMiddleware, aiPricingRoutes);
 
   app.get("/api/files", requireAuth, async (req, res) => {
     try {
