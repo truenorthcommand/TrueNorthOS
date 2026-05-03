@@ -1994,11 +1994,7 @@ export default function Clients() {
               >
                 <CardHeader
                   className="pb-3 cursor-pointer hover:bg-muted"
-                  onClick={() =>
-                    setExpandedClientId(
-                      expandedClientId === client.id ? null : client.id
-                    )
-                  }
+                  onClick={() => setLocation(`/clients/${client.id}`)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-3 flex-1">
@@ -2019,7 +2015,7 @@ export default function Clients() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setLocation(`/app/clients/${client.id}`);
+                            setLocation(`/clients/${client.id}`);
                           }}
                           className="h-8 w-8 p-0 shrink-0"
                           title="View Details"
