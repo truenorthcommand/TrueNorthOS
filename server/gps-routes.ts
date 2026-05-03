@@ -140,4 +140,189 @@ router.post('/walkaround-complete', async (req: Request, res: Response) => {
   }
 });
 
+
+
+/**
+ * GET /api/gps/live-positions
+ * Get all engineers' latest GPS positions (admin only)
+ */
+router.get('/live-positions', async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const client = await pool.connect();
+    try {
+      const result = await client.query(`
+        SELECT DISTINCT ON (g.user_id)
+          g.user_id,
+          g.latitude,
+          g.longitude,
+          g.accuracy,
+          g.action,
+          g.job_id,
+          g.logged_at,
+          u.username as name,
+          u.full_name,
+          CASE
+            WHEN g.logged_at > now() - interval '5 minutes' THEN 'active'
+            WHEN g.logged_at > now() - interval '30 minutes' THEN 'idle'
+            ELSE 'offline'
+          END as status
+        FROM gps_logs g
+        JOIN users u ON u.id = g.user_id
+        WHERE u.role = 'engineer'
+        ORDER BY g.user_id, g.logged_at DESC
+      `);
+      res.json(result.rows);
+    } finally {
+      client.release();
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/gps/trail/:userId
+ * Get GPS trail for an engineer today (route visualization)
+ */
+router.get('/trail/:userId', async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { userId } = req.params;
+
+    const client = await pool.connect();
+    try {
+      const result = await client.query(`
+        SELECT latitude, longitude, action, job_id, logged_at
+        FROM gps_logs
+        WHERE user_id = $1 AND DATE(logged_at) = CURRENT_DATE
+        ORDER BY logged_at ASC
+      `, [userId]);
+      res.json(result.rows);
+    } finally {
+      client.release();
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/gps/stats
+ * Live map dashboard stats
+ */
+router.get('/stats', async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const client = await pool.connect();
+    try {
+      // Engineers with GPS today
+      const activeEngineers = await client.query(`
+        SELECT COUNT(DISTINCT user_id) as count
+        FROM gps_logs
+        WHERE DATE(logged_at) = CURRENT_DATE
+        AND logged_at > now() - interval '30 minutes'
+      `);
+
+      // Total engineers
+      const totalEngineers = await client.query(`
+        SELECT COUNT(*) as count FROM users WHERE role = 'engineer'
+      `);
+
+      // Jobs completed today
+      const jobsCompleted = await client.query(`
+        SELECT COUNT(*) as count FROM jobs
+        WHERE status IN ('Signed Off', 'Awaiting Signatures')
+        AND DATE(COALESCE(completed_at, updated_at)) = CURRENT_DATE
+      `);
+
+      // Total jobs today
+      const jobsToday = await client.query(`
+        SELECT COUNT(*) as count FROM jobs
+        WHERE DATE(scheduled_date) = CURRENT_DATE
+      `);
+
+      // Walkarounds completed today
+      const walkarounds = await client.query(`
+        SELECT COUNT(*) as count FROM walkaround_checks
+        WHERE DATE(completed_at) = CURRENT_DATE
+      `);
+
+      res.json({
+        engineersActive: parseInt(activeEngineers.rows[0]?.count || '0'),
+        engineersTotal: parseInt(totalEngineers.rows[0]?.count || '0'),
+        jobsCompleted: parseInt(jobsCompleted.rows[0]?.count || '0'),
+        jobsToday: parseInt(jobsToday.rows[0]?.count || '0'),
+        walkaroundsCompleted: parseInt(walkarounds.rows[0]?.count || '0'),
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/gps/geofence-check
+ * Check if engineer is within geofence radius of job site
+ */
+router.post('/geofence-check', async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { latitude, longitude, jobId, radiusMetres = 100 } = req.body;
+
+    const client = await pool.connect();
+    try {
+      // Get job location (if it has coordinates)
+      const jobResult = await client.query(
+        `SELECT site_lat, site_lng, site_address FROM jobs WHERE id = $1`,
+        [jobId]
+      );
+
+      if (!jobResult.rows[0]?.site_lat) {
+        return res.json({ withinGeofence: null, message: 'Job has no coordinates' });
+      }
+
+      const jobLat = jobResult.rows[0].site_lat;
+      const jobLng = jobResult.rows[0].site_lng;
+
+      // Haversine distance calculation
+      const R = 6371e3; // Earth radius in metres
+      const lat1 = latitude * Math.PI / 180;
+      const lat2 = jobLat * Math.PI / 180;
+      const dLat = (jobLat - latitude) * Math.PI / 180;
+      const dLng = (jobLng - longitude) * Math.PI / 180;
+
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1) * Math.cos(lat2) *
+                Math.sin(dLng/2) * Math.sin(dLng/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      const distance = R * c;
+
+      res.json({
+        withinGeofence: distance <= radiusMetres,
+        distanceMetres: Math.round(distance),
+        radiusMetres,
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;
