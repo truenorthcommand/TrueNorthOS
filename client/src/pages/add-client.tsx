@@ -915,15 +915,15 @@ export default function AddClient() {
   const renderStep = () => {
     switch (currentStep) {
       case 0:
-        return <Step1BasicInfo />;
+        return Step1BasicInfo();
       case 1:
-        return <Step2Properties />;
+        return Step2Properties();
       case 2:
-        return <Step3Contacts />;
+        return Step3Contacts();
       case 3:
-        return <Step4Settings />;
+        return Step4Settings();
       case 4:
-        return <Step5Review />;
+        return Step5Review();
       default:
         return null;
     }
@@ -957,7 +957,7 @@ export default function AddClient() {
 
       {/* Main Content */}
       <div className="max-w-3xl mx-auto px-4 py-6">
-        <ProgressIndicator />
+        {ProgressIndicator()}
 
         {/* Step Content */}
         <div className="mb-6">{renderStep()}</div>
