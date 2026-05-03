@@ -2473,7 +2473,42 @@ export async function registerRoutes(
 
   app.post("/api/clients", requireAdmin, async (req, res) => {
     try {
-      const client = await storage.createClient(req.body);
+      const { properties, contacts, enablePortal, notes, ...clientData } = req.body;
+      
+      // Include portal and notes in client data
+      if (enablePortal !== undefined) clientData.portalEnabled = enablePortal;
+      if (notes) clientData.notes = notes;
+      
+      const client = await storage.createClient(clientData);
+      
+      // Create associated properties
+      if (properties && Array.isArray(properties) && properties.length > 0) {
+        for (const prop of properties) {
+          await storage.createClientProperty({
+            clientId: client.id,
+            name: prop.name,
+            address: prop.address,
+            postcode: prop.postcode || null,
+            contactName: prop.contactName || null,
+            contactPhone: prop.contactPhone || null,
+            contactEmail: prop.contactEmail || null,
+          });
+        }
+      }
+      
+      // Create associated contacts
+      if (contacts && Array.isArray(contacts) && contacts.length > 0) {
+        for (const contact of contacts) {
+          await storage.createClientContact({
+            clientId: client.id,
+            name: contact.name,
+            email: contact.email || null,
+            phone: contact.phone || null,
+            role: contact.role || null,
+            isPrimary: contact.isPrimary || false,
+          });
+        }
+      }
       
       // Audit log: Client created
       const currentUser = await storage.getUser(req.session.userId!);
@@ -2487,8 +2522,8 @@ export async function registerRoutes(
           actionCategory: "client",
           entityType: "client",
           entityId: client.id,
-          description: `Created client: ${client.name}`,
-          changesAfter: { name: client.name, email: client.email, phone: client.phone, address: client.address },
+          description: `Created client: ${client.name}${properties?.length ? ` with ${properties.length} properties` : ''}${contacts?.length ? ` and ${contacts.length} contacts` : ''}`,
+          changesAfter: { name: client.name, email: client.email, phone: client.phone, address: client.address, propertiesCount: properties?.length || 0, contactsCount: contacts?.length || 0 },
           severity: "info",
         });
 
