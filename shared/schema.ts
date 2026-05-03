@@ -2241,3 +2241,56 @@ export const feedback = pgTable("feedback", {
 export const insertFeedbackSchema = createInsertSchema(feedback).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
 export type Feedback = typeof feedback.$inferSelect;
+
+// ============================================================
+// PROPERTY INTELLIGENCE SYSTEM
+// ============================================================
+
+// Knowledge chunks - stores embedded data per client/property
+export const knowledgeChunks = pgTable("knowledge_chunks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull(),
+  propertyId: varchar("property_id"),
+  sourceType: text("source_type").notNull(), // 'job', 'quote', 'invoice', 'message', 'certificate', 'note', 'form'
+  sourceId: varchar("source_id"),
+  content: text("content").notNull(),
+  metadata: jsonb("metadata").default({}),
+  embedding: jsonb("embedding"), // Float array stored as JSONB (1536 dimensions)
+  gdprClassification: text("gdpr_classification").default("operation"), // 'operation', 'tenant_pii', 'financial'
+  retentionUntil: timestamp("retention_until"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdBy: varchar("created_by"),
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by"),
+  deletionReason: text("deletion_reason"),
+});
+
+// Intelligence conversations - full audit trail
+export const intelligenceConversations = pgTable("intelligence_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull(), // groups turns
+  userId: varchar("user_id").notNull(),
+  clientId: varchar("client_id"),
+  propertyId: varchar("property_id"),
+  queryScope: text("query_scope").notNull().default("property"), // 'organization', 'client', 'property'
+  userQuery: text("user_query").notNull(),
+  aiResponse: text("ai_response").notNull(),
+  responseType: text("response_type").notNull().default("factual"), // 'factual', 'predictive', 'analytical'
+  confidenceScore: doublePrecision("confidence_score"),
+  retrievedChunkIds: jsonb("retrieved_chunk_ids").default([]),
+  tokensUsed: integer("tokens_used"),
+  costEstimate: doublePrecision("cost_estimate"),
+  responseTimeMs: integer("response_time_ms"),
+  ipAddress: text("ip_address"),
+  sessionId: text("session_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertKnowledgeChunkSchema = createInsertSchema(knowledgeChunks).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertKnowledgeChunk = z.infer<typeof insertKnowledgeChunkSchema>;
+export type KnowledgeChunk = typeof knowledgeChunks.$inferSelect;
+
+export const insertIntelligenceConversationSchema = createInsertSchema(intelligenceConversations).omit({ id: true, createdAt: true });
+export type InsertIntelligenceConversation = z.infer<typeof insertIntelligenceConversationSchema>;
+export type IntelligenceConversation = typeof intelligenceConversations.$inferSelect;

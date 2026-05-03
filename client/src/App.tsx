@@ -88,6 +88,7 @@ import AssetForm from "@/pages/asset-form";
 import MerchantPortal from "@/pages/merchant-portal";
 import AdminMerchants from "@/pages/admin-merchants";
 import AdminBlog from "@/pages/admin-blog";
+import PropertyIntelligence from "@/pages/property-intelligence";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -156,6 +157,7 @@ function AppRoutes() {
         <Route path="/invoices/:id" component={InvoiceDetail} />
         <Route path="/settings" component={Settings} />
         <Route path="/integrations" component={Integrations} />
+        <Route path="/intelligence" component={PropertyIntelligence} />
         <Route path="/security" component={Security} />
         <Route path="/messages" component={Messages} />
         <Route path="/fleet" component={Fleet} />
