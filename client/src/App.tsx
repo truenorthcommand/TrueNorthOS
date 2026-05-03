@@ -13,6 +13,7 @@ import Dashboard from "@/pages/dashboard";
 import Jobs from "@/pages/jobs";
 import JobDetail from "@/pages/job-detail";
 import CreateJob from "@/pages/create-job";
+import EngineerDashboard from "@/pages/engineer-dashboard";
 import SignOff from "@/pages/sign-off";
 import Clients from "@/pages/clients";
 import ClientDetail from "@/pages/client-detail";
@@ -127,6 +128,7 @@ function AppRoutes() {
     <AuthGate>
       <Switch>
         <Route path="/" component={Dashboard} />
+        <Route path="/my-day" component={EngineerDashboard} />
         <Route path="/jobs" component={Jobs} />
         <Route path="/jobs/new" component={CreateJob} />
         <Route path="/jobs/:id" component={JobDetail} />

@@ -262,6 +262,34 @@ export function Layout({ children }: { children: React.ReactNode }) {
         "flex flex-col gap-1 flex-1 overflow-y-auto",
         collapsed && "items-center"
       )}>
+        {/* Simplified Engineer Navigation */}
+        {user?.role === 'engineer' && !hasRole(user, 'admin') && !collapsed && (
+          <>
+            <NavLink href="/my-day" icon={Calendar}>My Day</NavLink>
+            <NavLink href="/jobs" icon={Briefcase}>My Jobs</NavLink>
+            <NavLink href="/timesheets" icon={Clock}>Timesheets</NavLink>
+            <NavLink href="/expenses" icon={Receipt}>Expenses</NavLink>
+            <NavLink href="/fleet/walkaround" icon={ClipboardCheck}>Walkaround</NavLink>
+            <NavLink href="/fleet" icon={Truck}>Fleet</NavLink>
+            <NavLink href="/ai-tools" icon={Sparkles}>AI Tools</NavLink>
+            <NavLink href="/voice-notes" icon={Mic}>Voice Notes</NavLink>
+            <NavLink href="/messages" icon={MessageCircle}>Messages</NavLink>
+          </>
+        )}
+        {user?.role === 'engineer' && !hasRole(user, 'admin') && collapsed && (
+          <>
+            <Tooltip><TooltipTrigger asChild><Link href="/my-day"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location === "/my-day" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Calendar className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">My Day</TooltipContent></Tooltip>
+            <Tooltip><TooltipTrigger asChild><Link href="/jobs"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location.startsWith("/jobs") ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Briefcase className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">My Jobs</TooltipContent></Tooltip>
+            <Tooltip><TooltipTrigger asChild><Link href="/timesheets"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location === "/timesheets" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Clock className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">Timesheets</TooltipContent></Tooltip>
+            <Tooltip><TooltipTrigger asChild><Link href="/expenses"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location === "/expenses" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Receipt className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">Expenses</TooltipContent></Tooltip>
+            <Tooltip><TooltipTrigger asChild><Link href="/fleet"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location.startsWith("/fleet") ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Truck className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">Fleet</TooltipContent></Tooltip>
+            <Tooltip><TooltipTrigger asChild><Link href="/ai-tools"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location === "/ai-tools" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Sparkles className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">AI Tools</TooltipContent></Tooltip>
+            <Tooltip><TooltipTrigger asChild><Link href="/messages"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location === "/messages" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><MessageCircle className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">Messages</TooltipContent></Tooltip>
+          </>
+        )}
+        {/* Full Admin/Surveyor Navigation - only show for non-engineers */}
+        {(user?.role !== 'engineer' || hasRole(user, 'admin')) && (
+        <>
         {collapsed ? (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -506,6 +534,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </Tooltip>
           )}
         </MenuGroup>
+        </>
+        )}
       </nav>
 
       <div className={cn("border-t border-border pt-2 mt-auto", collapsed && "flex flex-col items-center")}>
