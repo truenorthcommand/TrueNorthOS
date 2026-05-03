@@ -57,3 +57,5 @@ temp/
 # Archives
 *.tar.gz
 *.zip
+# Agent Zero secrets
+.a0proj/secrets.env

@@ -8,6 +8,7 @@ const router = Router();
 // ============================================================
 function requireSuperAdmin(req: Request, res: Response, next: any) {
   const user = (req as any).user;
+  console.log('[Seed] Auth check - user:', user ? `${user.name} (${user.role}, superAdmin: ${user.superAdmin})` : 'NO USER');
   if (!user) {
     return res.status(401).json({ error: "Authentication required" });
   }
