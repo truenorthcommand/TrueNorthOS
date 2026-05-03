@@ -24,7 +24,7 @@ import {
   ArrowLeft, Save, Trash2, Plus, MapPin, Calendar, Clock, User, Users,
   FileText, Image, Upload, X, Printer, AlertTriangle, Shield, CheckCircle2,
   XCircle, Loader2, ClipboardCheck, Sparkles, Edit, Package, Camera,
-  ChevronDown, File, FileSpreadsheet, ExternalLink, QrCode
+  ChevronDown, File, FileSpreadsheet, ExternalLink, QrCode, Navigation, Play, Square, Timer, MessageSquare
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
@@ -320,7 +320,35 @@ export default function JobDetail() {
   const handleStatusChange = async (newStatus: string) => {
     if (!job) return;
     try {
-      await updateJob(job.id, { status: newStatus as any });
+      const updates: any = { status: newStatus };
+      
+      // Auto time logging
+      if (newStatus === 'In Progress' && job.status !== 'In Progress') {
+        updates.startedAt = new Date().toISOString();
+        // Log time start via API
+        try {
+          await fetch(`/api/jobs/${job.id}/time-log`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ action: 'start', timestamp: new Date().toISOString() }),
+          });
+        } catch (e) { /* non-critical */ }
+      }
+      if ((newStatus === 'Signed Off' || newStatus === 'Awaiting Signatures') && job.status === 'In Progress') {
+        updates.completedAt = new Date().toISOString();
+        // Log time stop via API
+        try {
+          await fetch(`/api/jobs/${job.id}/time-log`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ action: 'stop', timestamp: new Date().toISOString() }),
+          });
+        } catch (e) { /* non-critical */ }
+      }
+      
+      await updateJob(job.id, updates);
       toast({ title: 'Status updated', description: `Job status changed to ${newStatus}.` });
     } catch (e: any) {
       toast({ title: 'Status update failed', description: e.message, variant: 'destructive' });
@@ -1162,6 +1190,75 @@ export default function JobDetail() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Quick Actions Sticky Bar - Mobile */}
+      {job && job.status !== 'Signed Off' && job.status !== 'Cancelled' && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-50 px-2 py-3 md:hidden safe-area-bottom">
+          <div className="flex items-center justify-around gap-1 max-w-md mx-auto">
+            {/* Navigate */}
+            {(job.siteAddress || job.sitePostcode) && (
+              <button
+                onClick={() => {
+                  const query = encodeURIComponent(`${job.siteAddress || ''}, ${job.sitePostcode || ''}`);
+                  window.open(`https://www.google.com/maps/dir/?api=1&destination=${query}`, '_blank');
+                }}
+                className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-blue-50 text-blue-600 min-w-[60px]"
+              >
+                <Navigation className="w-5 h-5" />
+                <span className="text-[10px] font-medium">Navigate</span>
+              </button>
+            )}
+            {/* Take Photo */}
+            <button
+              onClick={() => {
+                const input = document.querySelector('input[type="file"][accept*="image"]') as HTMLInputElement;
+                if (input) input.click();
+              }}
+              className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-amber-50 text-amber-600 min-w-[60px]"
+            >
+              <Camera className="w-5 h-5" />
+              <span className="text-[10px] font-medium">Photo</span>
+            </button>
+            {/* Add Note */}
+            <button
+              onClick={() => {
+                const notesTab = document.querySelector('[value="actions"]') as HTMLElement;
+                if (notesTab) notesTab.click();
+                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+              }}
+              className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-purple-50 text-purple-600 min-w-[60px]"
+            >
+              <MessageSquare className="w-5 h-5" />
+              <span className="text-[10px] font-medium">Note</span>
+            </button>
+            {/* Start/Complete Job */}
+            {job.status === 'Ready' || job.status === 'Draft' ? (
+              <button
+                onClick={() => handleStatusChange('In Progress')}
+                className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-green-50 text-green-600 min-w-[60px]"
+              >
+                <Play className="w-5 h-5" />
+                <span className="text-[10px] font-medium">Start</span>
+              </button>
+            ) : job.status === 'In Progress' ? (
+              <button
+                onClick={() => handleStatusChange('Awaiting Signatures')}
+                className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-emerald-50 text-emerald-600 min-w-[60px]"
+              >
+                <CheckCircle2 className="w-5 h-5" />
+                <span className="text-[10px] font-medium">Complete</span>
+              </button>
+            ) : null}
+            {/* Timer indicator */}
+            {job.status === 'In Progress' && (
+              <div className="flex flex-col items-center gap-1 px-3 py-2 text-blue-600 min-w-[60px]">
+                <Timer className="w-5 h-5 animate-pulse" />
+                <span className="text-[10px] font-medium">Timing</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

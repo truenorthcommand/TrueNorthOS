@@ -41,7 +41,18 @@ export default function Login() {
     const result = await login(username, password, requires2FA ? totpToken : undefined);
 
     if (result.success) {
-      setLocation("/app");
+      // Redirect based on user role
+      try {
+        const stored = localStorage.getItem('truenorth_user');
+        const userData = stored ? JSON.parse(stored) : null;
+        if (userData?.role === 'engineer' && !userData?.superAdmin) {
+          setLocation('/app/my-day');
+        } else {
+          setLocation('/app');
+        }
+      } catch {
+        setLocation('/app');
+      }
     } else if (result.requiresTwoFactor) {
       setRequires2FA(true);
       setTotpToken("");
