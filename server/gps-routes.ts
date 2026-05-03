@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { pool } from "./db";
+import { geocodeAddress, getDistanceMatrix } from "./geocoding";
 
 const router = Router();
 
@@ -319,6 +320,139 @@ router.post('/geofence-check', async (req: Request, res: Response) => {
       });
     } finally {
       client.release();
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+
+/**
+ * POST /api/gps/geocode-job
+ * Geocode a single job address and store coordinates
+ */
+router.post('/geocode-job', async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { jobId } = req.body;
+    const client = await pool.connect();
+    try {
+      const jobResult = await client.query(
+        `SELECT id, site_address, address FROM jobs WHERE id = $1`, [jobId]
+      );
+      if (!jobResult.rows[0]) {
+        return res.status(404).json({ error: 'Job not found' });
+      }
+
+      const address = jobResult.rows[0].site_address || jobResult.rows[0].address;
+      if (!address) {
+        return res.json({ success: false, message: 'No address to geocode' });
+      }
+
+      const result = await geocodeAddress(address);
+      if (result) {
+        await client.query(
+          `UPDATE jobs SET site_lat = $1, site_lng = $2 WHERE id = $3`,
+          [result.lat, result.lng, jobId]
+        );
+        return res.json({ success: true, lat: result.lat, lng: result.lng, formattedAddress: result.formattedAddress });
+      }
+
+      res.json({ success: false, message: 'Geocoding returned no results' });
+    } finally {
+      client.release();
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/gps/geocode-all-jobs
+ * Batch geocode all jobs without coordinates (admin only)
+ */
+router.post('/geocode-all-jobs', async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const client = await pool.connect();
+    try {
+      // Find jobs without coordinates that have addresses
+      const jobsResult = await client.query(`
+        SELECT id, site_address, address FROM jobs
+        WHERE site_lat IS NULL
+        AND (site_address IS NOT NULL AND site_address != '' OR address IS NOT NULL AND address != '')
+        LIMIT 50
+      `);
+
+      let geocoded = 0;
+      let failed = 0;
+
+      for (const job of jobsResult.rows) {
+        const address = job.site_address || job.address;
+        if (!address) { failed++; continue; }
+
+        const result = await geocodeAddress(address);
+        if (result) {
+          await client.query(
+            `UPDATE jobs SET site_lat = $1, site_lng = $2 WHERE id = $3`,
+            [result.lat, result.lng, job.id]
+          );
+          geocoded++;
+        } else {
+          failed++;
+        }
+
+        // Rate limit: 50ms between requests
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+
+      res.json({
+        success: true,
+        total: jobsResult.rows.length,
+        geocoded,
+        failed,
+        message: `Geocoded ${geocoded}/${jobsResult.rows.length} jobs`,
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/gps/distance
+ * Get distance/ETA from engineer to job site
+ */
+router.post('/distance', async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { engineerLat, engineerLng, destinations } = req.body;
+
+    if (!engineerLat || !engineerLng || !destinations?.length) {
+      return res.status(400).json({ error: 'Missing origin or destinations' });
+    }
+
+    const result = await getDistanceMatrix(
+      { lat: engineerLat, lng: engineerLng },
+      destinations
+    );
+
+    if (result) {
+      res.json({ success: true, distances: result });
+    } else {
+      res.json({ success: false, message: 'Distance calculation failed' });
     }
   } catch (error: any) {
     res.status(500).json({ error: error.message });

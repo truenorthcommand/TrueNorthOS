@@ -78,6 +78,11 @@ export async function runMigrations() {
       );
     `);
 
+    // Add site coordinates to jobs table for map display
+    await client.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS site_lat double precision;`);
+    await client.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS site_lng double precision;`);
+    await client.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS site_address text;`);
+
     console.log("Database migrations completed successfully");
   } catch (error) {
     console.error("Migration error (non-fatal):", error);
