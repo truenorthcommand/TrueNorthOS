@@ -2019,6 +2019,18 @@ export default function Clients() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
+                            setLocation(`/clients/${client.id}`);
+                          }}
+                          className="h-8 w-8 p-0 shrink-0"
+                          title="View Details"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setEditingClient(client);
                             setEditClientDialogOpen(true);
                           }}

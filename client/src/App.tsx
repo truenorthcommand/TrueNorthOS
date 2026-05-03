@@ -14,6 +14,7 @@ import Jobs from "@/pages/jobs";
 import JobDetail from "@/pages/job-detail";
 import SignOff from "@/pages/sign-off";
 import Clients from "@/pages/clients";
+import ClientDetail from "@/pages/client-detail";
 import Engineers from "@/pages/engineers";
 import CompletedJobs from "@/pages/completed-jobs";
 import Staff from "@/pages/staff";
@@ -126,7 +127,7 @@ function AppRoutes() {
         <Route path="/jobs/:id" component={JobDetail} />
         <Route path="/jobs/:id/sign-off" component={SignOff} />
         <Route path="/clients" component={Clients} />
-        <Route path="/clients/:id" component={Clients} />
+        <Route path="/clients/:id" component={ClientDetail} />
         <Route path="/create-job-sheet" component={Clients} />
         <Route path="/engineers" component={Engineers} />
         <Route path="/completed-jobs" component={CompletedJobs} />
