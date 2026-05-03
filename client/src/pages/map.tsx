@@ -315,7 +315,25 @@ export default function MapPage() {
   const [alerts, setAlerts] = useState<MapAlert[]>([]);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | undefined>(undefined);
 
-  // Access control
+  // Data fetching (must be before any conditional returns - React hooks rules)
+  const { data: positions, isLoading: positionsLoading, refetch: refetchPositions } = useQuery<GpsPosition[]>({
+    queryKey: ['/api/gps/live-positions'],
+    refetchInterval: 15000,
+    enabled: hasRole(user, 'admin', 'works_manager'),
+  });
+
+  const { data: stats, refetch: refetchStats } = useQuery<GpsStats>({
+    queryKey: ['/api/gps/stats'],
+    refetchInterval: 30000,
+    enabled: hasRole(user, 'admin', 'works_manager'),
+  });
+
+  const { data: jobs, isLoading: jobsLoading } = useQuery<any[]>({
+    queryKey: ['/api/jobs'],
+    enabled: hasRole(user, 'admin', 'works_manager'),
+  });
+
+  // Access control (AFTER all hooks)
   if (!hasRole(user, 'admin', 'works_manager')) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -335,20 +353,6 @@ export default function MapPage() {
     );
   }
 
-  // Data fetching
-  const { data: positions, isLoading: positionsLoading, refetch: refetchPositions } = useQuery<GpsPosition[]>({
-    queryKey: ['/api/gps/live-positions'],
-    refetchInterval: 15000,
-  });
-
-  const { data: stats, refetch: refetchStats } = useQuery<GpsStats>({
-    queryKey: ['/api/gps/stats'],
-    refetchInterval: 30000,
-  });
-
-  const { data: jobs, isLoading: jobsLoading } = useQuery<any[]>({
-    queryKey: ['/api/jobs'],
-  });
 
   // Filter today's jobs
   const todayJobs = useMemo(() => {
@@ -536,10 +540,10 @@ export default function MapPage() {
         isFullScreen ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-4'
       }`}>
         {/* Map Section */}
-        <div className={`relative ${isFullScreen ? 'col-span-1' : 'lg:col-span-3'}`}>
+        <div className={`relative h-full min-h-[400px] ${isFullScreen ? 'col-span-1' : 'lg:col-span-3'}`}>
           <LeafletMap
             markers={markers}
-            height="100%"
+            height="calc(100vh - 140px)"
             center={mapCenter}
             onMarkerClick={handleMarkerClick}
             showUserLocation={false}
