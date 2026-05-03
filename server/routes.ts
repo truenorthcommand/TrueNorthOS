@@ -6672,11 +6672,27 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
   registerSupportChatRoutes(app);
   registerPublicChatbotRoutes(app);
 
+  // Middleware to populate req.user from req.session.userId
+  // This is needed for routes that check (req as any).user instead of req.session.userId
+  const populateUserMiddleware = async (req: Request, res: Response, next: NextFunction) => {
+    if (req.session?.userId) {
+      try {
+        const user = await storage.getUser(req.session.userId);
+        if (user) {
+          (req as any).user = user;
+        }
+      } catch (error) {
+        console.error('[Middleware] Failed to populate user:', error);
+      }
+    }
+    next();
+  };
+
   // Property Intelligence System
-  app.use('/api/intelligence', intelligenceRoutes);
+  app.use('/api/intelligence', populateUserMiddleware, intelligenceRoutes);
 
   // Database Seeding (Admin Only)
-  app.use('/api/seed', seedRoutes);
+  app.use('/api/seed', populateUserMiddleware, seedRoutes);
 
   app.get("/api/files", requireAuth, async (req, res) => {
     try {
