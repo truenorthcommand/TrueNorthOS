@@ -309,7 +309,7 @@ function JobCard({
 
   return (
     <Card 
-      className="hover:shadow-lg transition-all cursor-pointer group border-l-4 overflow-hidden" 
+      className="tradify-job-card hover:shadow-lg transition-all cursor-pointer group border-l-4 overflow-hidden" 
       style={{ borderLeftColor: statusColor.includes('blue') ? 'rgb(59, 130, 246)' : statusColor.includes('amber') ? 'rgb(217, 119, 6)' : statusColor.includes('emerald') ? 'rgb(16, 185, 129)' : 'rgb(100, 116, 139)' }}
       onClick={handleCardClick}
       data-testid={`card-job-${job.id}`}

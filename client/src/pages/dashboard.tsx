@@ -356,7 +356,7 @@ function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation("/jobs")} data-testid="card-active-jobs">
+        <Card className="tradify-widget cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation("/jobs")} data-testid="card-active-jobs">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-500 rounded-lg">
@@ -370,7 +370,7 @@ function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation("/quotes")} data-testid="card-pending-quotes">
+        <Card className="tradify-widget cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation("/quotes")} data-testid="card-pending-quotes">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-amber-500 rounded-lg">
@@ -384,7 +384,7 @@ function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation("/invoices")} data-testid="card-unpaid-invoices">
+        <Card className="tradify-widget cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation("/invoices")} data-testid="card-unpaid-invoices">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-lg ${overdueInvoices.length > 0 ? 'bg-red-500' : 'bg-emerald-500'}`}>
@@ -398,7 +398,7 @@ function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation("/engineers")} data-testid="card-team">
+        <Card className="tradify-widget cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation("/engineers")} data-testid="card-team">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-purple-500 rounded-lg">
@@ -419,7 +419,7 @@ function AdminDashboard() {
       <ClockInOutCard />
 
       {totalUnpaidAmount > 0 && (
-        <Card className="border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800">
+        <Card className="tradify-card border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -441,7 +441,7 @@ function AdminDashboard() {
       )}
 
       <div className="grid md:grid-cols-2 gap-6">
-        <Card>
+        <Card className="tradify-card">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Calendar className="h-5 w-5 text-primary" />
