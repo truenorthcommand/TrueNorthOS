@@ -29,6 +29,7 @@ import { ReferralService, FraudDetection, DiscountEngine } from "./referral-serv
 import intelligenceRoutes from "./intelligence-routes";
 import seedRoutes from "./seed-routes";
 import aiPricingRoutes from "./ai-pricing-routes";
+import gpsRoutes from "./gps-routes";
 
 function getStripeClient(): Stripe | null {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -6823,6 +6824,9 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
   // AI Pricing Wizard
   app.use('/api/ai', populateUserMiddleware, aiPricingRoutes);
+
+  // GPS & Walkaround
+  app.use('/api/gps', populateUserMiddleware, gpsRoutes);
 
   app.get("/api/files", requireAuth, async (req, res) => {
     try {

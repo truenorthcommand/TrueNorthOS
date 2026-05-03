@@ -50,6 +50,34 @@ export async function runMigrations() {
       );
     `);
 
+    // Create gps_logs table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gps_logs (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id varchar NOT NULL,
+        latitude double precision NOT NULL,
+        longitude double precision NOT NULL,
+        accuracy double precision,
+        job_id varchar,
+        action text DEFAULT 'check-in',
+        logged_at timestamp DEFAULT now()
+      );
+    `);
+
+    // Create walkaround_checks table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS walkaround_checks (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id varchar NOT NULL,
+        checks jsonb DEFAULT '{}',
+        defects jsonb DEFAULT '[]',
+        vehicle_safe boolean DEFAULT true,
+        latitude double precision,
+        longitude double precision,
+        completed_at timestamp DEFAULT now()
+      );
+    `);
+
     console.log("Database migrations completed successfully");
   } catch (error) {
     console.error("Migration error (non-fatal):", error);

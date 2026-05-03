@@ -270,10 +270,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <NavLink href="/timesheets" icon={Clock}>Timesheets</NavLink>
             <NavLink href="/expenses" icon={Receipt}>Expenses</NavLink>
             <NavLink href="/fleet/walkaround" icon={ClipboardCheck}>Walkaround</NavLink>
-            <NavLink href="/fleet" icon={Truck}>Fleet</NavLink>
-            <NavLink href="/ai-tools" icon={Sparkles}>AI Tools</NavLink>
-            <NavLink href="/voice-notes" icon={Mic}>Voice Notes</NavLink>
-            <NavLink href="/messages" icon={MessageCircle}>Messages</NavLink>
           </>
         )}
         {user?.role === 'engineer' && !hasRole(user, 'admin') && collapsed && (
@@ -282,9 +278,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Tooltip><TooltipTrigger asChild><Link href="/jobs"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location.startsWith("/jobs") ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Briefcase className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">My Jobs</TooltipContent></Tooltip>
             <Tooltip><TooltipTrigger asChild><Link href="/timesheets"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location === "/timesheets" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Clock className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">Timesheets</TooltipContent></Tooltip>
             <Tooltip><TooltipTrigger asChild><Link href="/expenses"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location === "/expenses" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Receipt className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">Expenses</TooltipContent></Tooltip>
-            <Tooltip><TooltipTrigger asChild><Link href="/fleet"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location.startsWith("/fleet") ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Truck className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">Fleet</TooltipContent></Tooltip>
-            <Tooltip><TooltipTrigger asChild><Link href="/ai-tools"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location === "/ai-tools" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Sparkles className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">AI Tools</TooltipContent></Tooltip>
-            <Tooltip><TooltipTrigger asChild><Link href="/messages"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location === "/messages" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><MessageCircle className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">Messages</TooltipContent></Tooltip>
+            <Tooltip><TooltipTrigger asChild><Link href="/fleet/walkaround"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location === "/fleet/walkaround" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><ClipboardCheck className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">Walkaround</TooltipContent></Tooltip>
           </>
         )}
         {/* Full Admin/Surveyor Navigation - only show for non-engineers */}
