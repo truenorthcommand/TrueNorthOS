@@ -1,378 +1,564 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { useAuth } from '@/lib/auth';
-import { useStore } from '@/lib/store';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 import {
-  MapPin, Navigation, Clock, Calendar, Receipt, Mic,
-  ChevronDown, ChevronRight, Play, Loader2, Car
+  Calendar, Clock, MapPin, Navigation, Play, CheckCircle2, Car, Sun, Moon,
+  Briefcase, Receipt, ClipboardCheck, AlertTriangle, Loader2, Timer
 } from 'lucide-react';
-import { format, isToday, addDays, startOfDay, isSameDay } from 'date-fns';
-import { Job } from '@/lib/types';
+import { format } from 'date-fns';
+
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function getOrdinalSuffix(day: number): string {
+  if (day > 3 && day < 21) return 'th';
+  switch (day % 10) {
+    case 1: return 'st';
+    case 2: return 'nd';
+    case 3: return 'rd';
+    default: return 'th';
+  }
+}
+
+function formatDateNice(date: Date): string {
+  const dayName = format(date, 'EEEE');
+  const day = date.getDate();
+  const month = format(date, 'MMMM');
+  const year = date.getFullYear();
+  return `${dayName} ${day}${getOrdinalSuffix(day)} ${month} ${year}`;
+}
+
+function formatElapsed(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+function getPriorityColor(priority: string): string {
+  switch (priority?.toLowerCase()) {
+    case 'low': return 'border-green-500';
+    case 'medium': return 'border-amber-500';
+    case 'high': return 'border-orange-500';
+    case 'emergency': return 'border-red-500';
+    default: return 'border-gray-300';
+  }
+}
+
+function getPriorityBadgeVariant(priority: string): string {
+  switch (priority?.toLowerCase()) {
+    case 'low': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+    case 'medium': return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200';
+    case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
+    case 'emergency': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+    default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
+  }
+}
+
+function getStatusBadge(status: string): { label: string; className: string } {
+  switch (status) {
+    case 'In Progress':
+      return { label: 'In Progress', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' };
+    case 'Completed':
+      return { label: 'Completed', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' };
+    default:
+      return { label: 'Ready', className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200' };
+  }
+}
+
+function getTimeBadge(job: any): string {
+  if (job.isFullDay) return 'Full Day';
+  const hour = new Date(job.scheduledDate).getHours();
+  return hour < 12 ? 'AM' : 'PM';
+}
 
 export default function EngineerDashboard() {
-  const [, setLocation] = useLocation();
-  const { user } = useAuth();
-  const { jobs, isLoading } = useStore();
-  const [weekExpanded, setWeekExpanded] = useState(false);
+  const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  const todayFormatted = format(new Date(), 'EEEE d MMMM yyyy');
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem('engineer-dark-mode') === 'true';
+  });
+  const [elapsed, setElapsed] = useState(0);
+  const [showEndDay, setShowEndDay] = useState(false);
+  const [startingJob, setStartingJob] = useState<string | null>(null);
 
-  const todayJobs = useMemo(() => {
-    if (!user) return [];
-    return jobs.filter((job) => {
-      if (!job.date) return false;
-      const jobDate = new Date(job.date);
-      if (!isToday(jobDate)) return false;
-      return (
-        job.assignedToId === user.id ||
-        (job.assignedToIds || []).includes(user.id)
-      );
-    }).sort((a, b) => {
-      const sessionOrder: Record<string, number> = { 'AM': 0, 'Full Day': 1, 'PM': 2 };
-      const aOrder = sessionOrder[a.session || ''] ?? 1;
-      const bOrder = sessionOrder[b.session || ''] ?? 1;
-      if (aOrder !== bOrder) return aOrder - bOrder;
-      return (a.orderIndex || 0) - (b.orderIndex || 0);
-    });
-  }, [jobs, user]);
+  const toggleDarkMode = () => {
+    const newMode = !darkMode;
+    setDarkMode(newMode);
+    localStorage.setItem('engineer-dark-mode', newMode.toString());
+    if (newMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
 
-  const completedCount = todayJobs.filter(j => j.status === 'Signed Off').length;
-  const pendingCount = todayJobs.filter(j => j.status !== 'Signed Off').length;
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
 
-  const nextJob = useMemo(() => {
-    return todayJobs.find(j => j.status === 'Ready' || j.status === 'In Progress') || null;
-  }, [todayJobs]);
+  const { data: user } = useQuery({
+    queryKey: ['/api/auth/me'],
+  });
 
-  const weekJobs = useMemo(() => {
-    if (!user) return [];
-    const today = startOfDay(new Date());
-    const days: { date: Date; jobs: Job[] }[] = [];
-    for (let i = 1; i <= 7; i++) {
-      const day = addDays(today, i);
-      const dayJobs = jobs.filter((job) => {
-        if (!job.date) return false;
-        return (
-          isSameDay(new Date(job.date), day) &&
-          (job.assignedToId === user.id || (job.assignedToIds || []).includes(user.id))
-        );
+  const { data: walkaroundStatus, isLoading: walkaroundLoading } = useQuery({
+    queryKey: ['/api/gps/walkaround-status'],
+  });
+
+  const { data: jobs, isLoading: jobsLoading } = useQuery({
+    queryKey: ['/api/jobs'],
+  });
+
+  const todayJobs = (jobs as any[])?.filter((j: any) => {
+    const jobDate = new Date(j.scheduledDate).toDateString();
+    const today = new Date().toDateString();
+    return jobDate === today;
+  })?.sort((a: any, b: any) => {
+    return new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime();
+  }) || [];
+
+  const activeJob = todayJobs.find((j: any) => j.status === 'In Progress');
+  const completedJobs = todayJobs.filter((j: any) => j.status === 'Completed');
+  const remainingJobs = todayJobs.filter((j: any) => j.status !== 'Completed' && j.status !== 'In Progress');
+
+  useEffect(() => {
+    if (!activeJob?.startedAt) {
+      setElapsed(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      const start = new Date(activeJob.startedAt).getTime();
+      setElapsed(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [activeJob?.startedAt]);
+
+  const handleStartJob = async (jobId: string) => {
+    setStartingJob(jobId);
+    try {
+      try {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+        });
+        await fetch('/api/gps/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+            jobId,
+            action: 'job-start',
+          }),
+        });
+      } catch {
+        // GPS not available, continue anyway
+      }
+
+      const res = await fetch(`/api/jobs/${jobId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: 'In Progress', startedAt: new Date().toISOString() }),
       });
-      days.push({ date: day, jobs: dayJobs });
-    }
-    return days;
-  }, [jobs, user]);
 
-  const handleNavigate = (address: string, postcode: string) => {
-    const query = encodeURIComponent(`${address}, ${postcode}`);
-    window.open(`https://www.google.com/maps/dir/?api=1&destination=${query}`, '_blank');
-  };
+      if (!res.ok) throw new Error('Failed to start job');
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Ready': return 'bg-purple-100 text-purple-700 border-purple-200';
-      case 'In Progress': return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'Signed Off': return 'bg-green-100 text-green-700 border-green-200';
-      case 'Awaiting Signatures': return 'bg-amber-100 text-amber-700 border-amber-200';
-      default: return 'bg-gray-100 text-gray-700 border-gray-200';
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      toast({ title: 'Job Started', description: 'Timer is now running.' });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to start job', variant: 'destructive' });
+    } finally {
+      setStartingJob(null);
     }
   };
 
-  const getSessionBadge = (session: string | null) => {
-    switch (session) {
-      case 'AM': return 'bg-sky-100 text-sky-700';
-      case 'PM': return 'bg-indigo-100 text-indigo-700';
-      case 'Full Day': return 'bg-violet-100 text-violet-700';
-      default: return 'bg-gray-100 text-gray-600';
-    }
+  const handleNavigate = (address: string) => {
+    const encoded = encodeURIComponent(address);
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`, '_blank');
   };
 
-  function renderHeader() {
-    return (
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-[#0F2B4C]">
-            {greeting}, {user?.name?.split(' ')[0] || 'Engineer'}
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">{todayFormatted}</p>
-        </div>
-        <img
-          src="/logo.png"
-          alt="ASG"
-          className="w-10 h-10 rounded-lg object-contain"
-        />
-      </div>
-    );
-  }
+  const walkaroundCompleted = (walkaroundStatus as any)?.completedToday === true;
+  const firstName = (user as any)?.firstName || (user as any)?.name?.split(' ')[0] || 'Engineer';
 
-  function renderStatusCards() {
+  if (walkaroundLoading || jobsLoading) {
     return (
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        <Card className="shadow-sm border-0 bg-white">
-          <CardContent className="p-3 text-center">
-            <div className="flex items-center justify-center mb-1">
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                <span className="text-sm font-bold text-blue-700">{todayJobs.length}</span>
-              </div>
-            </div>
-            <p className="text-xs text-gray-500 font-medium">Today's Jobs</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-0 bg-white">
-          <CardContent className="p-3 text-center">
-            <div className="flex items-center justify-center mb-1">
-              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                <span className="text-sm font-bold text-green-700">{completedCount}</span>
-              </div>
-            </div>
-            <p className="text-xs text-gray-500 font-medium">Completed</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-0 bg-white">
-          <CardContent className="p-3 text-center">
-            <div className="flex items-center justify-center mb-1">
-              <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
-                <span className="text-sm font-bold text-amber-700">{pendingCount}</span>
-              </div>
-            </div>
-            <p className="text-xs text-gray-500 font-medium">Pending</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  function renderNextJob() {
-    if (!nextJob) return null;
-    return (
-      <div className="mb-6">
-        <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">Next Job</h2>
-        <Card className="shadow-md border-0 border-l-4 border-l-[#E8A54B] bg-white overflow-hidden">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between mb-2">
-              <h3 className="text-lg font-bold text-[#0F2B4C] leading-tight">
-                {nextJob.customerName || nextJob.client || 'Unnamed Client'}
-              </h3>
-              {nextJob.session && (
-                <Badge className={`${getSessionBadge(nextJob.session)} text-xs font-medium border-0 ml-2 shrink-0`}>
-                  {nextJob.session}
-                </Badge>
-              )}
-            </div>
-            {nextJob.address && (
-              <div className="flex items-start gap-1.5 mb-2">
-                <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
-                <p className="text-sm text-gray-600">
-                  {nextJob.address}{nextJob.postcode ? `, ${nextJob.postcode}` : ''}
-                </p>
-              </div>
-            )}
-            {nextJob.description && (
-              <p className="text-sm text-gray-500 mb-3 line-clamp-2">{nextJob.description}</p>
-            )}
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge className={`${getStatusColor(nextJob.status)} text-xs border`}>
-                {nextJob.status}
-              </Badge>
-            </div>
-            <div className="flex gap-2 mt-4">
-              {nextJob.address && (
-                <Button
-                  size="sm"
-                  className="bg-blue-600 hover:bg-blue-700 text-white flex-1 h-11"
-                  onClick={() => handleNavigate(nextJob.address || '', nextJob.postcode || '')}
-                >
-                  <Navigation className="w-4 h-4 mr-1.5" />
-                  Navigate
-                </Button>
-              )}
-              <Button
-                size="sm"
-                className="bg-green-600 hover:bg-green-700 text-white flex-1 h-11"
-                onClick={() => setLocation(`/jobs/${nextJob.id}`)}
-              >
-                <Play className="w-4 h-4 mr-1.5" />
-                Start Job
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-gray-300 text-gray-700 h-11"
-                onClick={() => setLocation(`/jobs/${nextJob.id}`)}
-              >
-                Details
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  function renderTodaySchedule() {
-    return (
-      <div className="mb-6">
-        <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">Today's Schedule</h2>
-        {todayJobs.length === 0 ? (
-          <Card className="shadow-sm border-0 bg-white">
-            <CardContent className="p-8 text-center">
-              <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 font-medium">No jobs scheduled for today</p>
-              <p className="text-sm text-gray-400 mt-1">Enjoy your day off!</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {todayJobs.map((job) => (
-              <Card
-                key={job.id}
-                className="shadow-sm border-0 bg-white cursor-pointer hover:shadow-md transition-shadow active:scale-[0.99]"
-                onClick={() => setLocation(`/jobs/${job.id}`)}
-              >
-                <CardContent className="p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        {job.session && (
-                          <Badge className={`${getSessionBadge(job.session)} text-[10px] font-medium border-0 px-1.5 py-0`}>
-                            {job.session}
-                          </Badge>
-                        )}
-                        <span className="text-sm font-semibold text-[#0F2B4C] truncate">
-                          {job.customerName || job.client || 'Unnamed'}
-                        </span>
-                      </div>
-                      {job.address && (
-                        <p className="text-xs text-gray-500 truncate">
-                          {job.address}{job.postcode ? `, ${job.postcode}` : ''}
-                        </p>
-                      )}
-                    </div>
-                    <Badge className={`${getStatusColor(job.status)} text-[10px] border ml-2 shrink-0`}>
-                      {job.status === 'Awaiting Signatures' ? 'Awaiting' : job.status}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function renderQuickActions() {
-    const actions = [
-      { icon: Car, label: 'Start Walkaround', path: '/fleet/walkaround', color: 'text-blue-600 bg-blue-50' },
-      { icon: Clock, label: 'Log Time', path: '/timesheets', color: 'text-purple-600 bg-purple-50' },
-      { icon: Receipt, label: 'Submit Expense', path: '/expenses', color: 'text-green-600 bg-green-50' },
-      { icon: Mic, label: 'Voice Note', path: '/voice-notes', color: 'text-amber-600 bg-amber-50' },
-    ];
-
-    return (
-      <div className="mb-6">
-        <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">Quick Actions</h2>
-        <div className="grid grid-cols-2 gap-3">
-          {actions.map((action) => (
-            <Card
-              key={action.path}
-              className="shadow-sm border-0 bg-white cursor-pointer hover:shadow-md transition-shadow active:scale-[0.97]"
-              onClick={() => setLocation(action.path)}
-            >
-              <CardContent className="p-4 flex flex-col items-center justify-center text-center min-h-[88px]">
-                <div className={`w-10 h-10 rounded-xl ${action.color} flex items-center justify-center mb-2`}>
-                  <action.icon className="w-5 h-5" />
-                </div>
-                <span className="text-xs font-medium text-gray-700">{action.label}</span>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  function renderWeekPreview() {
-    return (
-      <div className="mb-6">
-        <button
-          className="flex items-center justify-between w-full text-left mb-2"
-          onClick={() => setWeekExpanded(!weekExpanded)}
-        >
-          <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">This Week</h2>
-          {weekExpanded ? (
-            <ChevronDown className="w-4 h-4 text-gray-400" />
-          ) : (
-            <ChevronRight className="w-4 h-4 text-gray-400" />
-          )}
-        </button>
-        {weekExpanded && (
-          <div className="space-y-2">
-            {weekJobs.map(({ date, jobs: dayJobs }) => (
-              <Card key={date.toISOString()} className="shadow-sm border-0 bg-white">
-                <CardContent className="p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-[#0F2B4C]">
-                        {format(date, 'EEEE d MMM')}
-                      </p>
-                      {dayJobs.length > 0 ? (
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {dayJobs[0].customerName || dayJobs[0].client || 'Job'}
-                          {dayJobs.length > 1 && ` +${dayJobs.length - 1} more`}
-                        </p>
-                      ) : (
-                        <p className="text-xs text-gray-400 mt-0.5">No jobs</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {dayJobs.length > 0 && (
-                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
-                          <span className="text-xs font-bold text-blue-700">{dayJobs.length}</span>
-                        </div>
-                      )}
-                      <ChevronRight className="w-4 h-4 text-gray-300" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function renderLoading() {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#E8A54B] mx-auto mb-3" />
-          <p className="text-sm text-gray-500">Loading your schedule...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-[#E8A54B] mx-auto mb-3" />
+          <p className="text-gray-600 dark:text-gray-400">Loading your day...</p>
         </div>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 px-4 pt-6 pb-24">
-        {renderLoading()}
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 pt-6 pb-24">
-      {renderHeader()}
-      {renderStatusCards()}
-      {renderNextJob()}
-      {renderTodaySchedule()}
-      {renderQuickActions()}
-      {renderWeekPreview()}
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-[#0F2B4C] dark:text-white">
+              {getGreeting()}, {firstName}
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {formatDateNice(new Date())}
+            </p>
+          </div>
+          <button
+            onClick={toggleDarkMode}
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            aria-label="Toggle dark mode"
+          >
+            {darkMode ? <Sun className="h-5 w-5 text-amber-400" /> : <Moon className="h-5 w-5 text-gray-600" />}
+          </button>
+        </div>
+      </div>
+
+      {/* State 1: Walkaround Required */}
+      {!walkaroundCompleted && (
+        <div className="p-4 flex items-center justify-center min-h-[calc(100vh-80px)]">
+          <Card className="w-full max-w-md text-center shadow-lg border-amber-200 dark:border-amber-800">
+            <CardContent className="pt-8 pb-8 px-6">
+              <div className="w-20 h-20 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-6">
+                <Car className="h-10 w-10 text-[#E8A54B]" />
+              </div>
+              <h2 className="text-2xl font-bold text-[#0F2B4C] dark:text-white mb-2">
+                Start Your Day
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                Complete your vehicle walkaround check before starting work.
+              </p>
+              <Button
+                onClick={() => navigate('/walkaround')}
+                className="w-full h-14 text-lg font-semibold bg-[#E8A54B] hover:bg-[#d4943d] text-white rounded-xl shadow-md"
+              >
+                <Car className="h-5 w-5 mr-2" />
+                Start Walkaround
+              </Button>
+              <div className="mt-6 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+                <span className="flex items-center gap-1">
+                  <Clock className="h-4 w-4" />
+                  {format(new Date(), 'HH:mm')}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Briefcase className="h-4 w-4" />
+                  {todayJobs.length} job{todayJobs.length !== 1 ? 's' : ''} scheduled
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* State 2: Day Active */}
+      {walkaroundCompleted && (
+        <div className="p-4 space-y-4">
+          {/* Active Job Timer */}
+          {activeJob && (
+            <Card className="border-2 border-green-400 dark:border-green-600 shadow-lg shadow-green-100 dark:shadow-green-900/20">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                  </span>
+                  <span className="text-sm font-medium text-green-700 dark:text-green-400 uppercase tracking-wide">
+                    In Progress
+                  </span>
+                </div>
+                <h3 className="font-bold text-lg text-[#0F2B4C] dark:text-white truncate">
+                  {activeJob.title || activeJob.jobNumber || 'Active Job'}
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 truncate mb-3">
+                  {activeJob.clientName || activeJob.client?.name || 'Client'}
+                </p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Timer className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    <span className="text-2xl font-mono font-bold text-[#0F2B4C] dark:text-white">
+                      {formatElapsed(elapsed)}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    {activeJob.siteAddress && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleNavigate(activeJob.siteAddress)}
+                        className="h-10"
+                      >
+                        <Navigation className="h-4 w-4 mr-1" />
+                        Navigate
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      onClick={() => navigate(`/jobs/${activeJob.id}/complete`)}
+                      className="h-10 bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-1" />
+                      Complete
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Status Cards Row */}
+          <div className="grid grid-cols-3 gap-3">
+            <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800">
+              <CardContent className="p-3 text-center">
+                <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{todayJobs.length}</p>
+                <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">Today's Jobs</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-green-50 dark:bg-green-900/20 border-green-100 dark:border-green-800">
+              <CardContent className="p-3 text-center">
+                <p className="text-2xl font-bold text-green-700 dark:text-green-300">{completedJobs.length}</p>
+                <p className="text-xs text-green-600 dark:text-green-400 font-medium">Completed</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800">
+              <CardContent className="p-3 text-center">
+                <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{remainingJobs.length}</p>
+                <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">Remaining</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Today's Schedule */}
+          <div>
+            <h2 className="text-lg font-bold text-[#0F2B4C] dark:text-white mb-3 flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Today's Schedule
+            </h2>
+            {todayJobs.length === 0 && (
+              <Card className="border-dashed">
+                <CardContent className="p-6 text-center">
+                  <Briefcase className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500 dark:text-gray-400">No jobs scheduled for today.</p>
+                </CardContent>
+              </Card>
+            )}
+            <div className="space-y-3">
+              {todayJobs.map((job: any) => {
+                const statusInfo = getStatusBadge(job.status);
+                const isStarting = startingJob === String(job.id);
+                return (
+                  <Card
+                    key={job.id}
+                    className={`border-l-4 ${getPriorityColor(job.priority)} ${job.status === 'Completed' ? 'opacity-60' : ''}`}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="text-xs font-medium">
+                            {getTimeBadge(job)}
+                          </Badge>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusInfo.className}`}>
+                            {statusInfo.label}
+                          </span>
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getPriorityBadgeVariant(job.priority)}`}>
+                          {job.priority || 'Normal'}
+                        </span>
+                      </div>
+                      <h3 className="font-semibold text-[#0F2B4C] dark:text-white truncate">
+                        {job.clientName || job.client?.name || 'Client'}
+                      </h3>
+                      {(job.siteAddress || job.address) && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate flex items-center gap-1 mt-1">
+                          <MapPin className="h-3 w-3 flex-shrink-0" />
+                          {job.siteAddress || job.address}
+                        </p>
+                      )}
+                      {job.title && (
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 truncate">
+                          {job.title}
+                        </p>
+                      )}
+                      <div className="flex gap-2 mt-3">
+                        {(job.siteAddress || job.address) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleNavigate(job.siteAddress || job.address)}
+                            className="h-10 flex-1"
+                          >
+                            <Navigation className="h-4 w-4 mr-1" />
+                            Navigate
+                          </Button>
+                        )}
+                        {job.status !== 'Completed' && job.status !== 'In Progress' && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleStartJob(String(job.id))}
+                            disabled={isStarting || !!activeJob}
+                            className="h-10 flex-1 bg-[#0F2B4C] hover:bg-[#1a3d66] text-white"
+                          >
+                            {isStarting ? (
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            ) : (
+                              <Play className="h-4 w-4 mr-1" />
+                            )}
+                            Start
+                          </Button>
+                        )}
+                        {job.status === 'In Progress' && (
+                          <Button
+                            size="sm"
+                            onClick={() => navigate(`/jobs/${job.id}/complete`)}
+                            className="h-10 flex-1 bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            <CheckCircle2 className="h-4 w-4 mr-1" />
+                            Complete
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Quick Actions Grid */}
+          <div>
+            <h2 className="text-lg font-bold text-[#0F2B4C] dark:text-white mb-3">Quick Actions</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <Card
+                className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
+                onClick={() => navigate('/walkaround')}
+              >
+                <CardContent className="p-4 flex flex-col items-center justify-center text-center h-24">
+                  <ClipboardCheck className="h-6 w-6 text-[#E8A54B] mb-2" />
+                  <span className="text-sm font-medium text-[#0F2B4C] dark:text-white">Walkaround</span>
+                </CardContent>
+              </Card>
+              <Card
+                className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
+                onClick={() => navigate('/timesheets')}
+              >
+                <CardContent className="p-4 flex flex-col items-center justify-center text-center h-24">
+                  <Clock className="h-6 w-6 text-[#E8A54B] mb-2" />
+                  <span className="text-sm font-medium text-[#0F2B4C] dark:text-white">Log Time</span>
+                </CardContent>
+              </Card>
+              <Card
+                className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
+                onClick={() => navigate('/expense/new')}
+              >
+                <CardContent className="p-4 flex flex-col items-center justify-center text-center h-24">
+                  <Receipt className="h-6 w-6 text-[#E8A54B] mb-2" />
+                  <span className="text-sm font-medium text-[#0F2B4C] dark:text-white">Expense</span>
+                </CardContent>
+              </Card>
+              <Card
+                className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
+                onClick={() => navigate('/jobs')}
+              >
+                <CardContent className="p-4 flex flex-col items-center justify-center text-center h-24">
+                  <Briefcase className="h-6 w-6 text-[#E8A54B] mb-2" />
+                  <span className="text-sm font-medium text-[#0F2B4C] dark:text-white">View All Jobs</span>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* End Day Section */}
+          <div className="mt-6">
+            {!showEndDay ? (
+              <Button
+                onClick={() => setShowEndDay(true)}
+                variant="outline"
+                className="w-full h-12 border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+              >
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                End Day
+              </Button>
+            ) : (
+              <Card className="border-red-200 dark:border-red-800">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg text-[#0F2B4C] dark:text-white">Timesheet Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {completedJobs.length === 0 && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No completed jobs today.</p>
+                  )}
+                  {completedJobs.map((job: any) => {
+                    const startTime = job.startedAt ? new Date(job.startedAt) : null;
+                    const endTime = job.completedAt ? new Date(job.completedAt) : null;
+                    let hours = 0;
+                    if (startTime && endTime) {
+                      hours = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
+                    }
+                    return (
+                      <div key={job.id} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                        <div>
+                          <p className="text-sm font-medium text-[#0F2B4C] dark:text-white truncate max-w-[200px]">
+                            {job.title || job.clientName || job.client?.name || 'Job'}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {startTime ? format(startTime, 'HH:mm') : '--:--'} - {endTime ? format(endTime, 'HH:mm') : '--:--'}
+                          </p>
+                        </div>
+                        <span className="text-sm font-semibold text-[#0F2B4C] dark:text-white">
+                          {hours.toFixed(1)}h
+                        </span>
+                      </div>
+                    );
+                  })}
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-600">
+                    <span className="font-semibold text-[#0F2B4C] dark:text-white">Total Hours</span>
+                    <span className="font-bold text-lg text-[#0F2B4C] dark:text-white">
+                      {completedJobs.reduce((total: number, job: any) => {
+                        const startTime = job.startedAt ? new Date(job.startedAt).getTime() : 0;
+                        const endTime = job.completedAt ? new Date(job.completedAt).getTime() : 0;
+                        return total + (startTime && endTime ? (endTime - startTime) / (1000 * 60 * 60) : 0);
+                      }, 0).toFixed(1)}h
+                    </span>
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowEndDay(false)}
+                      className="flex-1 h-11"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        toast({ title: 'Day Ended', description: 'Your timesheet has been submitted.' });
+                        setShowEndDay(false);
+                      }}
+                      className="flex-1 h-11 bg-[#0F2B4C] hover:bg-[#1a3d66] text-white"
+                    >
+                      Submit & End Day
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
