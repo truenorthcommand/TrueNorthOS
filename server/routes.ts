@@ -27,6 +27,7 @@ import { sendPortalInvitation, sendPasswordResetEmail } from "./email";
 import { logAuditEvent, logFailedAction, createUserSession, endUserSession, updateSessionActivity, logAuditLogAccess, getAuditLogs, getAuditLogById, getFailedActions, getActiveSessions, getAuditStats, getClientIp, getUserAgent, verifyAuditLogIntegrity } from "./audit";
 import { ReferralService, FraudDetection, DiscountEngine } from "./referral-service";
 import intelligenceRoutes from "./intelligence-routes";
+import seedRoutes from "./seed-routes";
 
 function getStripeClient(): Stripe | null {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -6673,6 +6674,9 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
   // Property Intelligence System
   app.use('/api/intelligence', intelligenceRoutes);
+
+  // Database Seeding (Admin Only)
+  app.use('/api/seed', seedRoutes);
 
   app.get("/api/files", requireAuth, async (req, res) => {
     try {

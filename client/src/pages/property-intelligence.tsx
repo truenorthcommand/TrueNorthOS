@@ -48,6 +48,26 @@ export default function PropertyIntelligence() {
     queryKey: ["/api/clients"],
   });
 
+  // Seed database mutation
+  const seedMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', '/api/seed/run');
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "Database Seeded", description: data.message });
+      // Refresh the page to show new data
+      window.location.reload();
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Seed Failed", 
+        description: error.message || "Failed to seed database",
+        variant: "destructive" 
+      });
+    },
+  });
+
   // Fetch properties for selected client
   const { data: properties = [] } = useQuery<Property[]>({
     queryKey: ["/api/clients", selectedClientId, "properties"],
@@ -237,6 +257,16 @@ export default function PropertyIntelligence() {
                   <span className="ml-1">Sync Client</span>
                 </Button>
               )}
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 text-xs"
+                onClick={() => seedMutation.mutate()}
+                disabled={seedMutation.isPending}
+              >
+                {seedMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                <span className="ml-1">Seed DB</span>
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
