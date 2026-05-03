@@ -15,6 +15,7 @@ import JobDetail from "@/pages/job-detail";
 import SignOff from "@/pages/sign-off";
 import Clients from "@/pages/clients";
 import ClientDetail from "@/pages/client-detail";
+import AddClient from "@/pages/add-client";
 import Engineers from "@/pages/engineers";
 // Force rebuild - client detail route fix
 import CompletedJobs from "@/pages/completed-jobs";
@@ -128,6 +129,7 @@ function AppRoutes() {
         <Route path="/jobs/:id" component={JobDetail} />
         <Route path="/jobs/:id/sign-off" component={SignOff} />
         <Route path="/clients" component={Clients} />
+        <Route path="/clients/new" component={AddClient} />
         <Route path="/clients/:id" component={ClientDetail} />
         <Route path="/create-job-sheet" component={Clients} />
         <Route path="/engineers" component={Engineers} />
