@@ -15,6 +15,7 @@ import JobDetail from "@/pages/job-detail";
 import CreateJob from "@/pages/create-job";
 import EngineerDashboard from "@/pages/engineer-dashboard";
 import WalkaroundWizard from "@/pages/walkaround-wizard";
+import JobCompleteWizard from "@/pages/job-complete-wizard";
 import SignOff from "@/pages/sign-off";
 import Clients from "@/pages/clients";
 import ClientDetail from "@/pages/client-detail";
@@ -135,6 +136,7 @@ function AppRoutes() {
         <Route path="/jobs/new" component={CreateJob} />
         <Route path="/jobs/:id" component={JobDetail} />
         <Route path="/jobs/:id/sign-off" component={SignOff} />
+        <Route path="/jobs/:id/complete" component={JobCompleteWizard} />
         <Route path="/clients" component={Clients} />
         <Route path="/clients/new" component={AddClient} />
         <Route path="/clients/:id" component={ClientDetail} />
