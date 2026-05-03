@@ -399,19 +399,95 @@ export default function CreateQuote() {
     const data = await handleSave('Draft');
     if (data?.id) {
       try {
-        const pdfResponse = await fetch(`/api/quotes/${data.id}/pdf`);
-        if (pdfResponse.ok) {
-          const blob = await pdfResponse.blob();
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `${quoteRef}.pdf`;
-          a.click();
-          URL.revokeObjectURL(url);
-          toast({ title: 'PDF Generated', description: 'Your quote PDF has been downloaded.' });
+        const { jsPDF } = await import('jspdf');
+        const doc = new jsPDF();
+        const pageWidth = doc.internal.pageSize.getWidth();
+        
+        // Header
+        doc.setFontSize(20);
+        doc.setTextColor(15, 43, 76); // #0F2B4C
+        doc.text('QUOTATION', pageWidth / 2, 20, { align: 'center' });
+        
+        // Company info
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text('Adapt Services Group', 14, 35);
+        
+        // Quote details
+        doc.setFontSize(10);
+        doc.setTextColor(0);
+        doc.text(`Quote Ref: ${quoteRef}`, pageWidth - 14, 35, { align: 'right' });
+        doc.text(`Date: ${new Date().toLocaleDateString('en-GB')}`, pageWidth - 14, 41, { align: 'right' });
+        if (expiryDate) {
+          doc.text(`Expires: ${new Date(expiryDate).toLocaleDateString('en-GB')}`, pageWidth - 14, 47, { align: 'right' });
         }
-      } catch {
-        toast({ title: 'PDF Generation', description: 'Quote saved. PDF generation will be available soon.', variant: 'default' });
+        
+        // Client info
+        doc.setFontSize(11);
+        doc.setTextColor(15, 43, 76);
+        doc.text('Client:', 14, 55);
+        doc.setTextColor(0);
+        doc.setFontSize(10);
+        doc.text(customerName || 'N/A', 14, 62);
+        if (siteAddress) doc.text(siteAddress, 14, 68);
+        if (sitePostcode) doc.text(sitePostcode, 14, 74);
+        
+        // Line items table header
+        let y = 88;
+        doc.setFillColor(15, 43, 76);
+        doc.rect(14, y - 5, pageWidth - 28, 8, 'F');
+        doc.setTextColor(255);
+        doc.setFontSize(9);
+        doc.text('Description', 16, y);
+        doc.text('Qty', 110, y);
+        doc.text('Unit Cost', 130, y);
+        doc.text('VAT', 155, y);
+        doc.text('Amount', pageWidth - 16, y, { align: 'right' });
+        
+        // Line items
+        y += 10;
+        doc.setTextColor(0);
+        lineItems.forEach((item) => {
+          if (y > 270) {
+            doc.addPage();
+            y = 20;
+          }
+          doc.text(item.description || 'Item', 16, y);
+          doc.text(String(item.quantity), 110, y);
+          doc.text(`£${item.unitCost.toFixed(2)}`, 130, y);
+          doc.text(`${item.vatRate}%`, 155, y);
+          doc.text(`£${item.amount.toFixed(2)}`, pageWidth - 16, y, { align: 'right' });
+          y += 7;
+        });
+        
+        // Totals
+        y += 10;
+        doc.setDrawColor(200);
+        doc.line(120, y - 5, pageWidth - 14, y - 5);
+        doc.setFontSize(10);
+        doc.text('Subtotal:', 130, y);
+        doc.text(`£${calculations.subtotal.toFixed(2)}`, pageWidth - 16, y, { align: 'right' });
+        y += 7;
+        doc.text('VAT:', 130, y);
+        doc.text(`£${calculations.totalVat.toFixed(2)}`, pageWidth - 16, y, { align: 'right' });
+        y += 7;
+        doc.setFontSize(12);
+        doc.setTextColor(15, 43, 76);
+        doc.text('TOTAL:', 130, y);
+        doc.text(`£${calculations.grandTotal.toFixed(2)}`, pageWidth - 16, y, { align: 'right' });
+        
+        // Payment terms
+        y += 15;
+        doc.setFontSize(9);
+        doc.setTextColor(100);
+        doc.text(`Payment Terms: ${paymentTerms}`, 14, y);
+        
+        // Save PDF
+        doc.save(`${quoteRef}.pdf`);
+        toast({ title: 'PDF Generated', description: 'Your quote PDF has been downloaded.' });
+      } catch (err) {
+        console.error('PDF generation error:', err);
+        toast({ title: 'Quote Saved', description: 'Quote saved successfully. PDF generation encountered an issue.', variant: 'default' });
       }
     }
   };
@@ -1290,7 +1366,7 @@ export default function CreateQuote() {
         <div className="pt-4 border-t">
           <Button
             variant="outline"
-            onClick={() => navigate('/app/quotes')}
+            onClick={() => navigate('/quotes')}
             className="w-full"
           >
             Finish & Go to Quotes
@@ -1322,7 +1398,7 @@ export default function CreateQuote() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => navigate('/app/quotes')}
+                onClick={() => navigate('/quotes')}
               >
                 <ArrowLeft className="w-4 h-4" />
               </Button>
