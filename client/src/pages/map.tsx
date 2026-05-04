@@ -3,7 +3,7 @@ import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth';
 import { hasRole } from '@/lib/types';
-import { LeafletMap, MapMarker } from '@/components/leaflet-map';
+import { GoogleMap, MapMarker } from '@/components/google-map';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -541,7 +541,7 @@ export default function MapPage() {
       }`}>
         {/* Map Section */}
         <div className={`relative h-full min-h-[400px] ${isFullScreen ? 'col-span-1' : 'lg:col-span-3'}`}>
-          <LeafletMap
+          <GoogleMap
             markers={markers}
             height="calc(100vh - 140px)"
             center={mapCenter}
