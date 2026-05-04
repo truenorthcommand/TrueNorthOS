@@ -369,7 +369,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/config/maps", requireAuth, (req, res) => {
-    const apiKey = process.env.PRO_MAIN_MAPS_API_KEY || '';
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.PRO_MAIN_MAPS_API_KEY || '';
     res.json({ apiKey });
   });
 
