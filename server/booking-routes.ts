@@ -650,7 +650,8 @@ router.post('/ai-suggest', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Error generating AI suggestions:', error);
-    res.status(500).json({ error: 'Failed to generate scheduling suggestions' });
+    const errMsg = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ error: 'Failed to generate scheduling suggestions', detail: errMsg });
   }
 });
 
