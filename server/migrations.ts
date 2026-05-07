@@ -182,9 +182,9 @@ export async function runMigrations() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS surveys (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        client_id INTEGER REFERENCES users(id),
-        property_id INTEGER,
-        surveyor_id INTEGER REFERENCES users(id),
+        client_id VARCHAR REFERENCES users(id),
+        property_id VARCHAR REFERENCES client_properties(id),
+        surveyor_id VARCHAR REFERENCES users(id),
         status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'in_progress', 'complete', 'converted')),
         survey_type TEXT DEFAULT 'custom',
         general_notes TEXT,
@@ -197,7 +197,7 @@ export async function runMigrations() {
         gps_lng DOUBLE PRECISION,
         arrived_at TIMESTAMP,
         departed_at TIMESTAMP,
-        quote_id INTEGER,
+        quote_id VARCHAR,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       );
@@ -263,7 +263,7 @@ export async function runMigrations() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS enquiries (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        client_id INTEGER REFERENCES users(id),
+        client_id VARCHAR REFERENCES users(id),
         property_id VARCHAR REFERENCES client_properties(id),
         source TEXT NOT NULL DEFAULT 'phone' CHECK (source IN ('phone', 'email', 'website', 'referral', 'repeat_customer', 'client_portal')),
         description TEXT NOT NULL,
@@ -271,7 +271,7 @@ export async function runMigrations() {
         budget_indication TEXT,
         urgency TEXT NOT NULL DEFAULT 'standard' CHECK (urgency IN ('emergency', 'urgent', 'standard', 'flexible')),
         preferred_dates TEXT,
-        assigned_to INTEGER REFERENCES users(id),
+        assigned_to VARCHAR REFERENCES users(id),
         status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'survey_booked', 'survey_complete', 'quote_sent', 'won', 'lost', 'cancelled')),
         lost_reason TEXT,
         survey_id UUID,
@@ -312,12 +312,12 @@ export async function runMigrations() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS job_phases (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
+        job_id VARCHAR REFERENCES jobs(id) ON DELETE CASCADE,
         phase_number INTEGER NOT NULL DEFAULT 1,
         title TEXT NOT NULL,
         description TEXT,
         trade_type TEXT,
-        assigned_to INTEGER REFERENCES users(id),
+        assigned_to VARCHAR REFERENCES users(id),
         status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'ready', 'in_progress', 'complete', 'skipped')),
         estimated_duration TEXT,
         depends_on UUID REFERENCES job_phases(id),
@@ -340,7 +340,7 @@ export async function runMigrations() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS variation_orders (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
+        job_id VARCHAR REFERENCES jobs(id) ON DELETE CASCADE,
         description TEXT NOT NULL,
         reason TEXT,
         additional_cost DECIMAL DEFAULT 0,
@@ -359,15 +359,15 @@ export async function runMigrations() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS snag_items (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
+        job_id VARCHAR REFERENCES jobs(id) ON DELETE CASCADE,
         description TEXT NOT NULL,
         location TEXT,
         severity TEXT DEFAULT 'minor' CHECK (severity IN ('minor', 'major', 'critical')),
         status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'accepted')),
-        assigned_to INTEGER REFERENCES users(id),
+        assigned_to VARCHAR REFERENCES users(id),
         photo_url TEXT,
         resolution_notes TEXT,
-        reported_by INTEGER REFERENCES users(id),
+        reported_by VARCHAR REFERENCES users(id),
         resolved_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
@@ -383,8 +383,8 @@ export async function runMigrations() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS job_signoffs (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
-        signed_off_by INTEGER REFERENCES users(id),
+        job_id VARCHAR REFERENCES jobs(id) ON DELETE CASCADE,
+        signed_off_by VARCHAR REFERENCES users(id),
         sign_off_type TEXT DEFAULT 'final' CHECK (sign_off_type IN ('phase', 'snag', 'final')),
         status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
         notes TEXT,
@@ -402,7 +402,7 @@ export async function runMigrations() {
 
     // === ADD QUOTE/ENQUIRY LINKING TO JOBS ===
     await client.query(`
-      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS quote_id INTEGER;
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS quote_id VARCHAR;
       ALTER TABLE jobs ADD COLUMN IF NOT EXISTS enquiry_id UUID;
       ALTER TABLE jobs ADD COLUMN IF NOT EXISTS is_complex BOOLEAN DEFAULT FALSE;
       ALTER TABLE jobs ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP;
