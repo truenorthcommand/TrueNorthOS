@@ -492,14 +492,18 @@ router.post('/ai-suggest', async (req: Request, res: Response) => {
     // Get target property location if available
     let targetLat: number | null = null;
     let targetLng: number | null = null;
+    let targetPostcode: string | null = null;
     if (property_id) {
-      const propResult = await pool.query(
-        'SELECT latitude, longitude, postcode FROM client_properties WHERE id = $1',
-        [property_id]
-      );
-      if (propResult.rows.length > 0) {
-        targetLat = propResult.rows[0].latitude;
-        targetLng = propResult.rows[0].longitude;
+      try {
+        const propResult = await pool.query(
+          'SELECT postcode FROM client_properties WHERE id = $1',
+          [property_id]
+        );
+        if (propResult.rows.length > 0) {
+          targetPostcode = propResult.rows[0].postcode;
+        }
+      } catch (propErr) {
+        // Non-fatal - property lookup failed
       }
     }
 
