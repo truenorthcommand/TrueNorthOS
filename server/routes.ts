@@ -32,6 +32,7 @@ import aiPricingRoutes from "./ai-pricing-routes";
 import gpsRoutes from "./gps-routes";
 import workflowRoutes from "./workflow-routes";
 import { startWorkflowWorker } from "./workflow-worker";
+import surveyRoutes from "./survey-routes";
 
 function getStripeClient(): Stripe | null {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -6832,6 +6833,9 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
   // Hidden Workflow Studio (super_admin only - access control in router)
   app.use('/api/workflows', populateUserMiddleware, workflowRoutes);
+
+  // Surveyor Portal
+  app.use('/api/surveys', populateUserMiddleware, surveyRoutes);
 
   // Start workflow worker (server-side execution engine)
   startWorkflowWorker();

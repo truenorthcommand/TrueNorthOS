@@ -101,6 +101,8 @@ import MerchantPortal from "@/pages/merchant-portal";
 import AdminMerchants from "@/pages/admin-merchants";
 import AdminBlog from "@/pages/admin-blog";
 import PropertyIntelligence from "@/pages/property-intelligence";
+import Surveys from "@/pages/surveys";
+import SurveyWizard from "@/pages/survey-wizard";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -173,6 +175,9 @@ function AppRoutes() {
         <Route path="/quotes" component={Quotes} />
         <Route path="/quotes/new" component={CreateQuote} />
         <Route path="/quotes/:id" component={QuoteDetail} />
+        <Route path="/surveys" component={Surveys} />
+        <Route path="/surveys/new" component={SurveyWizard} />
+        <Route path="/surveys/:id" component={SurveyWizard} />
         <Route path="/invoices" component={Invoices} />
         <Route path="/invoices/:id" component={InvoiceDetail} />
         <Route path="/settings" component={Settings} />

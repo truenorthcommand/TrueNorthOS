@@ -176,6 +176,88 @@ export async function runMigrations() {
       ON workflow_runs(idempotency_key) WHERE idempotency_key IS NOT NULL;
     `);
 
+    // === SURVEYOR PORTAL TABLES ===
+
+    // Surveys master table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS surveys (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        client_id INTEGER REFERENCES users(id),
+        property_id INTEGER,
+        surveyor_id INTEGER REFERENCES users(id),
+        status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'in_progress', 'complete', 'converted')),
+        survey_type TEXT DEFAULT 'custom',
+        general_notes TEXT,
+        condition_rating TEXT,
+        access_notes TEXT,
+        safety_notes TEXT,
+        client_preferences TEXT,
+        timeline TEXT,
+        gps_lat DOUBLE PRECISION,
+        gps_lng DOUBLE PRECISION,
+        arrived_at TIMESTAMP,
+        departed_at TIMESTAMP,
+        quote_id INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // Survey rooms
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS survey_rooms (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        survey_id UUID REFERENCES surveys(id) ON DELETE CASCADE,
+        room_name TEXT NOT NULL,
+        room_type TEXT DEFAULT 'custom',
+        notes TEXT,
+        voice_notes TEXT,
+        condition TEXT,
+        order_index INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // Survey work items
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS survey_work_items (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        survey_room_id UUID REFERENCES survey_rooms(id) ON DELETE CASCADE,
+        description TEXT NOT NULL,
+        type TEXT DEFAULT 'both' CHECK (type IN ('material', 'labour', 'both')),
+        priority TEXT DEFAULT 'essential' CHECK (priority IN ('essential', 'recommended', 'optional')),
+        quantity NUMERIC DEFAULT 1,
+        unit TEXT DEFAULT 'each',
+        measurements TEXT,
+        estimated_cost NUMERIC,
+        ai_suggested_price NUMERIC,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // Survey media
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS survey_media (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        survey_id UUID REFERENCES surveys(id) ON DELETE CASCADE,
+        survey_room_id UUID REFERENCES survey_rooms(id) ON DELETE SET NULL,
+        media_type TEXT NOT NULL CHECK (media_type IN ('photo', 'video', 'file')),
+        url TEXT NOT NULL,
+        filename TEXT,
+        caption TEXT,
+        uploaded_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // Survey indexes
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_surveys_client ON surveys(client_id);
+      CREATE INDEX IF NOT EXISTS idx_surveys_surveyor ON surveys(surveyor_id);
+      CREATE INDEX IF NOT EXISTS idx_surveys_status ON surveys(status);
+      CREATE INDEX IF NOT EXISTS idx_survey_rooms_survey ON survey_rooms(survey_id);
+      CREATE INDEX IF NOT EXISTS idx_survey_work_items_room ON survey_work_items(survey_room_id);
+      CREATE INDEX IF NOT EXISTS idx_survey_media_survey ON survey_media(survey_id);
+    `);
 
     console.log("Database migrations completed successfully");
   } catch (error) {
