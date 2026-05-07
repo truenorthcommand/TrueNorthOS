@@ -429,6 +429,12 @@ export async function runMigrations() {
       ALTER TABLE snag_items ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
       ALTER TABLE snag_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
     `);
+    // Make snagging_sheet_id nullable (was NOT NULL from Drizzle schema - conflicts with job-linked snags)
+    await client.query(`
+      ALTER TABLE snag_items ALTER COLUMN snagging_sheet_id DROP NOT NULL;
+      ALTER TABLE snag_items ALTER COLUMN category DROP NOT NULL;
+      ALTER TABLE snag_items ALTER COLUMN location DROP NOT NULL;
+    `);
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_snag_items_job ON snag_items(job_id);
       CREATE INDEX IF NOT EXISTS idx_snag_items_status ON snag_items(status);

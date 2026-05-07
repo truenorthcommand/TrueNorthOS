@@ -33,12 +33,10 @@ router.get('/:jobId/snags', requireAuth, async (req: Request, res: Response) => 
   try {
     const { jobId } = req.params;
     const result = await pool.query(`
-      SELECT si.*,
-        u1.name as assigned_to_name,
-        u2.name as reported_by_name
+      SELECT si.*, 
+        u1.name as assigned_to_name
       FROM snag_items si
-      LEFT JOIN users u1 ON si.assigned_to = u1.id
-      LEFT JOIN users u2 ON si.reported_by = u2.id
+      LEFT JOIN users u1 ON si.assigned_to_id = u1.id
       WHERE si.job_id = $1
       ORDER BY si.created_at DESC
     `, [jobId]);
@@ -62,12 +60,12 @@ router.post('/:jobId/snags', requireAuth, async (req: Request, res: Response) =>
     }
 
     const result = await pool.query(`
-      INSERT INTO snag_items (job_id, description, location, severity, assigned_to, photo_url, reported_by, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'open')
+      INSERT INTO snag_items (job_id, description, location, priority, assigned_to_id, notes, status)
+      VALUES ($1, $2, $3, $4, $5, $6, 'open')
       RETURNING *
     `, [
-      jobId, description, location || null, severity || 'minor',
-      assigned_to || null, photo_url || null, user.id
+      jobId, description, location || null, severity || 'medium',
+      assigned_to || null, `Reported by: ${user.id}`
     ]);
 
     res.status(201).json(result.rows[0]);
@@ -95,15 +93,15 @@ router.patch('/:jobId/snags/:snagId', requireAuth, async (req: Request, res: Res
       }
     }
     if (resolution_notes !== undefined) {
-      updates.push(`resolution_notes = $${idx++}`);
+      updates.push(`notes = $${idx++}`);
       values.push(resolution_notes);
     }
     if (assigned_to !== undefined) {
-      updates.push(`assigned_to = $${idx++}`);
+      updates.push(`assigned_to_id = $${idx++}`);
       values.push(assigned_to);
     }
     if (severity !== undefined) {
-      updates.push(`severity = $${idx++}`);
+      updates.push(`priority = $${idx++}`);
       values.push(severity);
     }
 
