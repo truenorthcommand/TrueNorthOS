@@ -387,19 +387,34 @@ export async function runMigrations() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS snag_items (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        job_id VARCHAR REFERENCES jobs(id) ON DELETE CASCADE,
-        description TEXT NOT NULL,
+        job_id VARCHAR,
+        description TEXT NOT NULL DEFAULT '',
         location TEXT,
-        severity TEXT DEFAULT 'minor' CHECK (severity IN ('minor', 'major', 'critical')),
-        status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'accepted')),
-        assigned_to VARCHAR REFERENCES users(id),
+        severity TEXT DEFAULT 'minor',
+        status TEXT NOT NULL DEFAULT 'open',
+        assigned_to VARCHAR,
         photo_url TEXT,
         resolution_notes TEXT,
-        reported_by VARCHAR REFERENCES users(id),
+        reported_by VARCHAR,
         resolved_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       );
+    `);
+    // Ensure columns exist if table was created by older migration
+    await client.query(`
+      ALTER TABLE snag_items ADD COLUMN IF NOT EXISTS job_id VARCHAR;
+      ALTER TABLE snag_items ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT '';
+      ALTER TABLE snag_items ADD COLUMN IF NOT EXISTS location TEXT;
+      ALTER TABLE snag_items ADD COLUMN IF NOT EXISTS severity TEXT DEFAULT 'minor';
+      ALTER TABLE snag_items ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'open';
+      ALTER TABLE snag_items ADD COLUMN IF NOT EXISTS assigned_to VARCHAR;
+      ALTER TABLE snag_items ADD COLUMN IF NOT EXISTS photo_url TEXT;
+      ALTER TABLE snag_items ADD COLUMN IF NOT EXISTS resolution_notes TEXT;
+      ALTER TABLE snag_items ADD COLUMN IF NOT EXISTS reported_by VARCHAR;
+      ALTER TABLE snag_items ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMP;
+      ALTER TABLE snag_items ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+      ALTER TABLE snag_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
     `);
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_snag_items_job ON snag_items(job_id);
