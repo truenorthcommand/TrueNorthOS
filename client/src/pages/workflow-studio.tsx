@@ -50,7 +50,7 @@ export default function WorkflowStudio() {
       queryClient.invalidateQueries({ queryKey: ['/api/workflows'] });
       setShowCreate(false);
       setNewWorkflow({ key: '', name: '', description: '', module: 'general' });
-      navigate(`/app/system/workflows/${data.id}`);
+      navigate(`/system/workflows/${data.id}`);
     }
   });
 
@@ -204,7 +204,7 @@ export default function WorkflowStudio() {
             <div
               key={wf.id}
               className="bg-white rounded-lg border hover:border-[#E8A54B] transition-colors cursor-pointer"
-              onClick={() => navigate(`/app/system/workflows/${wf.id}`)}
+              onClick={() => navigate(`/system/workflows/${wf.id}`)}
             >
               <div className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">

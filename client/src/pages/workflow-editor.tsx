@@ -236,7 +236,7 @@ export default function WorkflowEditor() {
       {/* Header */}
       <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/app/system/workflows')} className="p-1.5 hover:bg-gray-100 rounded">
+          <button onClick={() => navigate('/system/workflows')} className="p-1.5 hover:bg-gray-100 rounded">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
