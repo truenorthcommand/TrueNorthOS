@@ -182,7 +182,7 @@ export default function CreateEnquiry() {
       budget_indication: budgetIndication.trim() || null,
       urgency,
       preferred_dates: preferredDates.trim() || null,
-      assigned_to: assignedTo ? Number(assignedTo) : null,
+      assigned_to: assignedTo && assignedTo !== 'unassigned' ? Number(assignedTo) : null,
     });
   };
 
@@ -434,7 +434,7 @@ export default function CreateEnquiry() {
                     <SelectValue placeholder="Unassigned" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
                     {users.map((user) => (
                       <SelectItem key={user.id} value={String(user.id)}>
                         {user.name} ({user.role})
