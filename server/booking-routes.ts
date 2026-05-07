@@ -503,12 +503,15 @@ router.post('/ai-suggest', async (req: Request, res: Response) => {
       }
     }
 
-    // Find staff with matching role
+    // Find staff with matching role (fallback to admin/super_admin for works_manager)
+    const rolesToSearch = requiredRole === 'works_manager'
+      ? ['works_manager', 'admin', 'super_admin']
+      : [requiredRole];
     const staffResult = await pool.query(`
       SELECT id, name, role FROM users
-      WHERE role = $1 AND is_active = true
+      WHERE role = ANY($1::text[])
       ORDER BY name
-    `, [requiredRole]);
+    `, [rolesToSearch]);
 
     if (staffResult.rows.length === 0) {
       return res.json({
