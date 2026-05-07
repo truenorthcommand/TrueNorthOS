@@ -244,8 +244,7 @@ router.post('/:id/book-survey', async (req: Request, res: Response) => {
     // Create the survey
     const surveyResult = await pool.query(`
       INSERT INTO surveys (
-        client_id, property_id, surveyor_id, survey_type, status,
-        property_address
+        client_id, property_id, surveyor_id, survey_type, status, enquiry_id
       ) VALUES ($1, $2, $3, $4, 'draft', $5)
       RETURNING *
     `, [
@@ -253,7 +252,7 @@ router.post('/:id/book-survey', async (req: Request, res: Response) => {
       enquiry.property_id,
       surveyor_id || (req as any).user.id,
       survey_type || 'custom',
-      '', // property_address will be filled by surveyor
+      id, // link back to enquiry
     ]);
 
     const survey = surveyResult.rows[0];
