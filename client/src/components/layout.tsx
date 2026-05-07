@@ -332,6 +332,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* Sales Section - Admin & Surveyor */}
         {hasRole(user, 'admin', 'surveyor') && (
           <MenuGroup title="Sales" icon={BarChart3} section="sales">
+            <NavLink href="/enquiries" icon={ClipboardList}>Enquiries</NavLink>
             <NavLink href="/quotes" icon={FileText}>Quotes</NavLink>
             <NavLink href="/surveys" icon={ClipboardCheck}>Surveys</NavLink>
             {hasRole(user, 'admin') && (

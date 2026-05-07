@@ -191,6 +191,77 @@ export default function CreateQuote() {
   // Quote reference
   const [quoteRef] = useState(generateQuoteRef());
 
+  // Pre-fill from survey if from_survey param present
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const surveyId = params.get('from_survey');
+    if (!surveyId) return;
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/surveys/${surveyId}`, { credentials: 'include' });
+        if (!res.ok) return;
+        const survey = await res.json();
+
+        // Pre-fill client
+        if (survey.client_name) {
+          setCustomerName(survey.client_name);
+          setCustomerEmail(survey.client_email || '');
+          setCustomerPhone(survey.client_phone || '');
+          if (survey.client_id) {
+            setSelectedClient({ id: String(survey.client_id), name: survey.client_name, email: survey.client_email || '', phone: survey.client_phone || '' });
+            setUseExistingClient(true);
+          }
+        }
+
+        // Pre-fill property
+        if (survey.property_address) {
+          setSiteAddress(survey.property_address);
+          setSitePostcode(survey.property_postcode || '');
+        }
+
+        // Pre-fill line items from survey rooms + work items
+        const prefillItems: QuoteLineItem[] = [];
+        if (survey.rooms && Array.isArray(survey.rooms)) {
+          for (const room of survey.rooms) {
+            const workItems = room.work_items || [];
+            for (const item of workItems) {
+              const lineItem: QuoteLineItem = {
+                id: generateId(),
+                type: item.type === 'material' ? 'material' : item.type === 'labour' ? 'labour' : 'custom',
+                description: `[${room.room_name}] ${item.description}`,
+                quantity: Number(item.quantity) || 1,
+                unit: item.unit || 'each',
+                unitCost: 0, // Surveyor adds pricing
+                markup: 0,
+                discount: 0,
+                vatRate: 20,
+                amount: 0,
+              };
+              prefillItems.push(lineItem);
+            }
+          }
+        }
+
+        if (prefillItems.length > 0) {
+          setLineItems(prefillItems);
+        }
+
+        // Pre-fill notes with survey general notes
+        if (survey.general_notes) {
+          setNotes(`Survey Notes: ${survey.general_notes}`);
+        }
+
+        // Set reference to survey
+        setReference(`From Survey: ${surveyId}`);
+
+        toast({ title: 'Pre-filled from survey', description: `Loaded ${prefillItems.length} line items from survey data` });
+      } catch (err) {
+        console.error('Failed to pre-fill from survey:', err);
+      }
+    })();
+  }, []);
+
   // Fetch clients on search
   useEffect(() => {
     if (!useExistingClient) return;

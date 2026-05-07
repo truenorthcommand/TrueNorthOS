@@ -18,6 +18,7 @@ import { ActionPriority, JobUpdate, Photo, hasRole } from '@/lib/types';
 import { useUpload } from '@/hooks/use-upload';
 import { generateTrueNorthCode } from '@/lib/qr-utils';
 import { JobChecklist } from '@/components/job-checklist';
+import { JobPhases } from '@/components/job-phases';
 import type { FileWithRelations } from '@shared/schema';
 import QRCode from 'qrcode';
 import {
@@ -1122,6 +1123,7 @@ export default function JobDetail() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full overflow-x-auto flex justify-start mb-4">
           <TabsTrigger value="details">Details</TabsTrigger>
+          <TabsTrigger value="phases">Phases</TabsTrigger>
           <TabsTrigger value="schedule">Schedule</TabsTrigger>
           <TabsTrigger value="materials">Materials</TabsTrigger>
           <TabsTrigger value="photos">Photos & Files</TabsTrigger>
@@ -1131,6 +1133,7 @@ export default function JobDetail() {
         </TabsList>
 
         <TabsContent value="details">{renderTabDetails()}</TabsContent>
+        <TabsContent value="phases"><JobPhases jobId={parseInt(params?.id || '0')} /></TabsContent>
         <TabsContent value="schedule">{renderTabSchedule()}</TabsContent>
         <TabsContent value="materials">{renderTabMaterials()}</TabsContent>
         <TabsContent value="photos">{renderTabPhotos()}</TabsContent>

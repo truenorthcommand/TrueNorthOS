@@ -218,17 +218,17 @@ router.get('/:id', async (req: Request, res: Response) => {
 router.post('/', async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
-    const { client_id, property_id, survey_type } = req.body;
+    const { client_id, property_id, survey_type, enquiry_id } = req.body;
 
     if (!client_id) {
       return res.status(400).json({ error: 'client_id is required' });
     }
 
     const result = await pool.query(`
-      INSERT INTO surveys (client_id, property_id, surveyor_id, survey_type, status)
-      VALUES ($1, $2, $3, $4, 'draft')
+      INSERT INTO surveys (client_id, property_id, surveyor_id, survey_type, status, enquiry_id)
+      VALUES ($1, $2, $3, $4, 'draft', $5)
       RETURNING *
-    `, [client_id, property_id || null, user.id, survey_type || 'custom']);
+    `, [client_id, property_id || null, user.id, survey_type || 'custom', enquiry_id || null]);
 
     const survey = result.rows[0];
 
@@ -299,6 +299,17 @@ router.patch('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Survey not found' });
     }
 
+    // === AUTOMATION: Update linked enquiry when survey completes ===
+    if (req.body.status === 'complete') {
+      const survey = result.rows[0];
+      if (survey.enquiry_id) {
+        await pool.query(
+          `UPDATE enquiries SET status = 'survey_complete', updated_at = NOW() WHERE id = $1`,
+          [survey.enquiry_id]
+        );
+      }
+    }
+
     res.json(result.rows[0]);
   } catch (error: any) {
     console.error('Survey update error:', error);
@@ -327,7 +338,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 router.post('/:id/rooms', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { room_name, room_type, order_index } = req.body;
+    const { room_name, room_type, order_index, notes, length_m, width_m, height_m, condition, checklist_ref } = req.body;
 
     if (!room_name) {
       return res.status(400).json({ error: 'room_name is required' });
@@ -340,10 +351,10 @@ router.post('/:id/rooms', async (req: Request, res: Response) => {
     }
 
     const result = await pool.query(`
-      INSERT INTO survey_rooms (survey_id, room_name, room_type, order_index)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO survey_rooms (survey_id, room_name, room_type, order_index, notes, length_m, width_m, height_m, condition, checklist_ref)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
-    `, [id, room_name, room_type || 'custom', order_index || 0]);
+    `, [id, room_name, room_type || 'custom', order_index || 0, notes || null, length_m || null, width_m || null, height_m || null, condition || null, checklist_ref ? JSON.stringify(checklist_ref) : null]);
 
     res.status(201).json(result.rows[0]);
   } catch (error: any) {
@@ -356,7 +367,7 @@ router.post('/:id/rooms', async (req: Request, res: Response) => {
 router.patch('/:id/rooms/:roomId', async (req: Request, res: Response) => {
   try {
     const { id, roomId } = req.params;
-    const allowedFields = ['room_name', 'room_type', 'notes', 'voice_notes', 'condition', 'order_index'];
+    const allowedFields = ['room_name', 'room_type', 'notes', 'voice_notes', 'condition', 'order_index', 'length_m', 'width_m', 'height_m', 'checklist_ref'];
 
     const updates: string[] = [];
     const values: any[] = [];
@@ -416,7 +427,7 @@ router.delete('/:id/rooms/:roomId', async (req: Request, res: Response) => {
 router.post('/:id/rooms/:roomId/work-items', async (req: Request, res: Response) => {
   try {
     const { id, roomId } = req.params;
-    const { description, type, priority, quantity, unit, measurements, estimated_cost, ai_suggested_price } = req.body;
+    const { description, type, priority, quantity, unit, measurements, estimated_cost, ai_suggested_price, length_m, width_m, height_m, notes } = req.body;
 
     if (!description) {
       return res.status(400).json({ error: 'description is required' });
@@ -432,10 +443,10 @@ router.post('/:id/rooms/:roomId/work-items', async (req: Request, res: Response)
     }
 
     const result = await pool.query(`
-      INSERT INTO survey_work_items (survey_room_id, description, type, priority, quantity, unit, measurements, estimated_cost, ai_suggested_price)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      INSERT INTO survey_work_items (survey_room_id, description, type, priority, quantity, unit, measurements, estimated_cost, ai_suggested_price, length_m, width_m, height_m, notes)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
-    `, [roomId, description, type || 'both', priority || 'essential', quantity || 1, unit || 'each', measurements || null, estimated_cost || null, ai_suggested_price || null]);
+    `, [roomId, description, type || 'both', priority || 'essential', quantity || 1, unit || 'each', measurements || null, estimated_cost || null, ai_suggested_price || null, length_m || null, width_m || null, height_m || null, notes || null]);
 
     res.status(201).json(result.rows[0]);
   } catch (error: any) {
@@ -448,7 +459,7 @@ router.post('/:id/rooms/:roomId/work-items', async (req: Request, res: Response)
 router.patch('/:id/rooms/:roomId/work-items/:itemId', async (req: Request, res: Response) => {
   try {
     const { id, roomId, itemId } = req.params;
-    const allowedFields = ['description', 'type', 'priority', 'quantity', 'unit', 'measurements', 'estimated_cost', 'ai_suggested_price'];
+    const allowedFields = ['description', 'type', 'priority', 'quantity', 'unit', 'measurements', 'estimated_cost', 'ai_suggested_price', 'length_m', 'width_m', 'height_m', 'notes'];
 
     const updates: string[] = [];
     const values: any[] = [];

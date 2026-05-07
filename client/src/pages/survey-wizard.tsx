@@ -10,1075 +10,898 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth';
-import {
-  ArrowLeft, ArrowRight, Plus, Trash2, Mic, MicOff, MapPin,
-  Camera, Save, FileText, ChevronDown, ChevronUp, Search,
-  CheckCircle2, Loader2, Upload, X, Home, Wrench
-} from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plus, Trash2, Mic, MicOff, MapPin, Camera, Save, ChevronDown, ChevronUp, Search, CheckCircle2, Loader2, Upload, X, Home, Wrench } from 'lucide-react';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
-
-interface Client {
-  id: number;
-  name: string;
-  email: string;
-  phone: string;
+interface Client { id: number; name: string; phone?: string; email?: string; }
+interface Property { id: number; client_id: number; address: string; postcode?: string; lat?: number; lng?: number; }
+interface RoomTemplate { room_name: string; room_type: string; checklist: string[]; }
+interface WizardRoom {
+  local_id: string; server_id?: number; room_name: string; room_type: string;
+  checklist_ref: string[]; selected: boolean; length_m: string; width_m: string;
+  height_m: string; condition: string; notes: string; work_items: WorkItem[]; photos: File[];
 }
-
 interface WorkItem {
-  id: string;
-  description: string;
-  type: 'material' | 'labour' | 'both';
-  priority: 'essential' | 'recommended' | 'optional';
-  quantity: number;
-  unit: string;
+  local_id: string; server_id?: number; description: string; type: string;
+  priority: string; quantity: string; unit: string; length_m: string; width_m: string; height_m: string; notes: string;
 }
+type SurveyType = 'bathroom' | 'kitchen' | 'full' | 'electrical' | 'roofing' | 'external' | 'custom';
 
-interface RoomMedia {
-  id: string;
-  file: File;
-  preview: string;
-}
-
-interface Room {
-  id: string;
-  room_name: string;
-  notes: string;
-  work_items: WorkItem[];
-  media: RoomMedia[];
-  expanded: boolean;
-}
-
-interface SurveyData {
-  client_id: number | null;
-  client_name: string;
-  property_id: number | null;
-  property_address: string;
-  new_client_name: string;
-  new_client_phone: string;
-  new_client_email: string;
-  new_property_address: string;
-  new_property_postcode: string;
-  gps_lat: number | null;
-  gps_lng: number | null;
-  survey_type: string;
-  rooms: Room[];
-  condition_rating: string;
-  general_notes: string;
-  access_notes: string;
-  safety_notes: string;
-  client_preferences: string;
-  timeline: string;
-}
-
-// ─── Constants ─────────────────────────────────────────────────────────────────
-
-const STEPS = [
-  { id: 1, title: 'Client & Property', icon: '🏠' },
-  { id: 2, title: 'Survey Type', icon: '📋' },
-  { id: 3, title: 'Room Inspection', icon: '🔍' },
-  { id: 4, title: 'General Notes', icon: '📝' },
-  { id: 5, title: 'Review & Save', icon: '✅' },
+// ─── Template Data ─────────────────────────────────────────────────────────────
+const SURVEY_TYPES: { key: SurveyType; label: string; icon: string }[] = [
+  { key: 'bathroom', label: 'Bathroom', icon: '🛁' },
+  { key: 'kitchen', label: 'Kitchen', icon: '🍳' },
+  { key: 'full', label: 'Full Property', icon: '🏠' },
+  { key: 'electrical', label: 'Electrical', icon: '⚡' },
+  { key: 'roofing', label: 'Roofing', icon: '🏗️' },
+  { key: 'external', label: 'External/Garden', icon: '🌳' },
+  { key: 'custom', label: 'Custom', icon: '📝' },
 ];
 
-const SURVEY_TYPES = [
-  { id: 'bathroom', icon: '🛁', title: 'Bathroom Survey', desc: 'Full bathroom inspection and measurements' },
-  { id: 'kitchen', icon: '🍳', title: 'Kitchen Survey', desc: 'Kitchen layout, plumbing, and electrical assessment' },
-  { id: 'full', icon: '🏠', title: 'Full Property Survey', desc: 'Complete property inspection, all rooms' },
-  { id: 'electrical', icon: '⚡', title: 'Electrical Survey', desc: 'Electrical systems, wiring, and compliance' },
-  { id: 'roofing', icon: '🏗️', title: 'Roofing Survey', desc: 'Roof condition, tiles, guttering, and loft' },
-  { id: 'external', icon: '🌳', title: 'External/Garden Survey', desc: 'Exterior walls, garden, driveways, boundaries' },
-  { id: 'custom', icon: '📝', title: 'Custom Survey', desc: 'Create your own survey structure' },
-];
+const ROOM_TEMPLATES: Record<SurveyType, RoomTemplate[]> = {
+  bathroom: [{ room_name: 'Bathroom', room_type: 'bathroom', checklist: ['Plumbing condition', 'Tile condition', 'Ventilation', 'Lighting', 'Water pressure', 'Drainage', 'Fixtures condition'] }],
+  kitchen: [{ room_name: 'Kitchen', room_type: 'kitchen', checklist: ['Plumbing condition', 'Electrical points', 'Ventilation', 'Flooring', 'Wall condition', 'Worktop measurements', 'Appliance spaces'] }],
+  full: [
+    { room_name: 'Living Room', room_type: 'living', checklist: ['Walls', 'Ceiling', 'Flooring', 'Windows', 'Electrical', 'Heating'] },
+    { room_name: 'Kitchen', room_type: 'kitchen', checklist: ['Plumbing', 'Electrical', 'Ventilation', 'Flooring', 'Walls'] },
+    { room_name: 'Bathroom', room_type: 'bathroom', checklist: ['Plumbing', 'Tiles', 'Ventilation', 'Fixtures'] },
+    { room_name: 'Bedroom 1', room_type: 'bedroom', checklist: ['Walls', 'Ceiling', 'Flooring', 'Windows', 'Electrical'] },
+    { room_name: 'Hallway', room_type: 'hallway', checklist: ['Walls', 'Flooring', 'Lighting', 'Doors'] },
+    { room_name: 'Exterior', room_type: 'exterior', checklist: ['Roof', 'Guttering', 'Walls', 'Windows', 'Doors', 'Drainage'] },
+  ],
+  electrical: [
+    { room_name: 'Consumer Unit', room_type: 'utility', checklist: ['Board condition', 'RCD protection', 'Circuit labelling', 'Earthing', 'Bonding'] },
+    { room_name: 'General Circuits', room_type: 'general', checklist: ['Socket condition', 'Lighting circuits', 'Switches', 'Wiring age', 'Overloading signs'] },
+  ],
+  roofing: [
+    { room_name: 'Roof Exterior', room_type: 'exterior', checklist: ['Tiles/slates', 'Ridge', 'Valleys', 'Flashing', 'Guttering', 'Fascia/soffit'] },
+    { room_name: 'Loft Space', room_type: 'loft', checklist: ['Insulation', 'Ventilation', 'Timbers', 'Water tanks', 'Wiring'] },
+  ],
+  external: [
+    { room_name: 'Front Exterior', room_type: 'exterior', checklist: ['Walls', 'Windows', 'Door', 'Driveway', 'Fencing'] },
+    { room_name: 'Rear Exterior', room_type: 'exterior', checklist: ['Walls', 'Windows', 'Patio', 'Garden', 'Fencing', 'Drainage'] },
+  ],
+  custom: [],
+};
 
-const ROOM_OPTIONS = [
-  'Kitchen', 'Bathroom', 'Bedroom 1', 'Bedroom 2', 'Bedroom 3',
-  'Living Room', 'Hallway', 'En-Suite', 'Utility', 'External',
-  'Roof', 'Garden', 'Garage', 'Loft', 'Dining Room', 'Custom'
-];
+const CONDITION_OPTIONS = ['Excellent', 'Good', 'Fair', 'Poor'];
+const WORK_ITEM_TYPES = ['material', 'labour', 'both'];
+const PRIORITY_OPTIONS = ['essential', 'recommended', 'optional'];
+const UNIT_OPTIONS = ['sqm', 'lm', 'each', 'hours', 'days'];
+const STEPS = ['Client & Property', 'Survey Setup', 'Room Details', 'Review & Save'];
 
-const CONDITION_RATINGS = ['Excellent', 'Good', 'Fair', 'Poor', 'Urgent'];
-
-// ─── Voice-to-Text Hook ────────────────────────────────────────────────────────
-
-function useVoiceToText(onResult: (text: string) => void) {
-  const [isRecording, setIsRecording] = useState(false);
-  const recognitionRef = useRef<any>(null);
-
-  const startRecording = useCallback(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      return false;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.lang = 'en-GB';
-
-    recognition.onresult = (event: any) => {
-      const transcript = Array.from(event.results)
-        .map((result: any) => result[0].transcript)
-        .join(' ');
-      onResult(transcript);
-    };
-
-    recognition.onerror = () => {
-      setIsRecording(false);
-    };
-
-    recognition.onend = () => {
-      setIsRecording(false);
-    };
-
-    recognition.start();
-    recognitionRef.current = recognition;
-    setIsRecording(true);
-    return true;
-  }, [onResult]);
-
-  const stopRecording = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
-    setIsRecording(false);
-  }, []);
-
-  const toggle = useCallback(() => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      return startRecording();
-    }
-    return true;
-  }, [isRecording, startRecording, stopRecording]);
-
-  return { isRecording, toggle, isSupported: !!(((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)) };
+// ─── Helper ────────────────────────────────────────────────────────────────────
+function createWorkItem(): WorkItem {
+  return { local_id: crypto.randomUUID(), description: '', type: 'material', priority: 'recommended', quantity: '1', unit: 'each', length_m: '', width_m: '', height_m: '', notes: '' };
 }
 
-// ─── VoiceButton Component ─────────────────────────────────────────────────────
-
-function VoiceButton({ onTranscript }: { onTranscript: (text: string) => void }) {
-  const { isRecording, toggle, isSupported } = useVoiceToText(onTranscript);
-
-  if (!isSupported) return null;
-
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      onClick={toggle}
-      className={isRecording ? 'border-red-500 text-red-500 animate-pulse' : ''}
-    >
-      {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-    </Button>
-  );
+function createRoom(name: string, type: string, checklist: string[]): WizardRoom {
+  return { local_id: crypto.randomUUID(), room_name: name, room_type: type, checklist_ref: checklist, selected: true, length_m: '', width_m: '', height_m: '', condition: '', notes: '', work_items: [], photos: [] };
 }
 
 // ─── Main Component ────────────────────────────────────────────────────────────
-
 export default function SurveyWizard() {
   const [, navigate] = useLocation();
   const [, params] = useRoute('/surveys/:id');
-  const surveyId = params?.id;
-  const isEditing = surveyId && surveyId !== 'new';
-  const { toast } = useToast();
+  const surveyId = params?.id === 'new' ? null : params?.id ? Number(params.id) : null;
+  const isEditing = surveyId !== null;
+
   const { user } = useAuth();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // ─── Wizard State ──────────────────────────────────────────────────────────
   const [step, setStep] = useState(1);
-  const [clientSearch, setClientSearch] = useState('');
-  const [showNewClient, setShowNewClient] = useState(false);
-  const [showNewProperty, setShowNewProperty] = useState(false);
+  const [clientId, setClientId] = useState<number | null>(null);
+  const [clientName, setClientName] = useState('');
+  const [propertyId, setPropertyId] = useState<number | null>(null);
+  const [propertyAddress, setPropertyAddress] = useState('');
+  const [surveyType, setSurveyType] = useState<SurveyType | null>(null);
+  const [rooms, setRooms] = useState<WizardRoom[]>([]);
+  const [generalNotes, setGeneralNotes] = useState('');
+  const [accessNotes, setAccessNotes] = useState('');
+  const [safetyNotes, setSafetyNotes] = useState('');
+  const [conditionRating, setConditionRating] = useState('');
+  const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
-  const [data, setData] = useState<SurveyData>({
-    client_id: null,
-    client_name: '',
-    property_id: null,
-    property_address: '',
-    new_client_name: '',
-    new_client_phone: '',
-    new_client_email: '',
-    new_property_address: '',
-    new_property_postcode: '',
-    gps_lat: null,
-    gps_lng: null,
-    survey_type: '',
-    rooms: [],
-    condition_rating: '',
-    general_notes: '',
-    access_notes: '',
-    safety_notes: '',
-    client_preferences: '',
-    timeline: '',
-  });
+  // ─── Client Search ─────────────────────────────────────────────────────────
+  const [clientSearch, setClientSearch] = useState('');
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [showNewClientForm, setShowNewClientForm] = useState(false);
+  const [newClientName, setNewClientName] = useState('');
+  const [newClientPhone, setNewClientPhone] = useState('');
+  const [newClientEmail, setNewClientEmail] = useState('');
 
-  // Fetch clients
+  // ─── Property Search ───────────────────────────────────────────────────────
+  const [propertySearch, setPropertySearch] = useState('');
+  const [showPropertyDropdown, setShowPropertyDropdown] = useState(false);
+  const [showNewPropertyForm, setShowNewPropertyForm] = useState(false);
+  const [newPropertyAddress, setNewPropertyAddress] = useState('');
+  const [newPropertyPostcode, setNewPropertyPostcode] = useState('');
+  const [gpsLoading, setGpsLoading] = useState(false);
+
+  // ─── Voice recording ───────────────────────────────────────────────────────
+  const [activeVoiceRoom, setActiveVoiceRoom] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+
+  // ─── Custom room form ──────────────────────────────────────────────────────
+  const [customRoomName, setCustomRoomName] = useState('');
+
+  // ─── Queries ───────────────────────────────────────────────────────────────
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ['/api/clients'],
-    queryFn: async () => {
-      const res = await fetch('/api/clients', { credentials: 'include' });
-      if (!res.ok) return [];
-      const result = await res.json();
-      return Array.isArray(result) ? result : result.clients || [];
-    },
+    queryFn: () => fetch('/api/clients', { credentials: 'include' }).then(r => r.json()),
   });
 
-  // Fetch existing survey if editing
+  const { data: properties = [] } = useQuery<Property[]>({
+    queryKey: ['/api/clients', clientId, 'properties'],
+    queryFn: () => fetch(`/api/clients/${clientId}/properties`, { credentials: 'include' }).then(r => r.json()),
+    enabled: !!clientId,
+  });
+
   const { data: existingSurvey } = useQuery({
     queryKey: ['/api/surveys', surveyId],
-    queryFn: async () => {
-      if (!isEditing) return null;
-      const res = await fetch(`/api/surveys/${surveyId}`, { credentials: 'include' });
-      if (!res.ok) return null;
-      return res.json();
-    },
-    enabled: !!isEditing,
+    queryFn: () => fetch(`/api/surveys/${surveyId}`, { credentials: 'include' }).then(r => r.json()),
+    enabled: isEditing,
   });
 
-  // Populate from existing survey
+  // ─── Load existing survey data ─────────────────────────────────────────────
   useEffect(() => {
-    if (existingSurvey) {
-      setData(prev => ({
-        ...prev,
-        client_id: existingSurvey.client_id,
-        client_name: existingSurvey.client_name || '',
-        property_address: existingSurvey.property_address || '',
-        survey_type: existingSurvey.survey_type || '',
-        condition_rating: existingSurvey.condition_rating || '',
-        general_notes: existingSurvey.general_notes || '',
-        access_notes: existingSurvey.access_notes || '',
-        safety_notes: existingSurvey.safety_notes || '',
-        client_preferences: existingSurvey.client_preferences || '',
-        timeline: existingSurvey.timeline || '',
-        gps_lat: existingSurvey.gps_lat,
-        gps_lng: existingSurvey.gps_lng,
-        rooms: (existingSurvey.rooms || []).map((r: any) => ({
-          id: String(r.id),
-          room_name: r.room_name,
-          notes: r.notes || '',
-          work_items: (r.work_items || []).map((wi: any) => ({
-            id: String(wi.id),
-            description: wi.description,
-            type: wi.type || 'both',
-            priority: wi.priority || 'essential',
-            quantity: wi.quantity || 1,
-            unit: wi.unit || 'each',
-          })),
-          media: [],
-          expanded: true,
+    if (!existingSurvey) return;
+    setClientId(existingSurvey.client_id || null);
+    setClientName(existingSurvey.client_name || '');
+    setPropertyId(existingSurvey.property_id || null);
+    setPropertyAddress(existingSurvey.property_address || '');
+    setSurveyType(existingSurvey.survey_type || null);
+    setGeneralNotes(existingSurvey.general_notes || '');
+    setAccessNotes(existingSurvey.access_notes || '');
+    setSafetyNotes(existingSurvey.safety_notes || '');
+    setConditionRating(existingSurvey.condition_rating || '');
+    if (existingSurvey.rooms?.length) {
+      setRooms(existingSurvey.rooms.map((r: any) => ({
+        local_id: crypto.randomUUID(), server_id: r.id, room_name: r.room_name || '',
+        room_type: r.room_type || '', checklist_ref: r.checklist_ref || [],
+        selected: true, length_m: r.length_m?.toString() || '', width_m: r.width_m?.toString() || '',
+        height_m: r.height_m?.toString() || '', condition: r.condition || '',
+        notes: r.notes || '', photos: [],
+        work_items: (r.work_items || []).map((w: any) => ({
+          local_id: crypto.randomUUID(), server_id: w.id, description: w.description || '',
+          type: w.type || 'material', priority: w.priority || 'recommended',
+          quantity: w.quantity?.toString() || '1', unit: w.unit || 'each',
+          length_m: w.length_m?.toString() || '', width_m: w.width_m?.toString() || '',
+          height_m: w.height_m?.toString() || '', notes: w.notes || '',
         })),
-      }));
+      })));
     }
   }, [existingSurvey]);
 
-  // Filtered clients
+  // ─── Filtered lists ────────────────────────────────────────────────────────
   const filteredClients = clients.filter(c =>
-    c.name?.toLowerCase().includes(clientSearch.toLowerCase()) ||
-    c.email?.toLowerCase().includes(clientSearch.toLowerCase())
+    c.name.toLowerCase().includes(clientSearch.toLowerCase())
+  );
+  const filteredProperties = properties.filter(p =>
+    p.address.toLowerCase().includes(propertySearch.toLowerCase())
   );
 
-  // GPS capture
+  // ─── Navigation ────────────────────────────────────────────────────────────
+  const goBack = () => { if (step > 1) setStep(step - 1); else navigate('/surveys'); };
+  const goNext = () => { if (step < 4) setStep(step + 1); };
+
+  // ─── Client selection ──────────────────────────────────────────────────────
+  const selectClient = (client: Client) => {
+    setClientId(client.id); setClientName(client.name);
+    setShowClientDropdown(false); setClientSearch('');
+    setPropertyId(null); setPropertyAddress('');
+  };
+
+  const handleCreateClient = async () => {
+    if (!newClientName.trim()) return;
+    try {
+      const res = await fetch('/api/clients', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newClientName, phone: newClientPhone, email: newClientEmail }),
+      });
+      const client = await res.json();
+      selectClient(client);
+      setShowNewClientForm(false); setNewClientName(''); setNewClientPhone(''); setNewClientEmail('');
+      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      toast({ title: 'Client created' });
+    } catch { toast({ title: 'Failed to create client', variant: 'destructive' }); }
+  };
+
+  // ─── Property selection ────────────────────────────────────────────────────
+  const selectProperty = (property: Property) => {
+    setPropertyId(property.id); setPropertyAddress(property.address);
+    setShowPropertyDropdown(false); setPropertySearch('');
+  };
+
+  const handleCreateProperty = async () => {
+    if (!newPropertyAddress.trim() || !clientId) return;
+    try {
+      const res = await fetch(`/api/clients/${clientId}/properties`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address: newPropertyAddress, postcode: newPropertyPostcode, client_id: clientId }),
+      });
+      const property = await res.json();
+      selectProperty(property);
+      setShowNewPropertyForm(false); setNewPropertyAddress(''); setNewPropertyPostcode('');
+      queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'properties'] });
+      toast({ title: 'Property created' });
+    } catch { toast({ title: 'Failed to create property', variant: 'destructive' }); }
+  };
+
   const captureGPS = () => {
-    if (!navigator.geolocation) {
-      toast({ title: 'GPS not supported', variant: 'destructive' });
-      return;
-    }
+    if (!navigator.geolocation) { toast({ title: 'GPS not supported', variant: 'destructive' }); return; }
+    setGpsLoading(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setData(prev => ({ ...prev, gps_lat: pos.coords.latitude, gps_lng: pos.coords.longitude }));
-        toast({ title: 'GPS captured', description: `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}` });
-      },
-      () => toast({ title: 'GPS failed', description: 'Could not get location', variant: 'destructive' })
+      (pos) => { setGpsLoading(false); toast({ title: `GPS: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}` }); },
+      () => { setGpsLoading(false); toast({ title: 'GPS failed', variant: 'destructive' }); },
+      { enableHighAccuracy: true }
     );
   };
 
-  // Room management
-  const addRoom = () => {
-    setData(prev => ({
-      ...prev,
-      rooms: [...prev.rooms, {
-        id: crypto.randomUUID(),
-        room_name: '',
-        notes: '',
-        work_items: [],
-        media: [],
-        expanded: true,
-      }],
-    }));
+  // ─── Survey type selection ─────────────────────────────────────────────────
+  const handleSelectSurveyType = (type: SurveyType) => {
+    setSurveyType(type);
+    const templates = ROOM_TEMPLATES[type];
+    setRooms(templates.map(t => createRoom(t.room_name, t.room_type, t.checklist)));
   };
 
-  const removeRoom = (roomId: string) => {
-    setData(prev => ({ ...prev, rooms: prev.rooms.filter(r => r.id !== roomId) }));
+  const toggleRoomSelected = (localId: string) => {
+    setRooms(prev => prev.map(r => r.local_id === localId ? { ...r, selected: !r.selected } : r));
   };
 
-  const updateRoom = (roomId: string, updates: Partial<Room>) => {
-    setData(prev => ({
-      ...prev,
-      rooms: prev.rooms.map(r => r.id === roomId ? { ...r, ...updates } : r),
-    }));
+  const addCustomRoom = () => {
+    if (!customRoomName.trim()) return;
+    setRooms(prev => [...prev, createRoom(customRoomName.trim(), 'custom', [])]);
+    setCustomRoomName('');
   };
 
-  const toggleRoom = (roomId: string) => {
-    setData(prev => ({
-      ...prev,
-      rooms: prev.rooms.map(r => r.id === roomId ? { ...r, expanded: !r.expanded } : r),
-    }));
+  // ─── Room details helpers ──────────────────────────────────────────────────
+  const selectedRooms = rooms.filter(r => r.selected);
+
+  const toggleExpanded = (localId: string) => {
+    setExpandedRooms(prev => {
+      const next = new Set(prev);
+      next.has(localId) ? next.delete(localId) : next.add(localId);
+      return next;
+    });
   };
 
-  // Work item management
+  const updateRoom = (localId: string, updates: Partial<WizardRoom>) => {
+    setRooms(prev => prev.map(r => r.local_id === localId ? { ...r, ...updates } : r));
+  };
+
   const addWorkItem = (roomId: string) => {
-    setData(prev => ({
-      ...prev,
-      rooms: prev.rooms.map(r => r.id === roomId ? {
-        ...r,
-        work_items: [...r.work_items, {
-          id: crypto.randomUUID(),
-          description: '',
-          type: 'both',
-          priority: 'essential',
-          quantity: 1,
-          unit: 'each',
-        }],
-      } : r),
-    }));
-  };
-
-  const removeWorkItem = (roomId: string, itemId: string) => {
-    setData(prev => ({
-      ...prev,
-      rooms: prev.rooms.map(r => r.id === roomId ? {
-        ...r,
-        work_items: r.work_items.filter(wi => wi.id !== itemId),
-      } : r),
-    }));
+    setRooms(prev => prev.map(r => r.local_id === roomId ? { ...r, work_items: [...r.work_items, createWorkItem()] } : r));
   };
 
   const updateWorkItem = (roomId: string, itemId: string, updates: Partial<WorkItem>) => {
-    setData(prev => ({
-      ...prev,
-      rooms: prev.rooms.map(r => r.id === roomId ? {
-        ...r,
-        work_items: r.work_items.map(wi => wi.id === itemId ? { ...wi, ...updates } : wi),
-      } : r),
-    }));
+    setRooms(prev => prev.map(r => r.local_id === roomId ? {
+      ...r, work_items: r.work_items.map(w => w.local_id === itemId ? { ...w, ...updates } : w)
+    } : r));
   };
 
-  // Photo management
-  const addPhoto = (roomId: string, files: FileList | null) => {
+  const removeWorkItem = (roomId: string, itemId: string) => {
+    setRooms(prev => prev.map(r => r.local_id === roomId ? {
+      ...r, work_items: r.work_items.filter(w => w.local_id !== itemId)
+    } : r));
+  };
+
+  const handlePhotoUpload = (roomId: string, files: FileList | null) => {
     if (!files) return;
-    const newMedia: RoomMedia[] = Array.from(files).map(file => ({
-      id: crypto.randomUUID(),
-      file,
-      preview: URL.createObjectURL(file),
-    }));
-    setData(prev => ({
-      ...prev,
-      rooms: prev.rooms.map(r => r.id === roomId ? {
-        ...r,
-        media: [...r.media, ...newMedia],
-      } : r),
-    }));
+    setRooms(prev => prev.map(r => r.local_id === roomId ? {
+      ...r, photos: [...r.photos, ...Array.from(files)]
+    } : r));
   };
 
-  const removePhoto = (roomId: string, mediaId: string) => {
-    setData(prev => ({
-      ...prev,
-      rooms: prev.rooms.map(r => r.id === roomId ? {
-        ...r,
-        media: r.media.filter(m => m.id !== mediaId),
-      } : r),
-    }));
+  const removePhoto = (roomId: string, idx: number) => {
+    setRooms(prev => prev.map(r => r.local_id === roomId ? {
+      ...r, photos: r.photos.filter((_, i) => i !== idx)
+    } : r));
   };
 
-  // Save survey
-  const saveSurvey = async (generateQuote: boolean = false) => {
+  const handleCameraCapture = (roomId: string) => {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+    input.onchange = (e) => handlePhotoUpload(roomId, (e.target as HTMLInputElement).files);
+    input.click();
+  };
+
+  // ─── Voice-to-text ─────────────────────────────────────────────────────────
+  const toggleVoice = async (roomId: string) => {
+    if (activeVoiceRoom === roomId) {
+      mediaRecorderRef.current?.stop(); setActiveVoiceRoom(null); return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      recorder.onstop = () => {
+        stream.getTracks().forEach(t => t.stop());
+        toast({ title: 'Voice recording saved (transcription pending)' });
+      };
+      recorder.start(); mediaRecorderRef.current = recorder; setActiveVoiceRoom(roomId);
+    } catch { toast({ title: 'Microphone access denied', variant: 'destructive' }); }
+  };
+
+  // ─── Save logic ────────────────────────────────────────────────────────────
+  const handleSave = async (status: 'draft' | 'complete') => {
+    if (!clientId || !propertyId || !surveyType) {
+      toast({ title: 'Please complete all required fields', variant: 'destructive' }); return;
+    }
     setSaving(true);
     try {
-      let sid = surveyId;
+      const surveyBody = {
+        client_id: clientId, property_id: propertyId, survey_type: surveyType,
+        status, general_notes: generalNotes, access_notes: accessNotes,
+        safety_notes: safetyNotes, condition_rating: conditionRating,
+      };
 
-      // Step 1: Create or update survey
-      if (!isEditing) {
-        const res = await fetch('/api/surveys', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            client_id: data.client_id,
-            property_id: data.property_id,
-            survey_type: data.survey_type,
-          }),
+      let savedSurveyId = surveyId;
+      if (isEditing) {
+        await fetch(`/api/surveys/${surveyId}`, {
+          method: 'PATCH', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(surveyBody),
         });
-        if (!res.ok) throw new Error('Failed to create survey');
+      } else {
+        const res = await fetch('/api/surveys', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(surveyBody),
+        });
         const created = await res.json();
-        sid = String(created.id);
+        savedSurveyId = created.id;
       }
 
-      // Step 2: Update survey fields
-      await fetch(`/api/surveys/${sid}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          status: generateQuote ? 'complete' : 'draft',
-          general_notes: data.general_notes,
-          condition_rating: data.condition_rating,
-          access_notes: data.access_notes,
-          safety_notes: data.safety_notes,
-          client_preferences: data.client_preferences,
-          timeline: data.timeline,
-          gps_lat: data.gps_lat,
-          gps_lng: data.gps_lng,
-          survey_type: data.survey_type,
-        }),
-      });
+      // Save rooms and work items
+      for (const room of selectedRooms) {
+        const roomBody = {
+          room_name: room.room_name, room_type: room.room_type, notes: room.notes,
+          length_m: room.length_m ? parseFloat(room.length_m) : null,
+          width_m: room.width_m ? parseFloat(room.width_m) : null,
+          height_m: room.height_m ? parseFloat(room.height_m) : null,
+          condition: room.condition, checklist_ref: JSON.stringify(room.checklist_ref),
+        };
 
-      // Step 3: Create rooms and work items
-      for (const room of data.rooms) {
-        // Only create rooms that don't have numeric IDs (new rooms)
-        const isNewRoom = isNaN(Number(room.id));
-        let roomId = room.id;
-
-        if (isNewRoom) {
-          const roomRes = await fetch(`/api/surveys/${sid}/rooms`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              room_name: room.room_name,
-              room_type: room.room_name.toLowerCase().replace(/\s+/g, '_'),
-            }),
+        let roomId = room.server_id;
+        if (room.server_id) {
+          await fetch(`/api/surveys/${savedSurveyId}/rooms/${room.server_id}`, {
+            method: 'PATCH', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(roomBody),
           });
-          if (roomRes.ok) {
-            const createdRoom = await roomRes.json();
-            roomId = String(createdRoom.id);
-          }
         } else {
-          // Update existing room notes
-          await fetch(`/api/surveys/${sid}/rooms/${roomId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ notes: room.notes }),
+          const res = await fetch(`/api/surveys/${savedSurveyId}/rooms`, {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(roomBody),
           });
+          const created = await res.json();
+          roomId = created.id;
         }
 
-        // Create work items for new rooms
-        if (isNewRoom) {
-          for (const item of room.work_items) {
-            await fetch(`/api/surveys/${sid}/rooms/${roomId}/work-items`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({
-                description: item.description,
-                type: item.type,
-                priority: item.priority,
-                quantity: item.quantity,
-                unit: item.unit,
-              }),
-            });
-          }
+        // Save work items
+        for (const item of room.work_items) {
+          if (!item.description.trim()) continue;
+          await fetch(`/api/surveys/${savedSurveyId}/rooms/${roomId}/work-items`, {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              description: item.description, type: item.type, priority: item.priority,
+              quantity: item.quantity ? parseFloat(item.quantity) : 1, unit: item.unit,
+              length_m: item.length_m ? parseFloat(item.length_m) : null,
+              width_m: item.width_m ? parseFloat(item.width_m) : null,
+              height_m: item.height_m ? parseFloat(item.height_m) : null, notes: item.notes,
+            }),
+          });
         }
 
         // Upload photos
-        for (const media of room.media) {
+        for (const photo of room.photos) {
           const formData = new FormData();
-          formData.append('file', media.file);
-          formData.append('survey_room_id', roomId);
-          await fetch(`/api/surveys/${sid}/media`, {
-            method: 'POST',
-            credentials: 'include',
-            body: formData,
+          formData.append('file', photo);
+          if (roomId) formData.append('survey_room_id', roomId.toString());
+          await fetch(`/api/surveys/${savedSurveyId}/media`, {
+            method: 'POST', credentials: 'include', body: formData,
           });
         }
       }
 
-      // Step 4: Generate quote if requested
-      if (generateQuote) {
-        const quoteRes = await fetch(`/api/surveys/${sid}/generate-quote`, {
-          method: 'POST',
-          credentials: 'include',
-        });
-        if (quoteRes.ok) {
-          const quoteData = await quoteRes.json();
-          toast({ title: 'Quote generated!', description: `Quote ${quoteData.quote_no} created` });
-          queryClient.invalidateQueries({ queryKey: ['/api/surveys'] });
-          navigate(`/quotes/${quoteData.quote_id}`);
-          return;
-        }
-      }
-
-      toast({ title: 'Survey saved!', description: generateQuote ? 'Survey completed' : 'Saved as draft' });
       queryClient.invalidateQueries({ queryKey: ['/api/surveys'] });
+      toast({ title: status === 'draft' ? 'Survey saved as draft' : 'Survey marked complete' });
       navigate('/surveys');
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } finally {
-      setSaving(false);
-    }
+    } catch (err) {
+      toast({ title: 'Failed to save survey', variant: 'destructive' });
+    } finally { setSaving(false); }
   };
 
-  // ─── Step Renderers ──────────────────────────────────────────────────────────
+  // ─── Step Indicator ────────────────────────────────────────────────────────
+  const StepIndicator = () => (
+    <div className="flex items-center justify-between mb-6 px-2">
+      {STEPS.map((label, i) => {
+        const stepNum = i + 1;
+        const isActive = step === stepNum;
+        const isDone = step > stepNum;
+        return (
+          <div key={label} className="flex items-center">
+            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold transition-colors ${
+              isActive ? 'bg-blue-600 text-white' : isDone ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
+            }`}>{isDone ? '✓' : stepNum}</div>
+            <span className={`ml-2 text-xs hidden sm:inline ${
+              isActive ? 'text-blue-600 font-semibold' : 'text-gray-500'
+            }`}>{label}</span>
+            {i < STEPS.length - 1 && <div className="w-8 sm:w-16 h-px bg-gray-300 mx-2" />}
+          </div>
+        );
+      })}
+    </div>
+  );
 
+  // ─── Step 1: Client & Property ─────────────────────────────────────────────
   const renderStep1 = () => (
     <div className="space-y-6">
+      {/* Client Search */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Select Client</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search clients by name or email..."
-              value={clientSearch}
-              onChange={(e) => setClientSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-
-          {clientSearch && filteredClients.length > 0 && (
-            <div className="border rounded-md max-h-48 overflow-y-auto">
-              {filteredClients.slice(0, 10).map(client => (
-                <button
-                  key={client.id}
-                  className={`w-full text-left px-4 py-2 hover:bg-muted transition-colors border-b last:border-0 ${
-                    data.client_id === client.id ? 'bg-primary/5 border-l-2 border-l-primary' : ''
-                  }`}
-                  onClick={() => {
-                    setData(prev => ({ ...prev, client_id: client.id, client_name: client.name }));
-                    setClientSearch('');
-                  }}
-                >
-                  <div className="font-medium text-sm">{client.name}</div>
-                  <div className="text-xs text-muted-foreground">{client.email} • {client.phone}</div>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {data.client_id && (
-            <div className="flex items-center gap-2 p-3 bg-emerald-50 rounded-md border border-emerald-200">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-              <span className="text-sm font-medium text-emerald-800">{data.client_name}</span>
-              <Button variant="ghost" size="sm" className="ml-auto h-6" onClick={() => setData(prev => ({ ...prev, client_id: null, client_name: '' }))}>
-                <X className="h-3 w-3" />
+        <CardHeader><CardTitle className="text-lg">Client</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          {clientId ? (
+            <div className="flex items-center gap-2">
+              <Badge className="bg-green-100 text-green-800 gap-1"><CheckCircle2 className="w-3 h-3" />{clientName}</Badge>
+              <Button variant="ghost" size="sm" onClick={() => { setClientId(null); setClientName(''); setPropertyId(null); setPropertyAddress(''); }}>
+                <X className="w-4 h-4" />
               </Button>
             </div>
-          )}
-
-          <Button variant="outline" size="sm" onClick={() => setShowNewClient(!showNewClient)}>
-            <Plus className="h-4 w-4 mr-1" /> Quick-add New Client
-          </Button>
-
-          {showNewClient && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 border rounded-md bg-muted/30">
-              <div>
-                <Label className="text-xs">Name</Label>
-                <Input
-                  value={data.new_client_name}
-                  onChange={(e) => setData(prev => ({ ...prev, new_client_name: e.target.value }))}
-                  placeholder="Client name"
-                />
+          ) : (
+            <div className="relative">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input placeholder="Search clients..." value={clientSearch}
+                  onChange={(e) => { setClientSearch(e.target.value); setShowClientDropdown(true); }}
+                  onFocus={() => setShowClientDropdown(true)} className="pl-10" />
               </div>
-              <div>
-                <Label className="text-xs">Phone</Label>
-                <Input
-                  value={data.new_client_phone}
-                  onChange={(e) => setData(prev => ({ ...prev, new_client_phone: e.target.value }))}
-                  placeholder="Phone number"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Email</Label>
-                <Input
-                  value={data.new_client_email}
-                  onChange={(e) => setData(prev => ({ ...prev, new_client_email: e.target.value }))}
-                  placeholder="Email address"
-                />
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Property Details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label className="text-xs">Property Address</Label>
-            <Input
-              value={data.property_address}
-              onChange={(e) => setData(prev => ({ ...prev, property_address: e.target.value }))}
-              placeholder="Enter property address"
-            />
-          </div>
-
-          <Button variant="outline" size="sm" onClick={() => setShowNewProperty(!showNewProperty)}>
-            <Plus className="h-4 w-4 mr-1" /> Add New Property
-          </Button>
-
-          {showNewProperty && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 border rounded-md bg-muted/30">
-              <div>
-                <Label className="text-xs">Address</Label>
-                <Input
-                  value={data.new_property_address}
-                  onChange={(e) => setData(prev => ({ ...prev, new_property_address: e.target.value }))}
-                  placeholder="Full address"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Postcode</Label>
-                <Input
-                  value={data.new_property_postcode}
-                  onChange={(e) => setData(prev => ({ ...prev, new_property_postcode: e.target.value }))}
-                  placeholder="Postcode"
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={captureGPS}>
-              <MapPin className="h-4 w-4 mr-1" /> Capture GPS Location
-            </Button>
-            {data.gps_lat && (
-              <span className="text-xs text-muted-foreground">
-                📍 {data.gps_lat.toFixed(6)}, {data.gps_lng?.toFixed(6)}
-              </span>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-
-  const renderStep2 = () => (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-[#0F2B4C]">Select Survey Type</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {SURVEY_TYPES.map(type => (
-          <Card
-            key={type.id}
-            className={`cursor-pointer transition-all hover:shadow-md ${
-              data.survey_type === type.id
-                ? 'ring-2 ring-[#E8A54B] border-[#E8A54B] bg-[#E8A54B]/5'
-                : 'hover:border-[#0F2B4C]/30'
-            }`}
-            onClick={() => setData(prev => ({ ...prev, survey_type: type.id }))}
-          >
-            <CardContent className="p-6 text-center">
-              <div className="text-4xl mb-3">{type.icon}</div>
-              <h3 className="font-semibold text-[#0F2B4C] mb-1">{type.title}</h3>
-              <p className="text-xs text-muted-foreground">{type.desc}</p>
-              {data.survey_type === type.id && (
-                <Badge className="mt-3 bg-[#E8A54B] text-white">Selected</Badge>
+              {showClientDropdown && (
+                <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  {filteredClients.length === 0 ? (
+                    <div className="p-3 text-sm text-gray-500">No clients found</div>
+                  ) : filteredClients.map(c => (
+                    <button key={c.id} className="w-full px-3 py-2 text-left hover:bg-gray-50 text-sm"
+                      onClick={() => selectClient(c)}>{c.name}</button>
+                  ))}
+                </div>
               )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            </div>
+          )}
+          <Button variant="outline" size="sm" onClick={() => setShowNewClientForm(!showNewClientForm)}>
+            <Plus className="w-4 h-4 mr-1" /> Quick-add Client
+          </Button>
+          {showNewClientForm && (
+            <div className="p-3 border rounded-md space-y-2 bg-gray-50">
+              <Input placeholder="Name *" value={newClientName} onChange={(e) => setNewClientName(e.target.value)} />
+              <Input placeholder="Phone" value={newClientPhone} onChange={(e) => setNewClientPhone(e.target.value)} />
+              <Input placeholder="Email" value={newClientEmail} onChange={(e) => setNewClientEmail(e.target.value)} />
+              <Button size="sm" onClick={handleCreateClient} disabled={!newClientName.trim()}>Create Client</Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Property Search */}
+      <Card>
+        <CardHeader><CardTitle className="text-lg">Property</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          {!clientId ? (
+            <p className="text-sm text-gray-500">Select a client first</p>
+          ) : propertyId ? (
+            <div className="flex items-center gap-2">
+              <Badge className="bg-green-100 text-green-800 gap-1"><CheckCircle2 className="w-3 h-3" />{propertyAddress}</Badge>
+              <Button variant="ghost" size="sm" onClick={() => { setPropertyId(null); setPropertyAddress(''); }}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="relative">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input placeholder="Search properties..." value={propertySearch}
+                  onChange={(e) => { setPropertySearch(e.target.value); setShowPropertyDropdown(true); }}
+                  onFocus={() => setShowPropertyDropdown(true)} className="pl-10" />
+              </div>
+              {showPropertyDropdown && (
+                <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  {filteredProperties.length === 0 ? (
+                    <div className="p-3 text-sm text-gray-500">No properties found</div>
+                  ) : filteredProperties.map(p => (
+                    <button key={p.id} className="w-full px-3 py-2 text-left hover:bg-gray-50 text-sm"
+                      onClick={() => selectProperty(p)}>{p.address}{p.postcode ? ` (${p.postcode})` : ''}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {clientId && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setShowNewPropertyForm(!showNewPropertyForm)}>
+                <Plus className="w-4 h-4 mr-1" /> Add New Property
+              </Button>
+              {showNewPropertyForm && (
+                <div className="p-3 border rounded-md space-y-2 bg-gray-50">
+                  <Input placeholder="Address *" value={newPropertyAddress} onChange={(e) => setNewPropertyAddress(e.target.value)} />
+                  <Input placeholder="Postcode" value={newPropertyPostcode} onChange={(e) => setNewPropertyPostcode(e.target.value)} />
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handleCreateProperty} disabled={!newPropertyAddress.trim()}>Create Property</Button>
+                    <Button size="sm" variant="outline" onClick={captureGPS} disabled={gpsLoading}>
+                      {gpsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+                      <span className="ml-1">GPS</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 
-  const renderStep3 = () => (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-[#0F2B4C]">Room Inspection</h2>
-        <Button onClick={addRoom} className="bg-[#0F2B4C] hover:bg-[#0F2B4C]/90 text-white">
-          <Plus className="h-4 w-4 mr-1" /> Add Room
-        </Button>
+  // ─── Step 2: Survey Setup ──────────────────────────────────────────────────
+  const renderStep2 = () => (
+    <div className="space-y-6">
+      {/* Survey Type Selection */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Select Survey Type</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {SURVEY_TYPES.map(({ key, label, icon }) => (
+            <button key={key} onClick={() => handleSelectSurveyType(key)}
+              className={`p-4 rounded-lg border-2 text-center transition-all hover:shadow-md ${
+                surveyType === key ? 'border-blue-500 bg-blue-50 shadow-md' : 'border-gray-200 hover:border-gray-300'
+              }`}>
+              <div className="text-3xl mb-2">{icon}</div>
+              <div className="text-sm font-medium">{label}</div>
+            </button>
+          ))}
+        </div>
       </div>
 
-      {data.rooms.length === 0 && (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Home className="h-12 w-12 text-muted-foreground/30 mb-3" />
-            <p className="text-sm text-muted-foreground">No rooms added yet. Click "Add Room" to start.</p>
+      {/* Room Selection */}
+      {surveyType && (
+        <Card>
+          <CardHeader><CardTitle className="text-lg">Rooms to Survey</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {rooms.length === 0 && surveyType === 'custom' && (
+              <p className="text-sm text-gray-500">Add rooms manually for a custom survey.</p>
+            )}
+            {rooms.map(room => (
+              <div key={room.local_id} className="flex items-start gap-3 p-3 border rounded-md">
+                <input type="checkbox" checked={room.selected}
+                  onChange={() => toggleRoomSelected(room.local_id)}
+                  className="mt-1 w-4 h-4 rounded border-gray-300" />
+                <div className="flex-1">
+                  <div className="font-medium text-sm">{room.room_name}</div>
+                  {room.checklist_ref.length > 0 && (
+                    <div className="text-xs text-gray-400 mt-1">{room.checklist_ref.join(' • ')}</div>
+                  )}
+                </div>
+              </div>
+            ))}
+            {/* Add Custom Room */}
+            <div className="flex gap-2 pt-2 border-t">
+              <Input placeholder="Custom room name" value={customRoomName}
+                onChange={(e) => setCustomRoomName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') addCustomRoom(); }} className="flex-1" />
+              <Button size="sm" onClick={addCustomRoom} disabled={!customRoomName.trim()}>
+                <Plus className="w-4 h-4 mr-1" /> Add Custom Room
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
+    </div>
+  );
 
-      {data.rooms.map((room, index) => (
-        <Card key={room.id} className="overflow-hidden">
-          {/* Room Header */}
-          <div
-            className="flex items-center gap-3 p-4 bg-muted/30 cursor-pointer"
-            onClick={() => toggleRoom(room.id)}
-          >
-            <span className="font-medium text-sm text-[#0F2B4C] flex-1">
-              {room.room_name || `Room ${index + 1}`}
-            </span>
-            <Badge variant="outline" className="text-xs">
-              {room.work_items.length} items • {room.media.length} photos
-            </Badge>
-            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); removeRoom(room.id); }}>
-              <Trash2 className="h-4 w-4 text-red-500" />
-            </Button>
-            {room.expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </div>
+  // ─── Step 3: Room Details ──────────────────────────────────────────────────
+  const renderStep3 = () => (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold">Room Details</h3>
+      {selectedRooms.length === 0 ? (
+        <p className="text-sm text-gray-500">No rooms selected. Go back to add rooms.</p>
+      ) : selectedRooms.map(room => {
+        const isExpanded = expandedRooms.has(room.local_id);
+        const area = room.length_m && room.width_m
+          ? (parseFloat(room.length_m) * parseFloat(room.width_m)).toFixed(1) : null;
 
-          {/* Room Body */}
-          {room.expanded && (
-            <CardContent className="p-4 space-y-4">
-              {/* Room Name */}
-              <div>
-                <Label className="text-xs">Room Name</Label>
-                <Select
-                  value={room.room_name}
-                  onValueChange={(v) => updateRoom(room.id, { room_name: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select room type..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ROOM_OPTIONS.map(opt => (
-                      <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+        return (
+          <Card key={room.local_id} className="overflow-hidden">
+            <button className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors"
+              onClick={() => toggleExpanded(room.local_id)}>
+              <div className="flex items-center gap-2">
+                <Home className="w-4 h-4 text-gray-500" />
+                <span className="font-medium text-sm">{room.room_name}</span>
+                <Badge variant="secondary" className="text-xs">{room.room_type}</Badge>
+                {room.work_items.length > 0 && (
+                  <Badge className="text-xs bg-blue-100 text-blue-700">{room.work_items.length} items</Badge>
+                )}
               </div>
+              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
 
-              {/* Notes with voice */}
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <Label className="text-xs">Notes</Label>
-                  <VoiceButton onTranscript={(text) => updateRoom(room.id, { notes: room.notes + ' ' + text })} />
+            {isExpanded && (
+              <CardContent className="p-4 space-y-4">
+                {/* Room name edit */}
+                <div>
+                  <Label className="text-xs">Room Name</Label>
+                  <Input value={room.room_name} onChange={(e) => updateRoom(room.local_id, { room_name: e.target.value })} />
                 </div>
-                <Textarea
-                  value={room.notes}
-                  onChange={(e) => updateRoom(room.id, { notes: e.target.value })}
-                  placeholder="Room condition notes, observations..."
-                  rows={3}
-                />
-              </div>
 
-              {/* Photos */}
-              <div>
-                <Label className="text-xs mb-2 block">Photos & Videos</Label>
-                <div className="flex flex-wrap gap-2">
-                  {room.media.map(m => (
-                    <div key={m.id} className="relative w-20 h-20 rounded-md overflow-hidden border">
-                      <img src={m.preview} alt="" className="w-full h-full object-cover" />
-                      <button
-                        className="absolute top-0.5 right-0.5 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
-                        onClick={() => removePhoto(room.id, m.id)}
-                      >
-                        ×
-                      </button>
+                {/* Reference checklist */}
+                {room.checklist_ref.length > 0 && (
+                  <div className="text-xs text-gray-400 italic">
+                    <span className="font-medium">Reference:</span> {room.checklist_ref.join(', ')}
+                  </div>
+                )}
+
+                {/* Measurements */}
+                <div>
+                  <Label className="text-xs font-medium">Measurements</Label>
+                  <div className="grid grid-cols-3 gap-2 mt-1">
+                    <div>
+                      <Label className="text-xs text-gray-500">Length (m)</Label>
+                      <Input type="number" step="0.1" value={room.length_m}
+                        onChange={(e) => updateRoom(room.local_id, { length_m: e.target.value })} />
                     </div>
-                  ))}
-                  <label className="w-20 h-20 rounded-md border-2 border-dashed flex items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors">
-                    <Camera className="h-6 w-6 text-muted-foreground" />
-                    <input
-                      type="file"
-                      accept="image/*,video/*"
-                      capture="environment"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => addPhoto(room.id, e.target.files)}
-                    />
-                  </label>
+                    <div>
+                      <Label className="text-xs text-gray-500">Width (m)</Label>
+                      <Input type="number" step="0.1" value={room.width_m}
+                        onChange={(e) => updateRoom(room.local_id, { width_m: e.target.value })} />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-500">Height (m)</Label>
+                      <Input type="number" step="0.1" value={room.height_m}
+                        onChange={(e) => updateRoom(room.local_id, { height_m: e.target.value })} />
+                    </div>
+                  </div>
+                  {area && <p className="text-xs text-blue-600 mt-1 font-medium">Floor area: {area} m²</p>}
                 </div>
-              </div>
 
-              {/* Work Items */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <Label className="text-xs">Work Items</Label>
-                  <Button variant="outline" size="sm" onClick={() => addWorkItem(room.id)}>
-                    <Plus className="h-3 w-3 mr-1" /> Add Item
-                  </Button>
+                {/* Condition */}
+                <div>
+                  <Label className="text-xs">Condition</Label>
+                  <Select value={room.condition} onValueChange={(v) => updateRoom(room.local_id, { condition: v })}>
+                    <SelectTrigger><SelectValue placeholder="Select condition" /></SelectTrigger>
+                    <SelectContent>
+                      {CONDITION_OPTIONS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="space-y-2">
-                  {room.work_items.map(item => (
-                    <div key={item.id} className="grid grid-cols-12 gap-2 items-start p-2 border rounded-md bg-muted/20">
-                      <div className="col-span-12 md:col-span-4">
-                        <Input
-                          placeholder="Description"
-                          value={item.description}
-                          onChange={(e) => updateWorkItem(room.id, item.id, { description: e.target.value })}
-                          className="text-sm h-8"
-                        />
-                      </div>
-                      <div className="col-span-4 md:col-span-2">
-                        <Select value={item.type} onValueChange={(v: any) => updateWorkItem(room.id, item.id, { type: v })}>
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="material">Material</SelectItem>
-                            <SelectItem value="labour">Labour</SelectItem>
-                            <SelectItem value="both">Both</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="col-span-4 md:col-span-2">
-                        <Select value={item.priority} onValueChange={(v: any) => updateWorkItem(room.id, item.id, { priority: v })}>
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="essential">Essential</SelectItem>
-                            <SelectItem value="recommended">Recommended</SelectItem>
-                            <SelectItem value="optional">Optional</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="col-span-2 md:col-span-1">
-                        <Input
-                          type="number"
-                          min={1}
-                          value={item.quantity}
-                          onChange={(e) => updateWorkItem(room.id, item.id, { quantity: parseInt(e.target.value) || 1 })}
-                          className="text-sm h-8"
-                        />
-                      </div>
-                      <div className="col-span-3 md:col-span-2">
-                        <Input
-                          placeholder="Unit"
-                          value={item.unit}
-                          onChange={(e) => updateWorkItem(room.id, item.id, { unit: e.target.value })}
-                          className="text-sm h-8"
-                        />
-                      </div>
-                      <div className="col-span-1">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => removeWorkItem(room.id, item.id)}>
-                          <X className="h-3.5 w-3.5 text-red-500" />
+
+                {/* Notes with voice */}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs">Notes</Label>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => toggleVoice(room.local_id)}>
+                      {activeVoiceRoom === room.local_id ? <MicOff className="w-3 h-3 text-red-500" /> : <Mic className="w-3 h-3" />}
+                    </Button>
+                  </div>
+                  <Textarea value={room.notes} onChange={(e) => updateRoom(room.local_id, { notes: e.target.value })}
+                    placeholder="Add notes about this room..." rows={3} />
+                </div>
+
+                {/* Work Items */}
+                <div className="border-t pt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-sm font-medium flex items-center gap-1"><Wrench className="w-4 h-4" /> Work Items</Label>
+                    <Button variant="outline" size="sm" onClick={() => addWorkItem(room.local_id)}>
+                      <Plus className="w-3 h-3 mr-1" /> Add Work Item
+                    </Button>
+                  </div>
+                  {room.work_items.map((item) => (
+                    <div key={item.local_id} className="p-3 border rounded-md mb-2 bg-gray-50 space-y-2">
+                      <div className="flex gap-2">
+                        <Input placeholder="Description *" value={item.description}
+                          onChange={(e) => updateWorkItem(room.local_id, item.local_id, { description: e.target.value })} className="flex-1" />
+                        <Button variant="ghost" size="sm" onClick={() => removeWorkItem(room.local_id, item.local_id)}>
+                          <Trash2 className="w-4 h-4 text-red-500" />
                         </Button>
                       </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <Select value={item.type} onValueChange={(v) => updateWorkItem(room.local_id, item.local_id, { type: v })}>
+                          <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>{WORK_ITEM_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <Select value={item.priority} onValueChange={(v) => updateWorkItem(room.local_id, item.local_id, { priority: v })}>
+                          <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>{PRIORITY_OPTIONS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <Input type="number" placeholder="Qty" value={item.quantity}
+                          onChange={(e) => updateWorkItem(room.local_id, item.local_id, { quantity: e.target.value })} className="text-xs" />
+                        <Select value={item.unit} onValueChange={(v) => updateWorkItem(room.local_id, item.local_id, { unit: v })}>
+                          <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>{UNIT_OPTIONS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Input type="number" step="0.1" placeholder="L (m)" value={item.length_m}
+                          onChange={(e) => updateWorkItem(room.local_id, item.local_id, { length_m: e.target.value })} className="text-xs" />
+                        <Input type="number" step="0.1" placeholder="W (m)" value={item.width_m}
+                          onChange={(e) => updateWorkItem(room.local_id, item.local_id, { width_m: e.target.value })} className="text-xs" />
+                        <Input type="number" step="0.1" placeholder="H (m)" value={item.height_m}
+                          onChange={(e) => updateWorkItem(room.local_id, item.local_id, { height_m: e.target.value })} className="text-xs" />
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            </CardContent>
-          )}
-        </Card>
-      ))}
+
+                {/* Photos */}
+                <div className="border-t pt-3">
+                  <Label className="text-sm font-medium">Photos</Label>
+                  <div className="flex gap-2 mt-2">
+                    <Button variant="outline" size="sm" onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file'; input.accept = 'image/*'; input.multiple = true;
+                      input.onchange = (e) => handlePhotoUpload(room.local_id, (e.target as HTMLInputElement).files);
+                      input.click();
+                    }}><Upload className="w-4 h-4 mr-1" /> Upload</Button>
+                    <Button variant="outline" size="sm" onClick={() => handleCameraCapture(room.local_id)}>
+                      <Camera className="w-4 h-4 mr-1" /> Camera
+                    </Button>
+                  </div>
+                  {room.photos.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {room.photos.map((photo, idx) => (
+                        <div key={idx} className="relative w-16 h-16 rounded-md overflow-hidden border">
+                          <img src={URL.createObjectURL(photo)} alt="" className="w-full h-full object-cover" />
+                          <button className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs"
+                            onClick={() => removePhoto(room.local_id, idx)}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            )}
+          </Card>
+        );
+      })}
     </div>
   );
 
-  const renderStep4 = () => (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">General Assessment</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label className="text-xs">Overall Condition Rating</Label>
-            <Select
-              value={data.condition_rating}
-              onValueChange={(v) => setData(prev => ({ ...prev, condition_rating: v }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select condition..." />
-              </SelectTrigger>
-              <SelectContent>
-                {CONDITION_RATINGS.map(r => (
-                  <SelectItem key={r} value={r.toLowerCase()}>{r}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Label className="text-xs">General Notes</Label>
-              <VoiceButton onTranscript={(text) => setData(prev => ({ ...prev, general_notes: prev.general_notes + ' ' + text }))} />
-            </div>
-            <Textarea
-              value={data.general_notes}
-              onChange={(e) => setData(prev => ({ ...prev, general_notes: e.target.value }))}
-              placeholder="Overall observations, key findings..."
-              rows={4}
-            />
-          </div>
-
-          <div>
-            <Label className="text-xs">Access Issues</Label>
-            <Textarea
-              value={data.access_notes}
-              onChange={(e) => setData(prev => ({ ...prev, access_notes: e.target.value }))}
-              placeholder="Any access restrictions, parking, keys needed..."
-              rows={2}
-            />
-          </div>
-
-          <div>
-            <Label className="text-xs">Health & Safety Concerns</Label>
-            <Textarea
-              value={data.safety_notes}
-              onChange={(e) => setData(prev => ({ ...prev, safety_notes: e.target.value }))}
-              placeholder="Asbestos risk, structural issues, hazardous materials..."
-              rows={2}
-            />
-          </div>
-
-          <div>
-            <Label className="text-xs">Client Preferences</Label>
-            <Textarea
-              value={data.client_preferences}
-              onChange={(e) => setData(prev => ({ ...prev, client_preferences: e.target.value }))}
-              placeholder="Style preferences, budget constraints, material choices..."
-              rows={2}
-            />
-          </div>
-
-          <div>
-            <Label className="text-xs">Timeline Expectations</Label>
-            <Textarea
-              value={data.timeline}
-              onChange={(e) => setData(prev => ({ ...prev, timeline: e.target.value }))}
-              placeholder="When does the client want work to start? Any deadlines?"
-              rows={2}
-            />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-
-  const renderStep5 = () => {
-    const totalPhotos = data.rooms.reduce((sum, r) => sum + r.media.length, 0);
-    const totalWorkItems = data.rooms.reduce((sum, r) => sum + r.work_items.length, 0);
+  // ─── Step 4: Review & Save ─────────────────────────────────────────────────
+  const renderStep4 = () => {
+    const totalWorkItems = selectedRooms.reduce((sum, r) => sum + r.work_items.length, 0);
+    const totalPhotos = selectedRooms.reduce((sum, r) => sum + r.photos.length, 0);
 
     return (
       <div className="space-y-6">
+        {/* Summary */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Survey Summary</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 bg-muted/50 rounded-lg">
-                <div className="text-2xl font-bold text-[#0F2B4C]">{data.rooms.length}</div>
-                <div className="text-xs text-muted-foreground">Rooms</div>
-              </div>
-              <div className="text-center p-4 bg-muted/50 rounded-lg">
-                <div className="text-2xl font-bold text-[#0F2B4C]">{totalPhotos}</div>
-                <div className="text-xs text-muted-foreground">Photos/Videos</div>
-              </div>
-              <div className="text-center p-4 bg-muted/50 rounded-lg">
-                <div className="text-2xl font-bold text-[#0F2B4C]">{totalWorkItems}</div>
-                <div className="text-xs text-muted-foreground">Work Items</div>
-              </div>
-              <div className="text-center p-4 bg-muted/50 rounded-lg">
-                <div className="text-2xl font-bold text-[#0F2B4C] capitalize">{data.survey_type || '—'}</div>
-                <div className="text-xs text-muted-foreground">Survey Type</div>
-              </div>
+          <CardHeader><CardTitle className="text-lg">Survey Summary</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="text-gray-500">Client:</div>
+              <div className="font-medium">{clientName || '—'}</div>
+              <div className="text-gray-500">Property:</div>
+              <div className="font-medium">{propertyAddress || '—'}</div>
+              <div className="text-gray-500">Survey Type:</div>
+              <div className="font-medium capitalize">{surveyType || '—'}</div>
+              <div className="text-gray-500">Rooms:</div>
+              <div className="font-medium">{selectedRooms.length}</div>
+              <div className="text-gray-500">Work Items:</div>
+              <div className="font-medium">{totalWorkItems}</div>
+              <div className="text-gray-500">Photos:</div>
+              <div className="font-medium">{totalPhotos}</div>
             </div>
 
-            {/* Rooms summary */}
-            <div className="space-y-2">
-              <h3 className="font-medium text-sm">Rooms Inspected:</h3>
-              {data.rooms.map(room => (
-                <div key={room.id} className="flex items-center justify-between p-2 border rounded-md text-sm">
-                  <span className="font-medium">{room.room_name || 'Unnamed Room'}</span>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span>{room.work_items.length} items</span>
-                    <span>{room.media.length} photos</span>
+            {/* Room breakdown */}
+            <div className="border-t pt-3 mt-3">
+              <h4 className="text-sm font-medium mb-2">Rooms</h4>
+              {selectedRooms.map(room => {
+                const area = room.length_m && room.width_m
+                  ? `${(parseFloat(room.length_m) * parseFloat(room.width_m)).toFixed(1)} m²` : null;
+                return (
+                  <div key={room.local_id} className="flex items-center justify-between py-1 text-sm">
+                    <span>{room.room_name}</span>
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      {area && <span>{area}</span>}
+                      {room.work_items.length > 0 && <Badge variant="secondary" className="text-xs">{room.work_items.length} items</Badge>}
+                      {room.photos.length > 0 && <Badge variant="secondary" className="text-xs">{room.photos.length} 📷</Badge>}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
+          </CardContent>
+        </Card>
 
-            {data.condition_rating && (
-              <div className="p-3 bg-muted/30 rounded-md">
-                <span className="text-xs text-muted-foreground">Condition:</span>
-                <span className="ml-2 font-medium capitalize">{data.condition_rating}</span>
-              </div>
-            )}
+        {/* Notes */}
+        <Card>
+          <CardHeader><CardTitle className="text-lg">Notes</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label>General Notes</Label>
+              <Textarea value={generalNotes} onChange={(e) => setGeneralNotes(e.target.value)}
+                placeholder="General observations about the survey..." rows={3} />
+            </div>
+            <div>
+              <Label>Access Notes</Label>
+              <Textarea value={accessNotes} onChange={(e) => setAccessNotes(e.target.value)}
+                placeholder="Parking, key location, access codes..." rows={2} />
+            </div>
+            <div>
+              <Label>Safety Notes</Label>
+              <Textarea value={safetyNotes} onChange={(e) => setSafetyNotes(e.target.value)}
+                placeholder="Hazards, safety concerns..." rows={2} />
+            </div>
+            <div>
+              <Label>Overall Condition Rating</Label>
+              <Select value={conditionRating} onValueChange={setConditionRating}>
+                <SelectTrigger><SelectValue placeholder="Select rating" /></SelectTrigger>
+                <SelectContent>
+                  {['Excellent', 'Good', 'Fair', 'Poor', 'Urgent'].map(c => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </CardContent>
         </Card>
 
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Button
-            onClick={() => saveSurvey(false)}
-            disabled={saving}
-            className="flex-1 bg-[#0F2B4C] hover:bg-[#0F2B4C]/90 text-white"
-          >
-            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            💾 Save as Draft
+        <div className="flex gap-3">
+          <Button variant="outline" className="flex-1" onClick={() => handleSave('draft')} disabled={saving}>
+            {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+            Save as Draft
           </Button>
-          <Button
-            onClick={() => saveSurvey(true)}
-            disabled={saving || totalWorkItems === 0}
-            className="flex-1 bg-[#E8A54B] hover:bg-[#E8A54B]/90 text-white"
-          >
-            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-            📄 Generate Quote
+          <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => handleSave('complete')} disabled={saving}>
+            {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+            Mark Complete
           </Button>
         </div>
       </div>
     );
   };
 
-  // ─── Main Render ─────────────────────────────────────────────────────────────
-
+  // ─── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
+    <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/surveys')}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <h1 className="text-xl font-bold text-[#0F2B4C]">
-          {isEditing ? 'Edit Survey' : 'New Survey'}
-        </h1>
+      <div className="sticky top-0 z-40 bg-white border-b shadow-sm">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={goBack}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <h1 className="text-lg font-semibold flex-1">
+            {isEditing ? 'Edit Survey' : 'New Survey'}
+          </h1>
+          <span className="text-sm text-gray-500">Step {step} of 4</span>
+        </div>
+        <div className="max-w-4xl mx-auto px-4 pb-3">
+          <StepIndicator />
+        </div>
       </div>
 
-      {/* Progress Steps */}
-      <div className="flex items-center justify-between overflow-x-auto pb-2">
-        {STEPS.map((s, i) => (
-          <button
-            key={s.id}
-            onClick={() => setStep(s.id)}
-            className={`flex flex-col items-center min-w-[70px] px-2 py-2 rounded-lg transition-colors ${
-              step === s.id
-                ? 'bg-[#0F2B4C] text-white'
-                : step > s.id
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : 'bg-muted/50 text-muted-foreground'
-            }`}
-          >
-            <span className="text-lg">{s.icon}</span>
-            <span className="text-[10px] font-medium mt-0.5 whitespace-nowrap">{s.title}</span>
-          </button>
-        ))}
+      {/* Content */}
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        {step === 1 && renderStep1()}
+        {step === 2 && renderStep2()}
+        {step === 3 && renderStep3()}
+        {step === 4 && renderStep4()}
       </div>
 
-      {/* Step Content */}
-      {step === 1 && renderStep1()}
-      {step === 2 && renderStep2()}
-      {step === 3 && renderStep3()}
-      {step === 4 && renderStep4()}
-      {step === 5 && renderStep5()}
-
-      {/* Navigation */}
-      {step < 5 && (
-        <div className="flex justify-between pt-4">
-          <Button
-            variant="outline"
-            onClick={() => setStep(Math.max(1, step - 1))}
-            disabled={step === 1}
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" /> Back
-          </Button>
-          <Button
-            onClick={() => setStep(Math.min(5, step + 1))}
-            className="bg-[#0F2B4C] hover:bg-[#0F2B4C]/90 text-white"
-          >
-            Next <ArrowRight className="h-4 w-4 ml-1" />
-          </Button>
+      {/* Bottom Navigation */}
+      {step < 4 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg">
+          <div className="max-w-4xl mx-auto px-4 py-3 flex justify-between">
+            <Button variant="outline" onClick={goBack}>
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back
+            </Button>
+            <Button onClick={goNext} disabled={
+              (step === 1 && (!clientId || !propertyId)) ||
+              (step === 2 && !surveyType)
+            }>
+              Next <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
         </div>
       )}
     </div>

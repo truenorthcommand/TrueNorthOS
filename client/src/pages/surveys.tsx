@@ -210,7 +210,18 @@ export default function Surveys() {
                     </div>
 
                     {/* Right: Arrow */}
-                    <div className="hidden md:flex items-center">
+                    <div className="hidden md:flex items-center gap-2">
+                      {survey.status === 'complete' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                          onClick={(e) => { e.stopPropagation(); navigate(`/quotes/new?from_survey=${survey.id}`); }}
+                        >
+                          <FileText className="h-3.5 w-3.5 mr-1" />
+                          Create Quote
+                        </Button>
+                      )}
                       <ArrowRight className="h-5 w-5 text-muted-foreground/50" />
                     </div>
                   </div>

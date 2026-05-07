@@ -33,6 +33,9 @@ import gpsRoutes from "./gps-routes";
 import workflowRoutes from "./workflow-routes";
 import { startWorkflowWorker } from "./workflow-worker";
 import surveyRoutes from "./survey-routes";
+import enquiryRoutes from "./enquiry-routes";
+import jobPhasesRoutes from "./job-phases-routes";
+import signoffRoutes from "./signoff-routes";
 
 function getStripeClient(): Stripe | null {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -2210,14 +2213,72 @@ export async function registerRoutes(
         acceptedAt: new Date(),
       });
 
+      // === AUTO-CREATE/ACTIVATE JOB FROM ACCEPTED QUOTE ===
+      try {
+        // Check if a job already exists for this quote (created at quote creation time)
+        const existingJobs = await storage.getAllJobs();
+        const linkedJob = existingJobs.find((j: any) => 
+          j.customerName === quote.customerName && j.status === 'Draft' && 
+          j.description?.includes(quote.quoteNo || '')
+        );
+
+        if (linkedJob) {
+          // Activate the existing draft job
+          await storage.updateJob(linkedJob.id, {
+            status: 'Scheduled',
+            description: `${linkedJob.description || ''} [Quote Accepted: ${new Date().toISOString().split('T')[0]}]`,
+          });
+          // Link quote_id to job
+          await pool.query('UPDATE jobs SET quote_id = $1 WHERE id = $2', [quote.id, linkedJob.id]);
+        } else {
+          // Create a new job from the quote data
+          const jobCount = existingJobs.length + 1;
+          const year = new Date().getFullYear();
+          const jobNo = `J-${year}-${String(jobCount).padStart(3, '0')}`;
+
+          const newJob = await storage.createJob({
+            jobNo,
+            customerName: quote.customerName || 'Customer',
+            client: quote.customerId || undefined,
+            address: quote.siteAddress || undefined,
+            postcode: quote.sitePostcode || undefined,
+            contactEmail: quote.customerEmail || undefined,
+            contactPhone: quote.customerPhone || undefined,
+            description: `From Quote ${quote.quoteNo || ''} - ${quote.description || 'Accepted work'}`,
+            status: 'Scheduled',
+          });
+          // Link quote_id to the new job
+          await pool.query('UPDATE jobs SET quote_id = $1 WHERE id = $2', [quote.id, newJob.id]);
+        }
+      } catch (jobErr) {
+        console.error('Failed to auto-create job from quote:', jobErr);
+        // Don't fail the quote acceptance if job creation fails
+      }
+
       notifyAdmins({
         type: 'quote_accepted',
         title: 'Quote Accepted',
-        message: `Quote ${quote.quoteNo || ''} for ${quote.customerName || 'Customer'} (£${quote.total || 0}) has been accepted by the client`,
+        message: `Quote ${quote.quoteNo || ''} for ${quote.customerName || 'Customer'} (£${quote.total || 0}) has been accepted. Job auto-created.`,
         category: 'jobs',
         timestamp: new Date().toISOString(),
         linkUrl: `/app/quotes`,
       });
+
+      // === AUTOMATION: Update linked enquiry to 'won' ===
+      try {
+        await pool.query(
+          `UPDATE enquiries SET status = 'won', updated_at = NOW() WHERE id IN (
+            SELECT e.id FROM enquiries e
+            LEFT JOIN surveys s ON s.enquiry_id = e.id
+            WHERE e.client_id = (SELECT "customerId" FROM quotes WHERE id = $1)
+            AND e.status IN ('quote_sent', 'survey_complete', 'new')
+            ORDER BY e.created_at DESC LIMIT 1
+          )`,
+          [quote.id]
+        );
+      } catch (eqErr) {
+        console.error('Failed to update enquiry status on quote accept:', eqErr);
+      }
 
       res.json(updated);
     } catch (error) {
@@ -2249,6 +2310,21 @@ export async function registerRoutes(
         timestamp: new Date().toISOString(),
         linkUrl: `/app/quotes`,
       });
+
+      // === AUTOMATION: Update linked enquiry status ===
+      try {
+        await pool.query(
+          `UPDATE enquiries SET status = 'lost', lost_reason = $1, updated_at = NOW() WHERE id IN (
+            SELECT e.id FROM enquiries e
+            WHERE e.client_id = (SELECT "customerId" FROM quotes WHERE id = $2)
+            AND e.status IN ('quote_sent', 'survey_complete', 'new')
+            ORDER BY e.created_at DESC LIMIT 1
+          )`,
+          [reason || 'Quote declined', quote.id]
+        );
+      } catch (eqErr) {
+        console.error('Failed to update enquiry status on quote decline:', eqErr);
+      }
 
       res.json(updated);
     } catch (error) {
@@ -6777,6 +6853,32 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
             linkUrl: `/app/invoices`,
           });
 
+          // === AUTOMATION: Payment confirmed → close job + notify customer ===
+          try {
+            if (paidInvoice?.jobId) {
+              // Close the job
+              await pool.query(
+                `UPDATE jobs SET status = 'Closed', closed_at = NOW() WHERE id = $1 AND status != 'Closed'`,
+                [paidInvoice.jobId]
+              );
+
+              // Update linked enquiry to final state
+              await pool.query(
+                `UPDATE enquiries SET status = 'won', updated_at = NOW()
+                 WHERE id IN (SELECT enquiry_id FROM jobs WHERE id = $1 AND enquiry_id IS NOT NULL)`,
+                [paidInvoice.jobId]
+              );
+            }
+
+            // Send payment confirmation notification
+            if (paidInvoice?.customerEmail) {
+              console.log(`[AUTOMATION] Payment confirmed for ${paidInvoice.customerName} - would send email to ${paidInvoice.customerEmail}`);
+              // TODO: Send actual email via email service when configured
+            }
+          } catch (autoErr) {
+            console.error('Payment automation error (non-fatal):', autoErr);
+          }
+
           console.log(`Payment recorded for invoice ${invoiceId}`);
         } catch (error) {
           console.error("Error recording payment:", error);
@@ -6836,6 +6938,9 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
   // Surveyor Portal
   app.use('/api/surveys', populateUserMiddleware, surveyRoutes);
+  app.use('/api/enquiries', populateUserMiddleware, enquiryRoutes);
+  app.use('/api/jobs', populateUserMiddleware, jobPhasesRoutes);
+  app.use('/api/jobs', populateUserMiddleware, signoffRoutes);
 
   // Start workflow worker (server-side execution engine)
   startWorkflowWorker();

@@ -259,6 +259,155 @@ export async function runMigrations() {
       CREATE INDEX IF NOT EXISTS idx_survey_media_survey ON survey_media(survey_id);
     `);
 
+    // === ENQUIRIES TABLE ===
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS enquiries (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        client_id INTEGER REFERENCES users(id),
+        property_id VARCHAR REFERENCES client_properties(id),
+        source TEXT NOT NULL DEFAULT 'phone' CHECK (source IN ('phone', 'email', 'website', 'referral', 'repeat_customer', 'client_portal')),
+        description TEXT NOT NULL,
+        client_requirements TEXT,
+        budget_indication TEXT,
+        urgency TEXT NOT NULL DEFAULT 'standard' CHECK (urgency IN ('emergency', 'urgent', 'standard', 'flexible')),
+        preferred_dates TEXT,
+        assigned_to INTEGER REFERENCES users(id),
+        status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'survey_booked', 'survey_complete', 'quote_sent', 'won', 'lost', 'cancelled')),
+        lost_reason TEXT,
+        survey_id UUID,
+        quote_id UUID,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_enquiries_client ON enquiries(client_id);
+      CREATE INDEX IF NOT EXISTS idx_enquiries_status ON enquiries(status);
+      CREATE INDEX IF NOT EXISTS idx_enquiries_assigned ON enquiries(assigned_to);
+      CREATE INDEX IF NOT EXISTS idx_enquiries_created ON enquiries(created_at DESC);
+    `);
+
+    // === ADD MEASUREMENT COLUMNS TO SURVEY TABLES ===
+    await client.query(`
+      ALTER TABLE survey_rooms ADD COLUMN IF NOT EXISTS length_m DECIMAL;
+      ALTER TABLE survey_rooms ADD COLUMN IF NOT EXISTS width_m DECIMAL;
+      ALTER TABLE survey_rooms ADD COLUMN IF NOT EXISTS height_m DECIMAL;
+      ALTER TABLE survey_rooms ADD COLUMN IF NOT EXISTS condition TEXT;
+      ALTER TABLE survey_rooms ADD COLUMN IF NOT EXISTS checklist_ref JSONB;
+    `);
+
+    await client.query(`
+      ALTER TABLE survey_work_items ADD COLUMN IF NOT EXISTS length_m DECIMAL;
+      ALTER TABLE survey_work_items ADD COLUMN IF NOT EXISTS width_m DECIMAL;
+      ALTER TABLE survey_work_items ADD COLUMN IF NOT EXISTS height_m DECIMAL;
+      ALTER TABLE survey_work_items ADD COLUMN IF NOT EXISTS notes TEXT;
+    `);
+
+    await client.query(`
+      ALTER TABLE surveys ADD COLUMN IF NOT EXISTS enquiry_id UUID;
+    `);
+
+    // === JOB PHASES TABLE ===
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS job_phases (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
+        phase_number INTEGER NOT NULL DEFAULT 1,
+        title TEXT NOT NULL,
+        description TEXT,
+        trade_type TEXT,
+        assigned_to INTEGER REFERENCES users(id),
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'ready', 'in_progress', 'complete', 'skipped')),
+        estimated_duration TEXT,
+        depends_on UUID REFERENCES job_phases(id),
+        scheduled_date DATE,
+        started_at TIMESTAMP,
+        completed_at TIMESTAMP,
+        sign_off_notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_job_phases_job ON job_phases(job_id);
+      CREATE INDEX IF NOT EXISTS idx_job_phases_status ON job_phases(status);
+      CREATE INDEX IF NOT EXISTS idx_job_phases_assigned ON job_phases(assigned_to);
+    `);
+
+    // === VARIATION ORDERS TABLE ===
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS variation_orders (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
+        description TEXT NOT NULL,
+        reason TEXT,
+        additional_cost DECIMAL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'proposed' CHECK (status IN ('proposed', 'approved', 'rejected')),
+        approved_by TEXT,
+        approved_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_variation_orders_job ON variation_orders(job_id);
+    `);
+
+    // === SNAG LIST TABLE ===
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS snag_items (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
+        description TEXT NOT NULL,
+        location TEXT,
+        severity TEXT DEFAULT 'minor' CHECK (severity IN ('minor', 'major', 'critical')),
+        status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'accepted')),
+        assigned_to INTEGER REFERENCES users(id),
+        photo_url TEXT,
+        resolution_notes TEXT,
+        reported_by INTEGER REFERENCES users(id),
+        resolved_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_snag_items_job ON snag_items(job_id);
+      CREATE INDEX IF NOT EXISTS idx_snag_items_status ON snag_items(status);
+    `);
+
+    // === SIGN-OFF TABLE ===
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS job_signoffs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
+        signed_off_by INTEGER REFERENCES users(id),
+        sign_off_type TEXT DEFAULT 'final' CHECK (sign_off_type IN ('phase', 'snag', 'final')),
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+        notes TEXT,
+        rejection_reason TEXT,
+        customer_satisfied BOOLEAN,
+        quality_rating INTEGER CHECK (quality_rating >= 1 AND quality_rating <= 5),
+        created_at TIMESTAMP DEFAULT NOW(),
+        approved_at TIMESTAMP
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_job_signoffs_job ON job_signoffs(job_id);
+    `);
+
+    // === ADD QUOTE/ENQUIRY LINKING TO JOBS ===
+    await client.query(`
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS quote_id INTEGER;
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS enquiry_id UUID;
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS is_complex BOOLEAN DEFAULT FALSE;
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP;
+    `);
+
     console.log("Database migrations completed successfully");
   } catch (error) {
     console.error("Migration error (non-fatal):", error);
