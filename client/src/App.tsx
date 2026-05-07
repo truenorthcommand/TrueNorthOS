@@ -8,6 +8,8 @@ import { StoreProvider } from "@/lib/store";
 import { ThemeProvider } from "@/lib/theme";
 import { useVersionCheck } from "@/hooks/use-version-check";
 import NotFound from "@/pages/not-found";
+import WorkflowStudio from "@/pages/workflow-studio";
+import WorkflowEditor from "@/pages/workflow-editor";
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import Jobs from "@/pages/jobs";
@@ -207,6 +209,8 @@ function AppRoutes() {
         <Route path="/forms/builder/:id" component={FormBuilder} />
         <Route path="/forms/fill/:versionId" component={FormFill} />
         <Route path="/forms/submissions" component={FormSubmissions} />
+        <Route path="/system/workflows" component={WorkflowStudio} />
+        <Route path="/system/workflows/:id" component={WorkflowEditor} />
         <Route component={NotFound} />
       </Switch>
     </AuthGate>

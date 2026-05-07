@@ -30,6 +30,8 @@ import intelligenceRoutes from "./intelligence-routes";
 import seedRoutes from "./seed-routes";
 import aiPricingRoutes from "./ai-pricing-routes";
 import gpsRoutes from "./gps-routes";
+import workflowRoutes from "./workflow-routes";
+import { startWorkflowWorker } from "./workflow-worker";
 
 function getStripeClient(): Stripe | null {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -6827,6 +6829,12 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
   // GPS & Walkaround
   app.use('/api/gps', populateUserMiddleware, gpsRoutes);
+
+  // Hidden Workflow Studio (super_admin only - access control in router)
+  app.use('/api/workflows', populateUserMiddleware, workflowRoutes);
+
+  // Start workflow worker (server-side execution engine)
+  startWorkflowWorker();
 
   app.get("/api/files", requireAuth, async (req, res) => {
     try {

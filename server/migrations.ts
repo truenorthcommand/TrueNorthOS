@@ -83,6 +83,100 @@ export async function runMigrations() {
     await client.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS site_lng double precision;`);
     await client.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS site_address text;`);
 
+    // === WORKFLOW STUDIO TABLES ===
+
+    // Workflows master table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS workflows (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        key text UNIQUE NOT NULL,
+        name text NOT NULL,
+        description text,
+        module text NOT NULL DEFAULT 'general',
+        enabled boolean DEFAULT false,
+        current_version_id varchar,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      );
+    `);
+
+    // Workflow versions (immutable snapshots)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS workflow_versions (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        workflow_id varchar NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+        version_number integer NOT NULL DEFAULT 1,
+        definition jsonb NOT NULL,
+        status text NOT NULL DEFAULT 'draft',
+        created_by varchar,
+        created_at timestamp DEFAULT now(),
+        UNIQUE(workflow_id, version_number)
+      );
+    `);
+
+    // Workflow runs (execution logs)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS workflow_runs (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        workflow_id varchar NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+        version_id varchar NOT NULL REFERENCES workflow_versions(id),
+        trigger_event jsonb,
+        status text NOT NULL DEFAULT 'pending',
+        idempotency_key text,
+        context jsonb DEFAULT '{}',
+        error text,
+        is_dry_run boolean DEFAULT false,
+        started_at timestamp,
+        completed_at timestamp,
+        created_at timestamp DEFAULT now()
+      );
+    `);
+
+    // Workflow step logs (per-action detail)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS workflow_step_logs (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        run_id varchar NOT NULL REFERENCES workflow_runs(id) ON DELETE CASCADE,
+        action_id text NOT NULL,
+        action_type text NOT NULL,
+        step_order integer NOT NULL DEFAULT 0,
+        status text NOT NULL DEFAULT 'pending',
+        input jsonb,
+        output jsonb,
+        error text,
+        duration_ms integer,
+        started_at timestamp,
+        completed_at timestamp
+      );
+    `);
+
+    // Workflow events outbox
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS workflow_events (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        event_type text NOT NULL,
+        module text NOT NULL,
+        record_id varchar,
+        payload jsonb NOT NULL DEFAULT '{}',
+        processed boolean DEFAULT false,
+        processed_at timestamp,
+        created_at timestamp DEFAULT now()
+      );
+    `);
+
+    // Index for fast outbox polling
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_workflow_events_unprocessed
+      ON workflow_events(processed, created_at) WHERE processed = false;
+    `);
+
+    // Index for idempotency checks
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_workflow_runs_idempotency
+      ON workflow_runs(idempotency_key) WHERE idempotency_key IS NOT NULL;
+    `);
+
+
     console.log("Database migrations completed successfully");
   } catch (error) {
     console.error("Migration error (non-fatal):", error);
