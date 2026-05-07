@@ -3,6 +3,7 @@ import { pool } from "./db";
 /**
  * Run pending database migrations.
  * Uses IF NOT EXISTS / ADD COLUMN IF NOT EXISTS for idempotent execution.
+ * Each section is wrapped in its own try/catch for resilience.
  */
 export async function runMigrations() {
   const client = await pool.connect();
@@ -20,32 +21,28 @@ export async function runMigrations() {
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
         name text NOT NULL,
         description text,
-        category text,
+        category text DEFAULT 'general',
         line_items jsonb DEFAULT '[]'::jsonb,
-        terms text,
-        payment_terms text DEFAULT 'Net 30',
+        terms_and_conditions text,
         notes text,
-        is_default boolean DEFAULT false,
-        created_by_id varchar,
+        is_active boolean DEFAULT true,
         created_at timestamp DEFAULT now(),
         updated_at timestamp DEFAULT now()
       );
     `);
 
-    // Create material_prices table (AI learning database)
+    // Create material_prices table
     await client.query(`
       CREATE TABLE IF NOT EXISTS material_prices (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
-        trade text NOT NULL,
-        category text NOT NULL,
-        item_name text NOT NULL,
-        unit text NOT NULL,
-        avg_unit_cost double precision NOT NULL,
-        min_unit_cost double precision,
-        max_unit_cost double precision,
-        wastage_percent double precision DEFAULT 10,
-        data_points integer DEFAULT 1,
+        name text NOT NULL,
+        category text DEFAULT 'general',
+        unit text DEFAULT 'each',
+        unit_price numeric NOT NULL,
+        supplier text,
         last_updated timestamp DEFAULT now(),
+        is_active boolean DEFAULT true,
+        notes text,
         created_at timestamp DEFAULT now()
       );
     `);
@@ -54,13 +51,15 @@ export async function runMigrations() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS gps_logs (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id varchar NOT NULL,
+        user_id varchar REFERENCES users(id),
         latitude double precision NOT NULL,
         longitude double precision NOT NULL,
         accuracy double precision,
-        job_id varchar,
-        action text DEFAULT 'check-in',
-        logged_at timestamp DEFAULT now()
+        speed double precision,
+        heading double precision,
+        altitude double precision,
+        timestamp timestamp DEFAULT now(),
+        session_id text
       );
     `);
 
@@ -68,117 +67,101 @@ export async function runMigrations() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS walkaround_checks (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id varchar NOT NULL,
-        checks jsonb DEFAULT '{}',
-        defects jsonb DEFAULT '[]',
-        vehicle_safe boolean DEFAULT true,
-        latitude double precision,
-        longitude double precision,
-        completed_at timestamp DEFAULT now()
+        user_id varchar REFERENCES users(id),
+        vehicle_id varchar,
+        fleet_number text,
+        registration text,
+        mileage integer,
+        status text DEFAULT 'pending',
+        checks jsonb DEFAULT '[]'::jsonb,
+        photos jsonb DEFAULT '[]'::jsonb,
+        signature text,
+        notes text,
+        submitted_at timestamp,
+        created_at timestamp DEFAULT now()
       );
     `);
 
-    // Add site coordinates to jobs table for map display
-    await client.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS site_lat double precision;`);
-    await client.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS site_lng double precision;`);
-    await client.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS site_address text;`);
-
-    // === WORKFLOW STUDIO TABLES ===
-
-    // Workflows master table
+    // Create workflows table
     await client.query(`
       CREATE TABLE IF NOT EXISTS workflows (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
-        key text UNIQUE NOT NULL,
         name text NOT NULL,
         description text,
-        module text NOT NULL DEFAULT 'general',
-        enabled boolean DEFAULT false,
-        current_version_id varchar,
+        trigger_type text NOT NULL DEFAULT 'manual',
+        trigger_config jsonb DEFAULT '{}'::jsonb,
+        is_active boolean DEFAULT true,
+        created_by varchar REFERENCES users(id),
         created_at timestamp DEFAULT now(),
         updated_at timestamp DEFAULT now()
       );
     `);
 
-    // Workflow versions (immutable snapshots)
+    // Create workflow_versions table
     await client.query(`
       CREATE TABLE IF NOT EXISTS workflow_versions (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
-        workflow_id varchar NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
-        version_number integer NOT NULL DEFAULT 1,
-        definition jsonb NOT NULL,
-        status text NOT NULL DEFAULT 'draft',
-        created_by varchar,
-        created_at timestamp DEFAULT now(),
-        UNIQUE(workflow_id, version_number)
-      );
-    `);
-
-    // Workflow runs (execution logs)
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS workflow_runs (
-        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
-        workflow_id varchar NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
-        version_id varchar NOT NULL REFERENCES workflow_versions(id),
-        trigger_event jsonb,
-        status text NOT NULL DEFAULT 'pending',
-        idempotency_key text,
-        context jsonb DEFAULT '{}',
-        error text,
-        is_dry_run boolean DEFAULT false,
-        started_at timestamp,
-        completed_at timestamp,
+        workflow_id varchar REFERENCES workflows(id) ON DELETE CASCADE,
+        version integer NOT NULL DEFAULT 1,
+        steps jsonb NOT NULL DEFAULT '[]'::jsonb,
+        is_published boolean DEFAULT false,
+        published_at timestamp,
         created_at timestamp DEFAULT now()
       );
     `);
 
-    // Workflow step logs (per-action detail)
+    // Create workflow_runs table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS workflow_runs (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        workflow_id varchar REFERENCES workflows(id) ON DELETE CASCADE,
+        version_id varchar REFERENCES workflow_versions(id),
+        status text NOT NULL DEFAULT 'running',
+        trigger_data jsonb DEFAULT '{}'::jsonb,
+        context jsonb DEFAULT '{}'::jsonb,
+        current_step integer DEFAULT 0,
+        started_at timestamp DEFAULT now(),
+        completed_at timestamp,
+        error text,
+        created_by varchar REFERENCES users(id)
+      );
+    `);
+
+    // Create workflow_step_logs table
     await client.query(`
       CREATE TABLE IF NOT EXISTS workflow_step_logs (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
-        run_id varchar NOT NULL REFERENCES workflow_runs(id) ON DELETE CASCADE,
-        action_id text NOT NULL,
-        action_type text NOT NULL,
-        step_order integer NOT NULL DEFAULT 0,
+        run_id varchar REFERENCES workflow_runs(id) ON DELETE CASCADE,
+        step_index integer NOT NULL,
+        step_type text NOT NULL,
+        step_config jsonb DEFAULT '{}'::jsonb,
         status text NOT NULL DEFAULT 'pending',
-        input jsonb,
-        output jsonb,
+        input jsonb DEFAULT '{}'::jsonb,
+        output jsonb DEFAULT '{}'::jsonb,
         error text,
-        duration_ms integer,
         started_at timestamp,
         completed_at timestamp
       );
     `);
 
-    // Workflow events outbox
+    // Create workflow_events table
     await client.query(`
       CREATE TABLE IF NOT EXISTS workflow_events (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        workflow_id varchar REFERENCES workflows(id) ON DELETE CASCADE,
+        run_id varchar REFERENCES workflow_runs(id) ON DELETE CASCADE,
         event_type text NOT NULL,
-        module text NOT NULL,
-        record_id varchar,
-        payload jsonb NOT NULL DEFAULT '{}',
-        processed boolean DEFAULT false,
-        processed_at timestamp,
+        event_data jsonb DEFAULT '{}'::jsonb,
         created_at timestamp DEFAULT now()
       );
     `);
 
-    // Index for fast outbox polling
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_workflow_events_unprocessed
-      ON workflow_events(processed, created_at) WHERE processed = false;
-    `);
+  } catch (error) {
+    console.error("Migration error (base tables - non-fatal):", error);
+  }
 
-    // Index for idempotency checks
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_workflow_runs_idempotency
-      ON workflow_runs(idempotency_key) WHERE idempotency_key IS NOT NULL;
-    `);
-
-    // === SURVEYOR PORTAL TABLES ===
-
-    // Surveys master table
+  // === SURVEYOR PORTAL TABLES (isolated try/catch) ===
+  try {
     await client.query(`
       CREATE TABLE IF NOT EXISTS surveys (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -198,12 +181,17 @@ export async function runMigrations() {
         arrived_at TIMESTAMP,
         departed_at TIMESTAMP,
         quote_id VARCHAR,
+        enquiry_id UUID,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       );
     `);
+    console.log("[Migration] surveys table OK");
+  } catch (e: any) {
+    console.error("[Migration] surveys table error:", e.message);
+  }
 
-    // Survey rooms
+  try {
     await client.query(`
       CREATE TABLE IF NOT EXISTS survey_rooms (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -213,12 +201,20 @@ export async function runMigrations() {
         notes TEXT,
         voice_notes TEXT,
         condition TEXT,
+        length_m DECIMAL,
+        width_m DECIMAL,
+        height_m DECIMAL,
+        checklist_ref JSONB,
         order_index INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT NOW()
       );
     `);
+    console.log("[Migration] survey_rooms table OK");
+  } catch (e: any) {
+    console.error("[Migration] survey_rooms table error:", e.message);
+  }
 
-    // Survey work items
+  try {
     await client.query(`
       CREATE TABLE IF NOT EXISTS survey_work_items (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -229,13 +225,21 @@ export async function runMigrations() {
         quantity NUMERIC DEFAULT 1,
         unit TEXT DEFAULT 'each',
         measurements TEXT,
+        length_m DECIMAL,
+        width_m DECIMAL,
+        height_m DECIMAL,
+        notes TEXT,
         estimated_cost NUMERIC,
         ai_suggested_price NUMERIC,
         created_at TIMESTAMP DEFAULT NOW()
       );
     `);
+    console.log("[Migration] survey_work_items table OK");
+  } catch (e: any) {
+    console.error("[Migration] survey_work_items table error:", e.message);
+  }
 
-    // Survey media
+  try {
     await client.query(`
       CREATE TABLE IF NOT EXISTS survey_media (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -248,8 +252,12 @@ export async function runMigrations() {
         uploaded_at TIMESTAMP DEFAULT NOW()
       );
     `);
+    console.log("[Migration] survey_media table OK");
+  } catch (e: any) {
+    console.error("[Migration] survey_media table error:", e.message);
+  }
 
-    // Survey indexes
+  try {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_surveys_client ON surveys(client_id);
       CREATE INDEX IF NOT EXISTS idx_surveys_surveyor ON surveys(surveyor_id);
@@ -258,8 +266,13 @@ export async function runMigrations() {
       CREATE INDEX IF NOT EXISTS idx_survey_work_items_room ON survey_work_items(survey_room_id);
       CREATE INDEX IF NOT EXISTS idx_survey_media_survey ON survey_media(survey_id);
     `);
+    console.log("[Migration] survey indexes OK");
+  } catch (e: any) {
+    console.error("[Migration] survey indexes error:", e.message);
+  }
 
-    // === ENQUIRIES TABLE ===
+  // === ENQUIRIES TABLE ===
+  try {
     await client.query(`
       CREATE TABLE IF NOT EXISTS enquiries (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -280,15 +293,19 @@ export async function runMigrations() {
         updated_at TIMESTAMP DEFAULT NOW()
       );
     `);
-
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_enquiries_client ON enquiries(client_id);
       CREATE INDEX IF NOT EXISTS idx_enquiries_status ON enquiries(status);
       CREATE INDEX IF NOT EXISTS idx_enquiries_assigned ON enquiries(assigned_to);
       CREATE INDEX IF NOT EXISTS idx_enquiries_created ON enquiries(created_at DESC);
     `);
+    console.log("[Migration] enquiries table + indexes OK");
+  } catch (e: any) {
+    console.error("[Migration] enquiries error:", e.message);
+  }
 
-    // === ADD MEASUREMENT COLUMNS TO SURVEY TABLES ===
+  // === ADD MEASUREMENT COLUMNS TO SURVEY TABLES (safe even if columns exist) ===
+  try {
     await client.query(`
       ALTER TABLE survey_rooms ADD COLUMN IF NOT EXISTS length_m DECIMAL;
       ALTER TABLE survey_rooms ADD COLUMN IF NOT EXISTS width_m DECIMAL;
@@ -296,19 +313,22 @@ export async function runMigrations() {
       ALTER TABLE survey_rooms ADD COLUMN IF NOT EXISTS condition TEXT;
       ALTER TABLE survey_rooms ADD COLUMN IF NOT EXISTS checklist_ref JSONB;
     `);
-
     await client.query(`
       ALTER TABLE survey_work_items ADD COLUMN IF NOT EXISTS length_m DECIMAL;
       ALTER TABLE survey_work_items ADD COLUMN IF NOT EXISTS width_m DECIMAL;
       ALTER TABLE survey_work_items ADD COLUMN IF NOT EXISTS height_m DECIMAL;
       ALTER TABLE survey_work_items ADD COLUMN IF NOT EXISTS notes TEXT;
     `);
-
     await client.query(`
       ALTER TABLE surveys ADD COLUMN IF NOT EXISTS enquiry_id UUID;
     `);
+    console.log("[Migration] survey measurement columns OK");
+  } catch (e: any) {
+    console.error("[Migration] survey columns error:", e.message);
+  }
 
-    // === JOB PHASES TABLE ===
+  // === JOB PHASES TABLE ===
+  try {
     await client.query(`
       CREATE TABLE IF NOT EXISTS job_phases (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -320,7 +340,7 @@ export async function runMigrations() {
         assigned_to VARCHAR REFERENCES users(id),
         status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'ready', 'in_progress', 'complete', 'skipped')),
         estimated_duration TEXT,
-        depends_on UUID REFERENCES job_phases(id),
+        depends_on UUID,
         scheduled_date DATE,
         started_at TIMESTAMP,
         completed_at TIMESTAMP,
@@ -329,14 +349,18 @@ export async function runMigrations() {
         updated_at TIMESTAMP DEFAULT NOW()
       );
     `);
-
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_job_phases_job ON job_phases(job_id);
       CREATE INDEX IF NOT EXISTS idx_job_phases_status ON job_phases(status);
       CREATE INDEX IF NOT EXISTS idx_job_phases_assigned ON job_phases(assigned_to);
     `);
+    console.log("[Migration] job_phases table + indexes OK");
+  } catch (e: any) {
+    console.error("[Migration] job_phases error:", e.message);
+  }
 
-    // === VARIATION ORDERS TABLE ===
+  // === VARIATION ORDERS TABLE ===
+  try {
     await client.query(`
       CREATE TABLE IF NOT EXISTS variation_orders (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -350,12 +374,16 @@ export async function runMigrations() {
         created_at TIMESTAMP DEFAULT NOW()
       );
     `);
-
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_variation_orders_job ON variation_orders(job_id);
     `);
+    console.log("[Migration] variation_orders table + indexes OK");
+  } catch (e: any) {
+    console.error("[Migration] variation_orders error:", e.message);
+  }
 
-    // === SNAG LIST TABLE ===
+  // === SNAG LIST TABLE ===
+  try {
     await client.query(`
       CREATE TABLE IF NOT EXISTS snag_items (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -373,13 +401,17 @@ export async function runMigrations() {
         updated_at TIMESTAMP DEFAULT NOW()
       );
     `);
-
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_snag_items_job ON snag_items(job_id);
       CREATE INDEX IF NOT EXISTS idx_snag_items_status ON snag_items(status);
     `);
+    console.log("[Migration] snag_items table + indexes OK");
+  } catch (e: any) {
+    console.error("[Migration] snag_items error:", e.message);
+  }
 
-    // === SIGN-OFF TABLE ===
+  // === SIGN-OFF TABLE ===
+  try {
     await client.query(`
       CREATE TABLE IF NOT EXISTS job_signoffs (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -395,23 +427,27 @@ export async function runMigrations() {
         approved_at TIMESTAMP
       );
     `);
-
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_job_signoffs_job ON job_signoffs(job_id);
     `);
+    console.log("[Migration] job_signoffs table + indexes OK");
+  } catch (e: any) {
+    console.error("[Migration] job_signoffs error:", e.message);
+  }
 
-    // === ADD QUOTE/ENQUIRY LINKING TO JOBS ===
+  // === ADD QUOTE/ENQUIRY LINKING TO JOBS ===
+  try {
     await client.query(`
       ALTER TABLE jobs ADD COLUMN IF NOT EXISTS quote_id VARCHAR;
       ALTER TABLE jobs ADD COLUMN IF NOT EXISTS enquiry_id UUID;
       ALTER TABLE jobs ADD COLUMN IF NOT EXISTS is_complex BOOLEAN DEFAULT FALSE;
       ALTER TABLE jobs ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP;
     `);
-
-    console.log("Database migrations completed successfully");
-  } catch (error) {
-    console.error("Migration error (non-fatal):", error);
-  } finally {
-    client.release();
+    console.log("[Migration] jobs columns OK");
+  } catch (e: any) {
+    console.error("[Migration] jobs columns error:", e.message);
   }
+
+  console.log("[Migration] All migrations completed");
+  client.release();
 }
