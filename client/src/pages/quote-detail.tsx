@@ -404,23 +404,38 @@ export default function QuoteDetail() {
       y += 8;
       doc.setTextColor(0);
       doc.setFontSize(9);
+      const descMaxWidth = 80; // Max width for description column in mm
       lineItems.forEach((item, index) => {
-        if (y > 250) {
+        // Wrap description text to fit within allocated column width
+        const descText = item.description || 'Item';
+        const wrappedDesc = doc.splitTextToSize(descText, descMaxWidth);
+        const rowHeight = Math.max(7, wrappedDesc.length * 5);
+
+        // Check if we need a new page
+        if (y + rowHeight > 250) {
           doc.addPage();
           y = 20;
         }
+
+        // Alternating row background
         if (index % 2 === 0) {
           doc.setFillColor(248, 249, 250);
-          doc.rect(14, y - 4, pageWidth - 28, 7, 'F');
+          doc.rect(14, y - 4, pageWidth - 28, rowHeight, 'F');
         }
-        const typeLabel = item.type === 'material' ? '[M]' : item.type === 'labour' ? '[L]' : '[C]';
-        doc.text(`${typeLabel} ${item.description || 'Item'}`, 16, y);
+
+        // Description (wrapped, no prefix)
+        wrappedDesc.forEach((line: string, lineIdx: number) => {
+          doc.text(line, 16, y + (lineIdx * 5));
+        });
+
+        // Other columns (aligned to first line)
         doc.text(String(item.quantity), 100, y);
         doc.text(item.unit || 'each', 115, y);
         doc.text(`£${item.unitCost.toFixed(2)}`, 130, y);
         doc.text(`${item.vatRate}%`, 155, y);
         doc.text(`£${item.amount.toFixed(2)}`, pageWidth - 16, y, { align: 'right' });
-        y += 7;
+
+        y += rowHeight;
       });
 
       // Totals section
