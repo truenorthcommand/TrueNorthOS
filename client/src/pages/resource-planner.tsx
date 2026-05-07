@@ -32,8 +32,9 @@ interface CalendarBooking {
 }
 
 interface ResourceGroup {
-  user_id: number;
+  user_id: string | null;
   user_name: string;
+  role: string;
   bookings: CalendarBooking[];
 }
 
@@ -127,10 +128,11 @@ export default function ResourcePlanner() {
     if (roleFilter === 'all') return calendarData.by_resource;
 
     return calendarData.by_resource.filter(resource => {
-      // Check the role of any booking for this user
-      const firstBooking = resource.bookings[0];
-      if (!firstBooking) return true; // Show users with no bookings
-      return firstBooking.assigned_role === roleFilter;
+      // Use the role field directly from the resource
+      if (roleFilter === 'works_manager') {
+        return resource.role === 'works_manager' || resource.role === 'admin' || resource.role === 'super_admin';
+      }
+      return resource.role === roleFilter;
     });
   }, [calendarData, roleFilter]);
 
@@ -324,7 +326,7 @@ function WeekView({ weekDays, resources, onBookingClick, onEmptySlotClick }: Wee
         >
           {/* Staff Name */}
           <div className="p-2 border-r flex items-center gap-2 bg-muted/20">
-            <span className="text-sm">{ROLE_ICONS[resource.bookings[0]?.assigned_role || 'engineer'] || '👤'}</span>
+            <span className="text-sm">{ROLE_ICONS[resource.role] || '👤'}</span>
             <span className="text-sm font-medium truncate">{resource.user_name}</span>
           </div>
 
@@ -460,7 +462,7 @@ function DayView({ day, weekDays, resources, onBookingClick, onEmptySlotClick, o
             <div key={resource.user_id} className="flex border-b last:border-b-0">
               {/* Staff name */}
               <div className="w-[140px] shrink-0 p-2 border-r flex items-center gap-2 bg-muted/20">
-                <span className="text-sm">{ROLE_ICONS[resource.bookings[0]?.assigned_role || 'engineer'] || '👤'}</span>
+                <span className="text-sm">{ROLE_ICONS[resource.role] || '👤'}</span>
                 <span className="text-xs font-medium truncate">{resource.user_name}</span>
               </div>
 

@@ -63,7 +63,7 @@ router.get('/', async (req: Request, res: Response) => {
         c.phone as client_phone
       FROM bookings b
       LEFT JOIN users u ON b.assigned_to = u.id
-      LEFT JOIN users c ON b.client_id = c.id
+      LEFT JOIN clients c ON b.client_id = c.id
     `;
 
     const conditions: string[] = [];
@@ -148,7 +148,7 @@ router.get('/calendar', async (req: Request, res: Response) => {
         c.name as client_name
       FROM bookings b
       LEFT JOIN users u ON b.assigned_to = u.id
-      LEFT JOIN users c ON b.client_id = c.id
+      LEFT JOIN clients c ON b.client_id = c.id
       WHERE b.scheduled_date >= $1 AND b.scheduled_date <= $2
         AND b.status != 'cancelled'
     `;
@@ -166,22 +166,50 @@ router.get('/calendar', async (req: Request, res: Response) => {
     const result = await pool.query(query, params);
 
     // Group by assigned_to for resource planner view
-    const grouped: Record<string, any> = {};
+    // Get ALL field staff to show in planner (even those without bookings)
+    const staffResult = await pool.query(`
+      SELECT id, name, role FROM users
+      WHERE role IN ('engineer', 'surveyor', 'works_manager', 'admin', 'super_admin')
+      ORDER BY
+        CASE role
+          WHEN 'engineer' THEN 1
+          WHEN 'surveyor' THEN 2
+          WHEN 'works_manager' THEN 3
+          WHEN 'admin' THEN 4
+          WHEN 'super_admin' THEN 5
+        END,
+        name ASC
+    `);
+
+    // Group bookings by assigned_to
+    const bookingsByUser: Record<string, any[]> = {};
     for (const row of result.rows) {
       const key = row.assigned_to || 'unassigned';
-      if (!grouped[key]) {
-        grouped[key] = {
-          user_id: row.assigned_to,
-          user_name: row.assigned_to_name || 'Unassigned',
-          bookings: []
-        };
-      }
-      grouped[key].bookings.push(row);
+      if (!bookingsByUser[key]) bookingsByUser[key] = [];
+      bookingsByUser[key].push(row);
+    }
+
+    // Build resource list with ALL staff (empty bookings array if none)
+    const by_resource = staffResult.rows.map((staff: any) => ({
+      user_id: staff.id,
+      user_name: staff.name,
+      role: staff.role,
+      bookings: bookingsByUser[staff.id] || []
+    }));
+
+    // Add unassigned bookings if any
+    if (bookingsByUser['unassigned']?.length) {
+      by_resource.push({
+        user_id: null,
+        user_name: 'Unassigned',
+        role: 'unassigned',
+        bookings: bookingsByUser['unassigned']
+      });
     }
 
     res.json({
       bookings: result.rows,
-      by_resource: Object.values(grouped)
+      by_resource
     });
   } catch (error) {
     console.error('Error fetching calendar bookings:', error);
@@ -202,7 +230,7 @@ router.get('/user/:userId', async (req: Request, res: Response) => {
         c.phone as client_phone
       FROM bookings b
       LEFT JOIN users u ON b.assigned_to = u.id
-      LEFT JOIN users c ON b.client_id = c.id
+      LEFT JOIN clients c ON b.client_id = c.id
       WHERE b.assigned_to = $1
     `;
 
@@ -244,7 +272,7 @@ router.get('/:id', async (req: Request, res: Response) => {
         creator.name as created_by_name
       FROM bookings b
       LEFT JOIN users u ON b.assigned_to = u.id
-      LEFT JOIN users c ON b.client_id = c.id
+      LEFT JOIN clients c ON b.client_id = c.id
       LEFT JOIN users creator ON b.created_by = creator.id
       WHERE b.id = $1
     `, [id]);
