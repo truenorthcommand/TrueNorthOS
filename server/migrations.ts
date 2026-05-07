@@ -482,6 +482,52 @@ export async function runMigrations() {
     console.error("[Migration] jobs columns error:", e.message);
   }
 
+  // === BOOKINGS TABLE ===
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS bookings (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        booking_type TEXT NOT NULL DEFAULT 'job' CHECK (booking_type IN ('job', 'survey', 'inspection', 'signoff_visit', 'quote_visit', 'snag_check')),
+        assigned_to VARCHAR REFERENCES users(id),
+        assigned_role TEXT NOT NULL DEFAULT 'engineer' CHECK (assigned_role IN ('engineer', 'surveyor', 'works_manager')),
+        client_id VARCHAR,
+        property_id VARCHAR,
+        scheduled_date DATE NOT NULL,
+        scheduled_time_start TIME,
+        scheduled_time_end TIME,
+        estimated_duration_mins INTEGER DEFAULT 60,
+        travel_time_mins INTEGER DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'confirmed', 'en_route', 'in_progress', 'completed', 'cancelled', 'rescheduled')),
+        linked_entity_type TEXT CHECK (linked_entity_type IN ('job', 'survey', 'enquiry', 'quote', 'signoff')),
+        linked_entity_id VARCHAR,
+        priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+        notes TEXT,
+        address TEXT,
+        postcode TEXT,
+        lat DOUBLE PRECISION,
+        lng DOUBLE PRECISION,
+        created_by VARCHAR REFERENCES users(id),
+        confirmed_at TIMESTAMP,
+        started_at TIMESTAMP,
+        completed_at TIMESTAMP,
+        cancelled_reason TEXT,
+        calendar_color TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_bookings_assigned ON bookings(assigned_to);
+      CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings(scheduled_date);
+      CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
+      CREATE INDEX IF NOT EXISTS idx_bookings_type ON bookings(booking_type);
+      CREATE INDEX IF NOT EXISTS idx_bookings_linked ON bookings(linked_entity_type, linked_entity_id);
+    `);
+    console.log("[Migration] bookings table + indexes OK");
+  } catch (e: any) {
+    console.error("[Migration] bookings error:", e.message);
+  }
+
   console.log("[Migration] All migrations completed");
   client.release();
 }

@@ -106,6 +106,9 @@ import SurveyWizard from "@/pages/survey-wizard";
 import Enquiries from "@/pages/enquiries";
 import CreateEnquiry from "@/pages/create-enquiry";
 import EnquiryDetail from "@/pages/enquiry-detail";
+import Bookings from "@/pages/bookings";
+import CreateBooking from "@/pages/create-booking";
+import ResourcePlanner from "@/pages/resource-planner";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -184,6 +187,10 @@ function AppRoutes() {
         <Route path="/enquiries" component={Enquiries} />
         <Route path="/enquiries/new" component={CreateEnquiry} />
         <Route path="/enquiries/:id" component={EnquiryDetail} />
+        <Route path="/bookings" component={Bookings} />
+        <Route path="/bookings/new" component={CreateBooking} />
+        <Route path="/bookings/:id" component={Bookings} />
+        <Route path="/resource-planner" component={ResourcePlanner} />
         <Route path="/invoices" component={Invoices} />
         <Route path="/invoices/:id" component={InvoiceDetail} />
         <Route path="/settings" component={Settings} />

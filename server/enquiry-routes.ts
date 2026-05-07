@@ -262,6 +262,24 @@ router.post('/:id/book-survey', async (req: Request, res: Response) => {
       UPDATE enquiries SET status = 'survey_booked', survey_id = $1, updated_at = NOW() WHERE id = $2
     `, [survey.id, id]);
 
+    // Auto-create booking for the surveyor
+    try {
+      await pool.query(`
+        INSERT INTO bookings (booking_type, assigned_to, assigned_role, client_id, property_id, scheduled_date, status, linked_entity_type, linked_entity_id, notes, created_by)
+        VALUES ('survey', $1, 'surveyor', $2, $3, COALESCE($4::date, CURRENT_DATE + INTERVAL '3 days'), 'scheduled', 'survey', $5, $6, $7)
+      `, [
+        surveyor_id || (req as any).user.id,
+        enquiry.client_id,
+        enquiry.property_id,
+        scheduled_date || null,
+        survey.id,
+        `Survey for enquiry: ${enquiry.description?.substring(0, 100) || 'N/A'}`,
+        (req as any).user.id
+      ]);
+    } catch (bookingErr) {
+      console.error('Auto-booking creation failed (non-fatal):', bookingErr);
+    }
+
     res.json({
       success: true,
       enquiry_status: 'survey_booked',

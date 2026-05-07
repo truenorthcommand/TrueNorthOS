@@ -357,6 +357,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <MenuGroup title="Schedule" icon={Calendar} section="schedule">
             <NavLink href="/schedule/calendar" icon={Calendar}>Calendar</NavLink>
             <NavLink href="/schedule/planner" icon={LayoutGrid}>Planner</NavLink>
+            <NavLink href="/bookings" icon={BookOpen}>Bookings</NavLink>
+            <NavLink href="/resource-planner" icon={BarChart3}>Resource Planner</NavLink>
             <NavLink href="/time-logs" icon={Clock}>Time Logs</NavLink>
           </MenuGroup>
         )}

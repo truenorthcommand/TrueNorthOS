@@ -36,6 +36,7 @@ import surveyRoutes from "./survey-routes";
 import enquiryRoutes from "./enquiry-routes";
 import jobPhasesRoutes from "./job-phases-routes";
 import signoffRoutes from "./signoff-routes";
+import bookingRoutes from "./booking-routes";
 
 function getStripeClient(): Stripe | null {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -2253,6 +2254,26 @@ export async function registerRoutes(
       } catch (jobErr) {
         console.error('Failed to auto-create job from quote:', jobErr);
         // Don't fail the quote acceptance if job creation fails
+      }
+
+      // === AUTO-CREATE BOOKING FROM ACCEPTED QUOTE ===
+      try {
+        const jobResult = await pool.query('SELECT id FROM jobs WHERE quote_id = $1 LIMIT 1', [quote.id]);
+        const jobId = jobResult.rows[0]?.id || null;
+        await pool.query(`
+          INSERT INTO bookings (booking_type, assigned_to, assigned_role, client_id, scheduled_date, status, linked_entity_type, linked_entity_id, address, postcode, notes, created_by)
+          VALUES ('job', $1, 'engineer', $2, CURRENT_DATE + INTERVAL '7 days', 'scheduled', 'job', $3, $4, $5, $6, $7)
+        `, [
+          null, // no specific engineer yet - admin will assign
+          quote.customerId || null,
+          jobId,
+          quote.siteAddress || '',
+          quote.sitePostcode || '',
+          `Job from accepted quote ${quote.quoteNo || ''}`,
+          null // system-created
+        ]);
+      } catch (bookingErr) {
+        console.error('Auto-booking from quote acceptance failed (non-fatal):', bookingErr);
       }
 
       notifyAdmins({
@@ -6941,6 +6962,9 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
   app.use('/api/enquiries', populateUserMiddleware, enquiryRoutes);
   app.use('/api/jobs', populateUserMiddleware, jobPhasesRoutes);
   app.use('/api/jobs', populateUserMiddleware, signoffRoutes);
+
+  // Booking & Resource Planner
+  app.use('/api/bookings', populateUserMiddleware, bookingRoutes);
 
   // Start workflow worker (server-side execution engine)
   startWorkflowWorker();
