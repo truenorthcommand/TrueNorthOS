@@ -848,6 +848,9 @@ export default function SurveyWizard() {
 
         {/* Action Buttons */}
         <div className="flex gap-3">
+          <Button variant="outline" onClick={goBack}>
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back
+          </Button>
           <Button variant="outline" className="flex-1" onClick={() => handleSave('draft')} disabled={saving}>
             {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
             Save as Draft

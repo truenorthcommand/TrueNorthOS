@@ -74,7 +74,7 @@ export default function CreateEnquiry() {
       const res = await fetch('/api/clients', { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
-        setClients(data);
+        setClients(Array.isArray(data) ? data : (data.clients || []));
       }
     } catch (err) {
       console.error('Failed to fetch clients:', err);
@@ -86,10 +86,10 @@ export default function CreateEnquiry() {
   const fetchProperties = useCallback(async (clientId: number) => {
     setLoadingProperties(true);
     try {
-      const res = await fetch(`/api/clients/${clientId}`, { credentials: 'include' });
+      const res = await fetch(`/api/clients/${clientId}/properties`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
-        setProperties(data.properties || []);
+        setProperties(Array.isArray(data) ? data : (data.properties || []));
       }
     } catch (err) {
       console.error('Failed to fetch properties:', err);
