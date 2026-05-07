@@ -11,6 +11,7 @@ import { Save, Building, CreditCard, FileText, Loader2, RefreshCw, Smartphone, D
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { useLocation } from "wouter";
 import { hasRole } from "@/lib/types";
 
 type CompanySettings = {
@@ -45,6 +46,7 @@ interface HealthIssue {
 export default function Settings() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const [, navigate] = useLocation();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isClearingCache, setIsClearingCache] = useState(false);
@@ -406,6 +408,15 @@ export default function Settings() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
           <p className="text-muted-foreground">Configure your company details and preferences</p>
+        {user?.superAdmin && (
+          <button
+            onClick={() => navigate('/system/workflows')}
+            className="mt-2 flex items-center gap-2 px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-sm font-medium transition-colors"
+          >
+            <Zap className="w-4 h-4" />
+            Workflow Studio
+          </button>
+        )}
         </div>
         <Button onClick={saveSettings} disabled={isSaving} data-testid="button-save-settings">
           {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
