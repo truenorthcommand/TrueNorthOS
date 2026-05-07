@@ -304,6 +304,19 @@ export async function runMigrations() {
     console.error("[Migration] enquiries error:", e.message);
   }
 
+  // === FIX: Drop incorrect FK constraints (client_id should reference clients, not users) ===
+  try {
+    await client.query(`
+      ALTER TABLE enquiries DROP CONSTRAINT IF EXISTS enquiries_client_id_fkey;
+      ALTER TABLE enquiries DROP CONSTRAINT IF EXISTS enquiries_client_id_users_fkey;
+      ALTER TABLE surveys DROP CONSTRAINT IF EXISTS surveys_client_id_fkey;
+      ALTER TABLE surveys DROP CONSTRAINT IF EXISTS surveys_client_id_users_fkey;
+    `);
+    console.log("[Migration] FK constraint fixes OK");
+  } catch (e: any) {
+    console.error("[Migration] FK constraint fixes error:", e.message);
+  }
+
   // === ADD MEASUREMENT COLUMNS TO SURVEY TABLES (safe even if columns exist) ===
   try {
     await client.query(`
