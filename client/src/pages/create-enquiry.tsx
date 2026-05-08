@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   ArrowLeft, Search, Loader2, Building2, User, Phone, Mail
 } from 'lucide-react';
+import { AddressAutocomplete } from '@/components/address-autocomplete';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -65,6 +66,10 @@ export default function CreateEnquiry() {
   const [urgency, setUrgency] = useState<string>('standard');
   const [preferredDates, setPreferredDates] = useState('');
   const [assignedTo, setAssignedTo] = useState<string>('');
+
+  // Manual address (when no property selected)
+  const [manualAddress, setManualAddress] = useState('');
+  const [manualPostcode, setManualPostcode] = useState('');
 
   // ─── Data Fetching ─────────────────────────────────────────────────────────
 
@@ -183,6 +188,8 @@ export default function CreateEnquiry() {
       urgency,
       preferred_dates: preferredDates.trim() || null,
       assigned_to: assignedTo && assignedTo !== 'unassigned' ? Number(assignedTo) : null,
+      address: manualAddress || null,
+      postcode: manualPostcode || null,
     });
   };
 
@@ -308,7 +315,22 @@ export default function CreateEnquiry() {
                   Loading properties...
                 </div>
               ) : properties.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No properties on file for this client</p>
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">No properties on file for this client</p>
+                  <AddressAutocomplete
+                    onAddressChange={(addr) => {
+                      if (addr) {
+                        setManualAddress(addr.formatted_address);
+                        setManualPostcode(addr.postcode);
+                      } else {
+                        setManualAddress('');
+                        setManualPostcode('');
+                      }
+                    }}
+                    required={false}
+                    label="Enter property address"
+                  />
+                </div>
               ) : (
                 <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
                   <SelectTrigger>
@@ -323,6 +345,25 @@ export default function CreateEnquiry() {
                     ))}
                   </SelectContent>
                 </Select>
+              )}
+              {/* Manual address entry when properties exist but none selected */}
+              {properties.length > 0 && !selectedPropertyId && (
+                <div className="pt-3 border-t mt-3">
+                  <p className="text-sm text-muted-foreground mb-2">Or enter a new address:</p>
+                  <AddressAutocomplete
+                    onAddressChange={(addr) => {
+                      if (addr) {
+                        setManualAddress(addr.formatted_address);
+                        setManualPostcode(addr.postcode);
+                      } else {
+                        setManualAddress('');
+                        setManualPostcode('');
+                      }
+                    }}
+                    required={false}
+                    label="New property address"
+                  />
+                </div>
               )}
             </CardContent>
           </Card>

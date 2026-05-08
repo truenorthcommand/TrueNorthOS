@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { pool } from "./db";
+import { isValidUKPostcode, formatPostcode } from './validate-postcode';
 
 const router = Router();
 
@@ -132,6 +133,14 @@ router.post('/', async (req: Request, res: Response) => {
 
     if (!client_id || !description) {
       return res.status(400).json({ error: 'Client and description are required' });
+    }
+
+    // Validate postcode if provided (optional for enquiries)
+    if (req.body.postcode && !isValidUKPostcode(req.body.postcode)) {
+      return res.status(400).json({ error: 'Invalid UK postcode format. Please provide a full valid postcode (e.g., SW1A 2AA).' });
+    }
+    if (req.body.postcode) {
+      req.body.postcode = formatPostcode(req.body.postcode);
     }
 
     const result = await pool.query(`

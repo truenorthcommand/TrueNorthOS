@@ -1,5 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+import { isValidUKPostcode, formatPostcode } from './validate-postcode';
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import OpenAI from "openai";
@@ -1520,6 +1521,14 @@ export async function registerRoutes(
 
   app.post("/api/jobs", requireAuth, async (req, res) => {
     try {
+      // Validate postcode if provided
+      if (req.body.postcode && !isValidUKPostcode(req.body.postcode)) {
+        return res.status(400).json({ error: 'Invalid UK postcode format. Please provide a full valid postcode (e.g., SW1A 2AA).' });
+      }
+      if (req.body.postcode) {
+        req.body.postcode = formatPostcode(req.body.postcode);
+      }
+
       const data = insertJobSchema.parse(req.body);
       const job = await storage.createJob(data);
       
@@ -2366,6 +2375,14 @@ export async function registerRoutes(
 
   app.post("/api/quotes", requireAdmin, async (req, res) => {
     try {
+      // Validate sitePostcode if provided
+      if (req.body.sitePostcode && !isValidUKPostcode(req.body.sitePostcode)) {
+        return res.status(400).json({ error: 'Invalid UK postcode format. Please provide a full valid postcode (e.g., SW1A 2AA).' });
+      }
+      if (req.body.sitePostcode) {
+        req.body.sitePostcode = formatPostcode(req.body.sitePostcode);
+      }
+
       console.log("Creating quote with body:", JSON.stringify(req.body, null, 2));
       const quoteNo = await storage.getNextQuoteNumber();
       const accessToken = crypto.randomUUID();
@@ -2586,6 +2603,17 @@ export async function registerRoutes(
       
       // Create associated properties
       if (properties && Array.isArray(properties) && properties.length > 0) {
+        // Validate postcodes for all properties
+        for (const prop of properties) {
+          if (!prop.postcode) {
+            return res.status(400).json({ error: 'Postcode is required for each property.' });
+          }
+          if (!isValidUKPostcode(prop.postcode)) {
+            return res.status(400).json({ error: `Invalid UK postcode format for property "${prop.name || 'unnamed'}". Please provide a full valid postcode (e.g., SW1A 2AA).` });
+          }
+          prop.postcode = formatPostcode(prop.postcode);
+        }
+
         for (const prop of properties) {
           await storage.createClientProperty({
             clientId: client.id,
@@ -2778,6 +2806,15 @@ export async function registerRoutes(
 
   app.post("/api/clients/:id/properties", requireAdmin, async (req, res) => {
     try {
+      // Validate postcode (required for property creation)
+      if (!req.body.postcode) {
+        return res.status(400).json({ error: 'Postcode is required for property creation.' });
+      }
+      if (!isValidUKPostcode(req.body.postcode)) {
+        return res.status(400).json({ error: 'Invalid UK postcode format. Please provide a full valid postcode (e.g., SW1A 2AA).' });
+      }
+      req.body.postcode = formatPostcode(req.body.postcode);
+
       const property = await storage.createClientProperty({ ...req.body, clientId: req.params.id });
       res.json(property);
     } catch (error) {

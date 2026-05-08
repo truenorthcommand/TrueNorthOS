@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { pool } from "./db";
 import { calculateDistance } from "./geocoding";
+import { isValidUKPostcode, formatPostcode } from './validate-postcode';
 
 const router = Router();
 
@@ -327,6 +328,15 @@ router.post('/', requireAdmin, async (req: Request, res: Response) => {
         error: 'booking_type, assigned_to, and scheduled_date are required'
       });
     }
+
+    // Validate postcode (required for bookings)
+    if (!req.body.postcode) {
+      return res.status(400).json({ error: 'Postcode is required for bookings.' });
+    }
+    if (!isValidUKPostcode(req.body.postcode)) {
+      return res.status(400).json({ error: 'Invalid UK postcode format. Please provide a full valid postcode (e.g., SW1A 2AA).' });
+    }
+    req.body.postcode = formatPostcode(req.body.postcode);
 
     // Calculate travel time from previous booking on same day for same user
     let travel_time_mins = req.body.travel_time_mins || 0;

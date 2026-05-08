@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   ArrowLeft, Loader2, Search, Sparkles, Clock, MapPin, User, Calendar
 } from 'lucide-react';
+import { AddressAutocomplete } from '@/components/address-autocomplete';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -106,6 +107,11 @@ export default function CreateBooking() {
   const [estimatedDuration, setEstimatedDuration] = useState<string>('60');
   const [priority, setPriority] = useState<string>('normal');
   const [notes, setNotes] = useState('');
+
+  // Manual address (when no property selected)
+  const [manualAddress, setManualAddress] = useState('');
+  const [manualPostcode, setManualPostcode] = useState('');
+  const [addressValid, setAddressValid] = useState(false);
 
   // AI Suggest state
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
@@ -320,6 +326,9 @@ export default function CreateBooking() {
         payload.address = prop.address;
         payload.postcode = prop.postcode || null;
       }
+    } else if (manualAddress) {
+      payload.address = manualAddress;
+      payload.postcode = manualPostcode || null;
     }
 
     createMutation.mutate(payload);
@@ -476,6 +485,31 @@ export default function CreateBooking() {
                 </Select>
               )}
             </div>
+
+            {/* Manual Address Entry (when no property selected) */}
+            {selectedClient && !selectedPropertyId && (
+              <div className="space-y-2 pt-2 border-t">
+                <Label className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Or enter address manually
+                </Label>
+                <AddressAutocomplete
+                  onAddressChange={(addr) => {
+                    if (addr) {
+                      setManualAddress(addr.formatted_address);
+                      setManualPostcode(addr.postcode);
+                      setAddressValid(true);
+                    } else {
+                      setManualAddress('');
+                      setManualPostcode('');
+                      setAddressValid(false);
+                    }
+                  }}
+                  required={false}
+                  label="Booking Address"
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
 

@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth';
 import { ArrowLeft, ArrowRight, Plus, Trash2, Mic, MicOff, MapPin, Camera, Save, ChevronDown, ChevronUp, Search, CheckCircle2, Loader2, Upload, X, Home, Wrench } from 'lucide-react';
+import { AddressAutocomplete } from '@/components/address-autocomplete';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface Client { id: number; name: string; phone?: string; email?: string; }
@@ -527,10 +528,21 @@ export default function SurveyWizard() {
               </Button>
               {showNewPropertyForm && (
                 <div className="p-3 border rounded-md space-y-2 bg-gray-50">
-                  <Input placeholder="Address *" value={newPropertyAddress} onChange={(e) => setNewPropertyAddress(e.target.value)} />
-                  <Input placeholder="Postcode" value={newPropertyPostcode} onChange={(e) => setNewPropertyPostcode(e.target.value)} />
+                  <AddressAutocomplete
+                    onAddressChange={(addr) => {
+                      if (addr) {
+                        setNewPropertyAddress(addr.formatted_address);
+                        setNewPropertyPostcode(addr.postcode);
+                      } else {
+                        setNewPropertyAddress('');
+                        setNewPropertyPostcode('');
+                      }
+                    }}
+                    required={true}
+                    label="Property Address"
+                  />
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={handleCreateProperty} disabled={!newPropertyAddress.trim()}>Create Property</Button>
+                    <Button size="sm" onClick={handleCreateProperty} disabled={!newPropertyAddress.trim() || !newPropertyPostcode.trim()}>Create Property</Button>
                     <Button size="sm" variant="outline" onClick={captureGPS} disabled={gpsLoading}>
                       {gpsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
                       <span className="ml-1">GPS</span>
