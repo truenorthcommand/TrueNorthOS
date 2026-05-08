@@ -487,11 +487,12 @@ export default function CreateBooking() {
             </div>
 
             {/* Manual Address Entry (when no property selected) */}
-            {selectedClient && !selectedPropertyId && (
+            {/* Address Entry - always visible when no property selected */}
+            {!selectedPropertyId && (
               <div className="space-y-2 pt-2 border-t">
                 <Label className="flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
-                  Or enter address manually
+                  {selectedClient ? 'Or enter a new address' : 'Site Address'}
                 </Label>
                 <AddressAutocomplete
                   onAddressChange={(addr) => {
@@ -505,8 +506,8 @@ export default function CreateBooking() {
                       setAddressValid(false);
                     }
                   }}
-                  required={false}
-                  label="Booking Address"
+                  required={!selectedPropertyId}
+                  label="Search Address"
                 />
               </div>
             )}
