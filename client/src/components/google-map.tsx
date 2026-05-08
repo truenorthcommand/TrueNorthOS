@@ -1,13 +1,7 @@
-/// <reference types="@types/google.maps" />
-import { useEffect, useRef, useState } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Map, AdvancedMarker, InfoWindow, useMap, Pin } from '@vis.gl/react-google-maps';
+import { useGoogleMapsApi } from './google-maps-provider';
 import { Loader2 } from 'lucide-react';
-
-declare global {
-  interface Window {
-    google: typeof google;
-    initGoogleMaps: () => void;
-  }
-}
 
 type MarkerType = 'engineer' | 'job' | 'signoff';
 
@@ -21,7 +15,7 @@ export interface MapMarker {
   status?: string;
 }
 
-interface GoogleMapProps {
+export interface GoogleMapProps {
   markers: MapMarker[];
   center?: { lat: number; lng: number };
   zoom?: number;
@@ -30,29 +24,10 @@ interface GoogleMapProps {
   showUserLocation?: boolean;
 }
 
-let cachedApiKey: string | null = null;
-
-async function getGoogleMapsApiKey(): Promise<string> {
-  if (cachedApiKey !== null) return cachedApiKey;
-  
-  try {
-    const response = await fetch('/api/config/maps', { credentials: 'include' });
-    if (response.ok) {
-      const data = await response.json();
-      cachedApiKey = data.apiKey || '';
-    } else {
-      cachedApiKey = '';
-    }
-  } catch {
-    cachedApiKey = '';
-  }
-  return cachedApiKey as string;
-}
-
-const markerColors: Record<MarkerType, string> = {
-  engineer: '#3b82f6',
-  job: '#10b981', 
-  signoff: '#f59e0b',
+const markerColors: Record<MarkerType, { background: string; glyph: string; border: string }> = {
+  engineer: { background: '#3b82f6', glyph: '#ffffff', border: '#2563eb' },
+  job: { background: '#f97316', glyph: '#ffffff', border: '#ea580c' },
+  signoff: { background: '#a855f7', glyph: '#ffffff', border: '#9333ea' },
 };
 
 const statusColors: Record<string, string> = {
@@ -62,67 +37,60 @@ const statusColors: Record<string, string> = {
   'Signed Off': '#10b981',
 };
 
-let isScriptLoading = false;
-let isScriptLoaded = false;
-
-async function loadGoogleMapsScript(): Promise<void> {
-  if (isScriptLoaded && window.google?.maps) {
-    return;
+function getMarkerColor(type: MarkerType, status?: string) {
+  if (status && statusColors[status]) {
+    return { background: statusColors[status], glyph: '#ffffff', border: statusColors[status] };
   }
-
-  if (isScriptLoading) {
-    return new Promise((resolve) => {
-      const checkLoaded = setInterval(() => {
-        if (isScriptLoaded && window.google?.maps) {
-          clearInterval(checkLoaded);
-          resolve();
-        }
-      }, 100);
-    });
-  }
-
-  const apiKey = await getGoogleMapsApiKey();
-  if (!apiKey) {
-    throw new Error('Google Maps API key not configured');
-  }
-
-  isScriptLoading = true;
-
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-    script.async = true;
-    script.defer = true;
-    
-    script.onload = () => {
-      isScriptLoaded = true;
-      isScriptLoading = false;
-      resolve();
-    };
-    
-    script.onerror = () => {
-      isScriptLoading = false;
-      reject(new Error('Failed to load Google Maps script'));
-    };
-
-    document.head.appendChild(script);
-  });
+  return markerColors[type];
 }
 
-export function GoogleMap({ 
-  markers, 
-  center, 
-  zoom = 12, 
+// Component to auto-fit bounds when markers change
+function MapBoundsUpdater({ markers, userLocation }: { markers: MapMarker[]; userLocation: { lat: number; lng: number } | null }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+    if (markers.length === 0 && !userLocation) return;
+
+    const bounds = new google.maps.LatLngBounds();
+    let hasValidMarkers = false;
+
+    markers.forEach(marker => {
+      if (typeof marker.lat === 'number' && typeof marker.lng === 'number') {
+        bounds.extend({ lat: marker.lat, lng: marker.lng });
+        hasValidMarkers = true;
+      }
+    });
+
+    if (userLocation) {
+      bounds.extend(userLocation);
+      hasValidMarkers = true;
+    }
+
+    if (hasValidMarkers) {
+      if (markers.length === 1 && !userLocation) {
+        map.setCenter({ lat: markers[0].lat, lng: markers[0].lng });
+        map.setZoom(14);
+      } else {
+        map.fitBounds(bounds, 50);
+      }
+    }
+  }, [map, markers, userLocation]);
+
+  return null;
+}
+
+export function GoogleMap({
+  markers,
+  center,
+  zoom = 12,
   height = '400px',
   onMarkerClick,
-  showUserLocation = false
+  showUserLocation = false,
 }: GoogleMapProps) {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [userLocation, setUserLocation] = useState<{lat: number; lng: number} | null>(null);
+  const { isLoaded, error } = useGoogleMapsApi();
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [activeMarker, setActiveMarker] = useState<MapMarker | null>(null);
 
   useEffect(() => {
     if (showUserLocation && navigator.geolocation) {
@@ -130,7 +98,7 @@ export function GoogleMap({
         (position) => {
           setUserLocation({
             lat: position.coords.latitude,
-            lng: position.coords.longitude
+            lng: position.coords.longitude,
           });
         },
         () => {}
@@ -138,136 +106,21 @@ export function GoogleMap({
     }
   }, [showUserLocation]);
 
-  useEffect(() => {
-    let mounted = true;
+  const defaultCenter = useMemo(() => {
+    return center || userLocation || { lat: 51.5074, lng: -0.1278 };
+  }, [center, userLocation]);
 
-    async function initMap() {
-      try {
-        await loadGoogleMapsScript();
-        
-        if (!mounted || !mapRef.current) return;
-
-        const defaultCenter = center || userLocation || { lat: 51.5074, lng: -0.1278 };
-
-        const map = new google.maps.Map(mapRef.current, {
-          center: defaultCenter,
-          zoom,
-          mapTypeControl: false,
-          streetViewControl: false,
-          fullscreenControl: true,
-          zoomControl: true,
-          styles: [
-            {
-              featureType: 'poi',
-              elementType: 'labels',
-              stylers: [{ visibility: 'off' }]
-            }
-          ]
-        });
-
-        mapInstanceRef.current = map;
-        setIsLoading(false);
-      } catch (err) {
-        if (mounted) {
-          setError(err instanceof Error ? err.message : 'Failed to load map');
-          setIsLoading(false);
-        }
-      }
-    }
-
-    initMap();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!mapInstanceRef.current || !window.google?.maps) return;
-
-    markersRef.current.forEach(marker => marker.setMap(null));
-    markersRef.current = [];
-
-    const bounds = new google.maps.LatLngBounds();
-    let hasValidMarkers = false;
-
-    markers.forEach(markerData => {
-      if (!markerData.lat || !markerData.lng) return;
-
-      const position = { lat: markerData.lat, lng: markerData.lng };
-      bounds.extend(position);
-      hasValidMarkers = true;
-
-      const color = markerData.status ? (statusColors[markerData.status] || markerColors[markerData.type]) : markerColors[markerData.type];
-      
-      const markerIcon = {
-        path: markerData.type === 'engineer' 
-          ? google.maps.SymbolPath.CIRCLE 
-          : google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-        fillColor: color,
-        fillOpacity: 1,
-        strokeColor: '#ffffff',
-        strokeWeight: 2,
-        scale: markerData.type === 'engineer' ? 12 : 8,
-      };
-
-      const marker = new google.maps.Marker({
-        position,
-        map: mapInstanceRef.current!,
-        icon: markerIcon,
-        title: markerData.title,
-      });
-
-      const infoWindow = new google.maps.InfoWindow({
-        content: `
-          <div style="padding: 8px; max-width: 200px;">
-            <strong style="font-size: 14px;">${markerData.title}</strong>
-            ${markerData.subtitle ? `<p style="margin: 4px 0 0; color: #666; font-size: 12px;">${markerData.subtitle}</p>` : ''}
-            ${markerData.status ? `<span style="display: inline-block; margin-top: 4px; padding: 2px 6px; border-radius: 4px; font-size: 11px; background: ${color}; color: white;">${markerData.status}</span>` : ''}
-          </div>
-        `
-      });
-
-      marker.addListener('click', () => {
-        infoWindow.open(mapInstanceRef.current!, marker);
-        if (onMarkerClick) {
-          onMarkerClick(markerData);
-        }
-      });
-
-      markersRef.current.push(marker);
-    });
-
-    if (userLocation && showUserLocation) {
-      const userMarker = new google.maps.Marker({
-        position: userLocation,
-        map: mapInstanceRef.current,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          fillColor: '#ef4444',
-          fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 3,
-          scale: 10,
-        },
-        title: 'Your Location',
-      });
-      markersRef.current.push(userMarker);
-      bounds.extend(userLocation);
-      hasValidMarkers = true;
-    }
-
-    if (hasValidMarkers && markers.length > 1) {
-      mapInstanceRef.current.fitBounds(bounds, 50);
-    } else if (hasValidMarkers && markers.length === 1) {
-      mapInstanceRef.current.setCenter({ lat: markers[0].lat, lng: markers[0].lng });
-      mapInstanceRef.current.setZoom(14);
-    }
-  }, [markers, userLocation, showUserLocation, onMarkerClick]);
+  const handleMarkerClick = useCallback(
+    (marker: MapMarker) => {
+      setActiveMarker(marker);
+      onMarkerClick?.(marker);
+    },
+    [onMarkerClick]
+  );
 
   if (error) {
     return (
-      <div 
+      <div
         className="flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-lg border"
         style={{ height }}
       >
@@ -279,38 +132,107 @@ export function GoogleMap({
     );
   }
 
+  if (!isLoaded) {
+    return (
+      <div
+        className="flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-lg border"
+        style={{ height }}
+      >
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="relative rounded-lg overflow-hidden border" style={{ height }}>
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-100 dark:bg-slate-800 z-10">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      )}
-      <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
+      <Map
+        defaultCenter={defaultCenter}
+        defaultZoom={zoom}
+        gestureHandling="greedy"
+        disableDefaultUI={false}
+        mapTypeControl={false}
+        streetViewControl={false}
+        fullscreenControl={true}
+        zoomControl={true}
+        mapId="truenorth-main-map"
+        style={{ width: '100%', height: '100%' }}
+      >
+        <MapBoundsUpdater markers={markers} userLocation={showUserLocation ? userLocation : null} />
+
+        {markers.map((marker) => {
+          if (typeof marker.lat !== 'number' || typeof marker.lng !== 'number') return null;
+          const colors = getMarkerColor(marker.type, marker.status);
+
+          return (
+            <AdvancedMarker
+              key={marker.id}
+              position={{ lat: marker.lat, lng: marker.lng }}
+              title={marker.title}
+              onClick={() => handleMarkerClick(marker)}
+            >
+              <Pin
+                background={colors.background}
+                glyphColor={colors.glyph}
+                borderColor={colors.border}
+                scale={marker.type === 'engineer' ? 1.2 : 1.0}
+              />
+            </AdvancedMarker>
+          );
+        })}
+
+        {userLocation && showUserLocation && (
+          <AdvancedMarker
+            position={userLocation}
+            title="Your Location"
+          >
+            <div className="relative">
+              <div className="w-4 h-4 bg-red-500 border-2 border-white rounded-full shadow-lg" />
+              <div className="absolute inset-0 w-4 h-4 bg-red-400 rounded-full animate-ping opacity-75" />
+            </div>
+          </AdvancedMarker>
+        )}
+
+        {activeMarker && (
+          <InfoWindow
+            position={{ lat: activeMarker.lat, lng: activeMarker.lng }}
+            onCloseClick={() => setActiveMarker(null)}
+            pixelOffset={[0, -40]}
+          >
+            <div className="p-2 max-w-[200px]">
+              <strong className="text-sm block">{activeMarker.title}</strong>
+              {activeMarker.subtitle && (
+                <p className="text-xs text-gray-600 mt-1">{activeMarker.subtitle}</p>
+              )}
+              {activeMarker.status && (
+                <span
+                  className="inline-block mt-2 px-2 py-0.5 rounded text-xs text-white"
+                  style={{ backgroundColor: getMarkerColor(activeMarker.type, activeMarker.status).background }}
+                >
+                  {activeMarker.status}
+                </span>
+              )}
+            </div>
+          </InfoWindow>
+        )}
+      </Map>
     </div>
   );
 }
 
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
-  const apiKey = await getGoogleMapsApiKey();
-  if (!apiKey) {
-    return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-  }
-
   try {
-    await loadGoogleMapsScript();
-    const geocoder = new google.maps.Geocoder();
-    
-    return new Promise((resolve) => {
-      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-        if (status === 'OK' && results && results[0]) {
-          resolve(results[0].formatted_address);
-        } else {
-          resolve(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-        }
-      });
-    });
+    // Use the Google Maps Geocoder if available
+    if (window.google?.maps?.Geocoder) {
+      const geocoder = new google.maps.Geocoder();
+      const result = await geocoder.geocode({ location: { lat, lng } });
+      if (result.results && result.results[0]) {
+        return result.results[0].formatted_address;
+      }
+    }
   } catch {
-    return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    // Fall through to coordinates
   }
+  return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
 }
+
+export default GoogleMap;
