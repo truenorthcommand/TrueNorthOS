@@ -168,15 +168,13 @@ router.get('/calendar', async (req: Request, res: Response) => {
     // Group by assigned_to for resource planner view
     // Get ALL field staff to show in planner (even those without bookings)
     const staffResult = await pool.query(`
-      SELECT id, name, role FROM users
-      WHERE role IN ('engineer', 'surveyor', 'works_manager', 'admin', 'super_admin')
+      SELECT id, name, role, roles FROM users
+      WHERE roles ?| ARRAY['engineer', 'surveyor', 'works_manager']
       ORDER BY
-        CASE role
-          WHEN 'engineer' THEN 1
-          WHEN 'surveyor' THEN 2
-          WHEN 'works_manager' THEN 3
-          WHEN 'admin' THEN 4
-          WHEN 'super_admin' THEN 5
+        CASE
+          WHEN roles ? 'engineer' THEN 1
+          WHEN roles ? 'surveyor' THEN 2
+          WHEN roles ? 'works_manager' THEN 3
         END,
         name ASC
     `);
@@ -190,12 +188,21 @@ router.get('/calendar', async (req: Request, res: Response) => {
     }
 
     // Build resource list with ALL staff (empty bookings array if none)
-    const by_resource = staffResult.rows.map((staff: any) => ({
-      user_id: staff.id,
-      user_name: staff.name,
-      role: staff.role,
-      bookings: bookingsByUser[staff.id] || []
-    }));
+    const by_resource = staffResult.rows.map((staff: any) => {
+      // Determine primary field role from roles array
+      const roles = Array.isArray(staff.roles) ? staff.roles : [];
+      let fieldRole = 'engineer';
+      if (roles.includes('engineer')) fieldRole = 'engineer';
+      else if (roles.includes('surveyor')) fieldRole = 'surveyor';
+      else if (roles.includes('works_manager')) fieldRole = 'works_manager';
+      return {
+        user_id: staff.id,
+        user_name: staff.name,
+        role: fieldRole,
+        roles: roles,
+        bookings: bookingsByUser[staff.id] || []
+      };
+    });
 
     // Add unassigned bookings if any
     if (bookingsByUser['unassigned']?.length) {
@@ -536,14 +543,11 @@ router.post('/ai-suggest', async (req: Request, res: Response) => {
     }
 
     // Find staff with matching role (fallback to admin/super_admin for works_manager)
-    const rolesToSearch = requiredRole === 'works_manager'
-      ? ['works_manager', 'admin', 'super_admin']
-      : [requiredRole];
     const staffResult = await pool.query(`
-      SELECT id, name, role FROM users
-      WHERE role = ANY($1::text[])
+      SELECT id, name, role, roles FROM users
+      WHERE roles ? $1
       ORDER BY name
-    `, [rolesToSearch]);
+    `, [requiredRole]);
 
     if (staffResult.rows.length === 0) {
       return res.json({

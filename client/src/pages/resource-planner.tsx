@@ -35,6 +35,7 @@ interface ResourceGroup {
   user_id: string | null;
   user_name: string;
   role: string;
+  roles?: string[];
   bookings: CalendarBooking[];
 }
 
@@ -128,11 +129,9 @@ export default function ResourcePlanner() {
     if (roleFilter === 'all') return calendarData.by_resource;
 
     return calendarData.by_resource.filter(resource => {
-      // Use the role field directly from the resource
-      if (roleFilter === 'works_manager') {
-        return resource.role === 'works_manager' || resource.role === 'admin' || resource.role === 'super_admin';
-      }
-      return resource.role === roleFilter;
+      // Use the roles array if available, fallback to role field
+      const roles = resource.roles || [resource.role];
+      return roles.includes(roleFilter);
     });
   }, [calendarData, roleFilter]);
 
