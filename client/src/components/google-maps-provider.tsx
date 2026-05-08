@@ -1,5 +1,5 @@
 import { APIProvider } from '@vis.gl/react-google-maps';
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, useRef, createContext, useContext } from 'react';
 
 interface GoogleMapsContextType {
   apiKey: string | null;
@@ -20,18 +20,38 @@ export function useGoogleMapsApi() {
 export function GoogleMapsProvider({ children }: { children: React.ReactNode }) {
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const retryCount = useRef(0);
 
   useEffect(() => {
-    fetch('/api/config/maps', { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => {
-        if (data.apiKey) {
-          setApiKey(data.apiKey);
-        } else {
-          setError('No API key configured');
-        }
-      })
-      .catch(err => setError(err.message));
+    const fetchKey = () => {
+      fetch('/api/config/maps', { credentials: 'include' })
+        .then(res => {
+          if (!res.ok) {
+            // Might not be authenticated yet - retry
+            if (retryCount.current < 5) {
+              retryCount.current++;
+              setTimeout(fetchKey, 2000 * retryCount.current);
+              return null;
+            }
+            throw new Error(`Maps config failed: ${res.status}`);
+          }
+          return res.json();
+        })
+        .then(data => {
+          if (!data) return;
+          if (data.apiKey) {
+            setApiKey(data.apiKey);
+            setError(null);
+          } else {
+            setError('Google Maps API key not configured on server');
+          }
+        })
+        .catch(err => {
+          console.error('[GoogleMapsProvider] Failed to load API key:', err);
+          setError(err.message);
+        });
+    };
+    fetchKey();
   }, []);
 
   const contextValue = {

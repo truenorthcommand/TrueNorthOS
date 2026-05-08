@@ -377,7 +377,8 @@ export async function registerRoutes(
     });
   });
 
-  app.get("/api/config/maps", requireAuth, (req, res) => {
+  // Maps API key is public (restricted by HTTP referrer in Google Cloud Console)
+  app.get("/api/config/maps", (req, res) => {
     const apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.PRO_MAIN_MAPS_API_KEY || '';
     res.json({ apiKey });
   });
