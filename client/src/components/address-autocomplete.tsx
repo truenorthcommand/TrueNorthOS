@@ -1,0 +1,580 @@
+/// <reference types="@types/google.maps" />
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { MapPin, Search, AlertTriangle, CheckCircle2, XCircle, PenLine } from 'lucide-react';
+import { isValidUKPostcode, formatPostcode, isPartialPostcode } from '@/lib/validate-postcode';
+import { cn } from '@/lib/utils';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface ParsedAddress {
+  street: string;
+  city: string;
+  county: string;
+  postcode: string;
+  country: string;
+  latitude: number | null;
+  longitude: number | null;
+  formatted_address: string;
+  partial_postcode?: boolean;
+}
+
+interface AddressAutocompleteProps {
+  onAddressChange: (address: ParsedAddress | null) => void;
+  initialAddress?: Partial<ParsedAddress>;
+  required?: boolean;
+  label?: string;
+  disabled?: boolean;
+  className?: string;
+  showFields?: boolean;
+  compact?: boolean;
+}
+
+// ─── Google Maps Script Loader ────────────────────────────────────────────────
+
+let cachedApiKey: string | null = null;
+let scriptLoadPromise: Promise<void> | null = null;
+
+async function getGoogleMapsApiKey(): Promise<string> {
+  if (cachedApiKey !== null) return cachedApiKey;
+  try {
+    const response = await fetch('/api/config/maps', { credentials: 'include' });
+    if (response.ok) {
+      const data = await response.json();
+      cachedApiKey = data.apiKey || '';
+    } else {
+      cachedApiKey = '';
+    }
+  } catch {
+    cachedApiKey = '';
+  }
+  return cachedApiKey as string;
+}
+
+async function ensureGoogleMapsLoaded(): Promise<void> {
+  // Already loaded (possibly by google-map.tsx)
+  if (window.google?.maps?.places) {
+    return;
+  }
+
+  // Already loading
+  if (scriptLoadPromise) {
+    return scriptLoadPromise;
+  }
+
+  scriptLoadPromise = (async () => {
+    const apiKey = await getGoogleMapsApiKey();
+    if (!apiKey) {
+      throw new Error('Google Maps API key not configured');
+    }
+
+    // Check if script tag already exists (loaded by another component)
+    const existingScript = document.querySelector(
+      'script[src*="maps.googleapis.com/maps/api/js"]'
+    );
+    if (existingScript && window.google?.maps?.places) {
+      return;
+    }
+
+    if (existingScript) {
+      // Script exists but not yet loaded - wait for it
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Google Maps load timeout')), 10000);
+        const check = setInterval(() => {
+          if (window.google?.maps?.places) {
+            clearInterval(check);
+            clearTimeout(timeout);
+            resolve();
+          }
+        }, 100);
+      });
+      return;
+    }
+
+    // Load script
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Failed to load Google Maps script'));
+      document.head.appendChild(script);
+    });
+  })();
+
+  return scriptLoadPromise;
+}
+
+// ─── Pac Container Styles ─────────────────────────────────────────────────────
+
+const PAC_STYLES = `
+.pac-container {
+  z-index: 9999 !important;
+  border-radius: 0.5rem;
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  font-family: inherit;
+  margin-top: 4px;
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+}
+.pac-container .pac-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-top: 1px solid hsl(var(--border));
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+.pac-container .pac-item:first-child {
+  border-top: none;
+}
+.pac-container .pac-item:hover {
+  background: hsl(var(--accent));
+}
+.pac-container .pac-item .pac-icon {
+  display: none;
+}
+.pac-container .pac-item .pac-item-query {
+  font-weight: 500;
+  color: hsl(var(--foreground));
+}
+.pac-container .pac-item .pac-matched {
+  font-weight: 600;
+}
+.pac-container::after {
+  display: none !important;
+}
+`;
+
+function injectPacStyles() {
+  if (document.getElementById('pac-custom-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'pac-custom-styles';
+  style.textContent = PAC_STYLES;
+  document.head.appendChild(style);
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export function AddressAutocomplete({
+  onAddressChange,
+  initialAddress,
+  required = true,
+  label = 'Address',
+  disabled = false,
+  className,
+  showFields = true,
+  compact = false,
+}: AddressAutocompleteProps) {
+  // State
+  const [status, setStatus] = useState<'loading' | 'error' | 'ready' | 'selected'>('loading');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [manualMode, setManualMode] = useState(false);
+  const [searchValue, setSearchValue] = useState('');
+
+  // Address fields
+  const [street, setStreet] = useState(initialAddress?.street || '');
+  const [city, setCity] = useState(initialAddress?.city || '');
+  const [county, setCounty] = useState(initialAddress?.county || '');
+  const [postcode, setPostcode] = useState(initialAddress?.postcode || '');
+  const [country, setCountry] = useState(initialAddress?.country || 'United Kingdom');
+  const [latitude, setLatitude] = useState<number | null>(initialAddress?.latitude || null);
+  const [longitude, setLongitude] = useState<number | null>(initialAddress?.longitude || null);
+  const [formattedAddress, setFormattedAddress] = useState(initialAddress?.formatted_address || '');
+
+  // Refs
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const listenerRef = useRef<google.maps.MapsEventListener | null>(null);
+
+  // ─── Postcode Validation ──────────────────────────────────────────────────
+
+  type PostcodeStatus = 'empty' | 'valid' | 'partial' | 'invalid';
+
+  const getPostcodeStatus = useCallback((value: string): PostcodeStatus => {
+    const trimmed = value.trim();
+    if (!trimmed) return 'empty';
+    if (isValidUKPostcode(trimmed)) return 'valid';
+    if (isPartialPostcode(trimmed)) return 'partial';
+    return 'invalid';
+  }, []);
+
+  const postcodeStatus = getPostcodeStatus(postcode);
+
+  // ─── Notify Parent ────────────────────────────────────────────────────────
+
+  const notifyParent = useCallback(
+    (fields: {
+      street: string;
+      city: string;
+      county: string;
+      postcode: string;
+      country: string;
+      latitude: number | null;
+      longitude: number | null;
+      formatted_address: string;
+    }) => {
+      const pcStatus = getPostcodeStatus(fields.postcode);
+      if (pcStatus === 'valid') {
+        onAddressChange({
+          street: fields.street,
+          city: fields.city,
+          county: fields.county,
+          postcode: formatPostcode(fields.postcode),
+          country: fields.country,
+          latitude: fields.latitude,
+          longitude: fields.longitude,
+          formatted_address: fields.formatted_address,
+          partial_postcode: false,
+        });
+      } else {
+        onAddressChange(null);
+      }
+    },
+    [onAddressChange, getPostcodeStatus]
+  );
+
+  // ─── Initialize Google Places Autocomplete ────────────────────────────────
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function init() {
+      try {
+        await ensureGoogleMapsLoaded();
+        if (!mounted) return;
+
+        injectPacStyles();
+        setStatus('ready');
+
+        // Initialize autocomplete on search input
+        if (searchInputRef.current && !autocompleteRef.current) {
+          const autocomplete = new google.maps.places.Autocomplete(searchInputRef.current, {
+            componentRestrictions: { country: 'gb' },
+            types: ['address'],
+            fields: ['address_components', 'formatted_address', 'geometry'],
+          });
+
+          autocompleteRef.current = autocomplete;
+
+          listenerRef.current = autocomplete.addListener('place_changed', () => {
+            const place = autocomplete.getPlace();
+            if (!place.address_components) return;
+
+            // Parse address components
+            let streetNumber = '';
+            let route = '';
+            let parsedCity = '';
+            let parsedCounty = '';
+            let parsedPostcode = '';
+            let parsedCountry = 'United Kingdom';
+
+            for (const component of place.address_components) {
+              const types = component.types;
+              if (types.includes('street_number')) {
+                streetNumber = component.long_name;
+              } else if (types.includes('route')) {
+                route = component.long_name;
+              } else if (types.includes('postal_town')) {
+                parsedCity = component.long_name;
+              } else if (types.includes('locality') && !parsedCity) {
+                parsedCity = component.long_name;
+              } else if (types.includes('administrative_area_level_2')) {
+                parsedCounty = component.long_name;
+              } else if (types.includes('postal_code')) {
+                parsedPostcode = component.long_name;
+              } else if (types.includes('country')) {
+                parsedCountry = component.long_name;
+              }
+            }
+
+            const parsedStreet = streetNumber
+              ? `${streetNumber} ${route}`
+              : route;
+
+            const lat = place.geometry?.location?.lat() ?? null;
+            const lng = place.geometry?.location?.lng() ?? null;
+            const formatted = place.formatted_address || '';
+
+            // Update state
+            setStreet(parsedStreet);
+            setCity(parsedCity);
+            setCounty(parsedCounty);
+            setPostcode(parsedPostcode ? formatPostcode(parsedPostcode) : '');
+            setCountry(parsedCountry);
+            setLatitude(lat);
+            setLongitude(lng);
+            setFormattedAddress(formatted);
+            setSearchValue(formatted);
+            setStatus('selected');
+
+            // Notify parent
+            notifyParent({
+              street: parsedStreet,
+              city: parsedCity,
+              county: parsedCounty,
+              postcode: parsedPostcode ? formatPostcode(parsedPostcode) : '',
+              country: parsedCountry,
+              latitude: lat,
+              longitude: lng,
+              formatted_address: formatted,
+            });
+          });
+        }
+      } catch (err) {
+        if (!mounted) return;
+        setStatus('error');
+        setErrorMessage(err instanceof Error ? err.message : 'Failed to load address lookup');
+        setManualMode(true);
+      }
+    }
+
+    if (!manualMode) {
+      init();
+    }
+
+    return () => {
+      mounted = false;
+      if (listenerRef.current) {
+        google.maps.event.removeListener(listenerRef.current);
+        listenerRef.current = null;
+      }
+      autocompleteRef.current = null;
+    };
+  }, [manualMode, notifyParent]);
+
+  // ─── Handle postcode changes ──────────────────────────────────────────────
+
+  const handlePostcodeChange = useCallback(
+    (value: string) => {
+      setPostcode(value);
+      notifyParent({
+        street,
+        city,
+        county,
+        postcode: value,
+        country,
+        latitude,
+        longitude,
+        formatted_address: formattedAddress,
+      });
+    },
+    [street, city, county, country, latitude, longitude, formattedAddress, notifyParent]
+  );
+
+  // Handle postcode blur - format if valid
+  const handlePostcodeBlur = useCallback(() => {
+    if (isValidUKPostcode(postcode)) {
+      const formatted = formatPostcode(postcode);
+      setPostcode(formatted);
+      notifyParent({
+        street,
+        city,
+        county,
+        postcode: formatted,
+        country,
+        latitude,
+        longitude,
+        formatted_address: formattedAddress,
+      });
+    }
+  }, [postcode, street, city, county, country, latitude, longitude, formattedAddress, notifyParent]);
+
+  // ─── Handle manual field changes ──────────────────────────────────────────
+
+  const handleFieldChange = useCallback(
+    (field: 'street' | 'city' | 'county', value: string) => {
+      const setters = { street: setStreet, city: setCity, county: setCounty };
+      setters[field](value);
+
+      const fields = { street, city, county };
+      fields[field] = value;
+
+      notifyParent({
+        ...fields,
+        postcode,
+        country,
+        latitude,
+        longitude,
+        formatted_address: `${fields.street}, ${fields.city}, ${fields.county}, ${postcode}`,
+      });
+    },
+    [street, city, county, postcode, country, latitude, longitude, notifyParent]
+  );
+
+  // ─── Toggle manual mode ───────────────────────────────────────────────────
+
+  const toggleManualMode = useCallback(() => {
+    setManualMode((prev) => !prev);
+    if (manualMode) {
+      // Switching back to autocomplete
+      setStatus('loading');
+    }
+  }, [manualMode]);
+
+  // ─── Postcode indicator ───────────────────────────────────────────────────
+
+  const PostcodeIndicator = () => {
+    switch (postcodeStatus) {
+      case 'valid':
+        return (
+          <div className="flex items-center gap-1 text-green-600">
+            <CheckCircle2 className="h-4 w-4" />
+            <span className="text-xs">Valid</span>
+          </div>
+        );
+      case 'partial':
+        return (
+          <div className="flex items-center gap-1 text-orange-500">
+            <AlertTriangle className="h-4 w-4" />
+            <span className="text-xs">Partial – please add full postcode</span>
+          </div>
+        );
+      case 'invalid':
+        return (
+          <div className="flex items-center gap-1 text-red-500">
+            <XCircle className="h-4 w-4" />
+            <span className="text-xs">Invalid UK postcode format</span>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const postcodeBorderClass = {
+    empty: 'border-input',
+    valid: 'border-green-500 focus-visible:ring-green-500/20',
+    partial: 'border-orange-400 focus-visible:ring-orange-400/20',
+    invalid: 'border-red-500 focus-visible:ring-red-500/20',
+  }[postcodeStatus];
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+
+  return (
+    <div className={cn('space-y-3', className)}>
+      {/* Search Input */}
+      {!manualMode && (
+        <div className="space-y-1.5">
+          <Label className="text-sm font-medium flex items-center gap-1.5">
+            <Search className="h-3.5 w-3.5 text-muted-foreground" />
+            {label}
+          </Label>
+          <div className="relative">
+            <Input
+              ref={searchInputRef}
+              type="text"
+              placeholder={
+                status === 'loading'
+                  ? 'Loading address lookup...'
+                  : 'Start typing an address...'
+              }
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              disabled={disabled || status === 'loading'}
+              className="pl-9"
+            />
+            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            {status === 'loading' && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+              </div>
+            )}
+            {status === 'selected' && (
+              <Badge
+                variant="secondary"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs"
+              >
+                Selected
+              </Badge>
+            )}
+          </div>
+          {status === 'error' && errorMessage && (
+            <p className="text-xs text-red-500 flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3" />
+              {errorMessage} — using manual entry
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Address Fields */}
+      {showFields && !compact && (status === 'selected' || manualMode) && (
+        <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Street</Label>
+            <Input
+              value={street}
+              onChange={(e) => handleFieldChange('street', e.target.value)}
+              disabled={disabled || (!manualMode && status === 'selected')}
+              placeholder="Street address"
+              className="h-8 text-sm"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">City</Label>
+              <Input
+                value={city}
+                onChange={(e) => handleFieldChange('city', e.target.value)}
+                disabled={disabled || (!manualMode && status === 'selected')}
+                placeholder="City / Town"
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">County</Label>
+              <Input
+                value={county}
+                onChange={(e) => handleFieldChange('county', e.target.value)}
+                disabled={disabled || (!manualMode && status === 'selected')}
+                placeholder="County"
+                className="h-8 text-sm"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Postcode Field - Always Visible */}
+      <div className="space-y-1.5">
+        <Label className="text-sm font-medium">
+          Postcode {required && <span className="text-red-500">*</span>}
+        </Label>
+        <div className="flex items-center gap-2">
+          <Input
+            value={postcode}
+            onChange={(e) => handlePostcodeChange(e.target.value.toUpperCase())}
+            onBlur={handlePostcodeBlur}
+            disabled={disabled}
+            placeholder="e.g. SW1A 2AA"
+            className={cn('max-w-[180px] font-mono', postcodeBorderClass)}
+            required={required}
+          />
+          <PostcodeIndicator />
+        </div>
+      </div>
+
+      {/* Manual Toggle */}
+      <div>
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+          onClick={toggleManualMode}
+          disabled={disabled}
+        >
+          <PenLine className="h-3 w-3 mr-1" />
+          {manualMode ? 'Search instead' : 'Enter address manually'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export default AddressAutocomplete;
