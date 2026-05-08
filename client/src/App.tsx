@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { StoreProvider } from "@/lib/store";
 import { ThemeProvider } from "@/lib/theme";
+import { GoogleMapsProvider } from "@/components/google-maps-provider";
 import { useVersionCheck } from "@/hooks/use-version-check";
 import NotFound from "@/pages/not-found";
 import WorkflowStudio from "@/pages/workflow-studio";
@@ -284,14 +285,16 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
-          <StoreProvider>
-            <TooltipProvider>
-              <LocationTracker />
-              <Toaster />
-              <CookieConsent />
-              <Router />
-            </TooltipProvider>
-          </StoreProvider>
+          <GoogleMapsProvider>
+            <StoreProvider>
+              <TooltipProvider>
+                <LocationTracker />
+                <Toaster />
+                <CookieConsent />
+                <Router />
+              </TooltipProvider>
+            </StoreProvider>
+          </GoogleMapsProvider>
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>

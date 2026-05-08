@@ -1,5 +1,7 @@
 /// <reference types="@types/google.maps" />
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useMapsLibrary } from '@vis.gl/react-google-maps';
+import { useGoogleMapsApi } from './google-maps-provider';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -31,82 +33,6 @@ interface AddressAutocompleteProps {
   className?: string;
   showFields?: boolean;
   compact?: boolean;
-}
-
-// ─── Google Maps Script Loader ────────────────────────────────────────────────
-
-let cachedApiKey: string | null = null;
-let scriptLoadPromise: Promise<void> | null = null;
-
-async function getGoogleMapsApiKey(): Promise<string> {
-  if (cachedApiKey !== null) return cachedApiKey;
-  try {
-    const response = await fetch('/api/config/maps', { credentials: 'include' });
-    if (response.ok) {
-      const data = await response.json();
-      cachedApiKey = data.apiKey || '';
-    } else {
-      cachedApiKey = '';
-    }
-  } catch {
-    cachedApiKey = '';
-  }
-  return cachedApiKey as string;
-}
-
-async function ensureGoogleMapsLoaded(): Promise<void> {
-  // Already loaded (possibly by google-map.tsx)
-  if (window.google?.maps?.places) {
-    return;
-  }
-
-  // Already loading
-  if (scriptLoadPromise) {
-    return scriptLoadPromise;
-  }
-
-  scriptLoadPromise = (async () => {
-    const apiKey = await getGoogleMapsApiKey();
-    if (!apiKey) {
-      throw new Error('Google Maps API key not configured');
-    }
-
-    // Check if script tag already exists (loaded by another component)
-    const existingScript = document.querySelector(
-      'script[src*="maps.googleapis.com/maps/api/js"]'
-    );
-    if (existingScript && window.google?.maps?.places) {
-      return;
-    }
-
-    if (existingScript) {
-      // Script exists but not yet loaded - wait for it
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Google Maps load timeout')), 10000);
-        const check = setInterval(() => {
-          if (window.google?.maps?.places) {
-            clearInterval(check);
-            clearTimeout(timeout);
-            resolve();
-          }
-        }, 100);
-      });
-      return;
-    }
-
-    // Load script
-    await new Promise<void>((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load Google Maps script'));
-      document.head.appendChild(script);
-    });
-  })();
-
-  return scriptLoadPromise;
 }
 
 // ─── Pac Container Styles ─────────────────────────────────────────────────────
@@ -170,6 +96,10 @@ export function AddressAutocomplete({
   showFields = true,
   compact = false,
 }: AddressAutocompleteProps) {
+  // Google Maps hooks - uses global provider
+  const { isLoaded, error: mapsError } = useGoogleMapsApi();
+  const placesLib = useMapsLibrary('places');
+
   // State
   const [status, setStatus] = useState<'loading' | 'error' | 'ready' | 'selected'>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -238,114 +168,110 @@ export function AddressAutocomplete({
     [onAddressChange, getPostcodeStatus]
   );
 
+  // ─── Handle Maps Error ────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (mapsError) {
+      setStatus('error');
+      setErrorMessage(mapsError);
+      setManualMode(true);
+    }
+  }, [mapsError]);
+
   // ─── Initialize Google Places Autocomplete ────────────────────────────────
 
   useEffect(() => {
-    let mounted = true;
+    if (manualMode) return;
+    if (!placesLib) {
+      setStatus('loading');
+      return;
+    }
+    if (!searchInputRef.current) return;
+    if (autocompleteRef.current) return;
 
-    async function init() {
-      try {
-        await ensureGoogleMapsLoaded();
-        if (!mounted) return;
+    injectPacStyles();
+    setStatus('ready');
 
-        injectPacStyles();
-        setStatus('ready');
+    const autocomplete = new placesLib.Autocomplete(searchInputRef.current, {
+      componentRestrictions: { country: 'gb' },
+      types: ['address'],
+      fields: ['address_components', 'formatted_address', 'geometry'],
+    });
 
-        // Initialize autocomplete on search input
-        if (searchInputRef.current && !autocompleteRef.current) {
-          const autocomplete = new google.maps.places.Autocomplete(searchInputRef.current, {
-            componentRestrictions: { country: 'gb' },
-            types: ['address'],
-            fields: ['address_components', 'formatted_address', 'geometry'],
-          });
+    autocompleteRef.current = autocomplete;
 
-          autocompleteRef.current = autocomplete;
+    listenerRef.current = autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace();
+      if (!place.address_components) return;
 
-          listenerRef.current = autocomplete.addListener('place_changed', () => {
-            const place = autocomplete.getPlace();
-            if (!place.address_components) return;
+      // Parse address components
+      let streetNumber = '';
+      let route = '';
+      let parsedCity = '';
+      let parsedCounty = '';
+      let parsedPostcode = '';
+      let parsedCountry = 'United Kingdom';
 
-            // Parse address components
-            let streetNumber = '';
-            let route = '';
-            let parsedCity = '';
-            let parsedCounty = '';
-            let parsedPostcode = '';
-            let parsedCountry = 'United Kingdom';
-
-            for (const component of place.address_components) {
-              const types = component.types;
-              if (types.includes('street_number')) {
-                streetNumber = component.long_name;
-              } else if (types.includes('route')) {
-                route = component.long_name;
-              } else if (types.includes('postal_town')) {
-                parsedCity = component.long_name;
-              } else if (types.includes('locality') && !parsedCity) {
-                parsedCity = component.long_name;
-              } else if (types.includes('administrative_area_level_2')) {
-                parsedCounty = component.long_name;
-              } else if (types.includes('postal_code')) {
-                parsedPostcode = component.long_name;
-              } else if (types.includes('country')) {
-                parsedCountry = component.long_name;
-              }
-            }
-
-            const parsedStreet = streetNumber
-              ? `${streetNumber} ${route}`
-              : route;
-
-            const lat = place.geometry?.location?.lat() ?? null;
-            const lng = place.geometry?.location?.lng() ?? null;
-            const formatted = place.formatted_address || '';
-
-            // Update state
-            setStreet(parsedStreet);
-            setCity(parsedCity);
-            setCounty(parsedCounty);
-            setPostcode(parsedPostcode ? formatPostcode(parsedPostcode) : '');
-            setCountry(parsedCountry);
-            setLatitude(lat);
-            setLongitude(lng);
-            setFormattedAddress(formatted);
-            setSearchValue(formatted);
-            setStatus('selected');
-
-            // Notify parent
-            notifyParent({
-              street: parsedStreet,
-              city: parsedCity,
-              county: parsedCounty,
-              postcode: parsedPostcode ? formatPostcode(parsedPostcode) : '',
-              country: parsedCountry,
-              latitude: lat,
-              longitude: lng,
-              formatted_address: formatted,
-            });
-          });
+      for (const component of place.address_components) {
+        const types = component.types;
+        if (types.includes('street_number')) {
+          streetNumber = component.long_name;
+        } else if (types.includes('route')) {
+          route = component.long_name;
+        } else if (types.includes('postal_town')) {
+          parsedCity = component.long_name;
+        } else if (types.includes('locality') && !parsedCity) {
+          parsedCity = component.long_name;
+        } else if (types.includes('administrative_area_level_2')) {
+          parsedCounty = component.long_name;
+        } else if (types.includes('postal_code')) {
+          parsedPostcode = component.long_name;
+        } else if (types.includes('country')) {
+          parsedCountry = component.long_name;
         }
-      } catch (err) {
-        if (!mounted) return;
-        setStatus('error');
-        setErrorMessage(err instanceof Error ? err.message : 'Failed to load address lookup');
-        setManualMode(true);
       }
-    }
 
-    if (!manualMode) {
-      init();
-    }
+      const parsedStreet = streetNumber
+        ? `${streetNumber} ${route}`
+        : route;
+
+      const lat = place.geometry?.location?.lat() ?? null;
+      const lng = place.geometry?.location?.lng() ?? null;
+      const formatted = place.formatted_address || '';
+
+      // Update state
+      setStreet(parsedStreet);
+      setCity(parsedCity);
+      setCounty(parsedCounty);
+      setPostcode(parsedPostcode ? formatPostcode(parsedPostcode) : '');
+      setCountry(parsedCountry);
+      setLatitude(lat);
+      setLongitude(lng);
+      setFormattedAddress(formatted);
+      setSearchValue(formatted);
+      setStatus('selected');
+
+      // Notify parent
+      notifyParent({
+        street: parsedStreet,
+        city: parsedCity,
+        county: parsedCounty,
+        postcode: parsedPostcode ? formatPostcode(parsedPostcode) : '',
+        country: parsedCountry,
+        latitude: lat,
+        longitude: lng,
+        formatted_address: formatted,
+      });
+    });
 
     return () => {
-      mounted = false;
       if (listenerRef.current) {
         google.maps.event.removeListener(listenerRef.current);
         listenerRef.current = null;
       }
       autocompleteRef.current = null;
     };
-  }, [manualMode, notifyParent]);
+  }, [placesLib, manualMode, notifyParent]);
 
   // ─── Handle postcode changes ──────────────────────────────────────────────
 
@@ -411,7 +337,8 @@ export function AddressAutocomplete({
   const toggleManualMode = useCallback(() => {
     setManualMode((prev) => !prev);
     if (manualMode) {
-      // Switching back to autocomplete
+      // Switching back to autocomplete - reset autocomplete ref so it re-initializes
+      autocompleteRef.current = null;
       setStatus('loading');
     }
   }, [manualMode]);
