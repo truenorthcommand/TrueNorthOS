@@ -559,7 +559,22 @@ export async function runMigrations() {
     `);
     console.log("[Migration] feedback table + indexes OK");
   } catch (e: any) {
-    console.error("[Migration] feedback error:", e.message);
+    console.error("[Migration] feedback table error:", e.message);
+  }
+
+  // Feedback table - add missing columns (table may have been created by Drizzle without these)
+  try {
+    await client.query(`
+      ALTER TABLE feedback ADD COLUMN IF NOT EXISTS priority TEXT DEFAULT 'medium';
+      ALTER TABLE feedback ADD COLUMN IF NOT EXISTS page_url TEXT;
+      ALTER TABLE feedback ADD COLUMN IF NOT EXISTS screenshot_url TEXT;
+      ALTER TABLE feedback ADD COLUMN IF NOT EXISTS user_email TEXT;
+      ALTER TABLE feedback ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMP;
+      ALTER TABLE feedback ADD COLUMN IF NOT EXISTS resolved_by VARCHAR;
+    `);
+    console.log("[Migration] feedback columns OK");
+  } catch (e: any) {
+    console.error("[Migration] feedback columns error:", e.message);
   }
 
   console.log("[Migration] All migrations completed");
