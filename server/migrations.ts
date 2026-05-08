@@ -528,6 +528,40 @@ export async function runMigrations() {
     console.error("[Migration] bookings error:", e.message);
   }
 
+  // === FEEDBACK TABLE ===
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS feedback (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR REFERENCES users(id),
+        user_name TEXT,
+        user_email TEXT,
+        user_role TEXT,
+        category TEXT NOT NULL DEFAULT 'bug' CHECK (category IN ('bug', 'improvement', 'feature', 'other')),
+        priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'critical')),
+        subject TEXT NOT NULL,
+        description TEXT NOT NULL,
+        page_url TEXT,
+        screenshot_url TEXT,
+        status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'reviewed', 'in_progress', 'resolved', 'closed', 'wont_fix')),
+        admin_notes TEXT,
+        resolved_at TIMESTAMP,
+        resolved_by VARCHAR REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status);
+      CREATE INDEX IF NOT EXISTS idx_feedback_user ON feedback(user_id);
+      CREATE INDEX IF NOT EXISTS idx_feedback_category ON feedback(category);
+      CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback(created_at DESC);
+    `);
+    console.log("[Migration] feedback table + indexes OK");
+  } catch (e: any) {
+    console.error("[Migration] feedback error:", e.message);
+  }
+
   console.log("[Migration] All migrations completed");
   client.release();
 }

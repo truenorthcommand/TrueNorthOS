@@ -106,6 +106,7 @@ import SurveyWizard from "@/pages/survey-wizard";
 import Enquiries from "@/pages/enquiries";
 import CreateEnquiry from "@/pages/create-enquiry";
 import EnquiryDetail from "@/pages/enquiry-detail";
+import AdminFeedback from "@/pages/admin-feedback";
 import Bookings from "@/pages/bookings";
 import CreateBooking from "@/pages/create-booking";
 import ResourcePlanner from "@/pages/resource-planner";
@@ -213,6 +214,7 @@ function AppRoutes() {
         <Route path="/user-guide" component={UserGuide} />
         <Route path="/admin/advisors" component={AdminAdvisors} />
         <Route path="/admin/merchants" component={AdminMerchants} />
+        <Route path="/admin/feedback" component={AdminFeedback} />
         <Route path="/blog" component={AdminBlog} />
         <Route path="/works-manager" component={WorksManagerDashboard} />
         <Route path="/works-manager/jobs" component={WorksManagerJobs} />

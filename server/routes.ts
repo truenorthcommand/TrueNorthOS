@@ -37,6 +37,7 @@ import enquiryRoutes from "./enquiry-routes";
 import jobPhasesRoutes from "./job-phases-routes";
 import signoffRoutes from "./signoff-routes";
 import bookingRoutes from "./booking-routes";
+import feedbackRoutes from "./feedback-routes";
 
 function getStripeClient(): Stripe | null {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -6965,6 +6966,9 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
   // Booking & Resource Planner
   app.use('/api/bookings', populateUserMiddleware, bookingRoutes);
+
+  // Feedback System
+  app.use('/api/feedback', populateUserMiddleware, feedbackRoutes);
 
   // Start workflow worker (server-side execution engine)
   startWorkflowWorker();
