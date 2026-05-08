@@ -260,7 +260,11 @@ export default function PlannerPage() {
       const res = await fetch("/api/users", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch users");
       const data = await res.json();
-      const engineerList = data.filter((u: any) => u.role === "engineer");
+      const fieldRoles = ['engineer', 'surveyor', 'works_manager'];
+      const engineerList = data.filter((u: any) => {
+        const roles = Array.isArray(u.roles) ? u.roles : [u.role];
+        return roles.some((r: string) => fieldRoles.includes(r));
+      });
       return engineerList.map((e: any) => ({
         id: e.id,
         name: e.name,
@@ -699,7 +703,7 @@ export default function PlannerPage() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Show/Hide Engineers</DialogTitle>
+                <DialogTitle>Show/Hide Staff</DialogTitle>
               </DialogHeader>
               <ScrollArea className="max-h-[400px]">
                 <div className="space-y-2">
@@ -771,7 +775,7 @@ export default function PlannerPage() {
             <div className="min-w-[900px]">
               <div className="grid grid-cols-8 border-t border-l border-border">
                 <div className="p-2 font-medium text-sm bg-muted border-r border-b border-border text-foreground">
-                  Engineer
+                  Staff
                 </div>
                 {weekDays.map((day) => {
                   const dayStr = format(day, "yyyy-MM-dd");
