@@ -150,7 +150,7 @@ router.get("/stats", requireAdmin, async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error("[Feedback] Stats error:", error.message);
-    res.status(500).json({ error: "Failed to get feedback stats" });
+    res.status(500).json({ error: "Failed to get feedback stats", detail: error.message });
   }
 });
 
