@@ -124,6 +124,7 @@ export default function Clients() {
     date: format(new Date(), "yyyy-MM-dd"),
     orderNumber: "" as string | number,
     isLongRunning: false,
+    visitType: "job" as string,
   });
   const [jobPhotos, setJobPhotos] = useState<JobPhoto[]>([]);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
@@ -835,6 +836,7 @@ export default function Clients() {
       date: new Date(jobForm.date).toISOString(),
       session: jobForm.session,
       orderNumber: jobForm.orderNumber ? Number(jobForm.orderNumber) : null,
+      visitType: jobForm.visitType || 'job',
       description: jobForm.description,
       notes: jobForm.notes,
       isLongRunning: jobForm.isLongRunning,
@@ -848,6 +850,23 @@ export default function Clients() {
     });
 
     if (newJob) {
+      // Create initial job visit
+      try {
+        await fetch(`/api/jobs/${newJob.id}/visits`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            visit_type: jobForm.visitType || 'job',
+            assigned_to_id: primaryAssignee || null,
+            assigned_to_name: selectedEngineerIds.length > 0 ? engineers.find(e => e.id === selectedEngineerIds[0])?.name || null : null,
+            scheduled_date: jobForm.date,
+            time_start: jobForm.session === 'AM' ? '08:00' : '13:00',
+            duration_mins: 240,
+            notes: jobForm.notes || null,
+          }),
+        });
+      } catch (e) { console.error('Failed to create job visit:', e); }
       const message = status === 'Ready' 
         ? `Job sheet #${newJob.jobNo} saved as Ready for ${client.name}`
         : `Job sheet #${newJob.jobNo} has been created and sent for ${client.name}`;
@@ -862,7 +881,7 @@ export default function Clients() {
       setSelectedContactId("");
       setSelectedPropertyId("");
       setSelectedEngineerIds([]);
-      setJobForm({ nickname: "", description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "", isLongRunning: false });
+      setJobForm({ nickname: "", description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "", isLongRunning: false, visitType: "job" });
       setJobPhotos([]);
       setCurrentStep(1);
       setShowAddProperty(false);
@@ -1212,17 +1231,20 @@ export default function Clients() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Job Order</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  max="999"
-                  placeholder="Auto"
-                  value={jobForm.orderNumber}
-                  onChange={(e) => setJobForm({ ...jobForm, orderNumber: e.target.value })}
-                  data-testid="input-order-number"
-                />
-                <p className="text-xs text-muted-foreground">Lower numbers appear first</p>
+                <Label>Visit Type</Label>
+                <Select value={jobForm.visitType} onValueChange={(value) => setJobForm({ ...jobForm, visitType: value })}>
+                  <SelectTrigger data-testid="select-visit-type">
+                    <SelectValue placeholder="Select type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="survey">Survey</SelectItem>
+                    <SelectItem value="job">Job</SelectItem>
+                    <SelectItem value="snagging">Snagging</SelectItem>
+                    <SelectItem value="inspection">Inspection</SelectItem>
+                    <SelectItem value="follow_up">Follow-up</SelectItem>
+                    <SelectItem value="general">General</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
