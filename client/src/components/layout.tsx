@@ -457,9 +457,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <NavLink href="/integrations" icon={Link2}>Integrations</NavLink>
               <NavLink href="/admin/advisors" icon={Bot}>Advisor Settings</NavLink>
               <NavLink href="/intelligence" icon={Brain}>Property Intelligence</NavLink>
-              <NavLink href="/admin/feedback" icon={MessageSquarePlus}>Feedback</NavLink>
               <NavLink href="/system/workflows" icon={Zap}>Workflow Studio</NavLink>
             </>
+          )}
+          {user?.username === 'superadmin' && (
+            <NavLink href="/admin/feedback" icon={MessageSquarePlus}>Feedback</NavLink>
           )}
           {user?.superAdmin && (
             <>

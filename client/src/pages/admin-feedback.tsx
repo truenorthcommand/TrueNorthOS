@@ -69,6 +69,18 @@ export default function AdminFeedback() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Restrict access to specific admin only
+  if (user?.username !== 'superadmin') {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-muted-foreground">Access Denied</h2>
+          <p className="text-sm text-muted-foreground mt-2">This page is restricted.</p>
+        </div>
+      </div>
+    );
+  }
+
   // Filters
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
@@ -97,7 +109,10 @@ export default function AdminFeedback() {
       });
       if (!r.ok) throw new Error('Failed to fetch feedback');
       const data = await r.json();
-      return Array.isArray(data) ? data : [];
+      // API returns { feedback: [...], total, page, limit }
+      if (Array.isArray(data)) return data;
+      if (data?.feedback && Array.isArray(data.feedback)) return data.feedback;
+      return [];
     },
   });
 
