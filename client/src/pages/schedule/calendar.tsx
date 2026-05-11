@@ -45,10 +45,23 @@ export default function CalendarPage() {
   const [, setLocation] = useLocation();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [visits, setVisits] = useState<any[]>([]);
 
   useEffect(() => {
     refreshJobs();
   }, [refreshJobs]);
+
+  useEffect(() => {
+    async function fetchVisits() {
+      try {
+        const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
+        const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
+        const res = await fetch(`/api/visits?from=${start}&to=${end}`, { credentials: 'include' });
+        if (res.ok) setVisits(await res.json());
+      } catch (e) { console.error('Failed to fetch visits', e); }
+    }
+    fetchVisits();
+  }, [currentMonth]);
 
   if (!user || !hasRole(user, 'admin')) {
     return (
@@ -91,6 +104,23 @@ export default function CalendarPage() {
     }
   };
 
+  const getVisitTypeColor = (type: string): string => {
+    switch (type?.toLowerCase()) {
+      case 'survey': return 'bg-blue-400';
+      case 'installation': return 'bg-green-500';
+      case 'inspection': return 'bg-orange-400';
+      case 'follow_up': return 'bg-purple-500';
+      default: return 'bg-gray-400';
+    }
+  };
+
+  const getVisitsForDate = (date: Date): any[] => {
+    return visits.filter(v => {
+      const d = safeParseISO(v.scheduled_date);
+      return d && isSameDay(d, date);
+    });
+  };
+
   const getMonthStats = () => {
     const monthJobs = jobs.filter((job) => {
       const jobDate = safeParseISO(job.date);
@@ -109,6 +139,7 @@ export default function CalendarPage() {
 
   const stats = getMonthStats();
   const selectedDateJobs = selectedDate ? getJobsForDate(selectedDate) : [];
+  const selectedDateVisits = selectedDate ? getVisitsForDate(selectedDate) : [];
   const calendarWeekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
@@ -213,6 +244,7 @@ export default function CalendarPage() {
 
               {daysInMonth.map((day) => {
                 const dayJobs = getJobsForDate(day);
+                const dayVisits = getVisitsForDate(day);
                 const isSelected = selectedDate && isSameDay(day, selectedDate);
                 const isTodayDate = isToday(day);
 
@@ -237,7 +269,7 @@ export default function CalendarPage() {
                       {format(day, "d")}
                     </div>
                     <div className="space-y-0.5">
-                      {dayJobs.slice(0, 3).map((job) => (
+                      {dayJobs.slice(0, 2).map((job) => (
                         <div
                           key={job.id}
                           className={`text-xs px-1 py-0.5 rounded truncate text-white ${getStatusColor(job.status)}`}
@@ -247,9 +279,18 @@ export default function CalendarPage() {
                           {job.session || ""} {job.customerName}
                         </div>
                       ))}
-                      {dayJobs.length > 3 && (
-                        <div className="text-xs text-muted-foreground px-1" data-testid={`day-more-jobs-${format(day, "yyyy-MM-dd")}`}>
-                          +{dayJobs.length - 3} more
+                      {dayVisits.slice(0, 2).map((visit) => (
+                        <div
+                          key={`visit-${visit.id}`}
+                          className={`text-xs px-1 py-0.5 rounded truncate text-white ${getVisitTypeColor(visit.visit_type)}`}
+                          title={`${visit.visit_type}: ${visit.customer_name || ''}`}
+                        >
+                          {visit.visit_type} {visit.customer_name || ''}
+                        </div>
+                      ))}
+                      {(dayJobs.length > 2 || dayVisits.length > 2) && (
+                        <div className="text-xs text-muted-foreground px-1">
+                          +{Math.max(0, dayJobs.length - 2) + Math.max(0, dayVisits.length - 2)} more
                         </div>
                       )}
                     </div>
@@ -281,9 +322,9 @@ export default function CalendarPage() {
               <p className="text-muted-foreground text-center py-8" data-testid="no-date-selected">
                 Click on a date to see scheduled jobs
               </p>
-            ) : selectedDateJobs.length === 0 ? (
+            ) : selectedDateJobs.length === 0 && selectedDateVisits.length === 0 ? (
               <p className="text-muted-foreground text-center py-8" data-testid="no-jobs-for-date">
-                No jobs scheduled for this date
+                No jobs or visits scheduled for this date
               </p>
             ) : (
               <div className="space-y-3" data-testid="selected-date-jobs-list">
@@ -324,6 +365,41 @@ export default function CalendarPage() {
                           <span className="font-medium text-primary">
                             {job.assignedToIds.length} engineer{job.assignedToIds.length > 1 ? 's' : ''} assigned
                           </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {selectedDateVisits.map((visit) => (
+                  <div
+                    key={`visit-${visit.id}`}
+                    className="p-3 rounded-lg border border-l-4 hover:bg-muted transition-colors"
+                    style={{ borderLeftColor: visit.visit_type === 'survey' ? '#60a5fa' : visit.visit_type === 'installation' ? '#22c55e' : visit.visit_type === 'inspection' ? '#fb923c' : visit.visit_type === 'follow_up' ? '#a855f7' : '#9ca3af' }}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge className={getVisitTypeColor(visit.visit_type)}>
+                        {visit.visit_type?.replace('_', ' ')}
+                      </Badge>
+                      {visit.job_no && (
+                        <span className="text-xs font-mono text-muted-foreground">
+                          {visit.job_no}
+                        </span>
+                      )}
+                    </div>
+                    <p className="font-medium text-sm mb-2">
+                      {visit.customer_name || 'Unknown Customer'}
+                    </p>
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      {visit.assigned_to_name && (
+                        <div className="flex items-center gap-1">
+                          <Users className="h-3 w-3" />
+                          <span>{visit.assigned_to_name}</span>
+                        </div>
+                      )}
+                      {(visit.address || visit.postcode) && (
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          <span className="line-clamp-1">{visit.address || visit.postcode}</span>
                         </div>
                       )}
                     </div>

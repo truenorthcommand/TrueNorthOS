@@ -34,7 +34,6 @@ import { startWorkflowWorker } from "./workflow-worker";
 import surveyRoutes from "./survey-routes";
 import jobPhasesRoutes from "./job-phases-routes";
 import signoffRoutes from "./signoff-routes";
-import bookingRoutes from "./booking-routes";
 import feedbackRoutes from "./feedback-routes";
 
 function getStripeClient(): Stripe | null {
@@ -3423,6 +3422,9 @@ export async function registerRoutes(
         dueDate: new Date(Date.now() + (settings?.defaultPaymentTerms || 30) * 24 * 60 * 60 * 1000),
       });
       
+      // Lock the agreed price once invoice is generated
+      await pool.query('UPDATE jobs SET price_locked = true WHERE id = $1', [req.params.id]);
+
       res.json(invoice);
     } catch (error) {
       res.status(500).json({ error: "Failed to create invoice from job" });
@@ -3478,7 +3480,7 @@ export async function registerRoutes(
       });
 
       // Update job status to 'invoiced'
-      await storage.updateJob(id, { status: 'invoiced' });
+      await storage.updateJob(id, { status: 'invoiced', priceLocked: true });
 
       res.json(invoice);
     } catch (error: any) {
@@ -7333,8 +7335,6 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
   app.use('/api/jobs', populateUserMiddleware, jobPhasesRoutes);
   app.use('/api/jobs', populateUserMiddleware, signoffRoutes);
 
-  // Booking & Resource Planner
-  app.use('/api/bookings', populateUserMiddleware, bookingRoutes);
 
   // Feedback System
   app.use('/api/feedback', populateUserMiddleware, feedbackRoutes);

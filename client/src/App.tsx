@@ -98,8 +98,6 @@ import PropertyIntelligence from "@/pages/property-intelligence";
 import Surveys from "@/pages/surveys";
 import SurveyWizard from "@/pages/survey-wizard";
 import AdminFeedback from "@/pages/admin-feedback";
-import Bookings from "@/pages/bookings";
-import CreateBooking from "@/pages/create-booking";
 import ResourcePlanner from "@/pages/resource-planner";
 import QuoteAccept from "@/pages/quote-accept";
 import { Layout } from "@/components/layout";
@@ -176,9 +174,6 @@ function AppRoutes() {
         <Route path="/quotes/:id" component={QuoteDetail} />
         <Route path="/surveys" component={Surveys} />
         <Route path="/surveys/:id" component={SurveyWizard} />
-        <Route path="/bookings" component={Bookings} />
-        <Route path="/bookings/new" component={CreateBooking} />
-        <Route path="/bookings/:id" component={Bookings} />
         <Route path="/resource-planner" component={ResourcePlanner} />
         <Route path="/invoices" component={Invoices} />
         <Route path="/invoices/:id" component={InvoiceDetail} />

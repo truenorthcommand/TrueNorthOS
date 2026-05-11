@@ -210,6 +210,7 @@ export default function PlannerPage() {
   const [engineers, setEngineers] = useState<Engineer[]>([]);
   
   const rollbacksRef = useRef<Map<string, () => void>>(new Map());
+  const [visits, setVisits] = useState<any[]>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -229,6 +230,18 @@ export default function PlannerPage() {
   useEffect(() => {
     refreshJobs();
   }, [refreshJobs]);
+
+  useEffect(() => {
+    async function fetchVisits() {
+      try {
+        const start = format(weekStart, 'yyyy-MM-dd');
+        const end = format(addDays(weekStart, 6), 'yyyy-MM-dd');
+        const res = await fetch(`/api/visits?from=${start}&to=${end}`, { credentials: 'include' });
+        if (res.ok) setVisits(await res.json());
+      } catch (e) { console.error('Failed to fetch visits', e); }
+    }
+    fetchVisits();
+  }, [weekStart]);
 
   useEffect(() => {
     const fetchUpdateCounts = async () => {
@@ -349,6 +362,36 @@ export default function PlannerPage() {
     const dateKey = format(date, "yyyy-MM-dd");
     const cellKey = `${engineerId}_${dateKey}`;
     return jobsByCell[cellKey] || [];
+  };
+
+  const visitsByCell = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    visits.forEach((visit) => {
+      const visitDate = safeParseISO(visit.scheduled_date);
+      if (!visitDate) return;
+      const dateKey = format(visitDate, "yyyy-MM-dd");
+      const engineerId = visit.assigned_to_id || 'unassigned';
+      const cellKey = `${engineerId}_${dateKey}`;
+      if (!map[cellKey]) map[cellKey] = [];
+      map[cellKey].push(visit);
+    });
+    return map;
+  }, [visits]);
+
+  const getVisitsForCell = (engineerId: string, date: Date): any[] => {
+    const dateKey = format(date, "yyyy-MM-dd");
+    const cellKey = `${engineerId}_${dateKey}`;
+    return visitsByCell[cellKey] || [];
+  };
+
+  const getVisitTypeBorderColor = (type: string): string => {
+    switch (type?.toLowerCase()) {
+      case 'survey': return '#60a5fa';
+      case 'installation': return '#22c55e';
+      case 'inspection': return '#fb923c';
+      case 'follow_up': return '#a855f7';
+      default: return '#9ca3af';
+    }
   };
 
   const getUnassignedJobsForDay = (date: Date): Job[] => {
@@ -920,6 +963,20 @@ export default function PlannerPage() {
                               />
                             ))}
                           </SortableContext>
+                          {getVisitsForCell(engineer.id, day).map((visit) => (
+                            <div
+                              key={`visit-${visit.id}`}
+                              className="bg-card border rounded-md px-1.5 py-1 mb-0.5 shadow-sm select-none border-l-[3px]"
+                              style={{ borderLeftColor: getVisitTypeBorderColor(visit.visit_type) }}
+                            >
+                              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide leading-tight">
+                                {visit.visit_type?.replace('_', ' ')}
+                              </p>
+                              <p className="text-[11px] font-medium truncate leading-tight">
+                                {visit.customer_name || 'Unknown'}
+                              </p>
+                            </div>
+                          ))}
                         </DroppableCell>
                       );
                     })}
