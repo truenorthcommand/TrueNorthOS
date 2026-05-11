@@ -147,6 +147,12 @@ export default function JobDetail() {
   const [scheduleDuration, setScheduleDuration] = useState('');
   const [scheduleNotes, setScheduleNotes] = useState('');
 
+  // Visits state
+  const [visits, setVisits] = useState<any[]>([]);
+  const [loadingVisits, setLoadingVisits] = useState(false);
+  const [showAddVisit, setShowAddVisit] = useState(false);
+  const [newVisit, setNewVisit] = useState({ visit_type: 'general', assigned_to_name: '', scheduled_date: '', time_start: '09:00', notes: '' });
+
   const jobId = params?.id;
   const job = jobId ? getJob(jobId) : undefined;
 
@@ -303,6 +309,18 @@ export default function JobDetail() {
       fetchUpdates(job.id);
     }
   }, [job?.id, job?.isLongRunning]);
+
+  // Fetch visits when visits tab is active
+  useEffect(() => {
+    if (activeTab === 'visits' && job?.id && visits.length === 0 && !loadingVisits) {
+      setLoadingVisits(true);
+      fetch(`/api/jobs/${job.id}/visits`, { credentials: 'include' })
+        .then(res => res.ok ? res.json() : [])
+        .then(data => setVisits(data))
+        .catch(() => {})
+        .finally(() => setLoadingVisits(false));
+    }
+  }, [activeTab, job?.id]);
 
   const fetchUpdates = async (id: string) => {
     try {
@@ -749,6 +767,29 @@ export default function JobDetail() {
           </CardContent>
         </Card>
       </div>
+      {/* Pricing Section */}
+      {(job.agreedPrice || job.agreedPrice === 0) && (
+        <Card className="mt-6">
+          <CardHeader><CardTitle className="text-base">Pricing</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Agreed Price:</span>
+              <span className="font-semibold">£{Number(job.agreedPrice).toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">VAT Rate:</span>
+              <span className="font-medium">{job.vatRate || 20}%</span>
+            </div>
+            <div className="flex items-center justify-between border-t pt-2">
+              <span className="text-sm font-medium">Total inc. VAT:</span>
+              <span className="font-bold">£{(Number(job.agreedPrice) * (1 + (Number(job.vatRate) || 20) / 100)).toFixed(2)}</span>
+            </div>
+            {job.priceLocked && (
+              <Badge className="bg-red-100 text-red-800 border-red-200">Locked</Badge>
+            )}
+          </CardContent>
+        </Card>
+      )}
       </fieldset>
     );
   }
@@ -1154,6 +1195,138 @@ export default function JobDetail() {
     );
   }
 
+  function renderTabVisits() {
+    const handleAddVisit = async () => {
+      try {
+        const res = await fetch(`/api/jobs/${job.id}/visits`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(newVisit),
+        });
+        if (res.ok) {
+          const created = await res.json();
+          setVisits(prev => [...prev, created]);
+          setShowAddVisit(false);
+          setNewVisit({ visit_type: 'general', assigned_to_name: '', scheduled_date: '', time_start: '09:00', notes: '' });
+          toast({ title: 'Visit added' });
+        }
+      } catch (e) { toast({ title: 'Failed to add visit', variant: 'destructive' }); }
+    };
+
+    const handleDeleteVisit = async (visitId: string) => {
+      try {
+        await fetch(`/api/jobs/${job.id}/visits/${visitId}`, { method: 'DELETE', credentials: 'include' });
+        setVisits(prev => prev.filter(v => v.id !== visitId));
+        toast({ title: 'Visit deleted' });
+      } catch (e) { toast({ title: 'Failed to delete visit', variant: 'destructive' }); }
+    };
+
+    const getVisitTypeBadge = (type: string) => {
+      const colors: Record<string, string> = {
+        survey: 'bg-blue-100 text-blue-800',
+        installation: 'bg-green-100 text-green-800',
+        inspection: 'bg-purple-100 text-purple-800',
+        follow_up: 'bg-orange-100 text-orange-800',
+        general: 'bg-gray-100 text-gray-800',
+      };
+      return colors[type] || 'bg-gray-100 text-gray-800';
+    };
+
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Calendar className="h-5 w-5" /> Scheduled Visits
+              </CardTitle>
+              <Button size="sm" onClick={() => setShowAddVisit(!showAddVisit)}>
+                <Plus className="h-4 w-4 mr-1" /> Add Visit
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {showAddVisit && (
+              <div className="p-4 border rounded-lg space-y-3 bg-gray-50">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Visit Type</Label>
+                    <Select value={newVisit.visit_type} onValueChange={v => setNewVisit(p => ({ ...p, visit_type: v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="survey">Survey</SelectItem>
+                        <SelectItem value="installation">Installation</SelectItem>
+                        <SelectItem value="inspection">Inspection</SelectItem>
+                        <SelectItem value="follow_up">Follow-up</SelectItem>
+                        <SelectItem value="general">General</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Assigned To</Label>
+                    <Input value={newVisit.assigned_to_name} onChange={e => setNewVisit(p => ({ ...p, assigned_to_name: e.target.value }))} placeholder="Name" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Date</Label>
+                    <Input type="date" value={newVisit.scheduled_date} onChange={e => setNewVisit(p => ({ ...p, scheduled_date: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Time</Label>
+                    <Input type="time" value={newVisit.time_start} onChange={e => setNewVisit(p => ({ ...p, time_start: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Notes</Label>
+                  <Input value={newVisit.notes} onChange={e => setNewVisit(p => ({ ...p, notes: e.target.value }))} placeholder="Optional notes" />
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={handleAddVisit}>Save Visit</Button>
+                  <Button size="sm" variant="outline" onClick={() => setShowAddVisit(false)}>Cancel</Button>
+                </div>
+              </div>
+            )}
+
+            {loadingVisits ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span className="ml-2 text-sm text-muted-foreground">Loading visits...</span>
+              </div>
+            ) : visits.length === 0 ? (
+              <p className="text-center text-muted-foreground py-6">No visits scheduled yet</p>
+            ) : (
+              <div className="space-y-3">
+                {visits.map((visit: any) => (
+                  <div key={visit.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge className={getVisitTypeBadge(visit.visit_type)}>
+                          {visit.visit_type?.replace('_', ' ')}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">{visit.status || 'scheduled'}</Badge>
+                      </div>
+                      <div className="text-sm">
+                        {visit.assigned_to_name && <span className="font-medium">{visit.assigned_to_name} • </span>}
+                        {visit.scheduled_date && <span>{format(new Date(visit.scheduled_date), 'dd MMM yyyy')}</span>}
+                        {visit.time_start && <span> at {visit.time_start}</span>}
+                      </div>
+                      {visit.notes && <p className="text-xs text-muted-foreground mt-1">{visit.notes}</p>}
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => handleDeleteVisit(visit.id)}>
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   function renderTabActivity() {
     const events: Array<{ label: string; date: string; icon: React.ReactNode }> = [];
     if (job.createdAt) events.push({ label: 'Job created', date: job.createdAt, icon: <Plus className="h-3 w-3" /> });
@@ -1209,6 +1382,7 @@ export default function JobDetail() {
           <TabsTrigger value="photos">Photos & Files</TabsTrigger>
           <TabsTrigger value="actions">Actions</TabsTrigger>
           <TabsTrigger value="signoff">Sign-Off</TabsTrigger>
+          <TabsTrigger value="visits">Visits</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
 
@@ -1219,6 +1393,7 @@ export default function JobDetail() {
         <TabsContent value="photos">{renderTabPhotos()}</TabsContent>
         <TabsContent value="actions">{renderTabActions()}</TabsContent>
         <TabsContent value="signoff">{renderTabSignOff()}</TabsContent>
+        <TabsContent value="visits">{renderTabVisits()}</TabsContent>
         <TabsContent value="activity">{renderTabActivity()}</TabsContent>
       </Tabs>
 

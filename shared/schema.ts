@@ -112,6 +112,9 @@ export const jobs = pgTable("jobs", {
   completionBlockedReason: text("completion_blocked_reason"),
   qualityOverrideBy: varchar("quality_override_by"),
   qualityOverrideReason: text("quality_override_reason"),
+  agreedPrice: doublePrecision("agreed_price"),
+  vatRate: doublePrecision("vat_rate").default(20),
+  priceLocked: boolean("price_locked").default(false),
 });
 
 // Job updates for long-running jobs (2 updates per day max)

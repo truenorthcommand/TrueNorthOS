@@ -703,6 +703,46 @@ export async function runMigrations() {
     console.error("[Migration] intelligence tables error:", e.message);
   }
 
+  // === JOB PRICING COLUMNS ===
+  try {
+    await client.query(`
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS agreed_price DECIMAL(10,2);
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS vat_rate DECIMAL(4,2) DEFAULT 20.00;
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS price_locked BOOLEAN DEFAULT false;
+    `);
+    console.log("[Migration] job pricing columns OK");
+  } catch (e: any) {
+    console.error("[Migration] job pricing columns error:", e.message);
+  }
+
+  // === JOB VISITS TABLE ===
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS job_visits (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        job_id VARCHAR NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+        visit_type VARCHAR NOT NULL DEFAULT 'general',
+        assigned_to_id VARCHAR,
+        assigned_to_name VARCHAR,
+        scheduled_date DATE,
+        time_start VARCHAR,
+        time_end VARCHAR,
+        duration_mins INTEGER DEFAULT 60,
+        status VARCHAR DEFAULT 'scheduled',
+        notes TEXT,
+        completed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_job_visits_job ON job_visits(job_id);
+      CREATE INDEX IF NOT EXISTS idx_job_visits_assigned ON job_visits(assigned_to_id);
+      CREATE INDEX IF NOT EXISTS idx_job_visits_date ON job_visits(scheduled_date);
+    `);
+    console.log("[Migration] job_visits table OK");
+  } catch (e: any) {
+    console.error("[Migration] job_visits table error:", e.message);
+  }
+
   console.log("[Migration] All migrations completed");
   client.release();
 }

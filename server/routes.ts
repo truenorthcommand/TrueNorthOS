@@ -1774,6 +1774,99 @@ export async function registerRoutes(
     }
   });
 
+  // --- Job Visits ---
+  app.get('/api/jobs/:jobId/visits', requireAuth, async (req, res) => {
+    try {
+      const { jobId } = req.params;
+      const result = await pool.query(
+        'SELECT * FROM job_visits WHERE job_id = $1 ORDER BY scheduled_date ASC, time_start ASC',
+        [jobId]
+      );
+      res.json(result.rows);
+    } catch (error) {
+      console.error('Error fetching job visits:', error);
+      res.status(500).json({ error: 'Failed to fetch visits' });
+    }
+  });
+
+  app.post('/api/jobs/:jobId/visits', requireAuth, async (req, res) => {
+    try {
+      const { jobId } = req.params;
+      const { visit_type, assigned_to_id, assigned_to_name, scheduled_date, time_start, time_end, duration_mins, notes } = req.body;
+      const result = await pool.query(
+        `INSERT INTO job_visits (job_id, visit_type, assigned_to_id, assigned_to_name, scheduled_date, time_start, time_end, duration_mins, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+        [jobId, visit_type || 'general', assigned_to_id, assigned_to_name, scheduled_date, time_start, time_end, duration_mins || 60, notes]
+      );
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error('Error creating job visit:', error);
+      res.status(500).json({ error: 'Failed to create visit' });
+    }
+  });
+
+  app.patch('/api/jobs/:jobId/visits/:visitId', requireAuth, async (req, res) => {
+    try {
+      const { visitId } = req.params;
+      const fields = ['visit_type', 'assigned_to_id', 'assigned_to_name', 'scheduled_date', 'time_start', 'time_end', 'duration_mins', 'status', 'notes', 'completed_at'];
+      const updates: string[] = [];
+      const values: any[] = [];
+      let idx = 1;
+      for (const field of fields) {
+        if (req.body[field] !== undefined) {
+          updates.push(`${field} = $${idx}`);
+          values.push(req.body[field]);
+          idx++;
+        }
+      }
+      if (updates.length === 0) return res.json({ message: 'No changes' });
+      updates.push(`updated_at = NOW()`);
+      values.push(visitId);
+      const result = await pool.query(
+        `UPDATE job_visits SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`,
+        values
+      );
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error('Error updating job visit:', error);
+      res.status(500).json({ error: 'Failed to update visit' });
+    }
+  });
+
+  app.delete('/api/jobs/:jobId/visits/:visitId', requireAdmin, async (req, res) => {
+    try {
+      const { visitId } = req.params;
+      await pool.query('DELETE FROM job_visits WHERE id = $1', [visitId]);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting job visit:', error);
+      res.status(500).json({ error: 'Failed to delete visit' });
+    }
+  });
+
+  // Get all visits for calendar view (across all jobs)
+  app.get('/api/visits', requireAuth, async (req, res) => {
+    try {
+      const { from, to, assigned_to } = req.query;
+      let query = `
+        SELECT jv.*, j.customer_name, j.job_no, j.address, j.postcode, j.status as job_status
+        FROM job_visits jv
+        JOIN jobs j ON j.id = jv.job_id
+        WHERE 1=1
+      `;
+      const params: any[] = [];
+      if (from) { params.push(from); query += ` AND jv.scheduled_date >= $${params.length}`; }
+      if (to) { params.push(to); query += ` AND jv.scheduled_date <= $${params.length}`; }
+      if (assigned_to) { params.push(assigned_to); query += ` AND jv.assigned_to_id = $${params.length}`; }
+      query += ' ORDER BY jv.scheduled_date ASC, jv.time_start ASC';
+      const result = await pool.query(query, params);
+      res.json(result.rows);
+    } catch (error) {
+      console.error('Error fetching all visits:', error);
+      res.status(500).json({ error: 'Failed to fetch visits' });
+    }
+  });
+
   app.post("/api/jobs/:id/sign-off", requireAuth, async (req, res) => {
     try {
       const { signatures, signOffLat, signOffLng, signOffAddress } = req.body;

@@ -102,7 +102,13 @@ export default function CreateJob() {
   const [recurringFrequency, setRecurringFrequency] = useState('Monthly');
   const [recurringEndDate, setRecurringEndDate] = useState('');
 
+  // Step 2: Pricing
+  const [showPricing, setShowPricing] = useState(false);
+  const [agreedPrice, setAgreedPrice] = useState<string>('');
+  const [vatRate, setVatRate] = useState<string>('20');
+
   // Step 3: Schedule & Assignment
+  const [visitType, setVisitType] = useState<string>('general');
   const [scheduledDate, setScheduledDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [session, setSession] = useState('AM');
   const [specificTime, setSpecificTime] = useState('09:00');
@@ -326,11 +332,35 @@ export default function CreateJob() {
           checklistTemplate: checklistTemplate,
           engineerNotes: engineerNotes,
           materials: materials.filter(m => m.name.trim()),
+          ...(showPricing && agreedPrice ? {
+            agreedPrice: parseFloat(agreedPrice),
+            vatRate: parseFloat(vatRate),
+          } : {}),
         }),
       });
 
       if (res.ok) {
         const job = await res.json();
+        // Create the initial visit
+        try {
+          await fetch(`/api/jobs/${job.id}/visits`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              visit_type: visitType || 'general',
+              assigned_to_id: selectedEngineers[0]?.id || null,
+              assigned_to_name: selectedEngineers[0]?.name || null,
+              scheduled_date: scheduledDate,
+              time_start: session === 'Specific Time' ? specificTime : (session === 'AM' ? '08:00' : session === 'PM' ? '13:00' : '08:00'),
+              time_end: null,
+              duration_mins: estimatedDuration * (durationUnit === 'days' ? 480 : 60),
+              notes: engineerNotes,
+            }),
+          });
+        } catch (visitErr) {
+          console.error('Failed to create initial visit:', visitErr);
+        }
         toast({
           title: 'Job Created',
           description: `Job sheet "${jobTitle}" has been ${actionStatus === 'Issued' ? 'issued' : 'saved'} successfully.`,
@@ -531,6 +561,7 @@ export default function CreateJob() {
             </CardContent>
           </Card>
         )}
+
       </div>
     );
   }
@@ -692,6 +723,76 @@ export default function CreateJob() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Pricing */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Wrench className="h-5 w-5 text-[#E8A54B]" />
+              Pricing
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div>
+                <Label className="font-medium">Add Agreed Price</Label>
+                <p className="text-sm text-muted-foreground">Set a fixed price for reactive works</p>
+              </div>
+              <Switch checked={showPricing} onCheckedChange={setShowPricing} />
+            </div>
+            {showPricing && (
+              <div className="ml-4 pl-4 border-l-2 border-[#E8A54B] space-y-4">
+                <div className="space-y-2">
+                  <Label>Agreed Price</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">£</span>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={agreedPrice}
+                      onChange={(e) => setAgreedPrice(e.target.value)}
+                      className="pl-7"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>VAT Rate</Label>
+                  <Select value={vatRate} onValueChange={setVatRate}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">0% (Zero Rated)</SelectItem>
+                      <SelectItem value="5">5% (Reduced)</SelectItem>
+                      <SelectItem value="20">20% (Standard)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {agreedPrice && parseFloat(agreedPrice) > 0 && (
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Net:</span>
+                      <span className="font-medium">£{parseFloat(agreedPrice).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">VAT ({vatRate}%):</span>
+                      <span className="font-medium">£{(parseFloat(agreedPrice) * parseFloat(vatRate) / 100).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-bold border-t mt-2 pt-2">
+                      <span>Total inc. VAT:</span>
+                      <span>£{(parseFloat(agreedPrice) * (1 + parseFloat(vatRate) / 100)).toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground italic">
+                  For reactive works within client's agreed spend limit. Leave blank if a formal quote is required.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -709,6 +810,23 @@ export default function CreateJob() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Visit Type */}
+            <div className="space-y-2">
+              <Label>Visit Type</Label>
+              <Select value={visitType} onValueChange={setVisitType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select visit type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="survey">Survey</SelectItem>
+                  <SelectItem value="installation">Installation</SelectItem>
+                  <SelectItem value="inspection">Inspection</SelectItem>
+                  <SelectItem value="follow_up">Follow-up</SelectItem>
+                  <SelectItem value="general">General</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Scheduled Date *</Label>
@@ -775,7 +893,7 @@ export default function CreateJob() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Users className="h-5 w-5 text-[#E8A54B]" />
-              Assign Engineer(s)
+              Assign Team Member(s)
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -878,6 +996,10 @@ export default function CreateJob() {
                 })}
               </div>
             )}
+
+            <p className="text-xs text-muted-foreground italic mt-2">
+              Team members assigned here will be scheduled for this visit.
+            </p>
           </CardContent>
         </Card>
       </div>
