@@ -703,3 +703,287 @@ router.post('/:id/generate-quote', async (req: Request, res: Response) => {
 });
 
 export default router;
+
+// === JOB-CENTRIC SURVEY ROUTES (New Architecture) ===
+
+// GET /api/jobs/:jobId/survey - Get or create survey for job
+router.get('/jobs/:jobId/survey', async (req: Request, res: Response) => {
+  try {
+    const { jobId } = req.params;
+    
+    const existing = await pool.query(`
+      SELECT s.* 
+      FROM surveys s 
+      WHERE s.job_id = $1 
+      ORDER BY s.created_at DESC 
+      LIMIT 1
+    `, [jobId]);
+    
+    if (existing.rows.length > 0) {
+      return res.json(existing.rows[0]);
+    }
+    
+    res.status(404).json({ error: 'No survey found', jobId });
+    
+  } catch (error: any) {
+    console.error('Get job survey error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/jobs/:jobId/survey - Create or update survey
+router.post('/jobs/:jobId/survey', async (req: Request, res: Response) => {
+  try {
+    const { jobId } = req.params;
+    const { surveyorNotes, status } = req.body;
+    const user = (req as any).user;
+    
+    const existing = await pool.query(
+      'SELECT id FROM surveys WHERE job_id = $1 ORDER BY created_at DESC LIMIT 1',
+      [jobId]
+    );
+    
+    let survey;
+    
+    if (existing.rows.length > 0) {
+      const result = await pool.query(`
+        UPDATE surveys 
+        SET surveyor_notes = $1, 
+            status = COALESCE($2, status),
+            last_auto_save_at = NOW(),
+            updated_at = NOW()
+        WHERE id = $3
+        RETURNING *
+      `, [surveyorNotes, status, existing.rows[0].id]);
+      survey = result.rows[0];
+    } else {
+      const jobResult = await pool.query(
+        'SELECT description FROM jobs WHERE id = $1',
+        [jobId]
+      );
+      
+      let trade = 'general';
+      const desc = (jobResult.rows[0]?.description || '').toLowerCase();
+      if (desc.includes('bathroom')) trade = 'bathroom';
+      else if (desc.includes('kitchen')) trade = 'kitchen';
+      else if (desc.includes('electrical') || desc.includes('rewire')) trade = 'electrical';
+      else if (desc.includes('plumber') || desc.includes('heating')) trade = 'plumbing';
+      else if (desc.includes('roof')) trade = 'roofing';
+      
+      const result = await pool.query(`
+        INSERT INTO surveys (job_id, surveyor_id, survey_type, surveyor_notes, status, last_auto_save_at)
+        VALUES ($1, $2, $3, $4, COALESCE($5, 'draft'), NOW())
+        RETURNING *
+      `, [jobId, user?.id, trade, surveyorNotes, status]);
+      survey = result.rows[0];
+    }
+    
+    res.json(survey);
+    
+  } catch (error: any) {
+    console.error('Save job survey error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/jobs/:jobId/survey/send - Send survey and generate quote
+router.post('/jobs/:jobId/survey/send', async (req: Request, res: Response) => {
+  try {
+    const { jobId } = req.params;
+    const user = (req as any).user;
+    
+    const surveyResult = await pool.query(`
+      SELECT s.*, j.customerName, j.description, j.address, j.postcode, j.client
+      FROM surveys s
+      JOIN jobs j ON s.job_id = j.id::text
+      WHERE s.job_id = $1 AND s.status = 'draft'
+      ORDER BY s.created_at DESC
+      LIMIT 1
+    `, [jobId]);
+    
+    if (surveyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'No draft survey found for this job' });
+    }
+    
+    const survey = surveyResult.rows[0];
+    
+    await pool.query(`
+      UPDATE surveys SET status = 'submitting', updated_at = NOW() WHERE id = $1
+    `, [survey.id]);
+    
+    const { calculatePricing, learnFromQuoteLineItems } = await import('../services/ai-pricing');
+    
+    const aiResult = await calculatePricing({
+      trade: survey.survey_type,
+      jobDescription: `${survey.description || ''}\n\nSurveyor Notes:\n${survey.surveyor_notes || ''}`,
+      qualityLevel: 'mid-range'
+    });
+    
+    const quoteCount = await pool.query('SELECT COUNT(*) as count FROM quotes');
+    const quoteNo = `QTE-${String(parseInt(quoteCount.rows[0].count) + 1).padStart(4, '0')}`;
+    
+    const lineItems = aiResult.lineItems.map((item: any, idx: number) => ({
+      id: String(idx + 1),
+      type: item.type,
+      description: item.description,
+      quantity: item.quantity,
+      unit: item.unit,
+      unitCost: item.unitCost,
+      markup: 0,
+      discount: 0,
+      vatRate: item.vatRate,
+      amount: item.quantity * item.unitCost
+    }));
+    
+    const subtotal = lineItems.reduce((sum: number, item: any) => sum + item.amount, 0);
+    const vatRate = 20;
+    const vatAmount = subtotal * (vatRate / 100);
+    const total = subtotal + vatAmount;
+    
+    const quoteResult = await pool.query(`
+      INSERT INTO quotes (
+        quote_no, customer_id, customer_name, site_address, site_postcode,
+        description, line_items, subtotal, vat_rate, vat_amount, total,
+        status, created_by_id, notes
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, 'Draft', $12, $13
+      ) RETURNING id
+    `, [
+      quoteNo,
+      survey.client || null,
+      survey.customername || 'Unknown Customer',
+      survey.address || survey.postcode || null,
+      survey.postcode || null,
+      `Survey for ${survey.survey_type}`,
+      JSON.stringify(lineItems),
+      subtotal,
+      vatRate,
+      vatAmount,
+      total,
+      user?.id,
+      `Survey Notes:\n${survey.surveyor_notes || ''}`
+    ]);
+    
+    const quoteId = quoteResult.rows[0].id;
+    
+    await pool.query(`
+      UPDATE surveys 
+      SET status = 'sent', submitted_at = NOW(), submitted_by = $1, quote_id = $2, updated_at = NOW()
+      WHERE id = $3
+    `, [user?.id, quoteId, survey.id]);
+    
+    await learnFromQuoteLineItems(survey.survey_type, aiResult.lineItems);
+    
+    res.json({
+      success: true,
+      quoteId,
+      quoteNo,
+      confidence: aiResult.summary.confidence,
+      lineItemCount: lineItems.length,
+      total
+    });
+    
+  } catch (error: any) {
+    console.error('Send survey error:', error);
+    await pool.query(`
+      UPDATE surveys SET status = 'draft' WHERE job_id = $1 AND status = 'submitting'
+    `, [jobId]);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/jobs/:jobId/survey/photos
+router.get('/jobs/:jobId/survey/photos', async (req: Request, res: Response) => {
+  try {
+    const { jobId } = req.params;
+    
+    const survey = await pool.query(
+      'SELECT id FROM surveys WHERE job_id = $1 ORDER BY created_at DESC LIMIT 1',
+      [jobId]
+    );
+    
+    if (survey.rows.length === 0) {
+      return res.json([]);
+    }
+    
+    const photos = await pool.query(
+      'SELECT * FROM survey_photos WHERE survey_id = $1 ORDER BY uploaded_at DESC',
+      [survey.rows[0].id]
+    );
+    
+    res.json(photos.rows);
+    
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/jobs/:jobId/survey/photos
+router.post('/jobs/:jobId/survey/photos', upload.single('photo'), async (req: Request, res: Response) => {
+  try {
+    const { jobId } = req.params;
+    const user = (req as any).user;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'No photo uploaded' });
+    }
+    
+    const surveyCheck = await pool.query(
+      'SELECT id FROM surveys WHERE job_id = $1 ORDER BY created_at DESC LIMIT 1',
+      [jobId]
+    );
+    
+    let surveyId;
+    if (surveyCheck.rows.length === 0) {
+      const newSurvey = await pool.query(`
+        INSERT INTO surveys (job_id, surveyor_id, survey_type, status)
+        VALUES ($1, $2, 'general', 'draft')
+        RETURNING id
+      `, [jobId, user?.id]);
+      surveyId = newSurvey.rows[0].id;
+    } else {
+      surveyId = surveyCheck.rows[0].id;
+    }
+    
+    const fileUrl = `/uploads/surveys/${req.file.filename}`;
+    
+    const result = await pool.query(`
+      INSERT INTO survey_photos (survey_id, job_id, file_url, uploaded_by, file_size)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `, [surveyId, jobId, fileUrl, user?.id, req.file.size]);
+    
+    res.json(result.rows[0]);
+    
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/jobs/:jobId/survey/photos/:photoId
+router.delete('/jobs/:jobId/survey/photos/:photoId', async (req: Request, res: Response) => {
+  try {
+    const { jobId, photoId } = req.params;
+    
+    const photo = await pool.query(
+      'DELETE FROM survey_photos WHERE id = $1 AND job_id = $2 RETURNING *',
+      [photoId, jobId]
+    );
+    
+    if (photo.rows.length === 0) {
+      return res.status(404).json({ error: 'Photo not found' });
+    }
+    
+    const filePath = path.join(process.cwd(), 'public', photo.rows[0].file_url);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    
+    res.json({ success: true });
+    
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+export default router;

@@ -340,6 +340,43 @@ export async function runMigrations() {
     console.error("[Migration] survey columns error:", e.message);
   }
 
+  // === JOB-CENTRIC SURVEY ENHANCEMENTS ===
+  try {
+    await client.query(`
+      ALTER TABLE surveys ADD COLUMN IF NOT EXISTS job_id UUID;
+      CREATE INDEX IF NOT EXISTS idx_surveys_job_id ON surveys(job_id);
+      ALTER TABLE surveys ADD COLUMN IF NOT EXISTS surveyor_notes TEXT;
+      ALTER TABLE surveys ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'draft';
+      ALTER TABLE surveys ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMP;
+      ALTER TABLE surveys ADD COLUMN IF NOT EXISTS submitted_by VARCHAR;
+      ALTER TABLE surveys ADD COLUMN IF NOT EXISTS last_auto_save_at TIMESTAMP;
+    `);
+    console.log("[Migration] job-centric survey columns OK");
+  } catch (e: any) {
+    console.error("[Migration] job-centric survey columns error:", e.message);
+  }
+
+  // === SURVEY PHOTOS TABLE ===
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS survey_photos (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        survey_id UUID REFERENCES surveys(id) ON DELETE CASCADE,
+        job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
+        file_url TEXT NOT NULL,
+        caption TEXT,
+        uploaded_by VARCHAR NOT NULL,
+        uploaded_at TIMESTAMP DEFAULT NOW(),
+        file_size INT
+      );
+      CREATE INDEX IF NOT EXISTS idx_survey_photos_job ON survey_photos(job_id);
+      CREATE INDEX IF NOT EXISTS idx_survey_photos_survey ON survey_photos(survey_id);
+    `);
+    console.log("[Migration] survey_photos table OK");
+  } catch (e: any) {
+    console.error("[Migration] survey_photos table error:", e.message);
+  }
+
   // === JOB PHASES TABLE ===
   try {
     await client.query(`
