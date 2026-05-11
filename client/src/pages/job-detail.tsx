@@ -669,6 +669,9 @@ export default function JobDetail() {
                 <Button variant="outline" size="sm" onClick={handleGenerateQR}>
                   <QrCode className="h-4 w-4 mr-1" /> QR
                 </Button>
+                <Button variant="outline" size="sm" onClick={() => navigate(`/jobs/${job.id}/edit`)}>
+                  <Edit className="h-4 w-4 mr-1" /> Edit
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => window.print()}>
                   <Printer className="h-4 w-4 mr-1" /> Print
                 </Button>

@@ -16,6 +16,7 @@ import Dashboard from "@/pages/dashboard";
 import Jobs from "@/pages/jobs";
 import JobDetail from "@/pages/job-detail";
 import CreateJob from "@/pages/create-job";
+import EditJob from "@/pages/edit-job";
 import EngineerDashboard from "@/pages/engineer-dashboard";
 import WalkaroundWizard from "@/pages/walkaround-wizard";
 import JobCompleteWizard from "@/pages/job-complete-wizard";
@@ -139,6 +140,7 @@ function AppRoutes() {
         <Route path="/timesheet" component={QuickTimesheet} />
         <Route path="/jobs" component={Jobs} />
         <Route path="/jobs/new" component={CreateJob} />
+        <Route path="/jobs/:id/edit" component={EditJob} />
         <Route path="/jobs/:id" component={JobDetail} />
         <Route path="/jobs/:id/sign-off" component={SignOff} />
         <Route path="/jobs/:id/complete" component={JobCompleteWizard} />

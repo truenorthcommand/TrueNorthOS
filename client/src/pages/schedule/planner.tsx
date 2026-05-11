@@ -130,6 +130,69 @@ function SortableJobCard({
   );
 }
 
+function SortableVisitCard({
+  visit,
+  getVisitTypeBorderColor,
+}: {
+  visit: any;
+  getVisitTypeBorderColor: (type: string) => string;
+}) {
+  const visitDragId = `visit_${visit.id}`;
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    isDragging,
+  } = useSortable({
+    id: visitDragId,
+    data: { type: 'visit', visit },
+    animateLayoutChanges: () => false,
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition: 'none',
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1000 : 1,
+    touchAction: 'none',
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className="bg-card border rounded-md px-1.5 py-1 mb-0.5 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing select-none border-l-[3px]"
+      style={{ ...style, borderLeftColor: getVisitTypeBorderColor(visit.visit_type) } as React.CSSProperties}
+      data-testid={`planner-visit-${visit.id}`}
+    >
+      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide leading-tight">
+        {visit.visit_type?.replace('_', ' ')}
+      </p>
+      <p className="text-[11px] font-medium truncate leading-tight">
+        {visit.customer_name || 'Unknown'}
+      </p>
+    </div>
+  );
+}
+
+function VisitCardOverlay({ visit, getVisitTypeBorderColor }: { visit: any; getVisitTypeBorderColor: (type: string) => string }) {
+  return (
+    <div
+      className="bg-card border-2 border-primary rounded-md p-2 shadow-lg w-48 border-l-[3px]"
+      style={{ borderLeftColor: getVisitTypeBorderColor(visit.visit_type) }}
+    >
+      <div className="flex items-center gap-1 mb-1">
+        <Badge variant="outline" className="text-[9px] px-1 py-0">
+          {visit.visit_type?.replace('_', ' ')}
+        </Badge>
+      </div>
+      <p className="text-xs font-medium truncate">{visit.customer_name || 'Unknown'}</p>
+    </div>
+  );
+}
+
 function DroppableCell({
   id,
   children,
@@ -203,6 +266,7 @@ export default function PlannerPage() {
   );
   const [visibleEngineerIds, setVisibleEngineerIds] = useState<string[]>([]);
   const [activeJob, setActiveJob] = useState<Job | null>(null);
+  const [activeVisit, setActiveVisit] = useState<any | null>(null);
   const overIdRef = useRef<string | null>(null);
   const [engineerDialogOpen, setEngineerDialogOpen] = useState(false);
   const [updateCounts, setUpdateCounts] = useState<Record<string, { count: number; remaining: number }>>({});
@@ -549,9 +613,16 @@ export default function PlannerPage() {
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
-    const job = active.data.current?.job as Job;
-    if (job) {
-      setActiveJob(job);
+    const activeType = active.data.current?.type;
+    if (activeType === 'visit') {
+      setActiveVisit(active.data.current?.visit);
+      setActiveJob(null);
+    } else {
+      const job = active.data.current?.job as Job;
+      if (job) {
+        setActiveJob(job);
+      }
+      setActiveVisit(null);
     }
     overIdRef.current = null;
   };
@@ -572,6 +643,7 @@ export default function PlannerPage() {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveJob(null);
+    setActiveVisit(null);
 
     const activeId = active.id as string;
     let targetId = over?.id as string;
@@ -585,6 +657,97 @@ export default function PlannerPage() {
     if (!targetId) return;
 
     if (activeId === targetId) return;
+
+    // Handle visit drag
+    if (activeId.startsWith('visit_')) {
+      const visitId = activeId.replace('visit_', '');
+      const visit = visits.find((v: any) => String(v.id) === visitId);
+      if (!visit) return;
+
+      // Determine target cell
+      let cellId = targetId;
+      if (targetId.startsWith('visit_')) {
+        // Dropped on another visit - find which cell it belongs to
+        const targetVisitId = targetId.replace('visit_', '');
+        const targetVisit = visits.find((v: any) => String(v.id) === targetVisitId);
+        if (targetVisit) {
+          const tEngId = targetVisit.assigned_to_id || 'unassigned';
+          const tDate = targetVisit.scheduled_date ? format(safeParseISO(targetVisit.scheduled_date)!, 'yyyy-MM-dd') : '';
+          cellId = `${tEngId}_${tDate}`;
+        } else {
+          return;
+        }
+      } else if (!targetId.includes('_')) {
+        // Dropped on a job card - find which cell it belongs to
+        const targetJob = jobs.find((j) => j.id === targetId);
+        if (targetJob) {
+          const jobDate = safeParseISO(targetJob.date);
+          if (!jobDate) return;
+          const assignedIds = targetJob.assignedToIds?.length ? targetJob.assignedToIds : targetJob.assignedToId ? [targetJob.assignedToId] : [];
+          const tEngId = assignedIds[0] || 'unassigned';
+          cellId = `${tEngId}_${format(jobDate, 'yyyy-MM-dd')}`;
+        } else {
+          return;
+        }
+      }
+      // else: targetId is already a cell ID (contains _ and doesn't start with visit_)
+
+      const parts = cellId.split('_');
+      if (parts.length < 2) return;
+      const engineerId = parts[0];
+      const dateStr = parts.slice(1).join('-');
+      if (!dateStr || !engineerId) return;
+
+      // Check if same cell
+      const currentEngineerId = visit.assigned_to_id || 'unassigned';
+      const currentDate = visit.scheduled_date ? format(safeParseISO(visit.scheduled_date)!, 'yyyy-MM-dd') : '';
+      if (engineerId === currentEngineerId && dateStr === currentDate) return;
+
+      const newEngineerId = engineerId === 'unassigned' ? null : engineerId;
+      const newEngineerName = engineerId === 'unassigned' ? null : engineers.find(e => e.id === engineerId)?.name || null;
+
+      // Optimistically update visits
+      setVisits(prev => prev.map(v => 
+        String(v.id) === visitId 
+          ? { ...v, assigned_to_id: newEngineerId, assigned_to_name: newEngineerName, scheduled_date: dateStr }
+          : v
+      ));
+
+      // Call PATCH endpoint
+      fetch(`/api/jobs/${visit.job_id}/visits/${visit.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          assigned_to_id: newEngineerId,
+          assigned_to_name: newEngineerName,
+          scheduled_date: dateStr,
+        }),
+      }).then(res => {
+        if (!res.ok) {
+          // Rollback on failure
+          setVisits(prev => prev.map(v =>
+            String(v.id) === visitId
+              ? { ...v, assigned_to_id: visit.assigned_to_id, assigned_to_name: visit.assigned_to_name, scheduled_date: visit.scheduled_date }
+              : v
+          ));
+          toast({ title: 'Error', description: 'Failed to move visit', variant: 'destructive' });
+        } else {
+          toast({
+            title: 'Visit moved',
+            description: `Moved to ${newEngineerName || 'Unassigned'} on ${dateStr}`,
+          });
+        }
+      }).catch(() => {
+        setVisits(prev => prev.map(v =>
+          String(v.id) === visitId
+            ? { ...v, assigned_to_id: visit.assigned_to_id, assigned_to_name: visit.assigned_to_name, scheduled_date: visit.scheduled_date }
+            : v
+        ));
+        toast({ title: 'Error', description: 'Failed to move visit', variant: 'destructive' });
+      });
+      return;
+    }
 
     const activeJobItem = jobs.find((j) => j.id === activeId);
     const isOverJob = jobs.find((j) => j.id === targetId);
@@ -944,14 +1107,19 @@ export default function PlannerPage() {
                     {weekDays.map((day) => {
                       const cellId = `${engineer.id}_${format(day, "yyyy-MM-dd")}`;
                       const cellJobs = getJobsForCell(engineer.id, day);
+                      const cellVisits = getVisitsForCell(engineer.id, day);
+                      const allItems = [
+                        ...cellJobs.map((j) => j.id),
+                        ...cellVisits.map((v) => `visit_${v.id}`),
+                      ];
                       return (
                         <DroppableCell
                           key={cellId}
                           id={cellId}
-                          isEmpty={cellJobs.length === 0}
+                          isEmpty={cellJobs.length === 0 && cellVisits.length === 0}
                         >
                           <SortableContext
-                            items={cellJobs.map((j) => j.id)}
+                            items={allItems}
                             strategy={verticalListSortingStrategy}
                           >
                             {cellJobs.map((job) => (
@@ -962,21 +1130,14 @@ export default function PlannerPage() {
                                 updateCount={job.isLongRunning ? updateCounts[job.id] : null}
                               />
                             ))}
+                            {cellVisits.map((visit) => (
+                              <SortableVisitCard
+                                key={`visit-${visit.id}`}
+                                visit={visit}
+                                getVisitTypeBorderColor={getVisitTypeBorderColor}
+                              />
+                            ))}
                           </SortableContext>
-                          {getVisitsForCell(engineer.id, day).map((visit) => (
-                            <div
-                              key={`visit-${visit.id}`}
-                              className="bg-card border rounded-md px-1.5 py-1 mb-0.5 shadow-sm select-none border-l-[3px]"
-                              style={{ borderLeftColor: getVisitTypeBorderColor(visit.visit_type) }}
-                            >
-                              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide leading-tight">
-                                {visit.visit_type?.replace('_', ' ')}
-                              </p>
-                              <p className="text-[11px] font-medium truncate leading-tight">
-                                {visit.customer_name || 'Unknown'}
-                              </p>
-                            </div>
-                          ))}
                         </DroppableCell>
                       );
                     })}
@@ -990,14 +1151,19 @@ export default function PlannerPage() {
                   {weekDays.map((day) => {
                     const unassignedJobs = getUnassignedJobsForDay(day);
                     const unassignedCellId = `unassigned_${format(day, "yyyy-MM-dd")}`;
+                    const unassignedVisits = getVisitsForCell('unassigned', day);
+                    const allUnassignedItems = [
+                      ...unassignedJobs.map((j) => j.id),
+                      ...unassignedVisits.map((v) => `visit_${v.id}`),
+                    ];
                     return (
                       <DroppableCell
                         key={unassignedCellId}
                         id={unassignedCellId}
-                        isEmpty={unassignedJobs.length === 0}
+                        isEmpty={unassignedJobs.length === 0 && unassignedVisits.length === 0}
                       >
                         <SortableContext
-                          items={unassignedJobs.map((j) => j.id)}
+                          items={allUnassignedItems}
                           strategy={verticalListSortingStrategy}
                         >
                           {unassignedJobs.map((job) => (
@@ -1006,6 +1172,13 @@ export default function PlannerPage() {
                               job={job}
                               onRemoveFromDay={handleRemoveFromSchedule}
                               updateCount={job.isLongRunning ? updateCounts[job.id] : null}
+                            />
+                          ))}
+                          {unassignedVisits.map((visit) => (
+                            <SortableVisitCard
+                              key={`visit-${visit.id}`}
+                              visit={visit}
+                              getVisitTypeBorderColor={getVisitTypeBorderColor}
                             />
                           ))}
                         </SortableContext>
@@ -1032,6 +1205,7 @@ export default function PlannerPage() {
 
             <DragOverlay>
               {activeJob ? <JobCardOverlay job={activeJob} /> : null}
+              {activeVisit ? <VisitCardOverlay visit={activeVisit} getVisitTypeBorderColor={getVisitTypeBorderColor} /> : null}
             </DragOverlay>
           </DndContext>
         </CardContent>
