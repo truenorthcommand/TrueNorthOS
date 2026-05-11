@@ -24,7 +24,7 @@ interface Client {
 }
 
 interface Property {
-  id: number;
+  id: string;
   name?: string;
   address: string;
   postcode?: string;
@@ -234,7 +234,7 @@ export default function CreateBooking() {
         priority,
       };
       if (selectedClient) payload.client_id = selectedClient.id;
-      if (selectedPropertyId) payload.property_id = parseInt(selectedPropertyId);
+      if (selectedPropertyId) payload.property_id = selectedPropertyId;
 
       const res = await fetch('/api/bookings/ai-suggest', {
         method: 'POST',
@@ -317,11 +317,11 @@ export default function CreateBooking() {
     };
 
     if (selectedClient) payload.client_id = selectedClient.id;
-    if (selectedPropertyId) payload.property_id = parseInt(selectedPropertyId);
+    if (selectedPropertyId) payload.property_id = selectedPropertyId;
 
     // Get address from selected property
     if (selectedPropertyId) {
-      const prop = properties.find(p => p.id === parseInt(selectedPropertyId));
+      const prop = properties.find(p => p.id === selectedPropertyId);
       if (prop) {
         payload.address = prop.address;
         payload.postcode = prop.postcode || null;
