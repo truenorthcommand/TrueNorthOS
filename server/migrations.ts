@@ -650,6 +650,59 @@ export async function runMigrations() {
     console.error("[Migration] quote_tokens table error:", e.message);
   }
 
+  // === PROPERTY INTELLIGENCE TABLES ===
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS knowledge_chunks (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        client_id VARCHAR NOT NULL,
+        property_id VARCHAR,
+        source_type TEXT NOT NULL,
+        source_id VARCHAR,
+        content TEXT NOT NULL,
+        metadata JSONB DEFAULT '{}',
+        embedding JSONB,
+        gdpr_classification TEXT DEFAULT 'operation',
+        retention_until TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        created_by VARCHAR,
+        deleted_at TIMESTAMP,
+        deleted_by VARCHAR,
+        deletion_reason TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_client ON knowledge_chunks(client_id);
+      CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_property ON knowledge_chunks(property_id);
+      CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_source ON knowledge_chunks(source_type, source_id);
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS intelligence_conversations (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        conversation_id VARCHAR NOT NULL,
+        user_id VARCHAR NOT NULL,
+        client_id VARCHAR,
+        property_id VARCHAR,
+        query_scope TEXT NOT NULL DEFAULT 'property',
+        user_query TEXT NOT NULL,
+        ai_response TEXT NOT NULL,
+        response_type TEXT NOT NULL DEFAULT 'factual',
+        confidence_score DOUBLE PRECISION,
+        retrieved_chunk_ids JSONB DEFAULT '[]',
+        tokens_used INTEGER,
+        cost_estimate DOUBLE PRECISION,
+        response_time_ms INTEGER,
+        ip_address TEXT,
+        session_id TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_intelligence_conv_user ON intelligence_conversations(user_id);
+      CREATE INDEX IF NOT EXISTS idx_intelligence_conv_id ON intelligence_conversations(conversation_id);
+    `);
+    console.log("[Migration] intelligence tables OK");
+  } catch (e: any) {
+    console.error("[Migration] intelligence tables error:", e.message);
+  }
+
   console.log("[Migration] All migrations completed");
   client.release();
 }
