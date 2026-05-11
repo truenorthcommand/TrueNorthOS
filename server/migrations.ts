@@ -343,8 +343,10 @@ export async function runMigrations() {
   // === JOB-CENTRIC SURVEY ENHANCEMENTS ===
   try {
     await client.query(`
-      ALTER TABLE surveys ADD COLUMN IF NOT EXISTS job_id UUID;
+      ALTER TABLE surveys ADD COLUMN IF NOT EXISTS job_id VARCHAR;
       CREATE INDEX IF NOT EXISTS idx_surveys_job_id ON surveys(job_id);
+      -- Fix type if previously created as UUID
+      ALTER TABLE surveys ALTER COLUMN job_id TYPE VARCHAR USING job_id::VARCHAR;
       ALTER TABLE surveys ADD COLUMN IF NOT EXISTS surveyor_notes TEXT;
       ALTER TABLE surveys ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'draft';
       ALTER TABLE surveys ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMP;
@@ -358,11 +360,20 @@ export async function runMigrations() {
 
   // === SURVEY PHOTOS TABLE ===
   try {
+    // Fix: drop table if it exists with wrong column type (UUID vs VARCHAR for job_id)
+    await client.query(`
+      DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'survey_photos' AND column_name = 'job_id' AND data_type = 'uuid') THEN
+          DROP TABLE survey_photos CASCADE;
+        END IF;
+      END $$;
+    `);
     await client.query(`
       CREATE TABLE IF NOT EXISTS survey_photos (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         survey_id UUID REFERENCES surveys(id) ON DELETE CASCADE,
-        job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
+        job_id VARCHAR REFERENCES jobs(id) ON DELETE CASCADE,
         file_url TEXT NOT NULL,
         caption TEXT,
         uploaded_by VARCHAR NOT NULL,
