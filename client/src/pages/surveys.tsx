@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
-  ClipboardCheck, Plus, MapPin, User, Camera, Wrench,
-  Home, Calendar, Loader2, FileText, ArrowRight, Sparkles
+  ClipboardCheck, MapPin, User, Camera,
+  Calendar, Loader2, FileText, ArrowRight, Sparkles, Briefcase
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -13,42 +13,36 @@ import { useState } from 'react';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-interface Survey {
-  id: number;
-  client_id: number;
-  property_id: number | null;
-  surveyor_id: number;
-  survey_type: string;
+interface SurveyListItem {
+  id: string;
+  job_id: string;
   status: string;
-  property_address: string | null;
-  general_notes: string | null;
-  condition_rating: string | null;
+  surveyor_notes: string | null;
+  submitted_at: string | null;
+  last_auto_save_at: string | null;
   created_at: string;
   updated_at: string;
-  client_name: string | null;
-  client_email: string | null;
+  // Job info
+  job_no: string | null;
+  customer_name: string | null;
+  job_address: string | null;
+  job_status: string | null;
+  // Surveyor info
   surveyor_name: string | null;
-  room_count: string;
-  media_count: string;
+  // Counts
+  photo_count: string;
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<string, { badge: string; label: string }> = {
   draft: { badge: 'bg-gray-100 text-gray-700 border-gray-200', label: 'Draft' },
-  in_progress: { badge: 'bg-blue-100 text-blue-700 border-blue-200', label: 'In Progress' },
+  submitting: { badge: 'bg-blue-100 text-blue-700 border-blue-200', label: 'Creating Quote...' },
+  sent: { badge: 'bg-emerald-100 text-emerald-700 border-emerald-200', label: 'Sent to Admin' },
+  admin_reviewing: { badge: 'bg-amber-100 text-amber-700 border-amber-200', label: 'Admin Reviewing' },
+  rejected: { badge: 'bg-red-100 text-red-700 border-red-200', label: 'Needs Revision' },
   complete: { badge: 'bg-emerald-100 text-emerald-700 border-emerald-200', label: 'Complete' },
   converted: { badge: 'bg-purple-100 text-purple-700 border-purple-200', label: 'Converted to Quote' },
-};
-
-const SURVEY_TYPE_STYLES: Record<string, { icon: string; label: string; color: string }> = {
-  bathroom: { icon: '🛁', label: 'Bathroom', color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-  kitchen: { icon: '🍳', label: 'Kitchen', color: 'bg-orange-50 text-orange-700 border-orange-200' },
-  full: { icon: '🏠', label: 'Full Property', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-  electrical: { icon: '⚡', label: 'Electrical', color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
-  roofing: { icon: '🏗️', label: 'Roofing', color: 'bg-red-50 text-red-700 border-red-200' },
-  external: { icon: '🌳', label: 'External', color: 'bg-green-50 text-green-700 border-green-200' },
-  custom: { icon: '📝', label: 'Custom', color: 'bg-gray-50 text-gray-700 border-gray-200' },
 };
 
 // ─── Component ─────────────────────────────────────────────────────────────────
@@ -56,12 +50,12 @@ const SURVEY_TYPE_STYLES: Record<string, { icon: string; label: string; color: s
 export default function Surveys() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const [generatingSurveyId, setGeneratingSurveyId] = useState<string | null>(null);
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
 
-  const { data: surveys = [], isLoading } = useQuery<Survey[]>({
-    queryKey: ['/api/surveys'],
+  const { data: surveys = [], isLoading } = useQuery<SurveyListItem[]>({
+    queryKey: ['/api/surveys/job-surveys'],
     queryFn: async () => {
-      const res = await fetch('/api/surveys', { credentials: 'include' });
+      const res = await fetch('/api/surveys/job-surveys', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch surveys');
       return res.json();
     },
@@ -71,44 +65,39 @@ export default function Surveys() {
   const stats = {
     total: surveys.length,
     draft: surveys.filter(s => s.status === 'draft').length,
-    inProgress: surveys.filter(s => s.status === 'in_progress').length,
-    complete: surveys.filter(s => s.status === 'complete').length,
-    converted: surveys.filter(s => s.status === 'converted').length,
+    sent: surveys.filter(s => s.status === 'sent' || s.status === 'admin_reviewing').length,
+    complete: surveys.filter(s => s.status === 'complete' || s.status === 'converted').length,
   };
 
-  const handleGenerateQuote = async (surveyId: string, e: React.MouseEvent) => {
+  const handleGenerateQuote = async (jobId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (generatingSurveyId) return;
-    
-    setGeneratingSurveyId(surveyId);
+    if (generatingId) return;
+
+    setGeneratingId(jobId);
     try {
-      const res = await fetch(`/api/surveys/${surveyId}/generate-quote`, {
+      const res = await fetch(`/api/jobs/${jobId}/survey/send`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
       });
-      
+
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || 'Failed to generate quote');
       }
-      
-      const data = await res.json();
+
       toast({
-        title: 'Quote Generated',
-        description: `Quote ${data.quote_no} created successfully`,
+        title: 'Survey Sent',
+        description: 'Survey submitted for quote generation',
       });
-      
-      // Navigate to the new quote
-      navigate(`/quotes/${data.quote_id}`);
     } catch (err: any) {
       toast({
         title: 'Error',
-        description: err.message || 'Failed to generate quote from survey',
+        description: err.message || 'Failed to send survey',
         variant: 'destructive',
       });
     } finally {
-      setGeneratingSurveyId(null);
+      setGeneratingId(null);
     }
   };
 
@@ -129,19 +118,12 @@ export default function Surveys() {
             <ClipboardCheck className="h-7 w-7 text-[#E8A54B]" />
             Surveys
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">Manage property surveys and inspections</p>
+          <p className="text-muted-foreground text-sm mt-1">Job survey notes and site photos</p>
         </div>
-        <Button
-          onClick={() => navigate('/surveys/new')}
-          className="bg-[#0F2B4C] hover:bg-[#0F2B4C]/90 text-white"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New Survey
-        </Button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="border-l-4 border-l-[#0F2B4C]">
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-[#0F2B4C]">{stats.total}</div>
@@ -151,25 +133,19 @@ export default function Surveys() {
         <Card className="border-l-4 border-l-gray-400">
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-gray-700">{stats.draft}</div>
-            <div className="text-xs text-muted-foreground">Draft</div>
+            <div className="text-xs text-muted-foreground">Drafts</div>
           </CardContent>
         </Card>
-        <Card className="border-l-4 border-l-blue-500">
+        <Card className="border-l-4 border-l-amber-500">
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-700">{stats.inProgress}</div>
-            <div className="text-xs text-muted-foreground">In Progress</div>
+            <div className="text-2xl font-bold text-amber-700">{stats.sent}</div>
+            <div className="text-xs text-muted-foreground">Pending Review</div>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-emerald-500">
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-emerald-700">{stats.complete}</div>
             <div className="text-xs text-muted-foreground">Complete</div>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-purple-500">
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-purple-700">{stats.converted}</div>
-            <div className="text-xs text-muted-foreground">Converted</div>
           </CardContent>
         </Card>
       </div>
@@ -180,13 +156,15 @@ export default function Surveys() {
           <CardContent className="flex flex-col items-center justify-center py-16">
             <ClipboardCheck className="h-16 w-16 text-muted-foreground/30 mb-4" />
             <h3 className="text-lg font-semibold text-muted-foreground">No Surveys Yet</h3>
-            <p className="text-sm text-muted-foreground mt-1 mb-4">Create your first property survey to get started</p>
+            <p className="text-sm text-muted-foreground mt-1 mb-4">
+              Surveys are created from the Jobs page. Open a job and start a survey from there.
+            </p>
             <Button
-              onClick={() => navigate('/surveys/new')}
-              className="bg-[#E8A54B] hover:bg-[#E8A54B]/90 text-white"
+              onClick={() => navigate('/jobs')}
+              className="bg-[#0F2B4C] hover:bg-[#0F2B4C]/90 text-white"
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Create First Survey
+              <Briefcase className="h-4 w-4 mr-2" />
+              Go to Jobs
             </Button>
           </CardContent>
         </Card>
@@ -194,15 +172,13 @@ export default function Surveys() {
         <div className="grid gap-3">
           {surveys.map((survey) => {
             const statusStyle = STATUS_STYLES[survey.status] || STATUS_STYLES.draft;
-            const typeStyle = SURVEY_TYPE_STYLES[survey.survey_type] || SURVEY_TYPE_STYLES.custom;
-            const roomCount = parseInt(survey.room_count) || 0;
-            const mediaCount = parseInt(survey.media_count) || 0;
+            const photoCount = parseInt(survey.photo_count) || 0;
 
             return (
               <Card
                 key={survey.id}
                 className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-[#0F2B4C]/20 hover:border-l-[#E8A54B]"
-                onClick={() => navigate(`/surveys/${survey.id}`)}
+                onClick={() => navigate(`/surveys/${survey.job_id}`)}
               >
                 <CardContent className="p-4">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -210,31 +186,40 @@ export default function Surveys() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-semibold text-[#0F2B4C] truncate">
-                          {survey.client_name || 'Unknown Client'}
+                          {survey.customer_name || 'Unknown Customer'}
                         </h3>
-                        <Badge variant="outline" className={typeStyle.color}>
-                          {typeStyle.icon} {typeStyle.label}
-                        </Badge>
+                        {survey.job_no && (
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                            <Briefcase className="h-3 w-3 mr-1" />
+                            {survey.job_no}
+                          </Badge>
+                        )}
                         <Badge variant="outline" className={statusStyle.badge}>
                           {statusStyle.label}
                         </Badge>
                       </div>
 
-                      {survey.property_address && (
+                      {survey.job_address && (
                         <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
                           <MapPin className="h-3.5 w-3.5" />
-                          <span className="truncate">{survey.property_address}</span>
+                          <span className="truncate">{survey.job_address}</span>
+                        </div>
+                      )}
+
+                      {survey.surveyor_notes && (
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                          <FileText className="h-3.5 w-3.5 flex-shrink-0" />
+                          <span className="truncate">
+                            {survey.surveyor_notes.substring(0, 100)}
+                            {survey.surveyor_notes.length > 100 ? '...' : ''}
+                          </span>
                         </div>
                       )}
 
                       <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
-                          <Home className="h-3.5 w-3.5" />
-                          {roomCount} room{roomCount !== 1 ? 's' : ''}
-                        </span>
-                        <span className="flex items-center gap-1">
                           <Camera className="h-3.5 w-3.5" />
-                          {mediaCount} photo{mediaCount !== 1 ? 's' : ''}
+                          {photoCount} photo{photoCount !== 1 ? 's' : ''}
                         </span>
                         {survey.surveyor_name && (
                           <span className="flex items-center gap-1">
@@ -249,22 +234,22 @@ export default function Surveys() {
                       </div>
                     </div>
 
-                    {/* Right: Arrow */}
+                    {/* Right: Actions */}
                     <div className="hidden md:flex items-center gap-2">
-                      {survey.status === 'complete' && (
+                      {survey.status === 'draft' && survey.surveyor_notes && (
                         <Button
                           size="sm"
                           variant="outline"
                           className="text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                          onClick={(e) => handleGenerateQuote(String(survey.id), e)}
-                          disabled={generatingSurveyId === String(survey.id)}
+                          onClick={(e) => handleGenerateQuote(survey.job_id, e)}
+                          disabled={generatingId === survey.job_id}
                         >
-                          {generatingSurveyId === String(survey.id) ? (
+                          {generatingId === survey.job_id ? (
                             <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
                           ) : (
                             <Sparkles className="h-3.5 w-3.5 mr-1" />
                           )}
-                          Create Quote
+                          Send Survey
                         </Button>
                       )}
                       <ArrowRight className="h-5 w-5 text-muted-foreground/50" />

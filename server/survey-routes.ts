@@ -144,6 +144,30 @@ router.get('/templates', (_req: Request, res: Response) => {
   res.json(SURVEY_TEMPLATES);
 });
 
+// GET /job-surveys - List all job-centric surveys with job info
+router.get('/job-surveys', async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query(`
+      SELECT s.id, s.job_id, s.status, s.surveyor_notes,
+        s.submitted_at, s.last_auto_save_at, s.created_at, s.updated_at,
+        j.job_no, j.description as job_description, j.status as job_status,
+        j.address as job_address,
+        j.customer_name,
+        sv.name as surveyor_name,
+        (SELECT COUNT(*) FROM survey_photos sp WHERE sp.job_id = s.job_id) as photo_count
+      FROM surveys s
+      INNER JOIN jobs j ON s.job_id = j.id
+      LEFT JOIN users sv ON s.surveyor_id = sv.id
+      WHERE s.job_id IS NOT NULL
+      ORDER BY s.updated_at DESC
+    `);
+    res.json(result.rows);
+  } catch (error: any) {
+    console.error('Job surveys list error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET / - List all surveys
 router.get('/', async (req: Request, res: Response) => {
   try {
