@@ -94,7 +94,6 @@ import AssetDetail from "@/pages/asset-detail";
 import AssetForm from "@/pages/asset-form";
 import MerchantPortal from "@/pages/merchant-portal";
 import AdminMerchants from "@/pages/admin-merchants";
-import AdminBlog from "@/pages/admin-blog";
 import PropertyIntelligence from "@/pages/property-intelligence";
 import Surveys from "@/pages/surveys";
 import SurveyWizard from "@/pages/survey-wizard";
@@ -205,7 +204,6 @@ function AppRoutes() {
         <Route path="/admin/advisors" component={AdminAdvisors} />
         <Route path="/admin/merchants" component={AdminMerchants} />
         <Route path="/admin/feedback" component={AdminFeedback} />
-        <Route path="/blog" component={AdminBlog} />
         <Route path="/works-manager" component={WorksManagerDashboard} />
         <Route path="/works-manager/jobs" component={WorksManagerJobs} />
         <Route path="/works-manager/map" component={WorksManagerMap} />

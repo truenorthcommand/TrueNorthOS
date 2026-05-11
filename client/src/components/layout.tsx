@@ -455,7 +455,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <NavLink href="/ai-tools" icon={Sparkles}>AI Assistant</NavLink>
           <NavLink href="/ai-advisors" icon={Bot}>Technical Advisers</NavLink>
           <NavLink href="/voice-notes" icon={Mic}>Voice Notes</NavLink>
-          <NavLink href="/blog" icon={Newspaper}>Blog Manager</NavLink>
         </MenuGroup>
 
         {/* File Storage Section - Admin and above */}
