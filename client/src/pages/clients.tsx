@@ -125,6 +125,9 @@ export default function Clients() {
     orderNumber: "" as string | number,
     isLongRunning: false,
     visitType: "job" as string,
+    showPricing: false,
+    agreedPrice: "",
+    vatRate: "20",
   });
   const [jobPhotos, setJobPhotos] = useState<JobPhoto[]>([]);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
@@ -838,6 +841,8 @@ export default function Clients() {
       orderNumber: jobForm.orderNumber ? Number(jobForm.orderNumber) : null,
       visitType: jobForm.visitType || 'job',
       description: jobForm.description,
+      agreedPrice: jobForm.showPricing && jobForm.agreedPrice ? parseFloat(jobForm.agreedPrice) : null,
+      vatRate: jobForm.showPricing ? parseFloat(jobForm.vatRate || '20') : null,
       notes: jobForm.notes,
       isLongRunning: jobForm.isLongRunning,
       status: status,
@@ -881,7 +886,7 @@ export default function Clients() {
       setSelectedContactId("");
       setSelectedPropertyId("");
       setSelectedEngineerIds([]);
-      setJobForm({ nickname: "", description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "", isLongRunning: false, visitType: "job" });
+      setJobForm({ nickname: "", description: "", notes: "", session: "AM", date: format(new Date(), "yyyy-MM-dd"), orderNumber: "", isLongRunning: false, visitType: "job", showPricing: false, agreedPrice: "", vatRate: "20" });
       setJobPhotos([]);
       setCurrentStep(1);
       setShowAddProperty(false);
@@ -1295,6 +1300,63 @@ export default function Clients() {
                 data-testid="switch-long-running"
               />
             </div>
+
+            {/* Agreed Price */}
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="space-y-0.5">
+                <Label htmlFor="pricing-switch">Add Agreed Price</Label>
+                <p className="text-sm text-muted-foreground">For reactive works within agreed spend limit (no formal quote required)</p>
+              </div>
+              <Switch
+                id="pricing-switch"
+                checked={jobForm.showPricing || false}
+                onCheckedChange={(checked) => setJobForm({ ...jobForm, showPricing: checked })}
+                data-testid="switch-pricing"
+              />
+            </div>
+
+            {jobForm.showPricing && (
+              <div className="p-4 border rounded-lg space-y-4 bg-muted/30">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Agreed Price (ex. VAT)</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">£</span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        className="pl-7"
+                        value={jobForm.agreedPrice || ''}
+                        onChange={(e) => setJobForm({ ...jobForm, agreedPrice: e.target.value })}
+                        data-testid="input-agreed-price"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>VAT Rate</Label>
+                    <Select value={jobForm.vatRate || '20'} onValueChange={(value) => setJobForm({ ...jobForm, vatRate: value })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">0% (Exempt)</SelectItem>
+                        <SelectItem value="5">5% (Reduced)</SelectItem>
+                        <SelectItem value="20">20% (Standard)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {jobForm.agreedPrice && parseFloat(jobForm.agreedPrice) > 0 && (
+                  <div className="text-sm text-right space-y-1 border-t pt-3">
+                    <p>Net: <span className="font-medium">£{parseFloat(jobForm.agreedPrice).toFixed(2)}</span></p>
+                    <p>VAT ({jobForm.vatRate || '20'}%): <span className="font-medium">£{(parseFloat(jobForm.agreedPrice) * (parseFloat(jobForm.vatRate || '20') / 100)).toFixed(2)}</span></p>
+                    <p className="text-base font-semibold">Total: £{(parseFloat(jobForm.agreedPrice) * (1 + parseFloat(jobForm.vatRate || '20') / 100)).toFixed(2)}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="space-y-3">
               <Label>Photos (Optional)</Label>
