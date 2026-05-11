@@ -13,17 +13,15 @@ import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalk
 import { z } from "zod";
 import { notifyAdmins, notifyUser } from "./notifications";
 import { sessionMiddleware } from "./session";
-import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerGlobalAssistantRoutes } from "./globalAssistant";
 import { registerAiRoutes } from "./ai-service";
 import { registerSupportChatRoutes } from "./support-chat";
 import { registerPublicChatbotRoutes } from "./public-chatbot";
 import { insertFileSchema } from "@shared/schema";
-import { setupAuth } from "./replit_integrations/auth";
+import { setupGoogleAuth } from "./google-auth";
 import { registerInviteRoutes } from "./invite";
 import { generateFormPdf } from "./form-pdf";
 import { emitEvent } from "./events";
-import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
 import { sendPortalInvitation, sendPasswordResetEmail, sendQuoteEmail } from "./email";
 import { logAuditEvent, logFailedAction, createUserSession, endUserSession, updateSessionActivity, logAuditLogAccess, getAuditLogs, getAuditLogById, getFailedActions, getActiveSessions, getAuditStats, getClientIp, getUserAgent, verifyAuditLogIntegrity } from "./audit";
 import { ReferralService, FraudDetection, DiscountEngine } from "./referral-service";
@@ -50,7 +48,7 @@ function getStripeClient(): Stripe | null {
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 function getOpenAIClient(): OpenAI | null {
-  // First try Replit AI Integrations (preferred - no API key needed)
+  // Try AI Integrations env vars first
   if (process.env.AI_INTEGRATIONS_OPENAI_API_KEY && process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) {
     return new OpenAI({
       apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -146,14 +144,14 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
-  // Trust proxy for secure cookies behind Replit's reverse proxy
+  // Trust proxy for secure cookies behind reverse proxy
   app.set('trust proxy', 1);
   
   // Use shared session middleware (also used by WebSocket notifications)
   app.use(sessionMiddleware);
   
   // Setup Google OAuth 2.0 authentication
-  await setupAuth(app);
+  await setupGoogleAuth(app);
 
   // Register invite-based onboarding routes (/invite/:token and /api/users/invite)
   registerInviteRoutes(app);
@@ -6816,9 +6814,7 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
       
       // Send password reset email
       const companySettings = await storage.getCompanySettings();
-      const baseUrl = process.env.REPLIT_DEPLOYMENT_URL
-        || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : '')
-        || `${req.protocol}://${req.get('host')}`;
+      const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
       const resetUrl = `${baseUrl}/portal/${req.params.token}/reset/${resetToken}`;
       
       try {
@@ -6891,9 +6887,7 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
       const portalToken = crypto.randomUUID();
       await storage.updateClient(req.params.id, { portalToken, portalEnabled: true });
       
-      const baseUrl = process.env.REPLIT_DEPLOYMENT_URL
-        || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : '')
-        || `${req.protocol}://${req.get('host')}`;
+      const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
       const portalUrl = `${baseUrl}/portal/${portalToken}`;
       
       let emailSent = false;
@@ -6995,10 +6989,11 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
   app.post("/api/admin/blog-posts/upload-image", requireAdmin, async (req, res) => {
     try {
-      const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
-      res.json({ uploadURL, objectPath });
+      // Blog image uploads now use local file storage
+      const { randomUUID } = await import('crypto');
+      const objectId = randomUUID();
+      const objectPath = `/uploads/blog/${objectId}`;
+      res.json({ uploadURL: objectPath, objectPath });
     } catch (error) {
       console.error("Blog image upload error:", error);
       res.status(500).json({ error: "Failed to generate upload URL" });
@@ -7239,7 +7234,6 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
   // ==================== FILE STORAGE ROUTES ====================
   
-  registerObjectStorageRoutes(app, requireAuth);
   registerGlobalAssistantRoutes(app);
   registerAiRoutes(app);
   registerSupportChatRoutes(app);
@@ -10412,17 +10406,16 @@ Be concise and practical. Focus on real issues that affect the business.`;
             entityInfo,
           });
           
-          // Store PDF in object storage
-          const objectStorageService = new ObjectStorageService();
+          // Store PDF on local disk
+          const { randomUUID } = await import('crypto');
+          const fs = await import('fs');
+          const path = await import('path');
           const sanitizedName = templateName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
           const fileName = `${sanitizedName}_${submission.id}.pdf`;
-          
-          const { objectPath } = await objectStorageService.writeBuffer({
-            buffer: pdfBuffer,
-            fileName,
-            contentType: "application/pdf",
-            subPath: "forms",
-          });
+          const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'forms');
+          await fs.promises.mkdir(uploadsDir, { recursive: true });
+          await fs.promises.writeFile(path.join(uploadsDir, fileName), pdfBuffer);
+          const objectPath = `/uploads/forms/${fileName}`;
           
           // Create file record if entity is a job
           if (submission.entityType === "job" && submission.entityId) {

@@ -26,7 +26,6 @@ const SECURITY_CONFIG = {
   ALLOWED_URL_DOMAINS: [
     "truenorthoperationsgroup.com",
     "truenorth.com",
-    "replit.dev",
   ],
 };
 

@@ -61,7 +61,6 @@ import Expenses from "@/pages/expenses";
 import Payments from "@/pages/payments";
 import Analytics from "@/pages/analytics";
 import DirectorsSuite from "@/pages/directors-suite";
-import DemoDirectorsSuite from "@/pages/demo-directors";
 import Subscription from "@/pages/subscription";
 import Referrals from "@/pages/referrals";
 import NotificationsPage from "@/pages/notifications";
@@ -81,11 +80,6 @@ import SnaggingSheets from "@/pages/snagging-sheets";
 import SnaggingDetail from "@/pages/snagging-detail";
 import AccountsDashboard from "@/pages/accounts-dashboard";
 import Files from "@/pages/files";
-import GlassDemo from "@/pages/glass-demo";
-import GlassDashboardDemo from "@/pages/glass-dashboard-demo";
-import IconStylesDemo from "@/pages/icon-styles-demo";
-import GlowDashboardDemo from "@/pages/glow-dashboard-demo";
-import BigChangeDashboardDemo from "@/pages/bigchange-dashboard-demo";
 import PitchInvestor from "@/pages/pitch-investor";
 import PitchSales from "@/pages/pitch-sales";
 import PitchOnePager from "@/pages/pitch-onepager";
@@ -253,15 +247,9 @@ function Router() {
       <Route path="/invoice/:token" component={ClientInvoice} />
 
       <Route path="/proposal" component={Proposal} />
-      <Route path="/demo/directors" component={DemoDirectorsSuite} />
       <Route path="/pitch/investor" component={PitchInvestor} />
       <Route path="/pitch/sales" component={PitchSales} />
       <Route path="/pitch/onepager" component={PitchOnePager} />
-      <Route path="/glass-demo" component={GlassDemo} />
-      <Route path="/glass-dashboard" component={GlassDashboardDemo} />
-      <Route path="/icon-styles" component={IconStylesDemo} />
-      <Route path="/glow-dashboard" component={GlowDashboardDemo} />
-      <Route path="/bigchange-dashboard" component={BigChangeDashboardDemo} />
 
       <Route path="/merchant" component={MerchantPortal} />
 
