@@ -702,7 +702,6 @@ router.post('/:id/generate-quote', async (req: Request, res: Response) => {
   }
 });
 
-export default router;
 
 // === JOB-CENTRIC SURVEY ROUTES (New Architecture) ===
 
