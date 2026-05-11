@@ -227,7 +227,9 @@ export default function Invoices() {
 
   const filteredInvoices = invoices.filter((invoice) =>
     invoice.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    invoice.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase())
+    invoice.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (invoice.siteAddress || invoice.address || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (invoice.description || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const { subtotal, vatAmount, total } = calculateTotals();

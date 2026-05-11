@@ -67,7 +67,10 @@ export default function Quotes() {
 
   const filteredQuotes = quotes.filter((quote) =>
     quote.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    quote.quoteNo.toLowerCase().includes(searchTerm.toLowerCase())
+    quote.quoteNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (quote.siteAddress || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (quote.sitePostcode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (quote.description || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (isLoading) {

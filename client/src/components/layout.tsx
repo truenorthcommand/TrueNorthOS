@@ -19,6 +19,7 @@ import { useStore } from "@/lib/store";
 import { GlobalAIAssistant } from "@/components/GlobalAIAssistant";
 import { SupportChat } from "@/components/support-chat";
 import { FeedbackButton } from "@/components/feedback-button";
+import { GlobalSearch } from "@/components/global-search";
 
 type MenuSection = 'jobs' | 'schedule' | 'sales' | 'team' | 'tools' | 'fleet' | 'assets' | 'finance' | 'clients' | 'files' | 'settings';
 
@@ -621,6 +622,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex-1 flex flex-col min-h-screen bg-background">
           {/* Desktop Header */}
           <header className="sticky top-0 z-30 hidden md:flex h-14 items-center gap-4 px-6 shadow-sm border-b print:hidden bg-card border-border">
+            <GlobalSearch />
             <div className="ml-auto flex items-center gap-3">
               <Tooltip>
                 <TooltipTrigger asChild>

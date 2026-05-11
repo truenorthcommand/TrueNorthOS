@@ -407,6 +407,46 @@ export async function registerRoutes(
 
   // ==================== TWO-FACTOR AUTHENTICATION ====================
 
+  // ==================== GLOBAL SEARCH ====================
+  app.get("/api/search", requireAuth, async (req, res) => {
+    try {
+      const q = (req.query.q as string || '').trim();
+      if (!q || q.length < 2) return res.json({ jobs: [], clients: [], quotes: [] });
+
+      const searchTerm = `%${q}%`;
+
+      const [jobsResult, clientsResult, quotesResult] = await Promise.all([
+        pool.query(`
+          SELECT id, job_no, customer_name, address, postcode, status, description
+          FROM jobs
+          WHERE customer_name ILIKE $1 OR job_no ILIKE $1 OR address ILIKE $1 OR postcode ILIKE $1 OR description ILIKE $1
+          ORDER BY created_at DESC LIMIT 8
+        `, [searchTerm]),
+        pool.query(`
+          SELECT id, name, email, phone
+          FROM clients
+          WHERE name ILIKE $1 OR email ILIKE $1 OR phone ILIKE $1
+          ORDER BY name LIMIT 8
+        `, [searchTerm]),
+        pool.query(`
+          SELECT id, quote_no, customer_name, site_address, status, total
+          FROM quotes
+          WHERE customer_name ILIKE $1 OR quote_no ILIKE $1 OR site_address ILIKE $1
+          ORDER BY created_at DESC LIMIT 8
+        `, [searchTerm]),
+      ]);
+
+      res.json({
+        jobs: jobsResult.rows,
+        clients: clientsResult.rows,
+        quotes: quotesResult.rows,
+      });
+    } catch (error) {
+      console.error('Search error:', error);
+      res.json({ jobs: [], clients: [], quotes: [] });
+    }
+  });
+
   app.post("/api/auth/2fa/setup", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);
