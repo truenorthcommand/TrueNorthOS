@@ -111,6 +111,7 @@ import AdminFeedback from "@/pages/admin-feedback";
 import Bookings from "@/pages/bookings";
 import CreateBooking from "@/pages/create-booking";
 import ResourcePlanner from "@/pages/resource-planner";
+import QuoteAccept from "@/pages/quote-accept";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -252,6 +253,7 @@ function Router() {
       <Route path="/guides" component={UserGuides} />
 
       <Route path="/quote/:token" component={ClientQuote} />
+      <Route path="/quotes/accept/:token" component={QuoteAccept} />
       <Route path="/portal/:token/reset/:resetToken" component={CustomerPortal} />
       <Route path="/portal/:token" component={CustomerPortal} />
       <Route path="/invoice/:token" component={ClientInvoice} />

@@ -614,6 +614,31 @@ export async function runMigrations() {
     console.error("[Migration] feedback columns error:", e.message);
   }
 
+  // === QUOTE TOKENS TABLE (for email accept/reject workflow) ===
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS quote_tokens (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        quote_id VARCHAR NOT NULL,
+        token VARCHAR(64) UNIQUE NOT NULL,
+        action VARCHAR(20) NOT NULL DEFAULT 'pending',
+        expires_at TIMESTAMP NOT NULL,
+        used BOOLEAN DEFAULT FALSE,
+        customer_name VARCHAR,
+        customer_email VARCHAR,
+        feedback TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_quote_tokens_token ON quote_tokens(token);
+      CREATE INDEX IF NOT EXISTS idx_quote_tokens_quote_id ON quote_tokens(quote_id);
+    `);
+    console.log("[Migration] quote_tokens table OK");
+  } catch (e: any) {
+    console.error("[Migration] quote_tokens table error:", e.message);
+  }
+
   console.log("[Migration] All migrations completed");
   client.release();
 }

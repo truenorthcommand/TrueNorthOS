@@ -106,6 +106,27 @@ export default function SurveyWizard() {
     enabled: !!jobId && !!survey,
   });
 
+  // Query for associated quote (for surveyor visibility)
+  const { data: jobQuote } = useQuery<{ quoteNo: string; total: string; status: string } | null>({
+    queryKey: ['/api/quotes/by-job', jobId],
+    queryFn: async () => {
+      if (!jobId) return null;
+      const res = await fetch(`/api/quotes?jobId=${jobId}`, { credentials: 'include' });
+      if (!res.ok) return null;
+      const quotes = await res.json();
+      if (Array.isArray(quotes) && quotes.length > 0) {
+        const q = quotes[0];
+        return {
+          quoteNo: q.quoteNo || q.quote_no || q.id,
+          total: q.total || q.amount || '0.00',
+          status: q.status || 'draft'
+        };
+      }
+      return null;
+    },
+    enabled: !!jobId,
+  });
+
   // ─── Effects ─────────────────────────────────────────────────────────
   // Load survey notes into state
   useEffect(() => {
@@ -504,6 +525,40 @@ export default function SurveyWizard() {
           </Card>
         )}
       </div>
+
+      {/* Quote Status Section (read-only for surveyor) */}
+      {jobQuote && (
+        <div className="px-4 mb-4">
+          <Card className="bg-slate-50 border-slate-200">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2 text-slate-700">
+                <FileText className="h-4 w-4" />
+                Quote Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-900">Quote #{jobQuote.quoteNo}</p>
+                  <p className="text-lg font-bold text-slate-900">£{Number(jobQuote.total).toFixed(2)}</p>
+                </div>
+                <Badge className={
+                  jobQuote.status === 'accepted' ? 'bg-green-100 text-green-700 border-green-300' :
+                  jobQuote.status === 'sent' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                  jobQuote.status === 'rejected' || jobQuote.status === 'changes_requested' ? 'bg-red-100 text-red-700 border-red-300' :
+                  'bg-gray-100 text-gray-700 border-gray-300'
+                }>
+                  {jobQuote.status === 'accepted' ? 'Accepted' :
+                   jobQuote.status === 'sent' ? 'Sent to Customer' :
+                   jobQuote.status === 'rejected' ? 'Rejected' :
+                   jobQuote.status === 'changes_requested' ? 'Changes Requested' :
+                   jobQuote.status.charAt(0).toUpperCase() + jobQuote.status.slice(1)}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Bottom Action Bar */}
       {status === 'draft' && (

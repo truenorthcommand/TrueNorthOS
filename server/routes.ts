@@ -24,7 +24,7 @@ import { registerInviteRoutes } from "./invite";
 import { generateFormPdf } from "./form-pdf";
 import { emitEvent } from "./events";
 import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
-import { sendPortalInvitation, sendPasswordResetEmail } from "./email";
+import { sendPortalInvitation, sendPasswordResetEmail, sendQuoteEmail } from "./email";
 import { logAuditEvent, logFailedAction, createUserSession, endUserSession, updateSessionActivity, logAuditLogAccess, getAuditLogs, getAuditLogById, getFailedActions, getActiveSessions, getAuditStats, getClientIp, getUserAgent, verifyAuditLogIntegrity } from "./audit";
 import { ReferralService, FraudDetection, DiscountEngine } from "./referral-service";
 import intelligenceRoutes from "./intelligence-routes";
@@ -2065,6 +2065,50 @@ export async function registerRoutes(
     }
   });
 
+  // POST /api/jobs/:id/schedule - Schedule work for a job
+  app.post("/api/jobs/:id/schedule", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { assignedTo, startDate, duration, notes, session } = req.body;
+
+      // Verify job exists
+      const job = await storage.getJob(id);
+      if (!job) {
+        return res.status(404).json({ error: 'Job not found' });
+      }
+
+      // Update job with schedule info
+      const updateData: any = {
+        status: 'scheduled',
+        date: startDate ? new Date(startDate).toISOString() : null,
+        session: session || 'AM',
+      };
+
+      if (assignedTo) {
+        updateData.assignedToId = assignedTo;
+      }
+
+      const updated = await storage.updateJob(id, updateData);
+
+      // Store additional schedule metadata (duration, notes) in job notes or a separate field
+      if (duration || notes) {
+        const scheduleInfo = [];
+        if (duration) scheduleInfo.push(`Duration: ${duration} day(s)`);
+        if (notes) scheduleInfo.push(`Schedule notes: ${notes}`);
+        const existingNotes = updated.notes || '';
+        const newNotes = existingNotes
+          ? `${existingNotes}\n\n--- Schedule Info ---\n${scheduleInfo.join('\n')}`
+          : `--- Schedule Info ---\n${scheduleInfo.join('\n')}`;
+        await storage.updateJob(id, { notes: newNotes });
+      }
+
+      res.json({ success: true, job: updated });
+    } catch (error: any) {
+      console.error('Error scheduling job:', error);
+      res.status(500).json({ error: 'Failed to schedule job' });
+    }
+  });
+
   // ==================== LOCATION TRACKING ====================
   // NOTE: POST /api/users/:id/location is registered earlier in the file (around line 1165)
   // with full location history tracking. This section only has the admin GET endpoint.
@@ -2361,6 +2405,237 @@ export async function registerRoutes(
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to decline quote" });
+    }
+  });
+
+  // === QUOTE TOKEN ROUTES (Send to Customer + Public Accept/Reject) ===
+
+  // POST /api/quotes/:id/send-to-customer - Creates tokens and sends email
+  app.post("/api/quotes/:id/send-to-customer", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { customerEmail, customerName } = req.body;
+
+      // Get the quote
+      const quoteResult = await pool.query('SELECT * FROM quotes WHERE id = $1', [id]);
+      if (quoteResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Quote not found' });
+      }
+      const quote = quoteResult.rows[0];
+
+      const email = customerEmail || quote.customerEmail || quote.customer_email;
+      const name = customerName || quote.customerName || quote.customer_name || 'Customer';
+
+      if (!email) {
+        return res.status(400).json({ error: 'No customer email address provided' });
+      }
+
+      // Generate unique token
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+      // Insert token record
+      await pool.query(
+        `INSERT INTO quote_tokens (quote_id, token, action, expires_at, customer_name, customer_email)
+         VALUES ($1, $2, 'pending', $3, $4, $5)`,
+        [id, token, expiresAt, name, email]
+      );
+
+      // Build accept/reject URLs
+      const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+      const acceptUrl = `${baseUrl}/quotes/accept/${token}`;
+      const rejectUrl = `${baseUrl}/quotes/accept/${token}?action=reject`;
+
+      // Calculate total from quote
+      const total = quote.total || quote.amount || '0.00';
+      const quoteNo = quote.quoteNo || quote.quote_no || quote.id;
+
+      // Send email
+      const sent = await sendQuoteEmail(email, name, quoteNo, String(total), acceptUrl, rejectUrl);
+
+      if (!sent) {
+        return res.status(500).json({ error: 'Failed to send email. Check GMAIL_USER and GMAIL_APP_PASSWORD configuration.' });
+      }
+
+      // Update quote status
+      await pool.query('UPDATE quotes SET status = $1 WHERE id = $2', ['sent', id]);
+
+      res.json({ success: true, message: `Quote sent to ${email}`, token });
+    } catch (error: any) {
+      console.error('Error sending quote to customer:', error);
+      res.status(500).json({ error: 'Failed to send quote to customer' });
+    }
+  });
+
+  // GET /api/quotes/accept/:token - Public endpoint, returns quote summary
+  app.get("/api/quotes/accept/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+
+      // Look up token
+      const tokenResult = await pool.query(
+        'SELECT * FROM quote_tokens WHERE token = $1',
+        [token]
+      );
+
+      if (tokenResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Invalid or expired link' });
+      }
+
+      const tokenRecord = tokenResult.rows[0];
+
+      // Check expiry
+      if (new Date(tokenRecord.expires_at) < new Date()) {
+        return res.status(410).json({ error: 'This link has expired. Please contact us for a new quote.' });
+      }
+
+      // Check if already used
+      if (tokenRecord.used) {
+        return res.json({
+          already_actioned: true,
+          action: tokenRecord.action,
+          message: tokenRecord.action === 'accepted' ? 'This quote has already been accepted.' : 'This quote has already been responded to.'
+        });
+      }
+
+      // Get quote details
+      const quoteResult = await pool.query('SELECT * FROM quotes WHERE id = $1', [tokenRecord.quote_id]);
+      if (quoteResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Quote not found' });
+      }
+
+      const quote = quoteResult.rows[0];
+
+      // Return summary for public display
+      res.json({
+        quoteNo: quote.quoteNo || quote.quote_no || quote.id,
+        customerName: tokenRecord.customer_name,
+        lineItems: quote.lineItems || quote.line_items || [],
+        total: quote.total || quote.amount || '0.00',
+        subtotal: quote.subtotal || quote.total || '0.00',
+        vat: quote.vat || quote.vatAmount || '0.00',
+        notes: quote.notes || '',
+        termsAndConditions: quote.termsAndConditions || quote.terms_and_conditions || '',
+        validUntil: tokenRecord.expires_at,
+        status: tokenRecord.action
+      });
+    } catch (error: any) {
+      console.error('Error fetching quote by token:', error);
+      res.status(500).json({ error: 'Failed to load quote details' });
+    }
+  });
+
+  // POST /api/quotes/accept/:token - Marks quote accepted
+  app.post("/api/quotes/accept/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+
+      // Look up token
+      const tokenResult = await pool.query(
+        'SELECT * FROM quote_tokens WHERE token = $1',
+        [token]
+      );
+
+      if (tokenResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Invalid or expired link' });
+      }
+
+      const tokenRecord = tokenResult.rows[0];
+
+      if (new Date(tokenRecord.expires_at) < new Date()) {
+        return res.status(410).json({ error: 'This link has expired' });
+      }
+
+      if (tokenRecord.used) {
+        return res.status(400).json({ error: 'This quote has already been actioned' });
+      }
+
+      // Mark token as used + accepted
+      await pool.query(
+        'UPDATE quote_tokens SET used = TRUE, action = $1 WHERE token = $2',
+        ['accepted', token]
+      );
+
+      // Update quote status
+      await pool.query(
+        'UPDATE quotes SET status = $1 WHERE id = $2',
+        ['accepted', tokenRecord.quote_id]
+      );
+
+      // Update associated job status to quote_accepted if one exists
+      await pool.query(
+        `UPDATE jobs SET status = 'quote_accepted' WHERE id = (
+          SELECT "jobId" FROM quotes WHERE id = $1
+         ) OR id = (
+          SELECT job_id FROM quotes WHERE id = $1
+         )`,
+        [tokenRecord.quote_id]
+      );
+
+      // Update enquiry status if linked
+      try {
+        await pool.query(
+          `UPDATE enquiries SET status = 'quote_accepted' WHERE id = (
+            SELECT e.id FROM enquiries e
+            WHERE e.client_id = (SELECT "customerId" FROM quotes WHERE id = $1)
+            AND e.status IN ('quote_sent', 'new')
+            ORDER BY e.created_at DESC LIMIT 1
+          )`,
+          [tokenRecord.quote_id]
+        );
+      } catch (eqErr) {
+        console.error('Failed to update enquiry on quote accept:', eqErr);
+      }
+
+      res.json({ success: true, message: 'Quote accepted successfully! We will be in touch shortly to schedule the work.' });
+    } catch (error: any) {
+      console.error('Error accepting quote:', error);
+      res.status(500).json({ error: 'Failed to accept quote' });
+    }
+  });
+
+  // POST /api/quotes/reject/:token - Marks quote rejected with feedback
+  app.post("/api/quotes/reject/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { feedback } = req.body;
+
+      // Look up token
+      const tokenResult = await pool.query(
+        'SELECT * FROM quote_tokens WHERE token = $1',
+        [token]
+      );
+
+      if (tokenResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Invalid or expired link' });
+      }
+
+      const tokenRecord = tokenResult.rows[0];
+
+      if (new Date(tokenRecord.expires_at) < new Date()) {
+        return res.status(410).json({ error: 'This link has expired' });
+      }
+
+      if (tokenRecord.used) {
+        return res.status(400).json({ error: 'This quote has already been actioned' });
+      }
+
+      // Mark token as used + rejected
+      await pool.query(
+        'UPDATE quote_tokens SET used = TRUE, action = $1, feedback = $2 WHERE token = $3',
+        ['rejected', feedback || null, token]
+      );
+
+      // Update quote status
+      await pool.query(
+        'UPDATE quotes SET status = $1 WHERE id = $2',
+        ['changes_requested', tokenRecord.quote_id]
+      );
+
+      res.json({ success: true, message: 'Thank you for your feedback. We will review and get back to you.' });
+    } catch (error: any) {
+      console.error('Error rejecting quote:', error);
+      res.status(500).json({ error: 'Failed to submit feedback' });
     }
   });
 
@@ -3067,6 +3342,64 @@ export async function registerRoutes(
       res.json(invoice);
     } catch (error) {
       res.status(500).json({ error: "Failed to create invoice from job" });
+    }
+  });
+
+  // POST /api/jobs/:id/generate-invoice - Generate invoice from associated quote line items
+  app.post("/api/jobs/:id/generate-invoice", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const job = await storage.getJob(id);
+      if (!job) {
+        return res.status(404).json({ error: 'Job not found' });
+      }
+
+      // Find the associated quote for this job
+      const quoteResult = await pool.query(
+        'SELECT * FROM quotes WHERE "jobId" = $1 OR job_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [id]
+      );
+
+      if (quoteResult.rows.length === 0) {
+        return res.status(404).json({ error: 'No quote found for this job. Cannot generate invoice.' });
+      }
+
+      const quote = quoteResult.rows[0];
+      const lineItems = quote.lineItems || quote.line_items || [];
+      const subtotal = Number(quote.subtotal) || Number(quote.total) || 0;
+      const vatAmount = Number(quote.vat) || Number(quote.vatAmount) || 0;
+      const total = Number(quote.total) || Number(quote.amount) || 0;
+
+      const invoiceNo = await storage.getNextInvoiceNumber();
+      const accessToken = crypto.randomUUID();
+      const settings = await storage.getCompanySettings();
+
+      const invoice = await storage.createInvoice({
+        invoiceNo,
+        jobId: job.id,
+        customerName: job.customerName,
+        customerEmail: job.contactEmail || undefined,
+        customerPhone: job.contactPhone || undefined,
+        siteAddress: job.address || undefined,
+        sitePostcode: job.postcode || undefined,
+        lineItems,
+        subtotal,
+        vatRate: settings?.defaultVatRate || 20,
+        vatAmount,
+        total,
+        notes: `Generated from Quote ${quote.quoteNo || quote.quote_no || quote.id}`,
+        accessToken,
+        createdById: req.session.userId,
+        dueDate: new Date(Date.now() + (settings?.defaultPaymentTerms || 30) * 24 * 60 * 60 * 1000),
+      });
+
+      // Update job status to 'invoiced'
+      await storage.updateJob(id, { status: 'invoiced' });
+
+      res.json(invoice);
+    } catch (error: any) {
+      console.error('Failed to generate invoice from quote:', error);
+      res.status(500).json({ error: 'Failed to generate invoice' });
     }
   });
 

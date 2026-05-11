@@ -143,6 +143,10 @@ export default function JobDetail() {
   const [updateNotes, setUpdateNotes] = useState('');
   const [isSubmittingUpdate, setIsSubmittingUpdate] = useState(false);
 
+  // Schedule work state
+  const [scheduleDuration, setScheduleDuration] = useState('');
+  const [scheduleNotes, setScheduleNotes] = useState('');
+
   const jobId = params?.id;
   const job = jobId ? getJob(jobId) : undefined;
 
@@ -214,6 +218,36 @@ export default function JobDetail() {
       }
       toast({ title: 'Cannot complete job', description: err.error || err.message || 'Something went wrong', variant: 'destructive' });
     },
+  });
+
+  // Schedule work mutation
+  const scheduleWorkMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/jobs/${jobId}/schedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          assignedTo: job?.assignedToId || null,
+          startDate: formData.date || null,
+          duration: scheduleDuration ? parseInt(scheduleDuration) : null,
+          notes: scheduleNotes || null,
+          session: formData.session || 'AM'
+        })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(data.error || 'Failed to schedule work');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      refreshJobs();
+      toast({ title: 'Work Scheduled', description: 'Job has been scheduled successfully.' });
+    },
+    onError: (err: any) => {
+      toast({ title: 'Schedule Failed', description: err.message || 'Could not schedule the work', variant: 'destructive' });
+    }
   });
 
   // Fetch engineers
@@ -511,6 +545,27 @@ export default function JobDetail() {
     completeJobMutation.mutate({ override: true, overrideReason: reason });
   };
 
+  const handleGenerateInvoice = async () => {
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/generate-invoice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: 'Failed to generate invoice' }));
+        toast({ title: 'Error', description: data.error || 'Failed to generate invoice', variant: 'destructive' });
+        return;
+      }
+      const invoice = await res.json();
+      toast({ title: 'Invoice Generated', description: `Invoice ${invoice.invoiceNo} created successfully.` });
+      refreshJobs();
+      navigate(`/invoices/${invoice.id}`);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to generate invoice', variant: 'destructive' });
+    }
+  };
+
   // Loading state
   if (!job) {
     if (isLoading || (!jobNotFound && jobId)) {
@@ -599,6 +654,11 @@ export default function JobDetail() {
                 <Button variant="outline" size="sm" onClick={() => window.print()}>
                   <Printer className="h-4 w-4 mr-1" /> Print
                 </Button>
+                {(job.status === 'Signed Off' || job.status === 'Completed' || job.status === 'complete') && (
+                  <Button size="sm" variant="outline" className="border-green-300 text-green-700 hover:bg-green-50" onClick={handleGenerateInvoice}>
+                    <FileText className="h-4 w-4 mr-1" /> Generate Invoice
+                  </Button>
+                )}
                 <Button size="sm" onClick={handleSave} disabled={saving || !hasUnsavedChanges}>
                   {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
                   Save
@@ -712,11 +772,31 @@ export default function JobDetail() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label>Duration (days)</Label>
+              <Input type="number" min="1" placeholder="e.g. 3" value={scheduleDuration} onChange={e => setScheduleDuration(e.target.value)} />
+            </div>
+            <div>
+              <Label>Schedule Notes</Label>
+              <Textarea placeholder="Any notes about scheduling, access requirements, etc." value={scheduleNotes} onChange={e => setScheduleNotes(e.target.value)} className="min-h-[80px]" />
+            </div>
             {job.createdAt && (
               <div className="pt-4 border-t space-y-2">
                 <p className="text-sm"><span className="text-muted-foreground">Created:</span> {format(new Date(job.createdAt), 'dd MMM yyyy HH:mm')}</p>
                 {job.updatedAt && <p className="text-sm"><span className="text-muted-foreground">Last updated:</span> {format(new Date(job.updatedAt), 'dd MMM yyyy HH:mm')}</p>}
                 {job.signOffTimestamp && <p className="text-sm"><span className="text-muted-foreground">Signed off:</span> {format(new Date(job.signOffTimestamp), 'dd MMM yyyy HH:mm')}</p>}
+              </div>
+            )}
+            {isAdmin && (
+              <div className="pt-4 border-t">
+                <Button
+                  onClick={() => scheduleWorkMutation.mutate()}
+                  disabled={scheduleWorkMutation.isPending || !formData.date}
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                >
+                  {scheduleWorkMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Calendar className="h-4 w-4 mr-1" />}
+                  Confirm Schedule
+                </Button>
               </div>
             )}
           </CardContent>
