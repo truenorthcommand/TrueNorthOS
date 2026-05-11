@@ -1561,8 +1561,6 @@ export const insertMerchantEarningSchema = createInsertSchema(merchantEarnings).
 export type InsertMerchantEarning = z.infer<typeof insertMerchantEarningSchema>;
 export type MerchantEarning = typeof merchantEarnings.$inferSelect;
 
-// Export OAuth sessions table from auth module
-export * from "./models/auth";
 
 // ===== FORMS SYSTEM =====
 
