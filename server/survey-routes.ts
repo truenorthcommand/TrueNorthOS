@@ -218,17 +218,17 @@ router.get('/:id', async (req: Request, res: Response) => {
 router.post('/', async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
-    const { client_id, property_id, survey_type, enquiry_id } = req.body;
+    const { client_id, property_id, survey_type } = req.body;
 
     if (!client_id) {
       return res.status(400).json({ error: 'client_id is required' });
     }
 
     const result = await pool.query(`
-      INSERT INTO surveys (client_id, property_id, surveyor_id, survey_type, status, enquiry_id)
-      VALUES ($1, $2, $3, $4, 'draft', $5)
+      INSERT INTO surveys (client_id, property_id, surveyor_id, survey_type, status)
+      VALUES ($1, $2, $3, $4, 'draft')
       RETURNING *
-    `, [client_id, property_id || null, user.id, survey_type || 'custom', enquiry_id || null]);
+    `, [client_id, property_id || null, user.id, survey_type || 'custom']);
 
     const survey = result.rows[0];
 
@@ -297,17 +297,6 @@ router.patch('/:id', async (req: Request, res: Response) => {
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Survey not found' });
-    }
-
-    // === AUTOMATION: Update linked enquiry when survey completes ===
-    if (req.body.status === 'complete') {
-      const survey = result.rows[0];
-      if (survey.enquiry_id) {
-        await pool.query(
-          `UPDATE enquiries SET status = 'survey_complete', updated_at = NOW() WHERE id = $1`,
-          [survey.enquiry_id]
-        );
-      }
     }
 
     res.json(result.rows[0]);

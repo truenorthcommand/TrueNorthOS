@@ -34,7 +34,6 @@ import gpsRoutes from "./gps-routes";
 import workflowRoutes from "./workflow-routes";
 import { startWorkflowWorker } from "./workflow-worker";
 import surveyRoutes from "./survey-routes";
-import enquiryRoutes from "./enquiry-routes";
 import jobPhasesRoutes from "./job-phases-routes";
 import signoffRoutes from "./signoff-routes";
 import bookingRoutes from "./booking-routes";
@@ -2340,22 +2339,6 @@ export async function registerRoutes(
         linkUrl: `/app/quotes`,
       });
 
-      // === AUTOMATION: Update linked enquiry to 'won' ===
-      try {
-        await pool.query(
-          `UPDATE enquiries SET status = 'won', updated_at = NOW() WHERE id IN (
-            SELECT e.id FROM enquiries e
-            LEFT JOIN surveys s ON s.enquiry_id = e.id
-            WHERE e.client_id = (SELECT "customerId" FROM quotes WHERE id = $1)
-            AND e.status IN ('quote_sent', 'survey_complete', 'new')
-            ORDER BY e.created_at DESC LIMIT 1
-          )`,
-          [quote.id]
-        );
-      } catch (eqErr) {
-        console.error('Failed to update enquiry status on quote accept:', eqErr);
-      }
-
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to accept quote" });
@@ -2386,21 +2369,6 @@ export async function registerRoutes(
         timestamp: new Date().toISOString(),
         linkUrl: `/app/quotes`,
       });
-
-      // === AUTOMATION: Update linked enquiry status ===
-      try {
-        await pool.query(
-          `UPDATE enquiries SET status = 'lost', lost_reason = $1, updated_at = NOW() WHERE id IN (
-            SELECT e.id FROM enquiries e
-            WHERE e.client_id = (SELECT "customerId" FROM quotes WHERE id = $2)
-            AND e.status IN ('quote_sent', 'survey_complete', 'new')
-            ORDER BY e.created_at DESC LIMIT 1
-          )`,
-          [reason || 'Quote declined', quote.id]
-        );
-      } catch (eqErr) {
-        console.error('Failed to update enquiry status on quote decline:', eqErr);
-      }
 
       res.json(updated);
     } catch (error) {
@@ -2571,21 +2539,6 @@ export async function registerRoutes(
          )`,
         [tokenRecord.quote_id]
       );
-
-      // Update enquiry status if linked
-      try {
-        await pool.query(
-          `UPDATE enquiries SET status = 'quote_accepted' WHERE id = (
-            SELECT e.id FROM enquiries e
-            WHERE e.client_id = (SELECT "customerId" FROM quotes WHERE id = $1)
-            AND e.status IN ('quote_sent', 'new')
-            ORDER BY e.created_at DESC LIMIT 1
-          )`,
-          [tokenRecord.quote_id]
-        );
-      } catch (eqErr) {
-        console.error('Failed to update enquiry on quote accept:', eqErr);
-      }
 
       res.json({ success: true, message: 'Quote accepted successfully! We will be in touch shortly to schedule the work.' });
     } catch (error: any) {
@@ -7255,12 +7208,6 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
                 [paidInvoice.jobId]
               );
 
-              // Update linked enquiry to final state
-              await pool.query(
-                `UPDATE enquiries SET status = 'won', updated_at = NOW()
-                 WHERE id IN (SELECT enquiry_id FROM jobs WHERE id = $1 AND enquiry_id IS NOT NULL)`,
-                [paidInvoice.jobId]
-              );
             }
 
             // Send payment confirmation notification
@@ -7331,7 +7278,6 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
   // Surveyor Portal
   app.use('/api/surveys', populateUserMiddleware, surveyRoutes);
-  app.use('/api/enquiries', populateUserMiddleware, enquiryRoutes);
   app.use('/api/jobs', populateUserMiddleware, jobPhasesRoutes);
   app.use('/api/jobs', populateUserMiddleware, signoffRoutes);
 

@@ -104,9 +104,6 @@ import AdminBlog from "@/pages/admin-blog";
 import PropertyIntelligence from "@/pages/property-intelligence";
 import Surveys from "@/pages/surveys";
 import SurveyWizard from "@/pages/survey-wizard";
-import Enquiries from "@/pages/enquiries";
-import CreateEnquiry from "@/pages/create-enquiry";
-import EnquiryDetail from "@/pages/enquiry-detail";
 import AdminFeedback from "@/pages/admin-feedback";
 import Bookings from "@/pages/bookings";
 import CreateBooking from "@/pages/create-booking";
@@ -187,9 +184,6 @@ function AppRoutes() {
         <Route path="/surveys" component={Surveys} />
         <Route path="/surveys/new" component={SurveyWizard} />
         <Route path="/surveys/:id" component={SurveyWizard} />
-        <Route path="/enquiries" component={Enquiries} />
-        <Route path="/enquiries/new" component={CreateEnquiry} />
-        <Route path="/enquiries/:id" component={EnquiryDetail} />
         <Route path="/bookings" component={Bookings} />
         <Route path="/bookings/new" component={CreateBooking} />
         <Route path="/bookings/:id" component={Bookings} />
