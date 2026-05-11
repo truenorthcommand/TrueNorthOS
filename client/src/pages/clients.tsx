@@ -115,7 +115,7 @@ export default function Clients() {
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedContactId, setSelectedContactId] = useState("");
   const [selectedEngineerIds, setSelectedEngineerIds] = useState<string[]>([]);
-  const [engineers, setEngineers] = useState<{id: string; name: string}[]>([]);
+  const [engineers, setEngineers] = useState<{id: string; name: string; role?: string}[]>([]);
   const [jobForm, setJobForm] = useState({
     nickname: "",
     description: "",
@@ -532,8 +532,8 @@ export default function Clients() {
         .then(res => res.json())
         .then(data => {
           const engineerList = data
-            .filter((u: any) => u.role === 'engineer')
-            .map((u: any) => ({ id: u.id, name: u.name }));
+            .filter((u: any) => ['engineer', 'surveyor', 'works_manager', 'admin'].includes(u.role))
+            .map((u: any) => ({ id: u.id, name: u.name, role: u.role }));
           setEngineers(engineerList);
         })
         .catch(() => {});
@@ -1363,7 +1363,7 @@ export default function Clients() {
                   </div>
                   <div>
                     <p className="font-medium">Save as Ready</p>
-                    <p className="text-sm text-muted-foreground">Save the job without assigning an engineer. You can assign engineers later.</p>
+                    <p className="text-sm text-muted-foreground">Save the job without assigning staff. You can assign staff later.</p>
                   </div>
                 </div>
               </div>
@@ -1384,8 +1384,8 @@ export default function Clients() {
                     {assignOption === 'assign' && <Check className="h-3 w-3 text-white" />}
                   </div>
                   <div>
-                    <p className="font-medium">Assign Engineer & Send</p>
-                    <p className="text-sm text-muted-foreground">Select engineers and send the job sheet to them immediately.</p>
+                    <p className="font-medium">Assign Staff & Send</p>
+                    <p className="text-sm text-muted-foreground">Select staff and send the job sheet to them immediately.</p>
                   </div>
                 </div>
               </div>
@@ -1394,7 +1394,7 @@ export default function Clients() {
             {assignOption === 'assign' && hasRole(user, 'admin') && engineers.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label>Select Engineers</Label>
+                  <Label>Select Staff {jobForm.visitType === 'survey' ? '(Surveyors)' : jobForm.visitType === 'job' ? '(Engineers)' : jobForm.visitType === 'snagging' || jobForm.visitType === 'inspection' ? '(Works Managers)' : ''}</Label>
                   <Button
                     type="button"
                     variant="outline"
@@ -1411,7 +1411,19 @@ export default function Clients() {
                   className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto"
                   data-testid="engineer-checkbox-list"
                 >
-                  {engineers.map((eng) => (
+                  {engineers
+                    .filter((eng) => {
+                      if (!eng.role) return true;
+                      switch (jobForm.visitType) {
+                        case 'survey': return eng.role === 'surveyor' || eng.role === 'admin';
+                        case 'job': return eng.role === 'engineer' || eng.role === 'admin';
+                        case 'snagging': return eng.role === 'works_manager' || eng.role === 'admin';
+                        case 'inspection': return eng.role === 'works_manager' || eng.role === 'admin';
+                        case 'follow_up': return eng.role === 'engineer' || eng.role === 'admin';
+                        default: return true;
+                      }
+                    })
+                    .map((eng) => (
                     <div key={eng.id} className="flex items-center space-x-2">
                       <Checkbox
                         id={`eng-${eng.id}`}
@@ -1429,7 +1441,7 @@ export default function Clients() {
                         htmlFor={`eng-${eng.id}`} 
                         className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                       >
-                        {eng.name}
+                        {eng.name} <span className="text-xs text-muted-foreground capitalize">({eng.role?.replace('_', ' ')})</span>
                       </label>
                     </div>
                   ))}
