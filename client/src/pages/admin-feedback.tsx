@@ -91,16 +91,24 @@ export default function AdminFeedback() {
   // Fetch feedback list
   const { data: feedbackList, isLoading } = useQuery<any[]>({
     queryKey: ["/api/feedback", queryString],
-    queryFn: () =>
-      fetch(`/api/feedback${queryString ? `?${queryString}` : ""}`, {
+    queryFn: async () => {
+      const r = await fetch(`/api/feedback${queryString ? `?${queryString}` : ""}`, {
         credentials: "include",
-      }).then((r) => r.json()),
+      });
+      if (!r.ok) throw new Error('Failed to fetch feedback');
+      const data = await r.json();
+      return Array.isArray(data) ? data : [];
+    },
   });
 
   // Fetch stats
   const { data: stats } = useQuery<any>({
     queryKey: ["/api/feedback/stats"],
-    queryFn: () => fetch("/api/feedback/stats", { credentials: "include" }).then((r) => r.json()),
+    queryFn: async () => {
+      const r = await fetch("/api/feedback/stats", { credentials: "include" });
+      if (!r.ok) throw new Error('Failed to fetch stats');
+      return r.json();
+    },
   });
 
   // Update mutation
