@@ -5,9 +5,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   ClipboardCheck, Plus, MapPin, User, Camera, Wrench,
-  Home, Calendar, Loader2, FileText, ArrowRight
+  Home, Calendar, Loader2, FileText, ArrowRight, Sparkles
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -53,6 +55,8 @@ const SURVEY_TYPE_STYLES: Record<string, { icon: string; label: string; color: s
 
 export default function Surveys() {
   const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const [generatingSurveyId, setGeneratingSurveyId] = useState<string | null>(null);
 
   const { data: surveys = [], isLoading } = useQuery<Survey[]>({
     queryKey: ['/api/surveys'],
@@ -70,6 +74,42 @@ export default function Surveys() {
     inProgress: surveys.filter(s => s.status === 'in_progress').length,
     complete: surveys.filter(s => s.status === 'complete').length,
     converted: surveys.filter(s => s.status === 'converted').length,
+  };
+
+  const handleGenerateQuote = async (surveyId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (generatingSurveyId) return;
+    
+    setGeneratingSurveyId(surveyId);
+    try {
+      const res = await fetch(`/api/surveys/${surveyId}/generate-quote`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to generate quote');
+      }
+      
+      const data = await res.json();
+      toast({
+        title: 'Quote Generated',
+        description: `Quote ${data.quote_no} created successfully`,
+      });
+      
+      // Navigate to the new quote
+      navigate(`/quotes/${data.quote_id}`);
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to generate quote from survey',
+        variant: 'destructive',
+      });
+    } finally {
+      setGeneratingSurveyId(null);
+    }
   };
 
   if (isLoading) {
@@ -216,9 +256,14 @@ export default function Surveys() {
                           size="sm"
                           variant="outline"
                           className="text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                          onClick={(e) => { e.stopPropagation(); navigate(`/quotes/new?from_survey=${survey.id}`); }}
+                          onClick={(e) => handleGenerateQuote(String(survey.id), e)}
+                          disabled={generatingSurveyId === String(survey.id)}
                         >
-                          <FileText className="h-3.5 w-3.5 mr-1" />
+                          {generatingSurveyId === String(survey.id) ? (
+                            <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-3.5 w-3.5 mr-1" />
+                          )}
                           Create Quote
                         </Button>
                       )}
