@@ -4,12 +4,9 @@ import { useTheme } from "@/lib/theme";
 import { hasRole } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { BackButton } from "@/components/back-button";
-import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw, Mic, BookOpen, Mail, LayoutGrid, FolderOpen, Shield, Crown, Link2, Gift, Sparkles, ClipboardList, Sun, Moon, QrCode, Package, Handshake, Bell, Newspaper } from "lucide-react";
+import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw, Mic, BookOpen, Mail, LayoutGrid, FolderOpen, Shield, Crown, Link2, Gift, Sparkles, ClipboardList, Sun, Moon, Package, Handshake, Bell, Newspaper } from "lucide-react";
 import { Brain, Zap, MessageSquarePlus } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Scanner } from "@/components/scanner";
-import { parseTrueNorthCode } from "@/lib/qr-utils";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -35,27 +32,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [expandedSections, setExpandedSections] = useState<MenuSection[]>(['jobs']);
   const { refreshJobs } = useStore();
   const { toast } = useToast();
-  const [adminScanDialogOpen, setAdminScanDialogOpen] = useState(false);
 
-  const handleAdminScanSuccess = (code: string) => {
-    const parsed = parseTrueNorthCode(code);
-    if (parsed) {
-      setAdminScanDialogOpen(false);
-      if (parsed.type === 'job') {
-        toast({ title: "Job Scanned", description: `Navigating to job...` });
-        navigate(`/jobs/${parsed.id}`);
-      } else if (parsed.type === 'client') {
-        toast({ title: "Client Scanned", description: `Navigating to client...` });
-        navigate(`/clients/${parsed.id}`);
-      } else if (parsed.type === 'asset') {
-        toast({ title: "Asset Scanned", description: `Asset ID: ${parsed.id}` });
-      }
-    } else {
-      toast({ title: "Unknown Code", description: code, variant: "default" });
-      setAdminScanDialogOpen(false);
-    }
-  };
-  
   const handleNotification = useCallback((notification: Notification) => {
     if (notification.type === 'urgent_job_assigned' || 
         notification.type === 'job_rescheduled_today' ||
@@ -643,30 +620,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {/* Desktop Header */}
           <header className="sticky top-0 z-30 hidden md:flex h-14 items-center gap-4 px-6 shadow-sm border-b print:hidden bg-card border-border">
             <div className="ml-auto flex items-center gap-3">
-              <Link href="/scan">
-                <button 
-                  className="p-2 text-muted-foreground hover:bg-muted rounded-lg"
-                  data-testid="button-scan-desktop"
-                >
-                  <QrCode className="h-5 w-5" />
-                  <span className="sr-only">Scan QR/Barcode</span>
-                </button>
-              </Link>
-              {hasRole(user, 'admin') && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button 
-                      className="p-2 text-primary hover:bg-primary/10 rounded-lg"
-                      onClick={() => setAdminScanDialogOpen(true)}
-                      data-testid="button-quick-scan-admin-desktop"
-                    >
-                      <Sparkles className="h-5 w-5" />
-                      <span className="sr-only">Quick Scan</span>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>Quick Scan</TooltipContent>
-                </Tooltip>
-              )}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Link href="/notifications">
@@ -734,30 +687,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
             />
 
             <div className="ml-auto flex items-center gap-2">
-              <Link href="/scan">
-                <button 
-                  className="p-2 text-muted-foreground hover:bg-muted rounded-lg"
-                  data-testid="button-scan-mobile"
-                >
-                  <QrCode className="h-5 w-5" />
-                  <span className="sr-only">Scan QR/Barcode</span>
-                </button>
-              </Link>
-              {hasRole(user, 'admin') && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button 
-                      className="p-2 text-primary hover:bg-primary/10 rounded-lg"
-                      onClick={() => setAdminScanDialogOpen(true)}
-                      data-testid="button-quick-scan-admin-mobile"
-                    >
-                      <Sparkles className="h-5 w-5" />
-                      <span className="sr-only">Quick Scan</span>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>Quick Scan</TooltipContent>
-                </Tooltip>
-              )}
               <Link href="/notifications">
                 <button 
                   className="relative p-2 text-muted-foreground hover:bg-muted rounded-lg"
@@ -838,41 +767,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           
           <GlobalAIAssistant />
           
-          {/* Admin Quick Scan Dialog */}
-          <Dialog open={adminScanDialogOpen} onOpenChange={setAdminScanDialogOpen}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Quick Scan</DialogTitle>
-              </DialogHeader>
-              <p className="text-sm text-muted-foreground mb-4">
-                Scan a QR code or barcode to quickly navigate to a job, client, or asset.
-              </p>
-              <Scanner 
-                onScanSuccess={handleAdminScanSuccess}
-                onScanError={(error) => toast({ title: "Scan Error", description: error, variant: "destructive" })}
-              />
-            </DialogContent>
-          </Dialog>
-          
           {/* Floating Buttons - Desktop */}
           <div className="fixed bottom-[9.5rem] right-6 hidden md:flex flex-col gap-3 print:hidden z-40">
-            {hasRole(user, 'admin') && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    className="h-12 w-12 rounded-full shadow-lg bg-primary hover:bg-primary/90 border border-primary flex items-center justify-center"
-                    onClick={() => setAdminScanDialogOpen(true)}
-                    data-testid="button-quick-scan-admin-desktop"
-                  >
-                    <QrCode className="h-5 w-5 text-primary-foreground" />
-                    <span className="sr-only">Quick Scan</span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="left">
-                  <p>Quick Scan</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
             <FeedbackButton />
             <Tooltip>
               <TooltipTrigger asChild>

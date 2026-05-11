@@ -175,7 +175,6 @@ function AppRoutes() {
         <Route path="/quotes/new" component={CreateQuote} />
         <Route path="/quotes/:id" component={QuoteDetail} />
         <Route path="/surveys" component={Surveys} />
-        <Route path="/surveys/new" component={SurveyWizard} />
         <Route path="/surveys/:id" component={SurveyWizard} />
         <Route path="/bookings" component={Bookings} />
         <Route path="/bookings/new" component={CreateBooking} />
