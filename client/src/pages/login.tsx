@@ -231,8 +231,8 @@ export default function Login() {
 
           {/* Powered By footer */}
           <p className="text-center text-xs text-muted-foreground pt-2">
-            Powered by{" "}
-            <span className="font-semibold text-foreground">Adapt Services Group</span>
+            Powered By{" "}
+            <a href="https://truenorthos.co.uk/" target="_blank" rel="noopener noreferrer" className="font-semibold text-foreground hover:underline">TrueNorthOS</a>
           </p>
         </CardContent>
       </Card>
