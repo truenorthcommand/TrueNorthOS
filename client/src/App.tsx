@@ -20,7 +20,7 @@ import EditJob from "@/pages/edit-job";
 import EngineerDashboard from "@/pages/engineer-dashboard";
 import WalkaroundWizard from "@/pages/walkaround-wizard";
 import JobCompleteWizard from "@/pages/job-complete-wizard";
-import QuickExpense from "@/pages/quick-expense";
+import QuickReceipt from "@/pages/quick-receipt";
 import QuickTimesheet from "@/pages/quick-timesheet";
 import SignOff from "@/pages/sign-off";
 import Clients from "@/pages/clients";
@@ -58,7 +58,11 @@ import WalkaroundCheck from "@/pages/walkaround-check";
 import ReportDefect from "@/pages/report-defect";
 import DefectDetail from "@/pages/defect-detail";
 import Timesheets from "@/pages/timesheets";
-import Expenses from "@/pages/expenses";
+import Receipts from "@/pages/receipts";
+import FlaggedReceipts from "@/pages/flagged-receipts";
+import MaterialProfiles from "@/pages/material-profiles";
+import VendorRules from "@/pages/vendor-rules";
+import DeductionLedger from "@/pages/deduction-ledger";
 import Payments from "@/pages/payments";
 import Analytics from "@/pages/analytics";
 import DirectorsSuite from "@/pages/directors-suite";
@@ -136,7 +140,7 @@ function AppRoutes() {
         <Route path="/" component={Dashboard} />
         <Route path="/my-day" component={EngineerDashboard} />
         <Route path="/walkaround" component={WalkaroundWizard} />
-        <Route path="/expense/new" component={QuickExpense} />
+        <Route path="/receipt/new" component={QuickReceipt} />
         <Route path="/timesheet" component={QuickTimesheet} />
         <Route path="/jobs" component={Jobs} />
         <Route path="/jobs/new" component={CreateJob} />
@@ -158,7 +162,11 @@ function AppRoutes() {
         <Route path="/today" component={Today} />
         <Route path="/time-logs" component={TimeLogs} />
         <Route path="/timesheets" component={Timesheets} />
-        <Route path="/expenses" component={Expenses} />
+        <Route path="/receipts" component={Receipts} />
+        <Route path="/flagged-receipts" component={FlaggedReceipts} />
+        <Route path="/material-profiles" component={MaterialProfiles} />
+        <Route path="/vendor-rules" component={VendorRules} />
+        <Route path="/deduction-ledger" component={DeductionLedger} />
         <Route path="/payments" component={Payments} />
         <Route path="/analytics" component={Analytics} />
         <Route path="/directors" component={DirectorsSuite} />

@@ -98,7 +98,7 @@ const slides = [
           <div className="bg-white/10 backdrop-blur rounded-xl p-5 border border-white/20 flex flex-col">
             <Calculator className="w-10 h-10 text-green-300 mb-3" />
             <h3 className="font-bold text-white mb-2">Finance</h3>
-            <p className="text-sm text-blue-100 flex-1">Invoices that chase themselves. Timesheets that submit themselves. Expenses with photo receipts.</p>
+            <p className="text-sm text-blue-100 flex-1">Invoices that chase themselves. Timesheets that submit themselves. Receipts with photo capture.</p>
           </div>
           <div className="bg-white/10 backdrop-blur rounded-xl p-5 border border-white/20 flex flex-col">
             <Truck className="w-10 h-10 text-orange-300 mb-3" />
@@ -224,7 +224,7 @@ const slides = [
                 <span className="font-bold text-blue-600">5 hrs</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-700">Timesheets & expenses</span>
+                <span className="text-gray-700">Timesheets & receipts</span>
                 <span className="font-bold text-blue-600">8 hrs</span>
               </div>
             </div>

@@ -23,14 +23,14 @@ type AnalyticsData = {
   summary: {
     totalRevenue: number;
     totalCompletedJobs: number;
-    pendingExpenses: number;
+    pendingReceipts: number;
     activeEngineers: number;
   };
   monthlyRevenue: { month: string; revenue: number }[];
   jobsByMonth: { month: string; completed: number }[];
   jobsByStatus: { name: string; value: number; fill: string }[];
-  monthlyExpenses: { month: string; amount: number }[];
-  expensesByCategory: { category: string; amount: number }[];
+  monthlyReceipts: { month: string; amount: number }[];
+  receiptsByCategory: { category: string; amount: number }[];
   teamPerformance: {
     id: string;
     name: string;
@@ -40,7 +40,7 @@ type AnalyticsData = {
   }[];
 };
 
-const EXPENSE_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+const RECEIPT_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
 export default function Analytics() {
   const { data, isLoading, error } = useQuery<AnalyticsData>({
@@ -109,15 +109,15 @@ export default function Analytics() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-pending-expenses">
+        <Card data-testid="card-pending-receipts">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-amber-500 rounded-lg">
                 <Receipt className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{formatCurrency(data.summary.pendingExpenses)}</p>
-                <p className="text-xs text-muted-foreground">Pending Expenses</p>
+                <p className="text-2xl font-bold">{formatCurrency(data.summary.pendingReceipts)}</p>
+                <p className="text-xs text-muted-foreground">Pending Receipts</p>
               </div>
             </div>
           </CardContent>
@@ -258,19 +258,19 @@ export default function Analytics() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-expenses-category-chart">
+        <Card data-testid="card-receipts-category-chart">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingDown className="h-5 w-5 text-red-500" />
-              Expenses by Category
+              Receipts by Category
             </CardTitle>
-            <CardDescription>Total expenses breakdown by category</CardDescription>
+            <CardDescription>Total receipts breakdown by category</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              {data.expensesByCategory.length > 0 ? (
+              {data.receiptsByCategory.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.expensesByCategory} layout="vertical">
+                  <BarChart data={data.receiptsByCategory} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis 
                       type="number" 
@@ -283,15 +283,15 @@ export default function Analytics() {
                       labelClassName="font-medium"
                     />
                     <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
-                      {data.expensesByCategory.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={EXPENSE_COLORS[index % EXPENSE_COLORS.length]} />
+                      {data.receiptsByCategory.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={RECEIPT_COLORS[index % RECEIPT_COLORS.length]} />
                       ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="h-full flex items-center justify-center text-muted-foreground">
-                  No expense data available
+                  No receipt data available
                 </div>
               )}
             </div>

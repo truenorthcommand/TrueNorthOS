@@ -27,7 +27,7 @@ const MODULE_OPTIONS = [
   { value: 'quotes', label: 'Quotes' },
   { value: 'invoices', label: 'Invoices' },
   { value: 'clients', label: 'Clients' },
-  { value: 'expenses', label: 'Expenses' },
+  { value: 'receipts', label: 'Receipts' },
   { value: 'timesheets', label: 'Timesheets' },
   { value: 'fleet', label: 'Fleet' },
   { value: 'general', label: 'General' },

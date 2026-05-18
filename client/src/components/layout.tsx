@@ -4,7 +4,7 @@ import { useTheme } from "@/lib/theme";
 import { hasRole } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { BackButton } from "@/components/back-button";
-import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw, Mic, BookOpen, Mail, LayoutGrid, FolderOpen, Shield, Crown, Link2, Gift, Sparkles, ClipboardList, Sun, Moon, Package, Handshake, Bell, Newspaper } from "lucide-react";
+import { LogOut, LayoutDashboard, User as UserIcon, Menu, Building2 as Building2Icon, CheckCircle2, Users, Calendar, MapPin, Bot, Clock, FileText, Receipt, Settings, ChevronDown, ChevronLeft, ChevronRight, Briefcase, BarChart3, Wrench, MessageCircle, Truck, ClipboardCheck, AlertTriangle, Wallet, Timer, CreditCard, PieChart, WifiOff, RefreshCw, Mic, BookOpen, Mail, LayoutGrid, FolderOpen, Shield, ShieldCheck, Crown, Link2, Gift, Sparkles, ClipboardList, Sun, Moon, Package, Handshake, Bell, Newspaper } from "lucide-react";
 import { Brain, Zap, MessageSquarePlus } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
@@ -399,9 +399,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* Finance Section */}
         <MenuGroup title="Finance" icon={Wallet} section="finance">
           <NavLink href="/timesheets" icon={Timer}>Timesheets</NavLink>
-          <NavLink href="/expenses" icon={Receipt}>Expenses</NavLink>
+          <NavLink href="/receipts" icon={Receipt}>Receipts</NavLink>
           {hasRole(user, 'admin') && (
             <>
+              <NavLink href="/flagged-receipts" icon={AlertTriangle}>Flagged Receipts</NavLink>
+              <NavLink href="/deduction-ledger" icon={FileText}>Deductions</NavLink>
+              <NavLink href="/material-profiles" icon={Package}>Material Profiles</NavLink>
+              <NavLink href="/vendor-rules" icon={ShieldCheck}>Vendor Rules</NavLink>
               <NavLink href="/payments" icon={CreditCard}>Payments</NavLink>
               <NavLink href="/analytics" icon={PieChart}>Analytics</NavLink>
               {(user?.superAdmin || user?.hasDirectorsSuite) && (

@@ -33,7 +33,7 @@ All plans include: Secure UK cloud hosting, SSL encryption, GDPR compliance, two
 
 CORE MODULES:
 1. Operations — Job management, scheduling, quoting, invoicing, client portal
-2. Finance — Invoicing, expense tracking, payment processing (Stripe), VAT calculations
+2. Finance — Invoicing, receipt compliance, payment processing (Stripe), VAT calculations
 3. Fleet — Vehicle management, walkaround checks, defect tracking, mileage logging (HMRC rates)
 4. Workforce — Engineer management, skills tracking, timesheets, clock in/out with GPS
 5. Quality Control — Job sign-off with photos, signatures, geolocation verification

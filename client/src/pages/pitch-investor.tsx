@@ -39,7 +39,7 @@ const slides = [
               </div>
               <div>
                 <h3 className="font-semibold text-lg">Paper-Based Chaos</h3>
-                <p className="text-gray-600">Job sheets, timesheets, and expenses still on paper. Lost documents cost £5k+ annually.</p>
+                <p className="text-gray-600">Job sheets, timesheets, and receipts still on paper. Lost documents cost £5k+ annually.</p>
               </div>
             </div>
             <div className="flex items-start gap-4">
@@ -117,7 +117,7 @@ const slides = [
               <DollarSign className="w-6 h-6 text-white" />
             </div>
             <h3 className="font-bold text-lg mb-2">Finance</h3>
-            <p className="text-sm text-gray-600 flex-1">Timesheets, expenses, payments with approval workflows</p>
+            <p className="text-sm text-gray-600 flex-1">Timesheets, receipts, payments with approval workflows</p>
           </div>
           <div className="bg-orange-50 rounded-xl p-6 flex flex-col">
             <div className="w-12 h-12 bg-orange-600 rounded-lg flex items-center justify-center mb-4">

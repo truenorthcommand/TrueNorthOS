@@ -315,8 +315,8 @@ function AdminDashboard() {
     queryKey: ["/api/timesheets/pending"],
   });
 
-  const { data: pendingExpenses = [] } = useQuery<any[]>({
-    queryKey: ["/api/expenses/pending"],
+  const { data: pendingReceipts = [] } = useQuery<any[]>({
+    queryKey: ["/api/receipts/pending"],
   });
 
   const activeJobs = jobs.filter(j => j.status === "In Progress" || j.status === "Draft" || j.status === "Ready");
@@ -522,17 +522,17 @@ function AdminDashboard() {
                 </div>
               )}
 
-              {pendingExpenses.length > 0 && (
+              {pendingReceipts.length > 0 && (
                 <div 
                   className="flex items-center justify-between p-3 rounded-lg bg-purple-50 dark:bg-purple-950/30 cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
-                  onClick={() => setLocation("/expenses")}
-                  data-testid="pending-expenses"
+                  onClick={() => setLocation("/receipts")}
+                  data-testid="pending-receipts"
                 >
                   <div className="flex items-center gap-3">
                     <Receipt className="h-5 w-5 text-purple-600" />
-                    <span className="font-medium">Expenses to Approve</span>
+                    <span className="font-medium">Receipts to Approve</span>
                   </div>
-                  <Badge variant="secondary">{pendingExpenses.length}</Badge>
+                  <Badge variant="secondary">{pendingReceipts.length}</Badge>
                 </div>
               )}
 
@@ -550,7 +550,7 @@ function AdminDashboard() {
                 </div>
               )}
 
-              {awaitingSignature.length === 0 && pendingTimesheets.length === 0 && pendingExpenses.length === 0 && acceptedQuotes.length === 0 && (
+              {awaitingSignature.length === 0 && pendingTimesheets.length === 0 && pendingReceipts.length === 0 && acceptedQuotes.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <CheckCircle className="h-10 w-10 mx-auto mb-2 opacity-50 text-emerald-500" />
                   <p>All caught up!</p>

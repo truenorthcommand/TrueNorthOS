@@ -34,7 +34,7 @@ interface TeamStats {
   completedThisWeek: number;
   overdueJobs: number;
   pendingTimesheets: number;
-  pendingExpenses: number;
+  pendingReceipts: number;
   totalPendingApprovals: number;
 }
 
@@ -221,7 +221,7 @@ export default function WorksManagerDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{stats?.totalPendingApprovals || 0}</div>
             <p className="text-xs text-muted-foreground">
-              {stats?.pendingTimesheets || 0} timesheets, {stats?.pendingExpenses || 0} expenses
+              {stats?.pendingTimesheets || 0} timesheets, {stats?.pendingReceipts || 0} receipts
             </p>
           </CardContent>
         </Card>
@@ -262,7 +262,7 @@ export default function WorksManagerDashboard() {
                 </div>
                 <h3 className="font-medium">Approvals</h3>
                 <p className="text-sm text-muted-foreground">
-                  {(stats?.pendingTimesheets || 0) + (stats?.pendingExpenses || 0)} pending
+                  {(stats?.pendingTimesheets || 0) + (stats?.pendingReceipts || 0)} pending
                 </p>
               </CardContent>
             </Card>

@@ -213,10 +213,10 @@ export function getPageSuggestions(page: string): string[] {
       "Who has unapproved timesheets?",
       "What's the overtime total?",
     ],
-    expenses: [
-      "Show pending expense claims",
-      "What are this month's expenses?",
-      "Submit a new expense",
+    receipts: [
+      "Show pending receipt claims",
+      "What are this month's receipts?",
+      "Upload a new receipt",
     ],
     fleet: [
       "Which vehicles need inspection?",

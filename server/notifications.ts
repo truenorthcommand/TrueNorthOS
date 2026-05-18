@@ -17,7 +17,7 @@ const clients: NotificationClient[] = [];
 const DEFAULT_NOTIFICATION_PREFERENCES = {
   jobs: { inApp: true, email: true, push: true },
   messages: { inApp: true, email: false, push: true },
-  expenses: { inApp: true, email: true, push: false },
+  receipts: { inApp: true, email: true, push: false },
   fleet: { inApp: true, email: false, push: false },
   system: { inApp: true, email: false, push: false },
 };
@@ -340,7 +340,7 @@ export async function notifyUser(userId: string, notification: {
   urgent?: boolean;
   jobId?: string;
   jobNo?: string;
-  expenseId?: string;
+  receiptId?: string;
   defectId?: string;
   timestamp: string;
   linkUrl?: string;
@@ -354,7 +354,7 @@ export async function notifyUser(userId: string, notification: {
     metadata: { 
       jobId: notification.jobId, 
       jobNo: notification.jobNo, 
-      expenseId: notification.expenseId, 
+      receiptId: notification.receiptId, 
       defectId: notification.defectId 
     },
     linkUrl: notification.linkUrl || (notification.jobId ? `/app/jobs/${notification.jobId}` : undefined),

@@ -25,7 +25,7 @@ import { format, parseISO, isValid, formatDistanceToNow, differenceInDays } from
 
 interface AccountsReceipt {
   id: string;
-  expenseId: string | null;
+  receiptId: string | null;
   uploadedById: string;
   imageUrl: string;
   ocrVendor: string | null;
@@ -508,7 +508,7 @@ export default function AccountsDashboard() {
                   <div className="text-center py-12 text-gray-500">
                     <Receipt className="w-12 h-12 mx-auto mb-3 opacity-50" />
                     <p>No receipts uploaded yet</p>
-                    <p className="text-sm">Staff can upload receipts from the Expenses module</p>
+                    <p className="text-sm">Staff can upload receipts from the Receipts module</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -572,7 +572,7 @@ export default function AccountsDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle>Cost Aggregation</CardTitle>
-                <CardDescription>Automatically pulled from timesheets, expenses, fleet, and jobs</CardDescription>
+                <CardDescription>Automatically pulled from timesheets, receipts, fleet, and jobs</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -594,7 +594,7 @@ export default function AccountsDashboard() {
                     </h3>
                     <div className="p-4 bg-orange-50 rounded-lg">
                       <p className="text-3xl font-bold text-orange-700">{formatCurrency(summary?.vehicleCosts || 0)}</p>
-                      <p className="text-sm text-orange-600 mt-1">Mileage claims & fuel expenses</p>
+                      <p className="text-sm text-orange-600 mt-1">Mileage claims & fuel receipts</p>
                     </div>
                   </div>
 
@@ -628,7 +628,7 @@ export default function AccountsDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold">Fixed Costs</h2>
-                <p className="text-sm text-gray-600">Manage recurring business expenses</p>
+                <p className="text-sm text-gray-600">Manage recurring business receipts</p>
               </div>
               <Dialog open={showFixedCostDialog} onOpenChange={setShowFixedCostDialog}>
                 <DialogTrigger asChild>
@@ -640,7 +640,7 @@ export default function AccountsDashboard() {
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Add Fixed Cost</DialogTitle>
-                    <DialogDescription>Add a recurring business expense</DialogDescription>
+                    <DialogDescription>Add a recurring business receipt</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
@@ -725,7 +725,7 @@ export default function AccountsDashboard() {
                   <div className="text-center py-12 text-gray-500">
                     <Building2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
                     <p>No fixed costs added yet</p>
-                    <p className="text-sm">Add recurring expenses like rent, utilities, insurance</p>
+                    <p className="text-sm">Add recurring receipts like rent, utilities, insurance</p>
                   </div>
                 ) : (
                   <div className="space-y-3">

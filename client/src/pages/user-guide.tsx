@@ -30,7 +30,7 @@ type Message = {
 
 const quickQuestions = [
   "How do I create a new job?",
-  "How do I track expenses?",
+  "How do I manage receipts?",
   "How do I use the AI advisors?",
   "How do vehicle walkaround checks work?",
   "How do I generate an invoice?",
@@ -47,7 +47,7 @@ const moduleGuides = [
   { 
     icon: Calculator, 
     title: "Finance", 
-    description: "Timesheets, expenses, mileage, and payments",
+    description: "Timesheets, receipts, mileage, and payments",
     color: "bg-green-500"
   },
   { 
@@ -189,7 +189,7 @@ export default function UserGuide() {
                       <h3 className="font-semibold text-lg mb-2">How can I help you today?</h3>
                       <p className="text-muted-foreground text-sm mb-6 max-w-md">
                         I'm your guide to TrueNorth OS. Ask me anything about managing jobs, 
-                        tracking expenses, using AI advisors, fleet management, and more.
+                        managing receipts, using AI advisors, fleet management, and more.
                       </p>
                       <div className="flex flex-wrap gap-2 justify-center max-w-lg">
                         {quickQuestions.map((q, i) => (

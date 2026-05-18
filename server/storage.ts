@@ -22,7 +22,12 @@ import {
   type DefectUpdate, type InsertDefectUpdate,
   type WalkaroundCheckWithDetails, type DefectWithDetails, type VehicleWithStats,
   type Timesheet, type InsertTimesheet, type TimesheetWithUser,
-  type Expense, type InsertExpense, type ExpenseWithDetails,
+  type Receipt, type InsertReceipt, type ReceiptWithDetails,
+  type ReceiptLineItem, type InsertReceiptLineItem,
+  type Deduction, type InsertDeduction, type DeductionWithDetails,
+  type MaterialProfile, type InsertMaterialProfile,
+  type VendorRule, type InsertVendorRule,
+  type ArchivedExpense,
   type Payment, type InsertPayment, type PaymentWithInvoice,
   type Skill, type SubSkill, type UserSkill,
   type Inspection, type InsertInspection, type InspectionWithDetails,
@@ -56,7 +61,7 @@ import {
   users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, clientContacts, clientProperties, jobUpdates,
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
-  timesheets, expenses, payments,
+  timesheets, receipts, receiptLineItems, deductions, materialProfiles, vendorRules, archivedExpenses, payments,
   skills, subSkills, userSkills,
   inspections, inspectionItems, snaggingSheets, snagItems,
   accountsReceipts, invoiceChaseLogs, fixedCosts, snippets, files,
@@ -208,13 +213,46 @@ export interface IStorage {
   deleteTimesheet(id: string): Promise<void>;
   getActiveClockIn(userId: string): Promise<Timesheet | undefined>;
   
-  // Expenses
-  getExpense(id: string): Promise<Expense | undefined>;
-  getExpensesByUser(userId: string): Promise<ExpenseWithDetails[]>;
-  getAllExpenses(): Promise<ExpenseWithDetails[]>;
-  createExpense(expense: InsertExpense): Promise<Expense>;
-  updateExpense(id: string, updates: Partial<Expense>): Promise<Expense | undefined>;
-  deleteExpense(id: string): Promise<void>;
+  // Receipts (Company Card Compliance)
+  getReceipt(id: string): Promise<Receipt | undefined>;
+  getReceiptsByUser(userId: string): Promise<ReceiptWithDetails[]>;
+  getAllReceipts(): Promise<ReceiptWithDetails[]>;
+  getFlaggedReceipts(): Promise<ReceiptWithDetails[]>;
+  getReceiptsByJob(jobId: string): Promise<ReceiptWithDetails[]>;
+  createReceipt(receipt: InsertReceipt): Promise<Receipt>;
+  updateReceipt(id: string, updates: Partial<Receipt>): Promise<Receipt | undefined>;
+  deleteReceipt(id: string): Promise<void>;
+  
+  // Receipt Line Items
+  getReceiptLineItems(receiptId: string): Promise<ReceiptLineItem[]>;
+  createReceiptLineItem(item: InsertReceiptLineItem): Promise<ReceiptLineItem>;
+  updateReceiptLineItem(id: string, updates: Partial<ReceiptLineItem>): Promise<ReceiptLineItem | undefined>;
+  
+  // Deductions
+  getDeduction(id: string): Promise<Deduction | undefined>;
+  getDeductionsByUser(userId: string): Promise<DeductionWithDetails[]>;
+  getAllDeductions(): Promise<DeductionWithDetails[]>;
+  createDeduction(deduction: InsertDeduction): Promise<Deduction>;
+  updateDeduction(id: string, updates: Partial<Deduction>): Promise<Deduction | undefined>;
+  
+  // Material Profiles
+  getMaterialProfile(id: string): Promise<MaterialProfile | undefined>;
+  getAllMaterialProfiles(): Promise<MaterialProfile[]>;
+  createMaterialProfile(profile: InsertMaterialProfile): Promise<MaterialProfile>;
+  updateMaterialProfile(id: string, updates: Partial<MaterialProfile>): Promise<MaterialProfile | undefined>;
+  deleteMaterialProfile(id: string): Promise<void>;
+  
+  // Vendor Rules
+  getVendorRule(id: string): Promise<VendorRule | undefined>;
+  getAllVendorRules(): Promise<VendorRule[]>;
+  getVendorRuleByType(vendorType: string): Promise<VendorRule | undefined>;
+  createVendorRule(rule: InsertVendorRule): Promise<VendorRule>;
+  updateVendorRule(id: string, updates: Partial<VendorRule>): Promise<VendorRule | undefined>;
+  deleteVendorRule(id: string): Promise<void>;
+  
+  // Archived Expenses
+  archiveExpenses(): Promise<void>;
+  getArchivedExpenses(): Promise<ArchivedExpense[]>;
   
   // Payments
   getPayment(id: string): Promise<Payment | undefined>;
@@ -251,7 +289,7 @@ export interface IStorage {
   getTeamJobs(managerId: string): Promise<Job[]>;
   updateUserManager(userId: string, managerId: string | null): Promise<User | undefined>;
   getTeamTimesheets(managerId: string): Promise<TimesheetWithUser[]>;
-  getTeamExpenses(managerId: string): Promise<ExpenseWithDetails[]>;
+  getTeamReceipts(managerId: string): Promise<ReceiptWithDetails[]>;
   
   // Inspections
   getInspections(): Promise<Inspection[]>;
@@ -308,7 +346,7 @@ export interface IStorage {
   getAllFiles(): Promise<FileWithRelations[]>;
   getFilesByClient(clientId: string): Promise<FileWithRelations[]>;
   getFilesByJob(jobId: string): Promise<FileWithRelations[]>;
-  getFilesByExpense(expenseId: string): Promise<FileWithRelations[]>;
+  getFilesByReceipt(receiptId: string): Promise<FileWithRelations[]>;
   createFile(data: InsertFile): Promise<FileRecord>;
   updateFile(id: string, data: Partial<FileRecord>): Promise<FileRecord | undefined>;
   deleteFile(id: string): Promise<void>;
@@ -1532,68 +1570,212 @@ export class DatabaseStorage implements IStorage {
     return activeTimesheet;
   }
 
-  // ==================== EXPENSES ====================
+  // ==================== RECEIPTS (Company Card Compliance) ====================
 
-  async getExpense(id: string): Promise<Expense | undefined> {
-    const [expense] = await db.select().from(expenses).where(eq(expenses.id, id));
-    return expense;
+  private async enrichReceipt(receipt: any): Promise<ReceiptWithDetails> {
+    const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, receipt.userId));
+    let reviewedBy = null;
+    if (receipt.reviewedById) {
+      const [reviewer] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, receipt.reviewedById));
+      reviewedBy = reviewer || null;
+    }
+    let job = null;
+    if (receipt.jobId) {
+      const [jobRecord] = await db.select({ id: jobs.id, jobNo: jobs.jobNo, customerName: jobs.customerName }).from(jobs).where(eq(jobs.id, receipt.jobId));
+      job = jobRecord || null;
+    }
+    const lineItems = await db.select().from(receiptLineItems).where(eq(receiptLineItems.receiptId, receipt.id)).orderBy(asc(receiptLineItems.createdAt));
+    const receiptDeductions = await db.select().from(deductions).where(eq(deductions.receiptId, receipt.id)).orderBy(desc(deductions.createdAt));
+    return { ...receipt, user, reviewedBy, job, lineItems, deductions: receiptDeductions };
   }
 
-  async getExpensesByUser(userId: string): Promise<ExpenseWithDetails[]> {
-    const results = await db.select().from(expenses)
-      .where(eq(expenses.userId, userId))
-      .orderBy(desc(expenses.date));
-    
-    return Promise.all(results.map(async (expense) => {
-      const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, expense.userId));
-      let approvedBy = null;
-      if (expense.approvedById) {
-        const [approver] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, expense.approvedById));
-        approvedBy = approver || null;
-      }
-      let job = null;
-      if (expense.jobId) {
-        const [jobRecord] = await db.select({ id: jobs.id, jobNo: jobs.jobNo, customerName: jobs.customerName }).from(jobs).where(eq(jobs.id, expense.jobId));
-        job = jobRecord || null;
-      }
-      return { ...expense, user, approvedBy, job };
-    }));
+  async getReceipt(id: string): Promise<Receipt | undefined> {
+    const [receipt] = await db.select().from(receipts).where(eq(receipts.id, id));
+    return receipt;
   }
 
-  async getAllExpenses(): Promise<ExpenseWithDetails[]> {
-    const results = await db.select().from(expenses).orderBy(desc(expenses.date));
-    
-    return Promise.all(results.map(async (expense) => {
-      const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, expense.userId));
-      let approvedBy = null;
-      if (expense.approvedById) {
-        const [approver] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, expense.approvedById));
-        approvedBy = approver || null;
-      }
-      let job = null;
-      if (expense.jobId) {
-        const [jobRecord] = await db.select({ id: jobs.id, jobNo: jobs.jobNo, customerName: jobs.customerName }).from(jobs).where(eq(jobs.id, expense.jobId));
-        job = jobRecord || null;
-      }
-      return { ...expense, user, approvedBy, job };
-    }));
+  async getReceiptsByUser(userId: string): Promise<ReceiptWithDetails[]> {
+    const results = await db.select().from(receipts)
+      .where(eq(receipts.userId, userId))
+      .orderBy(desc(receipts.date));
+    return Promise.all(results.map(r => this.enrichReceipt(r)));
   }
 
-  async createExpense(expense: InsertExpense): Promise<Expense> {
-    const [created] = await db.insert(expenses).values(expense).returning();
+  async getAllReceipts(): Promise<ReceiptWithDetails[]> {
+    const results = await db.select().from(receipts).orderBy(desc(receipts.date));
+    return Promise.all(results.map(r => this.enrichReceipt(r)));
+  }
+
+  async getFlaggedReceipts(): Promise<ReceiptWithDetails[]> {
+    const results = await db.select().from(receipts)
+      .where(eq(receipts.status, 'flagged'))
+      .orderBy(desc(receipts.date));
+    return Promise.all(results.map(r => this.enrichReceipt(r)));
+  }
+
+  async getReceiptsByJob(jobId: string): Promise<ReceiptWithDetails[]> {
+    const results = await db.select().from(receipts)
+      .where(eq(receipts.jobId, jobId))
+      .orderBy(desc(receipts.date));
+    return Promise.all(results.map(r => this.enrichReceipt(r)));
+  }
+
+  async createReceipt(receipt: InsertReceipt): Promise<Receipt> {
+    const [created] = await db.insert(receipts).values(receipt).returning();
     return created;
   }
 
-  async updateExpense(id: string, updates: Partial<Expense>): Promise<Expense | undefined> {
-    const [updated] = await db.update(expenses)
+  async updateReceipt(id: string, updates: Partial<Receipt>): Promise<Receipt | undefined> {
+    const [updated] = await db.update(receipts)
       .set({ ...updates, updatedAt: new Date() })
-      .where(eq(expenses.id, id))
+      .where(eq(receipts.id, id))
       .returning();
     return updated;
   }
 
-  async deleteExpense(id: string): Promise<void> {
-    await db.delete(expenses).where(eq(expenses.id, id));
+  async deleteReceipt(id: string): Promise<void> {
+    // Delete associated line items and deductions first
+    await db.delete(receiptLineItems).where(eq(receiptLineItems.receiptId, id));
+    await db.delete(deductions).where(eq(deductions.receiptId, id));
+    await db.delete(receipts).where(eq(receipts.id, id));
+  }
+
+  // ==================== RECEIPT LINE ITEMS ====================
+
+  async getReceiptLineItems(receiptId: string): Promise<ReceiptLineItem[]> {
+    return db.select().from(receiptLineItems)
+      .where(eq(receiptLineItems.receiptId, receiptId))
+      .orderBy(asc(receiptLineItems.createdAt));
+  }
+
+  async createReceiptLineItem(item: InsertReceiptLineItem): Promise<ReceiptLineItem> {
+    const [created] = await db.insert(receiptLineItems).values(item).returning();
+    return created;
+  }
+
+  async updateReceiptLineItem(id: string, updates: Partial<ReceiptLineItem>): Promise<ReceiptLineItem | undefined> {
+    const [updated] = await db.update(receiptLineItems)
+      .set(updates)
+      .where(eq(receiptLineItems.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ==================== DEDUCTIONS ====================
+
+  async getDeduction(id: string): Promise<Deduction | undefined> {
+    const [deduction] = await db.select().from(deductions).where(eq(deductions.id, id));
+    return deduction;
+  }
+
+  async getDeductionsByUser(userId: string): Promise<DeductionWithDetails[]> {
+    const results = await db.select().from(deductions)
+      .where(eq(deductions.userId, userId))
+      .orderBy(desc(deductions.createdAt));
+    
+    return Promise.all(results.map(async (deduction) => {
+      const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, deduction.userId));
+      const [receipt] = await db.select({ id: receipts.id, vendorName: receipts.vendorName, date: receipts.date }).from(receipts).where(eq(receipts.id, deduction.receiptId));
+      const [createdBy] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, deduction.createdById));
+      return { ...deduction, user, receipt, createdBy };
+    }));
+  }
+
+  async getAllDeductions(): Promise<DeductionWithDetails[]> {
+    const results = await db.select().from(deductions).orderBy(desc(deductions.createdAt));
+    
+    return Promise.all(results.map(async (deduction) => {
+      const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, deduction.userId));
+      const [receipt] = await db.select({ id: receipts.id, vendorName: receipts.vendorName, date: receipts.date }).from(receipts).where(eq(receipts.id, deduction.receiptId));
+      const [createdBy] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, deduction.createdById));
+      return { ...deduction, user, receipt, createdBy };
+    }));
+  }
+
+  async createDeduction(deduction: InsertDeduction): Promise<Deduction> {
+    const [created] = await db.insert(deductions).values(deduction).returning();
+    return created;
+  }
+
+  async updateDeduction(id: string, updates: Partial<Deduction>): Promise<Deduction | undefined> {
+    const [updated] = await db.update(deductions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(deductions.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ==================== MATERIAL PROFILES ====================
+
+  async getMaterialProfile(id: string): Promise<MaterialProfile | undefined> {
+    const [profile] = await db.select().from(materialProfiles).where(eq(materialProfiles.id, id));
+    return profile;
+  }
+
+  async getAllMaterialProfiles(): Promise<MaterialProfile[]> {
+    return db.select().from(materialProfiles).orderBy(desc(materialProfiles.createdAt));
+  }
+
+  async createMaterialProfile(profile: InsertMaterialProfile): Promise<MaterialProfile> {
+    const [created] = await db.insert(materialProfiles).values(profile).returning();
+    return created;
+  }
+
+  async updateMaterialProfile(id: string, updates: Partial<MaterialProfile>): Promise<MaterialProfile | undefined> {
+    const [updated] = await db.update(materialProfiles)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(materialProfiles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteMaterialProfile(id: string): Promise<void> {
+    await db.delete(materialProfiles).where(eq(materialProfiles.id, id));
+  }
+
+  // ==================== VENDOR RULES ====================
+
+  async getVendorRule(id: string): Promise<VendorRule | undefined> {
+    const [rule] = await db.select().from(vendorRules).where(eq(vendorRules.id, id));
+    return rule;
+  }
+
+  async getAllVendorRules(): Promise<VendorRule[]> {
+    return db.select().from(vendorRules).orderBy(asc(vendorRules.displayName));
+  }
+
+  async getVendorRuleByType(vendorType: string): Promise<VendorRule | undefined> {
+    const [rule] = await db.select().from(vendorRules).where(eq(vendorRules.vendorType, vendorType));
+    return rule;
+  }
+
+  async createVendorRule(rule: InsertVendorRule): Promise<VendorRule> {
+    const [created] = await db.insert(vendorRules).values(rule).returning();
+    return created;
+  }
+
+  async updateVendorRule(id: string, updates: Partial<VendorRule>): Promise<VendorRule | undefined> {
+    const [updated] = await db.update(vendorRules)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(vendorRules.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteVendorRule(id: string): Promise<void> {
+    await db.delete(vendorRules).where(eq(vendorRules.id, id));
+  }
+
+  // ==================== ARCHIVED EXPENSES ====================
+
+  async archiveExpenses(): Promise<void> {
+    // This is a migration helper - moves old expense data to archived_expenses
+    // Since expenses table has been replaced, this is a no-op if already migrated
+    // Kept for API compatibility
+  }
+
+  async getArchivedExpenses(): Promise<ArchivedExpense[]> {
+    return db.select().from(archivedExpenses).orderBy(desc(archivedExpenses.date));
   }
 
   // ==================== PAYMENTS ====================
@@ -1810,31 +1992,18 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getTeamExpenses(managerId: string): Promise<ExpenseWithDetails[]> {
+  async getTeamReceipts(managerId: string): Promise<ReceiptWithDetails[]> {
     const teamMembers = await this.getTeamMembers(managerId);
     if (teamMembers.length === 0) {
       return [];
     }
     const teamMemberIds = teamMembers.map(m => m.id);
     
-    const results = await db.select().from(expenses)
-      .where(inArray(expenses.userId, teamMemberIds))
-      .orderBy(desc(expenses.date));
+    const results = await db.select().from(receipts)
+      .where(inArray(receipts.userId, teamMemberIds))
+      .orderBy(desc(receipts.date));
     
-    return Promise.all(results.map(async (expense) => {
-      const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, expense.userId));
-      let approvedBy = null;
-      if (expense.approvedById) {
-        const [approver] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, expense.approvedById));
-        approvedBy = approver || null;
-      }
-      let job = null;
-      if (expense.jobId) {
-        const [jobRecord] = await db.select({ id: jobs.id, jobNo: jobs.jobNo, customerName: jobs.customerName }).from(jobs).where(eq(jobs.id, expense.jobId));
-        job = jobRecord || null;
-      }
-      return { ...expense, user, approvedBy, job };
-    }));
+    return Promise.all(results.map(r => this.enrichReceipt(r)));
   }
 
   // ==================== INSPECTIONS ====================
@@ -2161,20 +2330,20 @@ export class DatabaseStorage implements IStorage {
       return sum + (hours * rate);
     }, 0);
 
-    // Get expenses including vehicle costs
-    const allExpenses = await db.select().from(expenses);
-    const filteredExpenses = allExpenses.filter(exp => {
-      const expDate = exp.date ? new Date(exp.date) : null;
-      return expDate && expDate >= start && expDate <= end && exp.status === 'approved';
+    // Get receipts including vehicle costs
+    const allReceipts = await db.select().from(receipts);
+    const filteredReceipts = allReceipts.filter(r => {
+      const rDate = r.date ? new Date(r.date) : null;
+      return rDate && rDate >= start && rDate <= end && (r.status === 'clean' || r.status === 'reviewed' || r.status === 'cleared');
     });
     
-    const vehicleCosts = filteredExpenses
-      .filter(exp => exp.mileage || exp.category === 'fuel' || exp.category === 'vehicle')
-      .reduce((sum, exp) => sum + (exp.amount || 0), 0);
+    const vehicleCosts = filteredReceipts
+      .filter(r => r.category === 'fuel')
+      .reduce((sum, r) => sum + (r.receiptTotal || 0), 0);
 
-    const materialsCosts = filteredExpenses
-      .filter(exp => exp.category === 'materials' || exp.category === 'parts')
-      .reduce((sum, exp) => sum + (exp.amount || 0), 0);
+    const materialsCosts = filteredReceipts
+      .filter(r => r.category === 'materials' || r.category === 'consumables')
+      .reduce((sum, r) => sum + (r.receiptTotal || 0), 0);
 
     // Get fixed costs
     const allFixedCosts = await db.select().from(fixedCosts).where(eq(fixedCosts.isActive, true));
@@ -2247,10 +2416,10 @@ export class DatabaseStorage implements IStorage {
           .from(jobs).where(eq(jobs.id, file.jobId));
         fileWithRelations.job = job || null;
       }
-      if (file.expenseId) {
-        const [expense] = await db.select({ id: expenses.id, description: expenses.description, category: expenses.category })
-          .from(expenses).where(eq(expenses.id, file.expenseId));
-        fileWithRelations.expense = expense || null;
+      if (file.receiptId) {
+        const [receipt] = await db.select({ id: receipts.id, description: receipts.description, category: receipts.category })
+          .from(receipts).where(eq(receipts.id, file.receiptId));
+        fileWithRelations.receipt = receipt || null;
       }
       if (file.uploadedById) {
         const [uploader] = await db.select({ id: users.id, name: users.name })
@@ -2306,13 +2475,13 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getFilesByExpense(expenseId: string): Promise<FileWithRelations[]> {
-    const expenseFiles = await db.select().from(files)
-      .where(eq(files.expenseId, expenseId))
+  async getFilesByReceipt(receiptId: string): Promise<FileWithRelations[]> {
+    const receiptFiles = await db.select().from(files)
+      .where(eq(files.receiptId, receiptId))
       .orderBy(desc(files.createdAt));
     
     const result: FileWithRelations[] = [];
-    for (const file of expenseFiles) {
+    for (const file of receiptFiles) {
       const fileWithRelations: FileWithRelations = { ...file };
       
       if (file.uploadedById) {

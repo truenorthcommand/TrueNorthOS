@@ -41,7 +41,7 @@ interface DirectorsDashboardData {
   monthlyTrends: {
     month: string;
     revenue: number;
-    expenses: number;
+    receipts: number;
     profit: number;
   }[];
   jobMetrics: {
@@ -274,7 +274,7 @@ export default function DirectorsSuite() {
                       />
                       <Legend />
                       <Bar dataKey="revenue" name="Revenue" fill={COLORS.primary} radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="expenses" name="Expenses" fill={COLORS.warning} radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="receipts" name="Receipts" fill={COLORS.warning} radius={[4, 4, 0, 0]} />
                       <Line type="monotone" dataKey="profit" name="Profit" stroke={COLORS.success} strokeWidth={2} dot={{ fill: COLORS.success }} />
                     </ComposedChart>
                   </ResponsiveContainer>
@@ -419,7 +419,7 @@ export default function DirectorsSuite() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-l-4 border-l-amber-500 cursor-pointer hover:shadow-lg transition-all bg-slate-800/50 border-slate-700" onClick={() => setLocation('/expenses')}>
+            <Card className="border-l-4 border-l-amber-500 cursor-pointer hover:shadow-lg transition-all bg-slate-800/50 border-slate-700" onClick={() => setLocation('/receipts')}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>

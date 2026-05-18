@@ -26,7 +26,7 @@ interface TimesheetWithUser {
   approvedBy: { id: string; name: string } | null;
 }
 
-interface ExpenseWithDetails {
+interface ReceiptWithDetails {
   id: string;
   userId: string;
   date: string;
@@ -44,8 +44,8 @@ type ApprovalItem = {
   type: 'timesheet';
   item: TimesheetWithUser;
 } | {
-  type: 'expense';
-  item: ExpenseWithDetails;
+  type: 'receipt';
+  item: ReceiptWithDetails;
 };
 
 export default function WorksManagerApprovals() {
@@ -62,13 +62,13 @@ export default function WorksManagerApprovals() {
     queryKey: ["/api/works-manager/timesheets"],
   });
 
-  const { data: expenses, isLoading: expensesLoading } = useQuery<ExpenseWithDetails[]>({
-    queryKey: ["/api/works-manager/expenses"],
+  const { data: receipts, isLoading: receiptsLoading } = useQuery<ReceiptWithDetails[]>({
+    queryKey: ["/api/works-manager/receipts"],
   });
 
   const approveMutation = useMutation({
-    mutationFn: async ({ type, id }: { type: 'timesheet' | 'expense'; id: string }) => {
-      const endpoint = type === 'timesheet' ? `/api/timesheets/${id}` : `/api/expenses/${id}`;
+    mutationFn: async ({ type, id }: { type: 'timesheet' | 'receipt'; id: string }) => {
+      const endpoint = type === 'timesheet' ? `/api/timesheets/${id}` : `/api/receipts/${id}`;
       const res = await fetch(endpoint, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -82,7 +82,7 @@ export default function WorksManagerApprovals() {
       if (variables.type === 'timesheet') {
         queryClient.invalidateQueries({ queryKey: ["/api/works-manager/timesheets"] });
       } else {
-        queryClient.invalidateQueries({ queryKey: ["/api/works-manager/expenses"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/works-manager/receipts"] });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/works-manager/stats"] });
       setReviewItem(null);
@@ -94,8 +94,8 @@ export default function WorksManagerApprovals() {
   });
 
   const rejectMutation = useMutation({
-    mutationFn: async ({ type, id, notes }: { type: 'timesheet' | 'expense'; id: string; notes: string }) => {
-      const endpoint = type === 'timesheet' ? `/api/timesheets/${id}` : `/api/expenses/${id}`;
+    mutationFn: async ({ type, id, notes }: { type: 'timesheet' | 'receipt'; id: string; notes: string }) => {
+      const endpoint = type === 'timesheet' ? `/api/timesheets/${id}` : `/api/receipts/${id}`;
       const res = await fetch(endpoint, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -109,7 +109,7 @@ export default function WorksManagerApprovals() {
       if (variables.type === 'timesheet') {
         queryClient.invalidateQueries({ queryKey: ["/api/works-manager/timesheets"] });
       } else {
-        queryClient.invalidateQueries({ queryKey: ["/api/works-manager/expenses"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/works-manager/receipts"] });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/works-manager/stats"] });
       setReviewItem(null);
@@ -123,7 +123,7 @@ export default function WorksManagerApprovals() {
   });
 
   const pendingTimesheets = timesheets?.filter(ts => ts.status === 'pending') || [];
-  const pendingExpenses = expenses?.filter(exp => exp.status === 'pending') || [];
+  const pendingReceipts = receipts?.filter(exp => exp.status === 'pending') || [];
 
   const formatTime = (dateStr: string | null) => {
     if (!dateStr) return '--:--';
@@ -156,7 +156,7 @@ export default function WorksManagerApprovals() {
           Team Approvals
         </h1>
         <p className="text-muted-foreground">
-          Review and approve timesheets and expenses from your team
+          Review and approve timesheets and receipts from your team
         </p>
       </div>
 
@@ -174,13 +174,13 @@ export default function WorksManagerApprovals() {
           </CardContent>
         </Card>
 
-        <Card data-testid="stat-pending-expenses">
+        <Card data-testid="stat-pending-receipts">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Expenses</CardTitle>
+            <CardTitle className="text-sm font-medium">Pending Receipts</CardTitle>
             <Receipt className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{pendingExpenses.length}</div>
+            <div className="text-2xl font-bold">{pendingReceipts.length}</div>
             <p className="text-xs text-muted-foreground">
               awaiting your approval
             </p>
@@ -197,11 +197,11 @@ export default function WorksManagerApprovals() {
               <Badge variant="destructive" className="ml-1">{pendingTimesheets.length}</Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="expenses" className="flex items-center gap-2" data-testid="tab-expenses">
+          <TabsTrigger value="receipts" className="flex items-center gap-2" data-testid="tab-receipts">
             <Receipt className="h-4 w-4" />
-            Expenses
-            {pendingExpenses.length > 0 && (
-              <Badge variant="destructive" className="ml-1">{pendingExpenses.length}</Badge>
+            Receipts
+            {pendingReceipts.length > 0 && (
+              <Badge variant="destructive" className="ml-1">{pendingReceipts.length}</Badge>
             )}
           </TabsTrigger>
         </TabsList>
@@ -272,23 +272,23 @@ export default function WorksManagerApprovals() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="expenses" className="mt-4">
+        <TabsContent value="receipts" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle>Expense Approvals</CardTitle>
+              <CardTitle>Receipt Approvals</CardTitle>
             </CardHeader>
             <CardContent>
-              {expensesLoading ? (
-                <p className="text-muted-foreground text-center py-8">Loading expenses...</p>
-              ) : pendingExpenses.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">No pending expenses</p>
+              {receiptsLoading ? (
+                <p className="text-muted-foreground text-center py-8">Loading receipts...</p>
+              ) : pendingReceipts.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">No pending receipts</p>
               ) : (
                 <div className="space-y-3">
-                  {pendingExpenses.map(exp => (
+                  {pendingReceipts.map(exp => (
                     <div 
                       key={exp.id}
                       className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg bg-slate-50 dark:bg-slate-900/50 border"
-                      data-testid={`expense-row-${exp.id}`}
+                      data-testid={`receipt-row-${exp.id}`}
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
@@ -316,16 +316,16 @@ export default function WorksManagerApprovals() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setReviewItem({ type: 'expense', item: exp })}
-                          data-testid={`button-review-expense-${exp.id}`}
+                          onClick={() => setReviewItem({ type: 'receipt', item: exp })}
+                          data-testid={`button-review-receipt-${exp.id}`}
                         >
                           Review
                         </Button>
                         <Button
                           size="sm"
-                          onClick={() => approveMutation.mutate({ type: 'expense', id: exp.id })}
+                          onClick={() => approveMutation.mutate({ type: 'receipt', id: exp.id })}
                           disabled={approveMutation.isPending}
-                          data-testid={`button-approve-expense-${exp.id}`}
+                          data-testid={`button-approve-receipt-${exp.id}`}
                         >
                           <CheckCircle2 className="h-4 w-4 mr-1" />
                           Approve
@@ -344,7 +344,7 @@ export default function WorksManagerApprovals() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              Review {reviewItem?.type === 'timesheet' ? 'Timesheet' : 'Expense'}
+              Review {reviewItem?.type === 'timesheet' ? 'Timesheet' : 'Receipt'}
             </DialogTitle>
           </DialogHeader>
           
@@ -385,7 +385,7 @@ export default function WorksManagerApprovals() {
             </div>
           )}
           
-          {reviewItem?.type === 'expense' && (
+          {reviewItem?.type === 'receipt' && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>

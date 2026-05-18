@@ -69,7 +69,7 @@ export default function Settings() {
   const [notifPrefs, setNotifPrefs] = useState<Record<string, { inApp: boolean; email: boolean; push: boolean }>>({
     jobs: { inApp: true, email: true, push: false },
     messages: { inApp: true, email: false, push: false },
-    expenses: { inApp: true, email: true, push: false },
+    receipts: { inApp: true, email: true, push: false },
     fleet: { inApp: true, email: false, push: false },
     system: { inApp: true, email: true, push: false },
   });
@@ -513,7 +513,7 @@ export default function Settings() {
               {[
                 { key: "jobs", label: "Jobs & Operations", icon: Briefcase },
                 { key: "messages", label: "Messages", icon: MessageCircle },
-                { key: "expenses", label: "Expenses & Finance", icon: Receipt },
+                { key: "receipts", label: "Receipts & Finance", icon: Receipt },
                 { key: "fleet", label: "Fleet & Vehicles", icon: Truck },
                 { key: "system", label: "System & Admin", icon: Settings2 },
               ].map(({ key, label, icon: Icon }) => (

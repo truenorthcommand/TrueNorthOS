@@ -769,42 +769,172 @@ export const insertTimesheetSchema = createInsertSchema(timesheets, {
 export type InsertTimesheet = z.infer<typeof insertTimesheetSchema>;
 export type Timesheet = typeof timesheets.$inferSelect;
 
-// ==================== EXPENSES ====================
+// ==================== RECEIPTS (Company Card Compliance System) ====================
 
-export const expenses = pgTable("expenses", {
+export const receipts = pgTable("receipts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
   date: timestamp("date").notNull(),
-  category: text("category").notNull(), // mileage, materials, tools, fuel, subsistence, other
+  type: text("type").notNull().default("general"), // general, job
+  category: text("category").notNull(), // fuel, cleaning, office_supplies, consumables, materials, sundries, other
   description: text("description").notNull(),
-  amount: doublePrecision("amount").notNull(),
+  receiptImageUrl: text("receipt_image_url").notNull(), // mandatory photo
+  vendorName: text("vendor_name"),
+  vendorType: text("vendor_type"), // petrol_station, builders_merchant, hardware_store, cleaning_supplier, general_retailer, unknown
+  receiptTotal: doublePrecision("receipt_total"), // AI-extracted total from receipt
   vatAmount: doublePrecision("vat_amount").default(0),
-  receiptUrl: text("receipt_url"),
-  mileage: doublePrecision("mileage"), // for mileage claims
-  mileageRate: doublePrecision("mileage_rate"), // pence per mile
-  jobId: varchar("job_id"), // optional link to job
+  currency: text("currency").notNull().default("GBP"),
+  jobId: varchar("job_id"), // mandatory for type=job, null for general
   clientId: varchar("client_id"), // optional link to client
-  status: text("status").notNull().default("pending"), // pending, approved, rejected, paid
-  approvedById: varchar("approved_by_id"),
-  approvedAt: timestamp("approved_at"),
-  paidAt: timestamp("paid_at"),
+  status: text("status").notNull().default("pending"), // pending, clean, flagged, reviewed, cleared, rejected
+  aiScannedAt: timestamp("ai_scanned_at"),
+  aiConfidence: doublePrecision("ai_confidence"), // 0-1 confidence score
+  aiSummary: text("ai_summary"), // AI reasoning summary
+  reviewedById: varchar("reviewed_by_id"), // admin/accounts who reviewed
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  flaggedItemCount: integer("flagged_item_count").default(0),
+  totalDeductionAmount: doublePrecision("total_deduction_amount").default(0),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertExpenseSchema = createInsertSchema(expenses, {
+export const insertReceiptSchema = createInsertSchema(receipts, {
   date: z.coerce.date(),
-  approvedAt: z.coerce.date().optional(),
-  paidAt: z.coerce.date().optional(),
+  aiScannedAt: z.coerce.date().optional(),
+  reviewedAt: z.coerce.date().optional(),
 }).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
 
-export type InsertExpense = z.infer<typeof insertExpenseSchema>;
-export type Expense = typeof expenses.$inferSelect;
+export type InsertReceipt = z.infer<typeof insertReceiptSchema>;
+export type Receipt = typeof receipts.$inferSelect;
+
+// Receipt line items - individual items extracted from receipt by AI
+export const receiptLineItems = pgTable("receipt_line_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  receiptId: varchar("receipt_id").notNull(),
+  description: text("description").notNull(),
+  quantity: doublePrecision("quantity").default(1),
+  unitPrice: doublePrecision("unit_price"),
+  totalPrice: doublePrecision("total_price").notNull(),
+  status: text("status").notNull().default("clean"), // clean, flagged, cleared, rejected
+  flagReason: text("flag_reason"), // AI reasoning for flagging
+  flagCategory: text("flag_category"), // food_drink, household, tools, personal, unrelated_material, other
+  reviewedById: varchar("reviewed_by_id"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewAction: text("review_action"), // cleared, rejected
+  reviewNotes: text("review_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertReceiptLineItemSchema = createInsertSchema(receiptLineItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertReceiptLineItem = z.infer<typeof insertReceiptLineItemSchema>;
+export type ReceiptLineItem = typeof receiptLineItems.$inferSelect;
+
+// Deductions - when receipt items are rejected, cost deducted from wages/invoice
+export const deductions = pgTable("deductions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  receiptId: varchar("receipt_id").notNull(),
+  receiptLineItemId: varchar("receipt_line_item_id").notNull(),
+  amount: doublePrecision("amount").notNull(),
+  reason: text("reason").notNull(),
+  itemDescription: text("item_description").notNull(), // what was rejected
+  status: text("status").notNull().default("pending"), // pending, applied, disputed
+  appliedToPayroll: boolean("applied_to_payroll").notNull().default(false),
+  payrollReference: text("payroll_reference"),
+  createdById: varchar("created_by_id").notNull(), // admin/accounts who rejected
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDeductionSchema = createInsertSchema(deductions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDeduction = z.infer<typeof insertDeductionSchema>;
+export type Deduction = typeof deductions.$inferSelect;
+
+// Material profiles - configurable by admin, maps job types to expected materials
+export const materialProfiles = pgTable("material_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // e.g. "Painting & Decorating"
+  description: text("description"),
+  jobTypes: jsonb("job_types").notNull().default([]), // array of job type strings this profile applies to
+  permittedMaterials: jsonb("permitted_materials").notNull().default([]), // array of permitted material keywords/categories
+  flaggedMaterials: jsonb("flagged_materials").notNull().default([]), // array of materials that should be flagged
+  isActive: boolean("is_active").notNull().default(true),
+  createdById: varchar("created_by_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertMaterialProfileSchema = createInsertSchema(materialProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMaterialProfile = z.infer<typeof insertMaterialProfileSchema>;
+export type MaterialProfile = typeof materialProfiles.$inferSelect;
+
+// Vendor rules - configurable by admin, maps vendor types to permitted/flagged items
+export const vendorRules = pgTable("vendor_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vendorType: text("vendor_type").notNull(), // petrol_station, builders_merchant, hardware_store, cleaning_supplier, general_retailer
+  displayName: text("display_name").notNull(), // "Petrol Station"
+  permittedItems: jsonb("permitted_items").notNull().default([]), // keywords/categories that are OK
+  flaggedItems: jsonb("flagged_items").notNull().default([]), // keywords/categories that trigger flag
+  isActive: boolean("is_active").notNull().default(true),
+  createdById: varchar("created_by_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertVendorRuleSchema = createInsertSchema(vendorRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertVendorRule = z.infer<typeof insertVendorRuleSchema>;
+export type VendorRule = typeof vendorRules.$inferSelect;
+
+// Archived expenses - old expense data preserved for reference
+export const archivedExpenses = pgTable("archived_expenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  originalId: varchar("original_id"),
+  userId: varchar("user_id").notNull(),
+  date: timestamp("date").notNull(),
+  category: text("category").notNull(),
+  description: text("description").notNull(),
+  amount: doublePrecision("amount").notNull(),
+  vatAmount: doublePrecision("vat_amount").default(0),
+  receiptUrl: text("receipt_url"),
+  mileage: doublePrecision("mileage"),
+  mileageRate: doublePrecision("mileage_rate"),
+  jobId: varchar("job_id"),
+  clientId: varchar("client_id"),
+  status: text("status").notNull(),
+  approvedById: varchar("approved_by_id"),
+  approvedAt: timestamp("approved_at"),
+  paidAt: timestamp("paid_at"),
+  notes: text("notes"),
+  originalCreatedAt: timestamp("original_created_at"),
+  archivedAt: timestamp("archived_at").defaultNow(),
+});
+
+export type ArchivedExpense = typeof archivedExpenses.$inferSelect;
 
 // ==================== PAYMENTS ====================
 
@@ -840,10 +970,18 @@ export type TimesheetWithUser = Timesheet & {
   approvedBy?: Pick<User, 'id' | 'name'> | null;
 };
 
-export type ExpenseWithDetails = Expense & {
+export type ReceiptWithDetails = Receipt & {
   user: Pick<User, 'id' | 'name'>;
-  approvedBy?: Pick<User, 'id' | 'name'> | null;
+  reviewedBy?: Pick<User, 'id' | 'name'> | null;
   job?: Pick<Job, 'id' | 'jobNo' | 'customerName'> | null;
+  lineItems?: ReceiptLineItem[];
+  deductions?: Deduction[];
+};
+
+export type DeductionWithDetails = Deduction & {
+  user: Pick<User, 'id' | 'name'>;
+  receipt: Pick<Receipt, 'id' | 'vendorName' | 'date'>;
+  createdBy: Pick<User, 'id' | 'name'>;
 };
 
 export type PaymentWithInvoice = Payment & {
@@ -990,7 +1128,7 @@ export type SnaggingSheetWithDetails = SnaggingSheet & {
 
 export const accountsReceipts = pgTable("accounts_receipts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  expenseId: varchar("expense_id"),
+  receiptId: varchar("receipt_id"),
   uploadedById: varchar("uploaded_by_id").notNull(),
   imageUrl: text("image_url").notNull(),
   ocrVendor: text("ocr_vendor"),
@@ -1104,7 +1242,7 @@ export type InsertSnippet = z.infer<typeof insertSnippetSchema>;
 export type Snippet = typeof snippets.$inferSelect;
 
 
-// Files - Uploaded files with optional assignment to clients, jobs, or expenses
+// Files - Uploaded files with optional assignment to clients, jobs, or receipts
 export const files = pgTable("files", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -1113,7 +1251,7 @@ export const files = pgTable("files", {
   size: integer("size"),
   clientId: varchar("client_id"),
   jobId: varchar("job_id"),
-  expenseId: varchar("expense_id"),
+  receiptId: varchar("receipt_id"),
   category: text("category"),
   tags: jsonb("tags").default([]),
   notes: text("notes"),
@@ -1135,14 +1273,14 @@ export type FileRecord = typeof files.$inferSelect;
 export type FileWithRelations = FileRecord & {
   client?: Pick<Client, 'id' | 'name'> | null;
   job?: Pick<Job, 'id' | 'jobNo' | 'customerName'> | null;
-  expense?: Pick<Expense, 'id' | 'description' | 'category'> | null;
+  receipt?: Pick<Receipt, 'id' | 'description' | 'category'> | null;
   uploadedBy?: Pick<User, 'id' | 'name'> | null;
 };
 
 export type AiFileSuggestion = {
   clientId?: string;
   jobId?: string;
-  expenseId?: string;
+  receiptId?: string;
   category?: string;
   confidence: number;
   reasoning: string;

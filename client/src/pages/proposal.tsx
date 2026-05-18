@@ -120,7 +120,7 @@ export default function Proposal() {
               <CardContent className="text-sm text-slate-600">
                 <ul className="space-y-1">
                   <li className="flex items-center gap-2"><CheckCircle className="h-3 w-3 text-green-500" /> Timesheets with clock in/out</li>
-                  <li className="flex items-center gap-2"><CheckCircle className="h-3 w-3 text-green-500" /> Expense tracking & receipts</li>
+                  <li className="flex items-center gap-2"><CheckCircle className="h-3 w-3 text-green-500" /> Receipt compliance & tracking</li>
                   <li className="flex items-center gap-2"><CheckCircle className="h-3 w-3 text-green-500" /> HMRC mileage calculator</li>
                   <li className="flex items-center gap-2"><CheckCircle className="h-3 w-3 text-green-500" /> Payment collection</li>
                   <li className="flex items-center gap-2"><CheckCircle className="h-3 w-3 text-green-500" /> Approval workflows</li>

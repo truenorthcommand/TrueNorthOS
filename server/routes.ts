@@ -9,7 +9,7 @@ import QRCode from "qrcode";
 import Stripe from "stripe";
 import { storage } from "./storage";
 import { pool } from "./db";
-import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalkaroundCheckSchema, insertCheckItemSchema, insertDefectSchema, insertDefectUpdateSchema, insertTimesheetSchema, insertExpenseSchema, insertPaymentSchema, insertFeedbackSchema } from "@shared/schema";
+import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalkaroundCheckSchema, insertCheckItemSchema, insertDefectSchema, insertDefectUpdateSchema, insertTimesheetSchema, insertReceiptSchema, insertReceiptLineItemSchema, insertDeductionSchema, insertMaterialProfileSchema, insertVendorRuleSchema, insertPaymentSchema, insertFeedbackSchema } from "@shared/schema";
 import { z } from "zod";
 import { notifyAdmins, notifyUser } from "./notifications";
 import { sessionMiddleware } from "./session";
@@ -4274,10 +4274,10 @@ TrueNorth Field View is a "business in a box" platform that enables field servic
 
 ### 2. Finance Module
 - **Timesheets**: Clock in/out with automatic time tracking, approval workflow for admins
-- **Expense Tracking**: Submit expenses with receipt uploads, approval workflow
+- **Receipt Compliance**: Company credit card receipt scanning with AI-powered compliance checking
 - **Mileage Calculator**: Uses HMRC rates (45p/mile for first 10,000, 25p/mile thereafter)
 - **Payment Collection**: Track payments against invoices, record payment methods
-- **Financial Analytics**: View revenue, expenses, and profit/loss reports
+- **Financial Analytics**: View revenue, receipts, and profit/loss reports
 
 ### 3. Fleet Module
 - **Vehicle Registry**: Add and manage company vehicles with registration, make, model, year
@@ -4308,7 +4308,7 @@ TrueNorth Field View is a "business in a box" platform that enables field servic
 
 ## User Roles
 - **Admin**: Full access to all features including settings, staff management, all jobs
-- **Engineer**: Access to assigned jobs, timesheets, expenses, fleet checks, messaging
+- **Engineer**: Access to assigned jobs, timesheets, receipts, fleet checks, messaging
 - **Super Admin**: All admin features plus system-wide configuration
 
 ## Key Features
@@ -4332,12 +4332,13 @@ TrueNorth Field View is a "business in a box" platform that enables field servic
 5. Use "Check Pricing" to validate against historical data
 6. Send to client via their unique link
 
-### Tracking Expenses
-1. Go to Finance → Expenses
-2. Click "Add Expense"
-3. Enter amount, category, description
-4. Upload receipt photo
-5. Submit for approval (Admin approves)
+### Submitting Receipts
+1. Go to Finance → Receipts
+2. Click "Add Receipt"
+3. Take a photo of the receipt (mandatory)
+4. Select receipt type (general or job-related)
+5. AI will automatically scan, extract items, and validate compliance
+6. Flagged items are sent to admin/accounts for review
 
 ### Vehicle Walkaround Check
 1. Go to Fleet → Walkaround Check
@@ -6385,264 +6386,520 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
-  // ==================== EXPENSES ROUTES ====================
+  // ==================== RECEIPTS ROUTES ====================
 
-  app.get("/api/expenses", requireAuth, async (req, res) => {
+  app.get("/api/receipts", requireAuth, async (req, res) => {
     try {
-      let expenses;
+      let receipts;
       if (req.session.userRole === "admin") {
-        expenses = await storage.getAllExpenses();
+        receipts = await storage.getAllReceipts();
       } else {
-        expenses = await storage.getExpensesByUser(req.session.userId!);
+        receipts = await storage.getReceiptsByUser(req.session.userId!);
       }
-      res.json(expenses);
+      res.json(receipts);
     } catch (error) {
-      console.error("Get expenses error:", error);
-      res.status(500).json({ error: "Failed to get expenses" });
+      console.error("Get receipts error:", error);
+      res.status(500).json({ error: "Failed to get receipts" });
     }
   });
 
-  app.get("/api/expenses/:id", requireAuth, async (req, res) => {
+  app.get("/api/receipts/flagged", requireAuth, async (req, res) => {
     try {
-      const expense = await storage.getExpense(req.params.id);
-      if (!expense) {
-        return res.status(404).json({ error: "Expense not found" });
+      if (req.session.userRole !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin or accounts role required." });
       }
-      if (req.session.userRole !== "admin" && expense.userId !== req.session.userId) {
+      const receipts = await storage.getFlaggedReceipts();
+      res.json(receipts);
+    } catch (error) {
+      console.error("Get flagged receipts error:", error);
+      res.status(500).json({ error: "Failed to get flagged receipts" });
+    }
+  });
+
+  app.get("/api/receipts/job/:jobId", requireAuth, async (req, res) => {
+    try {
+      const receipts = await storage.getReceiptsByJob(req.params.jobId);
+      res.json(receipts);
+    } catch (error) {
+      console.error("Get job receipts error:", error);
+      res.status(500).json({ error: "Failed to get receipts for job" });
+    }
+  });
+
+  app.get("/api/receipts/:id", requireAuth, async (req, res) => {
+    try {
+      const receipt = await storage.getReceipt(req.params.id);
+      if (!receipt) {
+        return res.status(404).json({ error: "Receipt not found" });
+      }
+      if (req.session.userRole !== "admin" && receipt.userId !== req.session.userId) {
         return res.status(403).json({ error: "Access denied" });
       }
-      res.json(expense);
+      const lineItems = await storage.getReceiptLineItems(req.params.id);
+      res.json({ ...receipt, lineItems });
     } catch (error) {
-      console.error("Get expense error:", error);
-      res.status(500).json({ error: "Failed to get expense" });
+      console.error("Get receipt error:", error);
+      res.status(500).json({ error: "Failed to get receipt" });
     }
   });
 
-  app.post("/api/expenses", requireAuth, async (req, res) => {
+  app.post("/api/receipts", requireAuth, async (req, res) => {
     try {
-      const MAX_RECEIPT_SIZE = 2 * 1024 * 1024;
-      
-      if (req.body.receiptUrl && req.body.receiptUrl.startsWith("data:image/")) {
-        const base64Size = req.body.receiptUrl.length * 0.75;
+      const MAX_RECEIPT_SIZE = 5 * 1024 * 1024;
+
+      if (!req.body.receiptImageUrl) {
+        return res.status(400).json({ error: "Receipt photo is mandatory. Please upload a receipt image." });
+      }
+
+      if (req.body.receiptImageUrl.startsWith("data:image/")) {
+        const base64Size = req.body.receiptImageUrl.length * 0.75;
         if (base64Size > MAX_RECEIPT_SIZE) {
-          return res.status(400).json({ error: "Receipt image is too large. Please use a smaller image." });
+          return res.status(400).json({ error: "Receipt image is too large. Please use a smaller image (max 5MB)." });
         }
       }
-      
-      const data = insertExpenseSchema.parse({
+
+      const data = insertReceiptSchema.parse({
         ...req.body,
         userId: req.body.userId || req.session.userId,
+        status: "processing",
       });
+
       if (req.session.userRole !== "admin" && data.userId !== req.session.userId) {
-        return res.status(403).json({ error: "Cannot create expense for another user" });
+        return res.status(403).json({ error: "Cannot create receipt for another user" });
       }
-      const expense = await storage.createExpense(data);
-      
-      if (data.receiptUrl && data.receiptUrl.startsWith("data:image/")) {
-        try {
-          await storage.createAccountsReceipt({
-            expenseId: expense.id,
-            uploadedById: req.session.userId!,
-            imageUrl: data.receiptUrl,
-            isProcessed: false,
+
+      // Create the receipt record
+      const receipt = await storage.createReceipt(data);
+
+      // AI scan the receipt image
+      let scanResult;
+      try {
+        const geminiAI = await import("./services/gemini-ai");
+        scanResult = await geminiAI.scanReceipt(data.receiptImageUrl);
+      } catch (scanError) {
+        console.error("AI receipt scan failed:", scanError);
+        // Update receipt status to indicate scan failure
+        await storage.updateReceipt(receipt.id, {
+          status: "scan_failed",
+          aiNotes: "AI receipt scanning failed. Manual review required.",
+        });
+        return res.status(201).json({
+          ...receipt,
+          status: "scan_failed",
+          aiNotes: "AI receipt scanning failed. Manual review required.",
+          lineItems: [],
+        });
+      }
+
+      // Update receipt with scanned data
+      await storage.updateReceipt(receipt.id, {
+        vendorName: scanResult.vendorName || receipt.vendorName,
+        totalAmount: scanResult.total?.toString() || receipt.totalAmount,
+        receiptDate: scanResult.receiptDate || receipt.receiptDate,
+        currency: scanResult.currency || "GBP",
+      });
+
+      // Create line items from scan results
+      const createdLineItems = [];
+      if (scanResult.items && scanResult.items.length > 0) {
+        for (const item of scanResult.items) {
+          const lineItem = await storage.createReceiptLineItem({
+            receiptId: receipt.id,
+            description: item.description,
+            quantity: item.quantity?.toString() || "1",
+            unitPrice: item.price?.toString() || "0",
+            totalPrice: ((item.quantity || 1) * (item.price || 0)).toString(),
+            status: "pending",
           });
-        } catch (receiptError) {
-          console.error("Failed to create accounts receipt:", receiptError);
+          createdLineItems.push(lineItem);
         }
       }
-      
-      res.status(201).json(expense);
+
+      // Validate the receipt using AI
+      let validationResult;
+      try {
+        const geminiAI = await import("./services/gemini-ai");
+        const vendorRules = await storage.getAllVendorRules();
+
+        if (data.receiptType === "job" && data.jobId) {
+          // Job receipt - validate against job context and material profile
+          const job = await storage.getJob(data.jobId);
+          const jobDescription = job?.description || "Unknown job";
+          const jobType = job?.type || "general";
+
+          // Try to find a material profile for this job type
+          const materialProfiles = await storage.getAllMaterialProfiles();
+          const materialProfile = materialProfiles.find(
+            (mp) => mp.jobType.toLowerCase() === jobType.toLowerCase()
+          ) || null;
+
+          validationResult = await geminiAI.validateJobReceipt(
+            scanResult,
+            jobDescription,
+            jobType,
+            materialProfile,
+            vendorRules
+          );
+        } else {
+          // General receipt - validate against vendor rules only
+          validationResult = await geminiAI.validateGeneralReceipt(
+            scanResult,
+            vendorRules
+          );
+        }
+      } catch (validationError) {
+        console.error("AI receipt validation failed:", validationError);
+        // Mark as needing manual review
+        await storage.updateReceipt(receipt.id, {
+          status: "review_needed",
+          aiNotes: "AI validation failed. Manual review required.",
+        });
+        return res.status(201).json({
+          ...receipt,
+          status: "review_needed",
+          lineItems: createdLineItems,
+        });
+      }
+
+      // Update line items with validation results
+      if (validationResult && validationResult.lineItems) {
+        for (let i = 0; i < createdLineItems.length && i < validationResult.lineItems.length; i++) {
+          const valItem = validationResult.lineItems[i];
+          await storage.updateReceiptLineItem(createdLineItems[i].id, {
+            status: valItem.status || "clean",
+            flagReason: valItem.flagReason || null,
+            flagCategory: valItem.flagCategory || null,
+            aiConfidence: validationResult.confidence?.toString() || null,
+          });
+        }
+      }
+
+      // Update receipt overall status
+      const overallStatus = validationResult?.overallStatus || "clean";
+      await storage.updateReceipt(receipt.id, {
+        status: overallStatus,
+        aiNotes: validationResult?.summary || null,
+        vendorType: validationResult?.vendorType || null,
+        aiConfidence: validationResult?.confidence?.toString() || null,
+      });
+
+      // If flagged, notify admin/accounts users
+      if (overallStatus === "flagged") {
+        const submitter = await storage.getUser(req.session.userId!);
+        const flaggedCount = validationResult?.lineItems?.filter(
+          (li: any) => li.status === "flagged"
+        ).length || 0;
+
+        notifyAdmins({
+          type: "receipt_flagged",
+          title: "Receipt Flagged for Review",
+          message: `${submitter?.name || "An employee"} submitted a receipt from ${scanResult.vendorName || "unknown vendor"} with ${flaggedCount} flagged item(s). Total: \u00a3${scanResult.total?.toFixed(2) || "0.00"}`,
+          receiptId: receipt.id,
+          timestamp: new Date().toISOString(),
+          urgent: flaggedCount >= 3,
+        });
+      }
+
+      // Fetch the updated line items
+      const finalLineItems = await storage.getReceiptLineItems(receipt.id);
+      const updatedReceipt = await storage.getReceipt(receipt.id);
+
+      res.status(201).json({
+        ...updatedReceipt,
+        lineItems: finalLineItems,
+        validationResult,
+      });
     } catch (error) {
-      console.error("Create expense error:", error);
+      console.error("Create receipt error:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.errors });
       }
-      res.status(500).json({ error: "Failed to create expense" });
+      res.status(500).json({ error: "Failed to create receipt" });
     }
   });
 
-  app.put("/api/expenses/:id", requireAuth, async (req, res) => {
+  app.put("/api/receipts/:id", requireAuth, async (req, res) => {
     try {
-      const expense = await storage.getExpense(req.params.id);
-      if (!expense) {
-        return res.status(404).json({ error: "Expense not found" });
+      const receipt = await storage.getReceipt(req.params.id);
+      if (!receipt) {
+        return res.status(404).json({ error: "Receipt not found" });
       }
-      if (req.session.userRole !== "admin" && expense.userId !== req.session.userId) {
+      if (req.session.userRole !== "admin" && receipt.userId !== req.session.userId) {
         return res.status(403).json({ error: "Access denied" });
       }
-      const updated = await storage.updateExpense(req.params.id, req.body);
+      const updated = await storage.updateReceipt(req.params.id, req.body);
       res.json(updated);
     } catch (error) {
-      console.error("Update expense error:", error);
-      res.status(500).json({ error: "Failed to update expense" });
+      console.error("Update receipt error:", error);
+      res.status(500).json({ error: "Failed to update receipt" });
     }
   });
 
-  app.delete("/api/expenses/:id", requireAuth, async (req, res) => {
+  app.delete("/api/receipts/:id", requireAuth, async (req, res) => {
     try {
-      const expense = await storage.getExpense(req.params.id);
-      if (!expense) {
-        return res.status(404).json({ error: "Expense not found" });
+      const receipt = await storage.getReceipt(req.params.id);
+      if (!receipt) {
+        return res.status(404).json({ error: "Receipt not found" });
       }
-      if (req.session.userRole !== "admin" && expense.userId !== req.session.userId) {
+      if (req.session.userRole !== "admin" && receipt.userId !== req.session.userId) {
         return res.status(403).json({ error: "Access denied" });
       }
-      await storage.deleteExpense(req.params.id);
+      await storage.deleteReceipt(req.params.id);
       res.json({ success: true });
     } catch (error) {
-      console.error("Delete expense error:", error);
-      res.status(500).json({ error: "Failed to delete expense" });
+      console.error("Delete receipt error:", error);
+      res.status(500).json({ error: "Failed to delete receipt" });
     }
   });
 
-  app.put("/api/expenses/:id/approve", requireAdmin, async (req, res) => {
+  // ==================== RECEIPT LINE ITEMS ROUTES ====================
+
+  app.get("/api/receipts/:id/line-items", requireAuth, async (req, res) => {
     try {
-      const expense = await storage.getExpense(req.params.id);
-      if (!expense) {
-        return res.status(404).json({ error: "Expense not found" });
+      const receipt = await storage.getReceipt(req.params.id);
+      if (!receipt) {
+        return res.status(404).json({ error: "Receipt not found" });
       }
-      const updated = await storage.updateExpense(req.params.id, {
-        status: "approved",
-        approvedById: req.session.userId,
-        approvedAt: new Date(),
+      if (req.session.userRole !== "admin" && receipt.userId !== req.session.userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const lineItems = await storage.getReceiptLineItems(req.params.id);
+      res.json(lineItems);
+    } catch (error) {
+      console.error("Get receipt line items error:", error);
+      res.status(500).json({ error: "Failed to get receipt line items" });
+    }
+  });
+
+  app.put("/api/receipt-line-items/:id/clear", requireAdmin, async (req, res) => {
+    try {
+      const updated = await storage.updateReceiptLineItem(req.params.id, {
+        status: "cleared",
+        clearedById: req.session.userId,
+        clearedAt: new Date(),
+        flagReason: null,
       });
-      
-      // Notify the engineer who submitted the expense
-      if (expense.userId) {
-        notifyUser(expense.userId, {
-          type: 'expense_approved',
-          title: 'Expense Approved',
-          message: `Your expense claim for £${expense.amount?.toFixed(2) || '0.00'} has been approved.`,
-          expenseId: expense.id,
-          timestamp: new Date().toISOString(),
-        });
+      if (!updated) {
+        return res.status(404).json({ error: "Line item not found" });
       }
-      
       res.json(updated);
     } catch (error) {
-      console.error("Approve expense error:", error);
-      res.status(500).json({ error: "Failed to approve expense" });
+      console.error("Clear line item error:", error);
+      res.status(500).json({ error: "Failed to clear line item" });
     }
   });
 
-  app.put("/api/expenses/:id/reject", requireAdmin, async (req, res) => {
+  app.put("/api/receipt-line-items/:id/reject", requireAdmin, async (req, res) => {
     try {
-      const expense = await storage.getExpense(req.params.id);
-      if (!expense) {
-        return res.status(404).json({ error: "Expense not found" });
-      }
-      const updated = await storage.updateExpense(req.params.id, {
+      const updated = await storage.updateReceiptLineItem(req.params.id, {
         status: "rejected",
-        approvedById: req.session.userId,
-        approvedAt: new Date(),
+        rejectedById: req.session.userId,
+        rejectedAt: new Date(),
       });
-      
-      // Notify the engineer who submitted the expense
-      if (expense.userId) {
-        notifyUser(expense.userId, {
-          type: 'expense_rejected',
-          title: 'Expense Rejected',
-          message: `Your expense claim for £${expense.amount?.toFixed(2) || '0.00'} has been rejected.`,
-          expenseId: expense.id,
+      if (!updated) {
+        return res.status(404).json({ error: "Line item not found" });
+      }
+
+      // Create a deduction record for the rejected item
+      const deduction = await storage.createDeduction({
+        userId: req.body.userId,
+        receiptLineItemId: updated.id,
+        amount: updated.totalPrice || updated.unitPrice || "0",
+        reason: req.body.reason || updated.flagReason || "Rejected receipt item",
+        status: "pending",
+      });
+
+      // Notify the user about the deduction
+      if (req.body.userId) {
+        notifyUser(req.body.userId, {
+          type: "deduction_created",
+          title: "Wage Deduction Notice",
+          message: `A receipt item "${updated.description}" (\u00a3${updated.totalPrice || "0.00"}) has been rejected and a deduction has been raised.`,
+          deductionId: deduction.id,
           timestamp: new Date().toISOString(),
         });
       }
-      
+
+      res.json({ lineItem: updated, deduction });
+    } catch (error) {
+      console.error("Reject line item error:", error);
+      res.status(500).json({ error: "Failed to reject line item" });
+    }
+  });
+
+  // ==================== DEDUCTIONS ROUTES ====================
+
+  app.get("/api/deductions", requireAuth, async (req, res) => {
+    try {
+      if (req.session.userRole !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin or accounts role required." });
+      }
+      const deductions = await storage.getAllDeductions();
+      res.json(deductions);
+    } catch (error) {
+      console.error("Get deductions error:", error);
+      res.status(500).json({ error: "Failed to get deductions" });
+    }
+  });
+
+  app.get("/api/deductions/user/:userId", requireAuth, async (req, res) => {
+    try {
+      if (req.session.userRole !== "admin" && req.params.userId !== req.session.userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const deductions = await storage.getDeductionsByUser(req.params.userId);
+      res.json(deductions);
+    } catch (error) {
+      console.error("Get user deductions error:", error);
+      res.status(500).json({ error: "Failed to get user deductions" });
+    }
+  });
+
+  app.put("/api/deductions/:id", requireAdmin, async (req, res) => {
+    try {
+      const deduction = await storage.getDeduction(req.params.id);
+      if (!deduction) {
+        return res.status(404).json({ error: "Deduction not found" });
+      }
+      const updated = await storage.updateDeduction(req.params.id, req.body);
       res.json(updated);
     } catch (error) {
-      console.error("Reject expense error:", error);
-      res.status(500).json({ error: "Failed to reject expense" });
+      console.error("Update deduction error:", error);
+      res.status(500).json({ error: "Failed to update deduction" });
     }
   });
 
-  app.put("/api/expenses/:id/mark-paid", requireAdmin, async (req, res) => {
+  // ==================== MATERIAL PROFILES ROUTES ====================
+
+  app.get("/api/material-profiles", requireAuth, async (req, res) => {
     try {
-      const expense = await storage.getExpense(req.params.id);
-      if (!expense) {
-        return res.status(404).json({ error: "Expense not found" });
+      const profiles = await storage.getAllMaterialProfiles();
+      res.json(profiles);
+    } catch (error) {
+      console.error("Get material profiles error:", error);
+      res.status(500).json({ error: "Failed to get material profiles" });
+    }
+  });
+
+  app.get("/api/material-profiles/:id", requireAuth, async (req, res) => {
+    try {
+      const profile = await storage.getMaterialProfile(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Material profile not found" });
       }
-      const updated = await storage.updateExpense(req.params.id, {
-        status: "paid",
-        paidAt: new Date(),
-      });
+      res.json(profile);
+    } catch (error) {
+      console.error("Get material profile error:", error);
+      res.status(500).json({ error: "Failed to get material profile" });
+    }
+  });
+
+  app.post("/api/material-profiles", requireAdmin, async (req, res) => {
+    try {
+      const data = insertMaterialProfileSchema.parse(req.body);
+      const profile = await storage.createMaterialProfile(data);
+      res.status(201).json(profile);
+    } catch (error) {
+      console.error("Create material profile error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create material profile" });
+    }
+  });
+
+  app.put("/api/material-profiles/:id", requireAdmin, async (req, res) => {
+    try {
+      const profile = await storage.getMaterialProfile(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Material profile not found" });
+      }
+      const updated = await storage.updateMaterialProfile(req.params.id, req.body);
       res.json(updated);
     } catch (error) {
-      console.error("Mark expense paid error:", error);
-      res.status(500).json({ error: "Failed to mark expense as paid" });
+      console.error("Update material profile error:", error);
+      res.status(500).json({ error: "Failed to update material profile" });
     }
   });
 
-  app.post("/api/expenses/bulk-approve", requireAdmin, async (req, res) => {
+  app.delete("/api/material-profiles/:id", requireAdmin, async (req, res) => {
     try {
-      const { expenseIds } = req.body;
-      if (!Array.isArray(expenseIds) || expenseIds.length === 0) {
-        return res.status(400).json({ error: "expenseIds array is required" });
+      const profile = await storage.getMaterialProfile(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Material profile not found" });
       }
-      
-      let approvedCount = 0;
-      for (const id of expenseIds) {
-        const expense = await storage.getExpense(id);
-        if (expense && expense.status === "pending") {
-          await storage.updateExpense(id, {
-            status: "approved",
-            approvedById: req.session.userId,
-            approvedAt: new Date(),
-          });
-          
-          if (expense.userId) {
-            notifyUser(expense.userId, {
-              type: 'expense_approved',
-              title: 'Expense Approved',
-              message: `Your expense claim for £${expense.amount?.toFixed(2) || '0.00'} has been approved.`,
-              expenseId: expense.id,
-              timestamp: new Date().toISOString(),
-            });
-          }
-          approvedCount++;
-        }
-      }
-      
-      res.json({ success: true, count: approvedCount });
+      await storage.deleteMaterialProfile(req.params.id);
+      res.json({ success: true });
     } catch (error) {
-      console.error("Bulk approve expenses error:", error);
-      res.status(500).json({ error: "Failed to bulk approve expenses" });
+      console.error("Delete material profile error:", error);
+      res.status(500).json({ error: "Failed to delete material profile" });
     }
   });
 
-  app.post("/api/expenses/bulk-reject", requireAdmin, async (req, res) => {
+  // ==================== VENDOR RULES ROUTES ====================
+
+  app.get("/api/vendor-rules", requireAuth, async (req, res) => {
     try {
-      const { expenseIds } = req.body;
-      if (!Array.isArray(expenseIds) || expenseIds.length === 0) {
-        return res.status(400).json({ error: "expenseIds array is required" });
-      }
-      
-      let rejectedCount = 0;
-      for (const id of expenseIds) {
-        const expense = await storage.getExpense(id);
-        if (expense && expense.status === "pending") {
-          await storage.updateExpense(id, {
-            status: "rejected",
-            approvedById: req.session.userId,
-            approvedAt: new Date(),
-          });
-          
-          if (expense.userId) {
-            notifyUser(expense.userId, {
-              type: 'expense_rejected',
-              title: 'Expense Rejected',
-              message: `Your expense claim for £${expense.amount?.toFixed(2) || '0.00'} has been rejected.`,
-              expenseId: expense.id,
-              timestamp: new Date().toISOString(),
-            });
-          }
-          rejectedCount++;
-        }
-      }
-      
-      res.json({ success: true, count: rejectedCount });
+      const rules = await storage.getAllVendorRules();
+      res.json(rules);
     } catch (error) {
-      console.error("Bulk reject expenses error:", error);
-      res.status(500).json({ error: "Failed to bulk reject expenses" });
+      console.error("Get vendor rules error:", error);
+      res.status(500).json({ error: "Failed to get vendor rules" });
+    }
+  });
+
+  app.get("/api/vendor-rules/:id", requireAuth, async (req, res) => {
+    try {
+      const rule = await storage.getVendorRule(req.params.id);
+      if (!rule) {
+        return res.status(404).json({ error: "Vendor rule not found" });
+      }
+      res.json(rule);
+    } catch (error) {
+      console.error("Get vendor rule error:", error);
+      res.status(500).json({ error: "Failed to get vendor rule" });
+    }
+  });
+
+  app.post("/api/vendor-rules", requireAdmin, async (req, res) => {
+    try {
+      const data = insertVendorRuleSchema.parse(req.body);
+      const rule = await storage.createVendorRule(data);
+      res.status(201).json(rule);
+    } catch (error) {
+      console.error("Create vendor rule error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create vendor rule" });
+    }
+  });
+
+  app.put("/api/vendor-rules/:id", requireAdmin, async (req, res) => {
+    try {
+      const rule = await storage.getVendorRule(req.params.id);
+      if (!rule) {
+        return res.status(404).json({ error: "Vendor rule not found" });
+      }
+      const updated = await storage.updateVendorRule(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Update vendor rule error:", error);
+      res.status(500).json({ error: "Failed to update vendor rule" });
+    }
+  });
+
+  app.delete("/api/vendor-rules/:id", requireAdmin, async (req, res) => {
+    try {
+      const rule = await storage.getVendorRule(req.params.id);
+      if (!rule) {
+        return res.status(404).json({ error: "Vendor rule not found" });
+      }
+      await storage.deleteVendorRule(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete vendor rule error:", error);
+      res.status(500).json({ error: "Failed to delete vendor rule" });
     }
   });
 
@@ -7249,7 +7506,7 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
             type: 'invoice_paid',
             title: 'Invoice Paid',
             message: `Invoice ${paidInvoice?.invoiceNo || invoiceId} for ${paidInvoice?.customerName || 'Customer'} (£${(paymentIntent.amount / 100).toFixed(2)}) has been paid via card`,
-            category: 'expenses',
+            category: 'receipts',
             timestamp: new Date().toISOString(),
             linkUrl: `/app/invoices`,
           });
@@ -7385,13 +7642,13 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
-  app.get("/api/expenses/:expenseId/files", requireAuth, async (req, res) => {
+  app.get("/api/receipts/:receiptId/files", requireAuth, async (req, res) => {
     try {
-      const files = await storage.getFilesByExpense(req.params.expenseId);
+      const files = await storage.getFilesByReceipt(req.params.receiptId);
       res.json(files);
     } catch (error) {
-      console.error("Get expense files error:", error);
-      res.status(500).json({ error: "Failed to get expense files" });
+      console.error("Get receipt files error:", error);
+      res.status(500).json({ error: "Failed to get receipt files" });
     }
   });
 
@@ -7411,11 +7668,11 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
   app.patch("/api/files/:id", requireAuth, async (req, res) => {
     try {
-      const { clientId, jobId, expenseId, category, tags, notes } = req.body;
+      const { clientId, jobId, receiptId, category, tags, notes } = req.body;
       const file = await storage.updateFile(req.params.id, {
         clientId,
         jobId,
-        expenseId,
+        receiptId,
         category,
         tags,
         notes,
@@ -7887,7 +8144,7 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
       const teamMembers = await storage.getTeamMembers(managerId);
       const teamJobs = await storage.getTeamJobs(managerId);
       const teamTimesheets = await storage.getTeamTimesheets(managerId);
-      const teamExpenses = await storage.getTeamExpenses(managerId);
+      const teamReceipts = await storage.getAllReceipts();
       
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -7919,7 +8176,7 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
       });
       
       const pendingTimesheets = teamTimesheets.filter(ts => ts.status === 'pending');
-      const pendingExpenses = teamExpenses.filter(exp => exp.status === 'pending');
+      const flaggedReceipts = teamReceipts.filter((r: any) => r.status === 'flagged');
       
       const onlineEngineers = teamMembers.filter(m => {
         if (!m.lastLocationUpdate) return false;
@@ -7937,8 +8194,8 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
         completedThisWeek: completedThisWeek.length,
         overdueJobs: overdueJobs.length,
         pendingTimesheets: pendingTimesheets.length,
-        pendingExpenses: pendingExpenses.length,
-        totalPendingApprovals: pendingTimesheets.length + pendingExpenses.length,
+        flaggedReceipts: flaggedReceipts.length,
+        totalPendingApprovals: pendingTimesheets.length + flaggedReceipts.length,
       });
     } catch (error) {
       console.error("Get works manager stats error:", error);
@@ -7956,13 +8213,13 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
     }
   });
 
-  app.get("/api/works-manager/expenses", requireRoles('works_manager', 'admin'), async (req, res) => {
+  app.get("/api/works-manager/receipts", requireRoles('works_manager', 'admin'), async (req, res) => {
     try {
-      const expenses = await storage.getTeamExpenses(req.session.userId!);
-      res.json(expenses);
+      const receipts = await storage.getAllReceipts();
+      res.json(receipts);
     } catch (error) {
-      console.error("Get team expenses error:", error);
-      res.status(500).json({ error: "Failed to fetch team expenses" });
+      console.error("Get team receipts error:", error);
+      res.status(500).json({ error: "Failed to fetch team receipts" });
     }
   });
 
@@ -8005,10 +8262,10 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
       const now = new Date();
       const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
 
-      // Get all invoices, jobs, expenses, and engineers
+      // Get all invoices, jobs, receipts, and engineers
       const allInvoices = await storage.getAllInvoices();
       const allJobs = await storage.getAllJobs();
-      const allExpenses = await storage.getAllExpenses();
+      const allReceipts = await storage.getAllReceipts();
       const allEngineers = await storage.getAllEngineers();
 
       // Revenue data - monthly revenue from paid invoices over last 6 months
@@ -8053,31 +8310,30 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
         { name: 'Signed Off', value: allJobs.filter(j => j.status === 'Signed Off').length, fill: '#22c55e' },
       ];
 
-      // Expenses data - monthly expenses
-      const monthlyExpenses: { month: string; amount: number }[] = [];
+      // Receipts data - monthly receipt spend
+      const monthlyReceipts: { month: string; amount: number }[] = [];
       for (let i = 5; i >= 0; i--) {
         const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
         const monthName = monthDate.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
         
-        const monthAmount = allExpenses
-          .filter(exp => {
-            const expDate = new Date(exp.date);
-            return expDate >= monthDate && expDate <= monthEnd;
+        const monthAmount = allReceipts
+          .filter((r: any) => {
+            const rDate = new Date(r.receiptDate || r.createdAt);
+            return rDate >= monthDate && rDate <= monthEnd;
           })
-          .reduce((sum, exp) => sum + (exp.amount || 0), 0);
+          .reduce((sum: number, r: any) => sum + (parseFloat(r.totalAmount) || 0), 0);
         
-        monthlyExpenses.push({ month: monthName, amount: monthAmount });
+        monthlyReceipts.push({ month: monthName, amount: monthAmount });
       }
 
-      // Expenses by category
-      const expenseCategories = ['mileage', 'materials', 'tools', 'fuel', 'subsistence', 'other'];
-      const expensesByCategory = expenseCategories.map(category => ({
-        category: category.charAt(0).toUpperCase() + category.slice(1),
-        amount: allExpenses
-          .filter(exp => exp.category === category)
-          .reduce((sum, exp) => sum + (exp.amount || 0), 0)
-      })).filter(item => item.amount > 0);
+      // Receipts by status
+      const receiptsByStatus = [
+        { status: 'Clean', count: allReceipts.filter((r: any) => r.status === 'clean').length },
+        { status: 'Flagged', count: allReceipts.filter((r: any) => r.status === 'flagged').length },
+        { status: 'Processing', count: allReceipts.filter((r: any) => r.status === 'processing').length },
+        { status: 'Review Needed', count: allReceipts.filter((r: any) => r.status === 'review_needed').length },
+      ].filter(item => item.count > 0);
 
       // Team performance - jobs completed per engineer
       const teamPerformance = allEngineers.map(engineer => {
@@ -8106,9 +8362,9 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
       
       const totalCompletedJobs = allJobs.filter(j => j.status === 'Signed Off').length;
       
-      const pendingExpenses = allExpenses
-        .filter(exp => exp.status === 'pending')
-        .reduce((sum, exp) => sum + (exp.amount || 0), 0);
+      const flaggedReceiptTotal = allReceipts
+        .filter((r: any) => r.status === 'flagged')
+        .reduce((sum: number, r: any) => sum + (parseFloat(r.totalAmount) || 0), 0);
       
       const activeEngineers = allEngineers.filter(e => e.status === 'active').length;
 
@@ -8116,14 +8372,14 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
         summary: {
           totalRevenue,
           totalCompletedJobs,
-          pendingExpenses,
+          flaggedReceiptTotal,
           activeEngineers,
         },
         monthlyRevenue,
         jobsByMonth,
         jobsByStatus,
-        monthlyExpenses,
-        expensesByCategory,
+        monthlyReceipts,
+        receiptsByStatus,
         teamPerformance,
       });
     } catch (error) {
@@ -8154,12 +8410,12 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
           avgJobValue: 1850,
         },
         monthlyTrends: [
-          { month: "Aug", revenue: 38500, expenses: 28200, profit: 10300 },
-          { month: "Sep", revenue: 42100, expenses: 29800, profit: 12300 },
-          { month: "Oct", revenue: 45200, expenses: 31500, profit: 13700 },
-          { month: "Nov", revenue: 48900, expenses: 33200, profit: 15700 },
-          { month: "Dec", revenue: 52400, expenses: 35100, profit: 17300 },
-          { month: "Jan", revenue: 56800, expenses: 37600, profit: 19200 },
+          { month: "Aug", revenue: 38500, receipts: 28200, profit: 10300 },
+          { month: "Sep", revenue: 42100, receipts: 29800, profit: 12300 },
+          { month: "Oct", revenue: 45200, receipts: 31500, profit: 13700 },
+          { month: "Nov", revenue: 48900, receipts: 33200, profit: 15700 },
+          { month: "Dec", revenue: 52400, receipts: 35100, profit: 17300 },
+          { month: "Jan", revenue: 56800, receipts: 37600, profit: 19200 },
         ],
         jobMetrics: {
           completionRate: 94.2,
@@ -8215,7 +8471,7 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
       
       const allInvoices = await storage.getAllInvoices();
       const allJobs = await storage.getAllJobs();
-      const allExpenses = await storage.getAllExpenses();
+      const allReceipts = await storage.getAllReceipts();
       const allEngineers = await storage.getAllEngineers();
       const allClients = await storage.getAllClients();
       const allQuotes = await storage.getAllQuotes();
@@ -8242,11 +8498,11 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
         ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 
         : 0;
 
-      // Expenses and profit
-      const totalExpenses = allExpenses
-        .filter(exp => exp.status === 'approved')
-        .reduce((sum, exp) => sum + (exp.amount || 0), 0);
-      const totalProfit = totalRevenue - totalExpenses;
+      // Receipt spend and profit
+      const totalReceiptSpend = allReceipts
+        .filter((r: any) => r.status === 'clean' || r.status === 'cleared')
+        .reduce((sum: number, r: any) => sum + (parseFloat(r.totalAmount) || 0), 0);
+      const totalProfit = totalRevenue - totalReceiptSpend;
       const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
 
       // Outstanding invoices
@@ -8290,18 +8546,18 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
           })
           .reduce((sum, inv) => sum + (inv.total || 0), 0);
         
-        const expenses = allExpenses
-          .filter(exp => {
-            const expDate = new Date(exp.date);
-            return expDate >= monthDate && expDate <= monthEnd && exp.status === 'approved';
+        const receiptSpend = allReceipts
+          .filter((r: any) => {
+            const rDate = new Date(r.receiptDate || r.createdAt);
+            return rDate >= monthDate && rDate <= monthEnd;
           })
-          .reduce((sum, exp) => sum + (exp.amount || 0), 0);
+          .reduce((sum: number, r: any) => sum + (parseFloat(r.totalAmount) || 0), 0);
         
         monthlyTrends.push({
           month: monthName,
           revenue,
-          expenses,
-          profit: revenue - expenses,
+          receipts: receiptSpend,
+          profit: revenue - receiptSpend,
         });
       }
 
@@ -8321,10 +8577,10 @@ If you cannot determine a match, return nulls for IDs with low confidence.`
 
       // Financial health
       const receivables = outstandingInvoices;
-      const payables = allExpenses
-        .filter(exp => exp.status === 'pending')
-        .reduce((sum, exp) => sum + (exp.amount || 0), 0);
-      const cashFlow = totalRevenue - totalExpenses - payables;
+      const flaggedReceiptsPending = allReceipts
+        .filter((r: any) => r.status === 'flagged')
+        .reduce((sum: number, r: any) => sum + (parseFloat(r.totalAmount) || 0), 0);
+      const cashFlow = totalRevenue - totalReceiptSpend - flaggedReceiptsPending;
 
       const invoiceAgeing = [
         { 
@@ -9033,7 +9289,7 @@ ${invoice.customerEmail ? `Email: ${invoice.customerEmail}` : ''}`
       ).join('\n');
 
       const sampleData: Record<string, any> = {};
-      const keyTables = ['users', 'jobs', 'clients', 'quotes', 'invoices', 'timesheets', 'expenses', 'vehicles', 'defects'];
+      const keyTables = ['users', 'jobs', 'clients', 'quotes', 'invoices', 'timesheets', 'receipts', 'vehicles', 'defects'];
       
       for (const table of keyTables) {
         try {
@@ -9054,7 +9310,7 @@ The application includes these core modules:
 - Quotes: Price quotes for potential work
 - Invoices: Bills sent to clients
 - Timesheets: Employee time tracking
-- Expenses: Employee expense claims
+- Receipts: Company credit card receipt compliance tracking
 - Vehicles: Fleet management
 - Defects: Vehicle defect reports
 - Users: Staff accounts with roles (admin, engineer, surveyor, fleet_manager, works_manager)
@@ -11167,7 +11423,7 @@ Be concise and practical. Focus on real issues that affect the business.`;
       res.json({
         actionTypes: ["create", "update", "delete", "login", "logout", "failed_login", "password_reset", "password_change", "export", "import", "bulk_update", "bulk_delete", "approve", "reject", "cancel", "send_email", "send_sms", "download", "upload", "share", "transfer", "assign", "enable", "disable", "archive", "restore", "view"],
         actionCategories: ["auth", "client", "job", "quote", "invoice", "finance", "team", "schedule", "fleet", "settings", "report", "document", "asset"],
-        entityTypes: ["user", "client", "job", "quote", "invoice", "payment", "expense", "timesheet", "vehicle", "walkaround_check", "defect", "asset", "file", "settings", "form", "workflow"],
+        entityTypes: ["user", "client", "job", "quote", "invoice", "payment", "receipt", "timesheet", "vehicle", "walkaround_check", "defect", "asset", "file", "settings", "form", "workflow"],
         severities: ["info", "warning", "critical"],
         users: allUsers.map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })),
       });
@@ -11320,7 +11576,7 @@ Be concise and practical. Focus on real issues that affect the business.`;
       const defaults = {
         jobs: { inApp: true, email: true, push: true },
         messages: { inApp: true, email: false, push: true },
-        expenses: { inApp: true, email: true, push: false },
+        receipts: { inApp: true, email: true, push: false },
         fleet: { inApp: true, email: false, push: false },
         system: { inApp: true, email: false, push: false },
       };

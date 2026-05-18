@@ -40,7 +40,7 @@ const ACTION_TYPES = [
   { value: 'send_webhook', label: 'Send Webhook', icon: '🌐' },
 ];
 
-const MODULES = ['general', 'jobs', 'quotes', 'invoices', 'clients', 'expenses', 'timesheets', 'fleet'];
+const MODULES = ['general', 'jobs', 'quotes', 'invoices', 'clients', 'receipts', 'timesheets', 'fleet'];
 
 export default function WorkflowEditor() {
   const [, navigate] = useLocation();

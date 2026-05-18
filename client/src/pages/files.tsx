@@ -15,7 +15,7 @@ import { FolderOpen, Upload, FileText, Image, FileSpreadsheet, File, Search, Gri
 import { Scanner } from "@/components/scanner";
 import { parseTrueNorthCode } from "@/lib/qr-utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import type { FileWithRelations, Client, Job, Expense } from "@shared/schema";
+import type { FileWithRelations, Client, Job, Receipt } from "@shared/schema";
 
 interface AiSuggestion {
   suggestedClientId: string | null;
@@ -48,7 +48,7 @@ export default function Files() {
   const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "client" | "job" | "expense" | "unassigned">("all");
+  const [filterType, setFilterType] = useState<"all" | "client" | "job" | "receipt" | "unassigned">("all");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<FileWithRelations | null>(null);
@@ -60,7 +60,7 @@ export default function Files() {
   const [newFileData, setNewFileData] = useState({
     clientId: "",
     jobId: "",
-    expenseId: "",
+    receiptId: "",
     category: "",
     notes: "",
   });
@@ -108,8 +108,8 @@ export default function Files() {
     queryKey: ["/api/jobs"],
   });
 
-  const { data: expenses = [] } = useQuery<Expense[]>({
-    queryKey: ["/api/expenses"],
+  const { data: receipts = [] } = useQuery<Receipt[]>({
+    queryKey: ["/api/receipts"],
   });
 
   const { uploadFile, isUploading, progress } = useUpload({
@@ -158,7 +158,7 @@ export default function Files() {
       setUploadingFile(null);
       setUploadedObjectPath(null);
       setAiSuggestion(null);
-      setNewFileData({ clientId: "", jobId: "", expenseId: "", category: "", notes: "" });
+      setNewFileData({ clientId: "", jobId: "", receiptId: "", category: "", notes: "" });
     },
     onError: (error: any) => {
       toast({ title: "Failed to save file", description: error.message, variant: "destructive" });
@@ -174,7 +174,7 @@ export default function Files() {
       size: uploadingFile.size || null,
       clientId: newFileData.clientId || null,
       jobId: newFileData.jobId || null,
-      expenseId: newFileData.expenseId || null,
+      receiptId: newFileData.receiptId || null,
       category: newFileData.category || null,
       notes: newFileData.notes || null,
     });
@@ -232,11 +232,11 @@ export default function Files() {
       case "job":
         matchesFilter = !!file.jobId;
         break;
-      case "expense":
-        matchesFilter = !!file.expenseId;
+      case "receipt":
+        matchesFilter = !!file.receiptId;
         break;
       case "unassigned":
-        matchesFilter = !file.clientId && !file.jobId && !file.expenseId;
+        matchesFilter = !file.clientId && !file.jobId && !file.receiptId;
         break;
     }
     
@@ -248,7 +248,7 @@ export default function Files() {
     setNewFileData({
       clientId: file.clientId || "",
       jobId: file.jobId || "",
-      expenseId: file.expenseId || "",
+      receiptId: file.receiptId || "",
       category: file.category || "",
       notes: file.notes || "",
     });
@@ -262,7 +262,7 @@ export default function Files() {
       data: {
         clientId: newFileData.clientId || null,
         jobId: newFileData.jobId || null,
-        expenseId: newFileData.expenseId || null,
+        receiptId: newFileData.receiptId || null,
         category: newFileData.category || null,
         notes: newFileData.notes || null,
       },
@@ -466,7 +466,7 @@ export default function Files() {
                 setUploadingFile(null);
                 setUploadedObjectPath(null);
                 setAiSuggestion(null);
-                setNewFileData({ clientId: "", jobId: "", expenseId: "", category: "", notes: "" });
+                setNewFileData({ clientId: "", jobId: "", receiptId: "", category: "", notes: "" });
               }}>Cancel</Button>
               {!uploadedObjectPath ? (
                 <Button 
@@ -548,7 +548,7 @@ export default function Files() {
                 <SelectItem value="all">All Files</SelectItem>
                 <SelectItem value="client">Client Files</SelectItem>
                 <SelectItem value="job">Job Files</SelectItem>
-                <SelectItem value="expense">Expense Files</SelectItem>
+                <SelectItem value="receipt">Receipt Files</SelectItem>
                 <SelectItem value="unassigned">Unassigned</SelectItem>
               </SelectContent>
             </Select>

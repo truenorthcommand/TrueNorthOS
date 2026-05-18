@@ -56,7 +56,7 @@ Key topics you help with:
 
 ### Features
 - PWA: Works offline, add to home screen on mobile
-- Receipt OCR: Expenses > Upload Receipt > AI extracts vendor, date, amount
+- Receipt OCR: Receipts > Upload Receipt > AI extracts vendor, date, amount
 - Quality Assessment: AI reviews completed jobs for quality scoring
 - Recurring jobs: Enable toggle when creating, set frequency
 - Invoice customization: Settings > Templates > Invoice Template

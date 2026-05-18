@@ -20,12 +20,14 @@ import { generateTrueNorthCode } from '@/lib/qr-utils';
 import { JobChecklist } from '@/components/job-checklist';
 import { JobPhases } from '@/components/job-phases';
 import type { FileWithRelations } from '@shared/schema';
+import { ReceiptPhotoCapture } from '@/components/receipt-photo-capture';
 import QRCode from 'qrcode';
 import {
   ArrowLeft, Save, Trash2, Plus, MapPin, Calendar, Clock, User, Users,
   FileText, Image, Upload, X, Printer, AlertTriangle, Shield, CheckCircle2,
   XCircle, Loader2, ClipboardCheck, Sparkles, Edit, Package, Camera,
-  ChevronDown, File, FileSpreadsheet, ExternalLink, QrCode, Navigation, Play, Square, Timer, MessageSquare
+  ChevronDown, File, FileSpreadsheet, ExternalLink, QrCode, Navigation, Play, Square, Timer, MessageSquare,
+  Receipt as ReceiptIcon, ShieldAlert
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
@@ -932,6 +934,169 @@ export default function JobDetail() {
     );
   }
 
+  function renderTabReceipts() {
+    const { data: jobReceipts = [], isLoading: receiptsLoading } = useQuery<any[]>({
+      queryKey: [`/api/receipts/job/${job.id}`],
+      enabled: !!job.id,
+    });
+
+    const [showUpload, setShowUpload] = useState(false);
+    const [receiptPhoto, setReceiptPhoto] = useState('');
+    const [receiptDescription, setReceiptDescription] = useState('');
+    const [receiptCategory, setReceiptCategory] = useState('materials');
+    const [uploading, setUploading] = useState(false);
+
+    const handleUploadReceipt = async () => {
+      if (!receiptPhoto) {
+        toast({ title: 'Photo required', description: 'Please take a photo of the receipt', variant: 'destructive' });
+        return;
+      }
+      setUploading(true);
+      try {
+        await apiRequest('POST', '/api/receipts', {
+          type: 'job',
+          category: receiptCategory,
+          description: receiptDescription || `Job receipt - ${job.jobNo}`,
+          receiptImageUrl: receiptPhoto,
+          date: new Date().toISOString(),
+          jobId: job.id,
+          clientId: job.clientId,
+        });
+        toast({ title: 'Receipt uploaded', description: 'AI is scanning your receipt for compliance' });
+        setShowUpload(false);
+        setReceiptPhoto('');
+        setReceiptDescription('');
+        setReceiptCategory('materials');
+        queryClient.invalidateQueries({ queryKey: [`/api/receipts/job/${job.id}`] });
+      } catch (err: any) {
+        toast({ title: 'Upload failed', description: err.message || 'Failed to upload receipt', variant: 'destructive' });
+      } finally {
+        setUploading(false);
+      }
+    };
+
+    const getStatusBadge = (status: string) => {
+      switch (status) {
+        case 'clean': return <Badge className="bg-green-100 text-green-800">Clean</Badge>;
+        case 'flagged': return <Badge className="bg-amber-100 text-amber-800">Flagged</Badge>;
+        case 'reviewed': return <Badge className="bg-blue-100 text-blue-800">Reviewed</Badge>;
+        case 'pending': return <Badge className="bg-gray-100 text-gray-800">Processing</Badge>;
+        default: return <Badge variant="outline">{status}</Badge>;
+      }
+    };
+
+    const totalSpend = jobReceipts.reduce((sum: number, r: any) => sum + (r.receiptTotal || 0), 0);
+    const budgetUsed = job.agreedPrice ? ((totalSpend / job.agreedPrice) * 100).toFixed(1) : null;
+
+    return (
+      <div className="space-y-4">
+        {/* Budget Summary */}
+        {job.agreedPrice && (
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Material Spend vs Budget</p>
+                  <p className="text-2xl font-bold">£{totalSpend.toFixed(2)} <span className="text-sm font-normal text-muted-foreground">/ £{job.agreedPrice.toFixed(2)}</span></p>
+                </div>
+                <Badge className={Number(budgetUsed) > 100 ? 'bg-red-100 text-red-800' : Number(budgetUsed) > 80 ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'}>
+                  {budgetUsed}% used
+                </Badge>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                <div className={`h-2 rounded-full ${Number(budgetUsed) > 100 ? 'bg-red-500' : Number(budgetUsed) > 80 ? 'bg-amber-500' : 'bg-green-500'}`} style={{ width: `${Math.min(Number(budgetUsed), 100)}%` }} />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Upload Receipt Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ReceiptIcon className="h-5 w-5" /> Job Receipts ({jobReceipts.length})
+              </CardTitle>
+              <Button size="sm" onClick={() => setShowUpload(!showUpload)}>
+                <Plus className="h-4 w-4 mr-1" /> Upload Receipt
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {showUpload && (
+              <div className="border rounded-lg p-4 mb-4 space-y-4 bg-muted/30">
+                <ReceiptPhotoCapture value={receiptPhoto} onChange={setReceiptPhoto} label="Receipt Photo (required)" />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Category</Label>
+                    <Select value={receiptCategory} onValueChange={setReceiptCategory}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="materials">Materials</SelectItem>
+                        <SelectItem value="sundries">Sundries</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Description</Label>
+                    <Input value={receiptDescription} onChange={e => setReceiptDescription(e.target.value)} placeholder="What was purchased?" />
+                  </div>
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button variant="outline" size="sm" onClick={() => setShowUpload(false)}>Cancel</Button>
+                  <Button size="sm" onClick={handleUploadReceipt} disabled={uploading || !receiptPhoto}>
+                    {uploading ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Scanning...</> : 'Upload & Scan'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {receiptsLoading ? (
+              <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+            ) : jobReceipts.length > 0 ? (
+              <div className="divide-y">
+                {jobReceipts.map((receipt: any) => (
+                  <div key={receipt.id} className="py-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {receipt.receiptImageUrl && (
+                          <img src={receipt.receiptImageUrl} alt="Receipt" className="w-12 h-12 object-cover rounded border" />
+                        )}
+                        <div>
+                          <p className="font-medium text-sm">{receipt.vendorName || receipt.description}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {receipt.date ? format(new Date(receipt.date), 'dd MMM yyyy') : 'No date'}
+                            {receipt.category && ` · ${receipt.category}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold">£{(receipt.receiptTotal || 0).toFixed(2)}</p>
+                        {getStatusBadge(receipt.status)}
+                      </div>
+                    </div>
+                    {receipt.status === 'flagged' && receipt.aiSummary && (
+                      <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-sm flex items-start gap-2">
+                        <ShieldAlert className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                        <span className="text-amber-800">{receipt.aiSummary}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <ReceiptIcon className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                <p>No receipts uploaded for this job</p>
+                <p className="text-sm">Upload material receipts to track job costs and ensure compliance</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   function renderTabPhotos() {
     const images = job.photos || [];
     const docs = jobFiles.filter(f => !f.mimeType?.startsWith('image/'));
@@ -1382,6 +1547,7 @@ export default function JobDetail() {
           <TabsTrigger value="phases">Phases</TabsTrigger>
           <TabsTrigger value="schedule">Schedule</TabsTrigger>
           <TabsTrigger value="materials">Materials</TabsTrigger>
+          <TabsTrigger value="receipts">Receipts</TabsTrigger>
           <TabsTrigger value="photos">Photos & Files</TabsTrigger>
           <TabsTrigger value="actions">Actions</TabsTrigger>
           <TabsTrigger value="signoff">Sign-Off</TabsTrigger>
@@ -1393,6 +1559,7 @@ export default function JobDetail() {
         <TabsContent value="phases"><JobPhases jobId={parseInt(params?.id || '0')} /></TabsContent>
         <TabsContent value="schedule">{renderTabSchedule()}</TabsContent>
         <TabsContent value="materials">{renderTabMaterials()}</TabsContent>
+        <TabsContent value="receipts">{renderTabReceipts()}</TabsContent>
         <TabsContent value="photos">{renderTabPhotos()}</TabsContent>
         <TabsContent value="actions">{renderTabActions()}</TabsContent>
         <TabsContent value="signoff">{renderTabSignOff()}</TabsContent>

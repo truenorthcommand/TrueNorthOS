@@ -9,7 +9,7 @@ export interface Notification {
   jobId?: string;
   jobNo?: string;
   engineerName?: string;
-  expenseId?: string;
+  receiptId?: string;
   defectId?: string;
   urgent?: boolean;
   timestamp: string;

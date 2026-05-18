@@ -743,6 +743,209 @@ export async function runMigrations() {
     console.error("[Migration] job_visits table error:", e.message);
   }
 
+  // === RECEIPT COMPLIANCE SYSTEM ===
+  try {
+    // Create receipts table (replaces expenses)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS receipts (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        user_id VARCHAR NOT NULL,
+        date TIMESTAMP NOT NULL,
+        type TEXT NOT NULL DEFAULT 'general',
+        category TEXT NOT NULL,
+        description TEXT NOT NULL,
+        receipt_image_url TEXT NOT NULL,
+        vendor_name TEXT,
+        vendor_type TEXT,
+        receipt_total DOUBLE PRECISION,
+        vat_amount DOUBLE PRECISION DEFAULT 0,
+        currency TEXT NOT NULL DEFAULT 'GBP',
+        job_id VARCHAR,
+        client_id VARCHAR,
+        status TEXT NOT NULL DEFAULT 'pending',
+        ai_scanned_at TIMESTAMP,
+        ai_confidence DOUBLE PRECISION,
+        ai_summary TEXT,
+        reviewed_by_id VARCHAR,
+        reviewed_at TIMESTAMP,
+        review_notes TEXT,
+        flagged_item_count INTEGER DEFAULT 0,
+        total_deduction_amount DOUBLE PRECISION DEFAULT 0,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_receipts_user ON receipts(user_id);
+      CREATE INDEX IF NOT EXISTS idx_receipts_job ON receipts(job_id);
+      CREATE INDEX IF NOT EXISTS idx_receipts_status ON receipts(status);
+      CREATE INDEX IF NOT EXISTS idx_receipts_date ON receipts(date);
+    `);
+
+    // Create receipt line items table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS receipt_line_items (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        receipt_id VARCHAR NOT NULL,
+        description TEXT NOT NULL,
+        quantity DOUBLE PRECISION DEFAULT 1,
+        unit_price DOUBLE PRECISION,
+        total_price DOUBLE PRECISION NOT NULL,
+        status TEXT NOT NULL DEFAULT 'clean',
+        flag_reason TEXT,
+        flag_category TEXT,
+        reviewed_by_id VARCHAR,
+        reviewed_at TIMESTAMP,
+        review_action TEXT,
+        review_notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_receipt_line_items_receipt ON receipt_line_items(receipt_id);
+      CREATE INDEX IF NOT EXISTS idx_receipt_line_items_status ON receipt_line_items(status);
+    `);
+
+    // Create deductions table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS deductions (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        user_id VARCHAR NOT NULL,
+        receipt_id VARCHAR NOT NULL,
+        receipt_line_item_id VARCHAR NOT NULL,
+        amount DOUBLE PRECISION NOT NULL,
+        reason TEXT NOT NULL,
+        item_description TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        applied_to_payroll BOOLEAN NOT NULL DEFAULT false,
+        payroll_reference TEXT,
+        created_by_id VARCHAR NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_deductions_user ON deductions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_deductions_receipt ON deductions(receipt_id);
+      CREATE INDEX IF NOT EXISTS idx_deductions_status ON deductions(status);
+    `);
+
+    // Create material profiles table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS material_profiles (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        name TEXT NOT NULL,
+        description TEXT,
+        job_types JSONB NOT NULL DEFAULT '[]'::jsonb,
+        permitted_materials JSONB NOT NULL DEFAULT '[]'::jsonb,
+        flagged_materials JSONB NOT NULL DEFAULT '[]'::jsonb,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        created_by_id VARCHAR,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // Create vendor rules table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS vendor_rules (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        vendor_type TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        permitted_items JSONB NOT NULL DEFAULT '[]'::jsonb,
+        flagged_items JSONB NOT NULL DEFAULT '[]'::jsonb,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        created_by_id VARCHAR,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // Create archived expenses table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS archived_expenses (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        original_id VARCHAR,
+        user_id VARCHAR NOT NULL,
+        date TIMESTAMP NOT NULL,
+        category TEXT NOT NULL,
+        description TEXT NOT NULL,
+        amount DOUBLE PRECISION NOT NULL,
+        vat_amount DOUBLE PRECISION DEFAULT 0,
+        receipt_url TEXT,
+        mileage DOUBLE PRECISION,
+        mileage_rate DOUBLE PRECISION,
+        job_id VARCHAR,
+        client_id VARCHAR,
+        status TEXT NOT NULL,
+        approved_by_id VARCHAR,
+        approved_at TIMESTAMP,
+        paid_at TIMESTAMP,
+        notes TEXT,
+        original_created_at TIMESTAMP,
+        archived_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // Update accounts_receipts to use receipt_id instead of expense_id
+    await client.query(`
+      ALTER TABLE accounts_receipts ADD COLUMN IF NOT EXISTS receipt_id VARCHAR;
+    `);
+
+    // Update files to use receipt_id instead of expense_id
+    await client.query(`
+      ALTER TABLE files ADD COLUMN IF NOT EXISTS receipt_id VARCHAR;
+    `);
+
+    // Archive existing expenses if expenses table exists
+    try {
+      const tableCheck = await client.query(`
+        SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'expenses');
+      `);
+      if (tableCheck.rows[0].exists) {
+        const countResult = await client.query('SELECT COUNT(*) FROM expenses');
+        if (parseInt(countResult.rows[0].count) > 0) {
+          await client.query(`
+            INSERT INTO archived_expenses (original_id, user_id, date, category, description, amount, vat_amount, receipt_url, mileage, mileage_rate, job_id, client_id, status, approved_by_id, approved_at, paid_at, notes, original_created_at)
+            SELECT id, user_id, date, category, description, amount, vat_amount, receipt_url, mileage, mileage_rate, job_id, client_id, status, approved_by_id, approved_at, paid_at, notes, created_at
+            FROM expenses
+            ON CONFLICT DO NOTHING;
+          `);
+          console.log("[Migration] Archived existing expenses");
+        }
+      }
+    } catch (archiveErr: any) {
+      console.log("[Migration] No expenses to archive or already archived");
+    }
+
+    // Seed default material profiles
+    const profileCount = await client.query('SELECT COUNT(*) FROM material_profiles');
+    if (parseInt(profileCount.rows[0].count) === 0) {
+      await client.query(`
+        INSERT INTO material_profiles (name, description, job_types, permitted_materials, flagged_materials) VALUES
+        ('Painting & Decorating', 'Materials expected for painting and decorating jobs', '["painting", "decorating", "painting & decorating", "painter", "decorator"]'::jsonb, '["emulsion", "undercoat", "gloss", "primer", "filler", "sandpaper", "dust sheets", "masking tape", "brushes", "rollers", "paint tray", "caulk", "sealant", "white spirit", "sugar soap", "wallpaper", "wallpaper paste", "lining paper", "cutting knife", "paint kettle"]'::jsonb, '["plasterboard", "copper pipe", "cable", "tiles", "cement", "bricks", "timber framing", "radiators", "boiler parts"]'::jsonb),
+        ('Plumbing', 'Materials expected for plumbing jobs', '["plumbing", "plumber", "heating", "gas"]'::jsonb, '["copper pipe", "fittings", "solder", "flux", "ptfe", "silicone", "waste pipe", "compression fittings", "push fit", "valves", "taps", "cistern", "float valve", "overflow pipe", "soil pipe", "clips", "brackets", "washers", "o-rings"]'::jsonb, '["paint", "emulsion", "plasterboard", "timber", "tiles", "wallpaper", "cable", "sockets"]'::jsonb),
+        ('Electrical', 'Materials expected for electrical jobs', '["electrical", "electrician", "rewire", "wiring"]'::jsonb, '["cable", "twin and earth", "switches", "sockets", "consumer unit", "mcb", "rcbo", "conduit", "trunking", "back boxes", "face plates", "junction box", "wire connectors", "cable clips", "earth rod", "bonding", "flex"]'::jsonb, '["paint", "copper pipe", "plasterboard", "tiles", "timber", "wallpaper", "solder"]'::jsonb),
+        ('Plastering', 'Materials expected for plastering jobs', '["plastering", "plasterer", "rendering", "skimming"]'::jsonb, '["plasterboard", "plaster", "bonding", "multi finish", "scrim tape", "beads", "angle beads", "pva", "mesh", "dot and dab", "jointing compound", "plaster of paris"]'::jsonb, '["paint", "copper pipe", "cable", "tiles", "solder", "wallpaper", "sockets"]'::jsonb),
+        ('General Maintenance', 'Broader tolerance for general maintenance jobs', '["general", "maintenance", "handyman", "repairs", "general maintenance"]'::jsonb, '["screws", "fixings", "nails", "rawl plugs", "silicone", "filler", "sandpaper", "adhesive", "tape", "brackets", "hinges", "handles", "locks", "catches", "weather strip", "draught excluder"]'::jsonb, '["large quantities of specialist materials", "bulk copper pipe", "bulk cable", "bulk plasterboard"]'::jsonb);
+      `);
+      console.log("[Migration] Seeded default material profiles");
+    }
+
+    // Seed default vendor rules
+    const ruleCount = await client.query('SELECT COUNT(*) FROM vendor_rules');
+    if (parseInt(ruleCount.rows[0].count) === 0) {
+      await client.query(`
+        INSERT INTO vendor_rules (vendor_type, display_name, permitted_items, flagged_items) VALUES
+        ('petrol_station', 'Petrol Station', '["diesel", "unleaded", "petrol", "fuel", "adblue", "ad blue", "oil", "engine oil", "screenwash", "screen wash", "de-icer", "antifreeze", "air freshener", "bulb", "wiper", "fuse"]'::jsonb, '["food", "sandwich", "meal deal", "crisps", "chocolate", "sweets", "drinks", "coffee", "tea", "energy drink", "red bull", "monster", "coca cola", "pepsi", "water bottle", "lucozade", "cigarettes", "tobacco", "lottery", "scratch card", "vape", "alcohol", "beer", "wine", "spirits", "magazine", "newspaper"]'::jsonb),
+        ('builders_merchant', 'Builders Merchant', '["timber", "plasterboard", "cement", "sand", "aggregate", "bricks", "blocks", "fixings", "screws", "nails", "adhesive", "sealant", "insulation", "membrane", "pipe", "fittings", "cable", "plaster", "paint", "emulsion"]'::jsonb, '["food", "drinks", "clothing", "footwear", "electronics", "household", "garden furniture", "bbq", "toys"]'::jsonb),
+        ('hardware_store', 'Hardware Store', '["fixings", "screws", "nails", "brackets", "hinges", "adhesive", "sealant", "tape", "sandpaper", "filler", "paint", "brushes", "rollers", "ppe", "gloves", "goggles", "dust masks", "safety boots", "consumables"]'::jsonb, '["food", "drinks", "household appliances", "garden furniture", "toys", "electronics", "clothing"]'::jsonb),
+        ('cleaning_supplier', 'Cleaning Supplier', '["cleaning products", "detergent", "bleach", "disinfectant", "polish", "mop", "bucket", "cloths", "sponges", "bin bags", "refuse sacks", "paper towels", "hand soap", "sanitiser", "air freshener", "rubber gloves", "ppe"]'::jsonb, '["food", "drinks", "personal items", "electronics", "clothing", "household appliances"]'::jsonb),
+        ('general_retailer', 'General Retailer', '["stationery", "printer paper", "envelopes", "stamps", "labels", "folders", "pens", "batteries", "extension lead"]'::jsonb, '["food", "drinks", "personal care", "cosmetics", "clothing", "electronics", "toys", "games", "books", "magazines", "alcohol", "tobacco"]'::jsonb);
+      `);
+      console.log("[Migration] Seeded default vendor rules");
+    }
+
+    console.log("[Migration] Receipt compliance system OK");
+  } catch (e: any) {
+    console.error("[Migration] Receipt compliance system error:", e.message);
+  }
+
   console.log("[Migration] All migrations completed");
   client.release();
 }

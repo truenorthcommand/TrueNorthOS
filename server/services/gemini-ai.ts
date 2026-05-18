@@ -68,6 +68,70 @@ interface VoiceTranscription {
   keyPoints: string[];
 }
 
+// === Receipt Validation Types ===
+
+interface VendorRule {
+  vendorType: string;
+  permittedCategories: string[];
+  flaggedCategories: string[];
+  notes?: string;
+}
+
+interface MaterialProfile {
+  jobType: string;
+  expectedMaterials: string[];
+  commonConsumables: string[];
+  notes?: string;
+}
+
+interface ValidatedLineItem {
+  description: string;
+  quantity: number;
+  unitPrice: number | null;
+  totalPrice: number;
+  status: "clean" | "flagged";
+  flagReason: string | null;
+  flagCategory: string | null;
+}
+
+interface ReceiptValidationResult {
+  overallStatus: "clean" | "flagged";
+  confidence: number;
+  vendorType: string;
+  summary: string;
+  lineItems: ValidatedLineItem[];
+}
+
+function cleanupJsonResponse(text: string): string {
+  const codeBlockMatch = text.match(/```(?:json)?\n?([\s\S]*?)```/);
+  if (codeBlockMatch) {
+    return codeBlockMatch[1].trim();
+  }
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  return jsonMatch ? jsonMatch[0] : text;
+}
+
+function buildConservativeResult(
+  receiptData: ReceiptData,
+  vendorType: string = "unknown"
+): ReceiptValidationResult {
+  return {
+    overallStatus: "flagged",
+    confidence: 0,
+    vendorType,
+    summary: "AI validation failed — all items conservatively flagged for manual review.",
+    lineItems: (receiptData.items || []).map((item) => ({
+      description: item.description,
+      quantity: item.quantity,
+      unitPrice: item.price,
+      totalPrice: item.price * item.quantity,
+      status: "flagged" as const,
+      flagReason: "Unable to validate automatically — requires manual review",
+      flagCategory: "other",
+    })),
+  };
+}
+
 export async function scanReceipt(imageBase64: string): Promise<ReceiptData> {
   const prompt = `You are an expert receipt scanner for UK businesses. Analyze this receipt image and extract all details.
 
@@ -328,4 +392,198 @@ export async function generateImage(prompt: string): Promise<string> {
 
   const mimeType = imagePart.inlineData.mimeType || "image/png";
   return `data:${mimeType};base64,${imagePart.inlineData.data}`;
+}
+
+// === Receipt Validation Functions ===
+
+export async function validateGeneralReceipt(
+  receiptData: ReceiptData,
+  vendorRules: VendorRule[]
+): Promise<ReceiptValidationResult> {
+  const vendorRulesContext = vendorRules.length > 0
+    ? `\n\nVendor Rules:\n${vendorRules.map((r) => `- Vendor type "${r.vendorType}": Permitted=[${r.permittedCategories.join(", ")}], Flagged=[${r.flaggedCategories.join(", ")}]${r.notes ? " Notes: " + r.notes : ""}`).join("\n")}`
+    : "";
+
+  const prompt = `You are a company credit card abuse prevention analyst for a UK trades business. Your job is to analyse receipt line items and flag suspicious purchases.
+
+RECEIPT INFORMATION:
+- Vendor: ${receiptData.vendorName || "Unknown"}
+- Date: ${receiptData.receiptDate || "Unknown"}
+- Total: ${receiptData.currency} ${receiptData.total ?? "Unknown"}
+${vendorRulesContext}
+
+LINE ITEMS TO ANALYSE:
+${(receiptData.items || []).map((item, i) => `${i + 1}. "${item.description}" — Qty: ${item.quantity}, Price: ${item.price}`).join("\n")}
+
+RULES — You MUST follow these strictly:
+1. Identify the vendor type from the vendor name (petrol_station, builders_merchant, hardware_store, cleaning_supplier, general_retailer, or other).
+2. For EACH line item, determine if it should be "clean" or "flagged".
+3. ALWAYS FLAG these categories regardless of vendor:
+   - Food and drinks (sandwiches, crisps, sweets, energy drinks, coffee, water bottles, meal deals, etc.)
+   - Household items (cleaning products for home, air fresheners, bin bags for personal use, etc.)
+   - Tobacco and alcohol (cigarettes, beer, wine, spirits, vapes, etc.)
+   - Personal items (phone chargers, clothing, toiletries, sunglasses, etc.)
+   - Electronics (headphones, speakers, USB drives, etc.)
+   - ANY tools of ANY description (power tools, hand tools, drill bits, saw blades, spanners, screwdrivers, paintbrushes, rollers, tool kits, etc.)
+4. Items that are CLEAN for general receipts:
+   - Vehicle consumables at petrol stations (fuel, screenwash, AdBlue, oil)
+   - Trade consumables that are NOT tools (WD-40, silicone sealant, adhesives, tape, fixings like screws/nails/bolts, cable ties, sandpaper)
+   - PPE (gloves, safety glasses, masks, ear defenders, hi-vis)
+   - Legitimate trade materials (timber, plasterboard, pipe, wire, fittings, paint, cement)
+5. Use common-sense reasoning. For example:
+   - "Monster Energy" or "Red Bull" at BP → flagged as food_drink
+   - "Screenwash" at BP → clean (vehicle maintenance)
+   - "DeWalt drill" at Toolstation → flagged as tools
+   - "WD-40" at Toolstation → clean (consumable, NOT a tool)
+   - "Paintbrush set" on a general receipt → flagged as tools
+   - "Sandwich" → flagged as food_drink
+
+RESPONSE FORMAT — Return ONLY a valid JSON object:
+{
+  "overallStatus": "clean" or "flagged" (flagged if ANY item is flagged),
+  "confidence": 0.0 to 1.0,
+  "vendorType": "identified vendor type",
+  "summary": "Brief explanation of findings",
+  "lineItems": [
+    {
+      "description": "original item description",
+      "quantity": number,
+      "unitPrice": number or null,
+      "totalPrice": number,
+      "status": "clean" or "flagged",
+      "flagReason": "reason if flagged, null if clean",
+      "flagCategory": "food_drink | household | tools | personal | tobacco_alcohol | electronics | other | null"
+    }
+  ]
+}
+
+Return ONLY valid JSON. No markdown, no explanation outside the JSON.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        temperature: 0.1,
+      },
+    });
+
+    const text = response.text || "";
+    const jsonStr = cleanupJsonResponse(text);
+    const result: ReceiptValidationResult = JSON.parse(jsonStr);
+
+    // Ensure overallStatus is consistent with line items
+    const hasFlagged = result.lineItems.some((item) => item.status === "flagged");
+    if (hasFlagged) {
+      result.overallStatus = "flagged";
+    }
+
+    return result;
+  } catch (error) {
+    console.error("validateGeneralReceipt Gemini error:", error);
+    return buildConservativeResult(receiptData, "unknown");
+  }
+}
+
+export async function validateJobReceipt(
+  receiptData: ReceiptData,
+  jobDescription: string,
+  jobType: string,
+  materialProfile: MaterialProfile | null,
+  vendorRules: VendorRule[]
+): Promise<ReceiptValidationResult> {
+  const vendorRulesContext = vendorRules.length > 0
+    ? `\nVendor Rules:\n${vendorRules.map((r) => `- Vendor type "${r.vendorType}": Permitted=[${r.permittedCategories.join(", ")}], Flagged=[${r.flaggedCategories.join(", ")}]${r.notes ? " Notes: " + r.notes : ""}`).join("\n")}`
+    : "";
+
+  const materialContext = materialProfile
+    ? `\nMATERIAL PROFILE FOR "${materialProfile.jobType}":\n- Expected materials: ${materialProfile.expectedMaterials.join(", ")}\n- Common consumables: ${materialProfile.commonConsumables.join(", ")}${materialProfile.notes ? "\n- Notes: " + materialProfile.notes : ""}`
+    : "";
+
+  const prompt = `You are a company credit card abuse prevention analyst for a UK trades business. Your job is to analyse receipt line items for a SPECIFIC JOB and flag suspicious or unrelated purchases.
+
+JOB CONTEXT:
+- Job Type: ${jobType}
+- Job Description: ${jobDescription}
+${materialContext}
+
+RECEIPT INFORMATION:
+- Vendor: ${receiptData.vendorName || "Unknown"}
+- Date: ${receiptData.receiptDate || "Unknown"}
+- Total: ${receiptData.currency} ${receiptData.total ?? "Unknown"}
+${vendorRulesContext}
+
+LINE ITEMS TO ANALYSE:
+${(receiptData.items || []).map((item, i) => `${i + 1}. "${item.description}" — Qty: ${item.quantity}, Price: ${item.price}`).join("\n")}
+
+RULES — You MUST follow these strictly:
+1. Identify the vendor type from the vendor name (petrol_station, builders_merchant, hardware_store, cleaning_supplier, general_retailer, or other).
+2. For EACH line item, determine if it is appropriate for the specified job.
+3. ALWAYS FLAG these categories regardless of job type:
+   - Food and drinks (sandwiches, crisps, sweets, energy drinks, coffee, water bottles, meal deals, etc.)
+   - Household items (cleaning products for home, air fresheners, bin bags for personal use, etc.)
+   - Tobacco and alcohol (cigarettes, beer, wine, spirits, vapes, etc.)
+   - Personal items (phone chargers, clothing, toiletries, sunglasses, etc.)
+   - Electronics (headphones, speakers, USB drives, etc.)
+   - ANY tools of ANY description (power tools, hand tools, drill bits, saw blades, spanners, screwdrivers, tool kits, etc.)
+4. ADDITIONALLY FLAG materials that don't match the job type:
+   - E.g., copper pipe for a painting job → flagged as unrelated_material
+   - E.g., electrical cable for a plumbing job → flagged as unrelated_material
+5. Items that are CLEAN for job receipts:
+   - Materials that match the job's material profile and expected materials
+   - Trade consumables that are NOT tools (WD-40, silicone sealant, adhesives, tape, fixings, cable ties, sandpaper)
+   - PPE (gloves, safety glasses, masks, ear defenders, hi-vis)
+   - Vehicle consumables at petrol stations (fuel, screenwash, AdBlue, oil)
+   - Job-specific consumables (e.g., paintbrush for a painting job is a consumable FOR the job, NOT a tool — mark as CLEAN)
+6. IMPORTANT DISTINCTION for job receipts:
+   - Items like paintbrushes, rollers, sandpaper pads ARE consumables when they match the job type — mark CLEAN
+   - The same items on a general receipt (no job context) would be flagged as tools
+   - Power tools and durable tools are ALWAYS flagged even if related to the job
+7. Use common-sense reasoning about whether materials are appropriate for the job type.
+
+RESPONSE FORMAT — Return ONLY a valid JSON object:
+{
+  "overallStatus": "clean" or "flagged" (flagged if ANY item is flagged),
+  "confidence": 0.0 to 1.0,
+  "vendorType": "identified vendor type",
+  "summary": "Brief explanation of findings including job relevance assessment",
+  "lineItems": [
+    {
+      "description": "original item description",
+      "quantity": number,
+      "unitPrice": number or null,
+      "totalPrice": number,
+      "status": "clean" or "flagged",
+      "flagReason": "reason if flagged, null if clean",
+      "flagCategory": "food_drink | household | tools | personal | tobacco_alcohol | electronics | unrelated_material | other | null"
+    }
+  ]
+}
+
+Return ONLY valid JSON. No markdown, no explanation outside the JSON.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        temperature: 0.1,
+      },
+    });
+
+    const text = response.text || "";
+    const jsonStr = cleanupJsonResponse(text);
+    const result: ReceiptValidationResult = JSON.parse(jsonStr);
+
+    // Ensure overallStatus is consistent with line items
+    const hasFlagged = result.lineItems.some((item) => item.status === "flagged");
+    if (hasFlagged) {
+      result.overallStatus = "flagged";
+    }
+
+    return result;
+  } catch (error) {
+    console.error("validateJobReceipt Gemini error:", error);
+    return buildConservativeResult(receiptData, "unknown");
+  }
 }

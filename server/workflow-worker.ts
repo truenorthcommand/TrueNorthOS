@@ -461,7 +461,7 @@ function getTableForModule(module: string): string | null {
     invoices: 'invoices',
     clients: 'clients',
     properties: 'properties',
-    expenses: 'expenses',
+    receipts: 'receipts',
     timesheets: 'timesheets',
     fleet: 'vehicles',
     users: 'users'

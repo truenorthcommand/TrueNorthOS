@@ -463,11 +463,11 @@ export default function EngineerDashboard() {
               </Card>
               <Card
                 className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
-                onClick={() => navigate('/expense/new')}
+                onClick={() => navigate('/receipt/new')}
               >
                 <CardContent className="p-4 flex flex-col items-center justify-center text-center h-24">
                   <Receipt className="h-6 w-6 text-[#E8A54B] mb-2" />
-                  <span className="text-sm font-medium text-[#0F2B4C] dark:text-white">Expense</span>
+                  <span className="text-sm font-medium text-[#0F2B4C] dark:text-white">Receipt</span>
                 </CardContent>
               </Card>
               <Card
