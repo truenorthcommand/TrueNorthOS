@@ -32,8 +32,9 @@ export async function generateFormPdf(options: PdfOptions): Promise<Buffer> {
 
   doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
-  doc.text(templateName, pageWidth / 2, y, { align: "center" });
-  y += 10;
+  const wrappedTitle = doc.splitTextToSize(templateName, contentWidth);
+  doc.text(wrappedTitle, pageWidth / 2, y, { align: "center" });
+  y += wrappedTitle.length * 7 + 3;
 
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
@@ -47,8 +48,10 @@ export async function generateFormPdf(options: PdfOptions): Promise<Buffer> {
   }
 
   if (entityInfo) {
-    doc.text(`${entityInfo.type}: ${entityInfo.name || "Unknown"}`, pageWidth / 2, y, { align: "center" });
-    y += 6;
+    const entityText = `${entityInfo.type}: ${entityInfo.name || "Unknown"}`;
+    const wrappedEntityInfo = doc.splitTextToSize(entityText, contentWidth);
+    doc.text(wrappedEntityInfo, pageWidth / 2, y, { align: "center" });
+    y += wrappedEntityInfo.length * 5 + 1;
   }
 
   doc.setTextColor(0);
@@ -69,8 +72,9 @@ export async function generateFormPdf(options: PdfOptions): Promise<Buffer> {
     if (fieldType === "header" || fieldType === "section") {
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
-      doc.text(field.label, margin, y);
-      y += 8;
+      const wrappedSectionLabel = doc.splitTextToSize(field.label, contentWidth);
+      doc.text(wrappedSectionLabel, margin, y);
+      y += wrappedSectionLabel.length * 6 + 2;
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
       continue;
@@ -78,8 +82,10 @@ export async function generateFormPdf(options: PdfOptions): Promise<Buffer> {
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text(field.label + (field.required ? " *" : ""), margin, y);
-    y += 5;
+    const labelText = field.label + (field.required ? " *" : "");
+    const wrappedFieldLabel = doc.splitTextToSize(labelText, contentWidth);
+    doc.text(wrappedFieldLabel, margin, y);
+    y += wrappedFieldLabel.length * 5;
 
     doc.setFont("helvetica", "normal");
     

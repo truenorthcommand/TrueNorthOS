@@ -716,7 +716,7 @@ export default function JobDetail() {
             </div>
             <div>
               <Label>Site Address</Label>
-              <Input value={formData.address} onChange={e => handleFieldChange('address', e.target.value)} placeholder="Site address" />
+              <Textarea rows={2} className="resize-y" value={formData.address} onChange={e => handleFieldChange('address', e.target.value)} placeholder="Site address" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -1283,7 +1283,7 @@ export default function JobDetail() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Notes</Label>
-                  <Input value={newVisit.notes} onChange={e => setNewVisit(p => ({ ...p, notes: e.target.value }))} placeholder="Optional notes" />
+                  <Textarea rows={2} className="resize-y" value={newVisit.notes} onChange={e => setNewVisit(p => ({ ...p, notes: e.target.value }))} placeholder="Optional notes" />
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" onClick={handleAddVisit}>Save Visit</Button>

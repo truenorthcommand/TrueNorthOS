@@ -98,15 +98,18 @@ export default function FormSubmissions() {
     y += 10;
 
     doc.setFontSize(14);
-    doc.text(schema.name, 20, y);
-    y += 8;
+    const wrappedSchemaName = doc.splitTextToSize(schema.name, 170);
+    doc.text(wrappedSchemaName, 20, y);
+    y += wrappedSchemaName.length * 6 + 2;
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.text(`Submitted: ${submission.submittedAt ? new Date(submission.submittedAt).toLocaleString() : "Draft"}`, 20, y);
     y += 6;
-    doc.text(`Entity: ${entityTypeLabels[submission.entityType]} - ${submission.entityId}`, 20, y);
-    y += 15;
+    const entityText = `Entity: ${entityTypeLabels[submission.entityType]} - ${submission.entityId}`;
+    const wrappedEntity = doc.splitTextToSize(entityText, 170);
+    doc.text(wrappedEntity, 20, y);
+    y += wrappedEntity.length * 5 + 10;
 
     schema.fields.forEach((field) => {
       if (y > 270) {
@@ -116,8 +119,9 @@ export default function FormSubmissions() {
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
-      doc.text(field.label, 20, y);
-      y += 6;
+      const wrappedLabel = doc.splitTextToSize(field.label, 170);
+      doc.text(wrappedLabel, 20, y);
+      y += wrappedLabel.length * 5 + 1;
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);

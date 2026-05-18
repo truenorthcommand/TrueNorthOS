@@ -371,24 +371,44 @@ export default function QuoteDetail() {
       // Quote details (left)
       doc.setFontSize(10);
       doc.setTextColor(0);
-      doc.text(`Quote Ref: ${quote?.quoteNo || 'N/A'}`, 14, 54);
-      doc.text(`Date: ${quoteDate ? new Date(quoteDate).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB')}`, 14, 60);
+      let leftY = 54;
+      doc.text(`Quote Ref: ${quote?.quoteNo || 'N/A'}`, 14, leftY);
+      leftY += 6;
+      doc.text(`Date: ${quoteDate ? new Date(quoteDate).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB')}`, 14, leftY);
+      leftY += 6;
       if (expiryDate) {
-        doc.text(`Valid Until: ${new Date(expiryDate).toLocaleDateString('en-GB')}`, 14, 66);
+        doc.text(`Valid Until: ${new Date(expiryDate).toLocaleDateString('en-GB')}`, 14, leftY);
+        leftY += 6;
       }
-      doc.text(`Payment Terms: ${paymentTerms === 'Custom' ? customPaymentTerms : paymentTerms}`, 14, 72);
+      const paymentTermsText = `Payment Terms: ${paymentTerms === 'Custom' ? customPaymentTerms : paymentTerms}`;
+      const wrappedPaymentTerms = doc.splitTextToSize(paymentTermsText, 80);
+      doc.text(wrappedPaymentTerms, 14, leftY);
+      leftY += wrappedPaymentTerms.length * 5;
 
       // Client info (right)
+      const rightColX = pageWidth - 80;
+      const rightColMaxW = 75;
+      let rightY = 54;
       doc.setFontSize(10);
       doc.setTextColor(15, 43, 76);
-      doc.text('QUOTED TO:', pageWidth - 80, 54);
+      doc.text('QUOTED TO:', rightColX, rightY);
+      rightY += 6;
       doc.setTextColor(0);
-      doc.text(customerName || 'N/A', pageWidth - 80, 60);
-      if (siteAddress) doc.text(siteAddress, pageWidth - 80, 66);
-      if (sitePostcode) doc.text(sitePostcode, pageWidth - 80, 72);
+      const wrappedName = doc.splitTextToSize(customerName || 'N/A', rightColMaxW);
+      doc.text(wrappedName, rightColX, rightY);
+      rightY += wrappedName.length * 5;
+      if (siteAddress) {
+        const wrappedAddr = doc.splitTextToSize(siteAddress, rightColMaxW);
+        doc.text(wrappedAddr, rightColX, rightY);
+        rightY += wrappedAddr.length * 5;
+      }
+      if (sitePostcode) {
+        doc.text(sitePostcode, rightColX, rightY);
+        rightY += 5;
+      }
 
       // Line items table header
-      let y = 85;
+      let y = Math.max(85, Math.max(leftY, rightY) + 10);
       doc.setFillColor(15, 43, 76);
       doc.rect(14, y - 5, pageWidth - 28, 8, 'F');
       doc.setTextColor(255);
@@ -664,7 +684,9 @@ export default function QuoteDetail() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>Site Address *</Label>
-              <Input
+              <Textarea
+                rows={2}
+                className="resize-y"
                 value={siteAddress}
                 onChange={(e) => setSiteAddress(e.target.value)}
                 placeholder="Site address"
@@ -778,11 +800,12 @@ export default function QuoteDetail() {
                 </div>
                 <div className="md:col-span-3">
                   <Label className="text-xs">Description</Label>
-                  <Input
+                  <Textarea
+                    rows={2}
+                    className="resize-y"
                     value={item.description}
                     onChange={(e) => updateLineItem(item.id, { description: e.target.value })}
                     placeholder="Item description"
-                    className="h-9"
                   />
                 </div>
                 <div>
@@ -1035,7 +1058,9 @@ export default function QuoteDetail() {
             {paymentTerms === 'Custom' && (
               <div>
                 <Label>Custom Payment Terms</Label>
-                <Input
+                <Textarea
+                  rows={2}
+                  className="resize-y"
                   value={customPaymentTerms}
                   onChange={(e) => setCustomPaymentTerms(e.target.value)}
                   placeholder="e.g. 50% upfront, 50% on completion"

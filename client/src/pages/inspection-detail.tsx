@@ -282,7 +282,9 @@ export default function InspectionDetail() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Site Address</Label>
-                  <Input
+                  <Textarea
+                    rows={2}
+                    className="resize-y"
                     value={inspection.siteAddress || ""}
                     onChange={(e) => updateMutation.mutate({ siteAddress: e.target.value })}
                     data-testid="input-site-address"

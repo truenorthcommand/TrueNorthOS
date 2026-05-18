@@ -482,7 +482,9 @@ export default function CreateQuote() {
         if (expiryDate) {
           doc.text(`Valid Until: ${new Date(expiryDate).toLocaleDateString('en-GB')}`, 14, 66);
         }
-        doc.text(`Payment Terms: ${paymentTerms === 'Custom' ? customPaymentTerms : paymentTerms}`, 14, 72);
+        const paymentTermsText = `Payment Terms: ${paymentTerms === 'Custom' ? customPaymentTerms : paymentTerms}`;
+        const wrappedPayTerms = doc.splitTextToSize(paymentTermsText, 80);
+        doc.text(wrappedPayTerms, 14, 72);
         
         // Client info (right)
         const rightColX = pageWidth - 80;
@@ -871,7 +873,9 @@ export default function CreateQuote() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Label>Site Address *</Label>
-            <Input
+            <Textarea
+              rows={2}
+              className="resize-y"
               value={siteAddress}
               onChange={(e) => setSiteAddress(e.target.value)}
               placeholder="Full site address"
