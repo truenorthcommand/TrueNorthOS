@@ -12,6 +12,7 @@ import { pool } from "./db";
 import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalkaroundCheckSchema, insertCheckItemSchema, insertDefectSchema, insertDefectUpdateSchema, insertTimesheetSchema, insertReceiptSchema, insertReceiptLineItemSchema, insertDeductionSchema, insertMaterialProfileSchema, insertVendorRuleSchema, insertPaymentSchema, insertFeedbackSchema } from "@shared/schema";
 import { z } from "zod";
 import { notifyAdmins, notifyUser } from "./notifications";
+import * as objectStorage from "./services/object-storage";
 import { sessionMiddleware } from "./session";
 import { registerGlobalAssistantRoutes } from "./globalAssistant";
 import { registerAiRoutes } from "./ai-service";
@@ -6386,6 +6387,86 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
     }
   });
 
+  // ==================== FILE UPLOAD ROUTES (MinIO) ====================
+
+  // Presigned URL for client-side direct upload
+  app.post("/api/uploads/request-url", requireAuth, async (req, res) => {
+    try {
+      const { name, size, contentType } = req.body;
+      if (!name || !contentType) {
+        return res.status(400).json({ error: "name and contentType are required" });
+      }
+      if (size && size > 50 * 1024 * 1024) {
+        return res.status(400).json({ error: "File too large (max 50MB)" });
+      }
+
+      // Determine bucket based on content type
+      let bucket = objectStorage.BUCKETS.FILES;
+      let prefix = "file";
+      if (contentType.startsWith("image/")) {
+        bucket = objectStorage.BUCKETS.PHOTOS;
+        prefix = "photo";
+      }
+
+      const result = await objectStorage.getPresignedUploadUrl(bucket, name, contentType, prefix);
+      res.json({
+        uploadURL: result.uploadURL,
+        objectPath: result.objectPath,
+        key: result.key,
+        metadata: { name, size, contentType },
+      });
+    } catch (error) {
+      console.error("Presigned URL error:", error);
+      res.status(500).json({ error: "Failed to generate upload URL" });
+    }
+  });
+
+  // Presigned URL for receipt image upload specifically
+  app.post("/api/uploads/receipt-url", requireAuth, async (req, res) => {
+    try {
+      const { name, contentType } = req.body;
+      if (!name || !contentType) {
+        return res.status(400).json({ error: "name and contentType are required" });
+      }
+      if (!contentType.startsWith("image/")) {
+        return res.status(400).json({ error: "Only image files are accepted for receipts" });
+      }
+
+      const result = await objectStorage.getPresignedUploadUrl(
+        objectStorage.BUCKETS.RECEIPTS,
+        name,
+        contentType,
+        "receipt"
+      );
+      res.json({
+        uploadURL: result.uploadURL,
+        objectPath: result.objectPath,
+        key: result.key,
+      });
+    } catch (error) {
+      console.error("Receipt presigned URL error:", error);
+      res.status(500).json({ error: "Failed to generate receipt upload URL" });
+    }
+  });
+
+  // Get a presigned download URL for viewing a stored file
+  app.get("/api/uploads/download-url", requireAuth, async (req, res) => {
+    try {
+      const { bucket, key } = req.query;
+      if (!bucket || !key) {
+        return res.status(400).json({ error: "bucket and key query params are required" });
+      }
+      const url = await objectStorage.getPresignedDownloadUrl(
+        bucket as any,
+        key as string
+      );
+      res.json({ downloadURL: url });
+    } catch (error) {
+      console.error("Download URL error:", error);
+      res.status(500).json({ error: "Failed to generate download URL" });
+    }
+  });
+
   // ==================== RECEIPTS ROUTES ====================
 
   app.get("/api/receipts", requireAuth, async (req, res) => {
@@ -6451,15 +6532,32 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
         return res.status(400).json({ error: "Receipt photo is mandatory. Please upload a receipt image." });
       }
 
-      if (req.body.receiptImageUrl.startsWith("data:image/")) {
-        const base64Size = req.body.receiptImageUrl.length * 0.75;
+      // Upload receipt image to MinIO if it's a base64 data URL
+      let receiptImageUrl = req.body.receiptImageUrl;
+      let receiptImageKey: string | null = null;
+      if (receiptImageUrl.startsWith("data:image/")) {
+        const base64Size = receiptImageUrl.length * 0.75;
         if (base64Size > MAX_RECEIPT_SIZE) {
           return res.status(400).json({ error: "Receipt image is too large. Please use a smaller image (max 5MB)." });
+        }
+        try {
+          const uploaded = await objectStorage.uploadBase64Image(
+            objectStorage.BUCKETS.RECEIPTS,
+            receiptImageUrl,
+            "receipt"
+          );
+          receiptImageKey = uploaded.key;
+          receiptImageUrl = uploaded.url;
+          console.log(`[Receipt] Image uploaded to MinIO: ${uploaded.key}`);
+        } catch (uploadErr: any) {
+          console.error("[Receipt] MinIO upload failed, storing base64 fallback:", uploadErr.message);
+          // Fall back to storing base64 in DB if MinIO is unavailable
         }
       }
 
       const data = insertReceiptSchema.parse({
         ...req.body,
+        receiptImageUrl,
         userId: req.body.userId || req.session.userId,
         status: "processing",
       });

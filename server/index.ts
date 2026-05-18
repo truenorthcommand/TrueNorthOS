@@ -6,6 +6,7 @@ import { setupNotifications } from "./notifications";
 import { storage } from "./storage";
 import { ensureSessionTable } from "./session";
 import { runMigrations } from "./migrations";
+import { testConnection as testObjectStorage } from "./services/object-storage";
 import path from "path";
 import fs from "fs";
 
@@ -92,6 +93,10 @@ app.use((req, res, next) => {
 (async () => {
   await ensureSessionTable();
   await runMigrations();
+  
+  // Test MinIO/S3 object storage connection
+  await testObjectStorage();
+
   await registerRoutes(httpServer, app);
 
   const seedDefaultSkills = async () => {
