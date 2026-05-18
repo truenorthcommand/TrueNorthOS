@@ -246,7 +246,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <NavLink href="/my-day" icon={Calendar}>My Day</NavLink>
             <NavLink href="/jobs" icon={Briefcase}>My Jobs</NavLink>
             <NavLink href="/timesheet" icon={Clock}>Timesheets</NavLink>
-            <NavLink href="/expenses" icon={Receipt}>Expenses</NavLink>
             <NavLink href="/walkaround" icon={ClipboardCheck}>Walkaround</NavLink>
           </>
         )}
@@ -255,7 +254,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Tooltip><TooltipTrigger asChild><Link href="/my-day"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location === "/my-day" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Calendar className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">My Day</TooltipContent></Tooltip>
             <Tooltip><TooltipTrigger asChild><Link href="/jobs"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location.startsWith("/jobs") ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Briefcase className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">My Jobs</TooltipContent></Tooltip>
             <Tooltip><TooltipTrigger asChild><Link href="/timesheet"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location === "/timesheet" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Clock className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">Timesheets</TooltipContent></Tooltip>
-            <Tooltip><TooltipTrigger asChild><Link href="/expenses"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location === "/expenses" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Receipt className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">Expenses</TooltipContent></Tooltip>
             <Tooltip><TooltipTrigger asChild><Link href="/walkaround"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location === "/walkaround" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><ClipboardCheck className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">Walkaround</TooltipContent></Tooltip>
           </>
         )}
@@ -621,7 +619,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex-1 flex flex-col min-h-screen bg-background">
           {/* Desktop Header */}
           <header className="sticky top-0 z-30 hidden md:flex h-14 items-center gap-4 px-6 shadow-sm border-b print:hidden bg-card border-border">
-            <GlobalSearch />
+            {(user?.role !== 'engineer' || hasRole(user, 'admin')) && <GlobalSearch />}
             <div className="ml-auto flex items-center gap-3">
               <Tooltip>
                 <TooltipTrigger asChild>

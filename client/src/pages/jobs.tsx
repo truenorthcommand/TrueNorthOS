@@ -415,11 +415,33 @@ export default function Jobs() {
 
   const isAdmin = hasRole(user, 'admin', 'works_manager');
 
+  const isEngineer = user?.role === 'engineer' && !hasRole(user, 'admin');
+
   // Filter by role
   const roleFilteredJobs = useMemo(() => {
     if (isAdmin) return jobs;
-    return jobs.filter((j: any) => j.assignedToId === user?.id || (j.assignedToIds || []).includes(user?.id));
-  }, [jobs, isAdmin, user]);
+
+    // Engineers: only their assigned jobs
+    let filtered = jobs.filter((j: any) => j.assignedToId === user?.id || (j.assignedToIds || []).includes(user?.id));
+
+    if (isEngineer) {
+      // Engineers only see actionable statuses (no Draft, Cancelled, On Hold)
+      const allowedStatuses = ['Ready', 'In Progress', 'Awaiting Signatures', 'Signed Off'];
+      filtered = filtered.filter((j: any) => allowedStatuses.includes(j.status));
+
+      // Engineers only see today and tomorrow's jobs
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = addDays(today, 1);
+      filtered = filtered.filter((j: any) => {
+        if (!j.scheduledDate) return false;
+        const jobDate = new Date(j.scheduledDate);
+        return isSameDay(jobDate, today) || isSameDay(jobDate, tomorrow);
+      });
+    }
+
+    return filtered;
+  }, [jobs, isAdmin, isEngineer, user]);
 
   // Apply all filters
   const displayedJobs = useMemo(() => {
@@ -456,7 +478,7 @@ export default function Jobs() {
 
   // Stats
   const stats = useMemo(() => {
-    const activeStatuses = ['Ready', 'In Progress', 'Draft'];
+    const activeStatuses = isEngineer ? ['Ready', 'In Progress'] : ['Ready', 'In Progress', 'Draft'];
     return {
       total: roleFilteredJobs.filter((j: any) => activeStatuses.includes(j.status)).length,
       inProgress: roleFilteredJobs.filter((j: any) => j.status === 'In Progress').length,
@@ -494,8 +516,8 @@ export default function Jobs() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#0F2B4C]">Jobs In Progress</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Manage and track all field service jobs</p>
+          <h1 className="text-2xl font-bold text-[#0F2B4C]">{isEngineer ? 'My Jobs' : 'Jobs In Progress'}</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{isEngineer ? "Today's and tomorrow's assigned work" : 'Manage and track all field service jobs'}</p>
         </div>
         {isAdmin && (
           <Button
@@ -511,7 +533,7 @@ export default function Jobs() {
       {renderStatsCards(stats)}
 
       {/* Search & Filters */}
-      <Card className="shadow-sm">
+      {!isEngineer && <Card className="shadow-sm">
         <CardContent className="p-4">
           <div className="flex flex-col lg:flex-row gap-3">
             {/* Search */}
@@ -566,7 +588,7 @@ export default function Jobs() {
           {/* Active filters */}
           {renderActiveFilters(filters, setFilters)}
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* View Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -597,14 +619,16 @@ export default function Jobs() {
           </Button>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-[160px] text-xs">
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              {SORT_OPTIONS.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          {!isEngineer && (
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-[160px] text-xs">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                {SORT_OPTIONS.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
           {isAdmin && (
             <Button variant="outline" size="sm" onClick={handleExport}>
               <Download className="h-4 w-4 mr-1" /> Export
