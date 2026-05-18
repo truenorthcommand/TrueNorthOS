@@ -485,16 +485,29 @@ export default function CreateQuote() {
         doc.text(`Payment Terms: ${paymentTerms === 'Custom' ? customPaymentTerms : paymentTerms}`, 14, 72);
         
         // Client info (right)
+        const rightColX = pageWidth - 80;
+        const rightColMaxW = 75; // max width in mm for right column text
+        let rightY = 54;
         doc.setFontSize(10);
         doc.setTextColor(15, 43, 76);
-        doc.text('QUOTED TO:', pageWidth - 80, 54);
+        doc.text('QUOTED TO:', rightColX, rightY);
+        rightY += 6;
         doc.setTextColor(0);
-        doc.text(customerName || 'N/A', pageWidth - 80, 60);
-        if (siteAddress) doc.text(siteAddress, pageWidth - 80, 66);
-        if (sitePostcode) doc.text(sitePostcode, pageWidth - 80, 72);
+        const wrappedName = doc.splitTextToSize(customerName || 'N/A', rightColMaxW);
+        doc.text(wrappedName, rightColX, rightY);
+        rightY += wrappedName.length * 5;
+        if (siteAddress) {
+          const wrappedAddr = doc.splitTextToSize(siteAddress, rightColMaxW);
+          doc.text(wrappedAddr, rightColX, rightY);
+          rightY += wrappedAddr.length * 5;
+        }
+        if (sitePostcode) {
+          doc.text(sitePostcode, rightColX, rightY);
+          rightY += 5;
+        }
         
         // Line items table header
-        let y = 85;
+        let y = Math.max(85, rightY + 10);
         doc.setFillColor(15, 43, 76);
         doc.rect(14, y - 5, pageWidth - 28, 8, 'F');
         doc.setTextColor(255);
