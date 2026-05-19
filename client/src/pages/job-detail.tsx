@@ -27,7 +27,7 @@ import {
   FileText, Image, Upload, X, Printer, AlertTriangle, Shield, CheckCircle2,
   XCircle, Loader2, ClipboardCheck, Sparkles, Edit, Package, Camera,
   ChevronDown, File, FileSpreadsheet, ExternalLink, QrCode, Navigation, Play, Square, Timer, MessageSquare,
-  Receipt as ReceiptIcon, ShieldAlert
+  Receipt as ReceiptIcon, ShieldAlert, Lock, Unlock
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
@@ -615,6 +615,9 @@ export default function JobDetail() {
 
   const isAdmin = hasRole(user, 'admin', 'works_manager');
   const isEngineer = user?.role === 'engineer' && !hasRole(user, 'admin');
+  const lockedStatuses = ['Awaiting Signatures', 'Completed', 'Signed Off', 'Invoiced'];
+  const isJobLocked = lockedStatuses.includes(job?.status || '');
+  const isLockedForEngineer = isEngineer && isJobLocked;
   const assignedEngineer = engineers.find(e => e.id === job.assignedToId);
 
   // --- Render functions ---
@@ -691,6 +694,21 @@ export default function JobDetail() {
                     <FileText className="h-4 w-4 mr-1" /> Generate Invoice
                   </Button>
                 )}
+                {isAdmin && isJobLocked && (
+                  <Button size="sm" variant="outline" className="border-orange-300 text-orange-700 hover:bg-orange-50" onClick={async () => {
+                    try {
+                      const res = await fetch(`/api/jobs/${job.id}/unlock`, { method: 'POST', credentials: 'include' });
+                      if (!res.ok) { const err = await res.json(); throw new Error(err.error); }
+                      toast({ title: 'Job Unlocked', description: 'Job set back to In Progress. Engineer can now edit.' });
+                      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+                      queryClient.invalidateQueries({ queryKey: [`/api/jobs/${job.id}`] });
+                    } catch (err: any) {
+                      toast({ title: 'Error', description: err.message || 'Failed to unlock job', variant: 'destructive' });
+                    }
+                  }}>
+                    <Unlock className="h-4 w-4 mr-1" /> Unlock for Engineer
+                  </Button>
+                )}
                 <Button size="sm" onClick={handleSave} disabled={saving || !hasUnsavedChanges}>
                   {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
                   Save
@@ -710,8 +728,17 @@ export default function JobDetail() {
 
   function renderTabDetails() {
     return (
-      <fieldset disabled={isEngineer} className={isEngineer ? 'opacity-75' : ''}>
-      {isEngineer && (
+      <fieldset disabled={isLockedForEngineer} className={isLockedForEngineer ? 'opacity-60 pointer-events-none' : isEngineer ? 'opacity-75' : ''}>
+      {isLockedForEngineer && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
+          <Lock className="h-5 w-5 text-red-600 flex-shrink-0" />
+          <div>
+            <span className="text-sm text-red-700 font-bold block">🔒 Job Locked — Completed</span>
+            <span className="text-xs text-red-600">This job has been submitted and is locked from editing. Contact your manager to unlock.</span>
+          </div>
+        </div>
+      )}
+      {isEngineer && !isLockedForEngineer && (
         <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
           <Shield className="h-4 w-4 text-amber-600" />
           <span className="text-sm text-amber-700 font-medium">View Only — Contact your manager to make changes</span>

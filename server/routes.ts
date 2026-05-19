@@ -1706,8 +1706,14 @@ export async function registerRoutes(
         }
       }
 
-      if (existingJob.status === 'Signed Off') {
-        return res.status(409).json({ error: "Job is signed off and locked from editing" });
+      // Lock completed jobs from engineer editing - only admin can edit or unlock
+      const lockedStatuses = ['Awaiting Signatures', 'Completed', 'Signed Off', 'Invoiced'];
+      if (req.session.userRole === 'engineer' && lockedStatuses.includes(existingJob.status)) {
+        return res.status(409).json({ 
+          error: "This job is completed and locked. Contact your manager to unlock.",
+          locked: true,
+          status: existingJob.status
+        });
       }
 
       let updates = req.body;
@@ -1841,6 +1847,63 @@ export async function registerRoutes(
     } catch (error) {
       console.error('Error starting job:', error);
       res.status(500).json({ error: "Failed to start job" });
+    }
+  });
+
+  // Admin: Unlock a completed job so engineer can edit again
+  app.post("/api/jobs/:id/unlock", requireAuth, async (req, res) => {
+    try {
+      const isAdmin = ['admin', 'works_manager', 'surveyor'].includes(req.session.userRole || '');
+      if (!isAdmin) {
+        return res.status(403).json({ error: "Only administrators can unlock jobs" });
+      }
+
+      const job = await storage.getJob(req.params.id);
+      if (!job) return res.status(404).json({ error: "Job not found" });
+
+      // Set job back to In Progress so engineer can edit
+      const updated = await storage.updateJob(req.params.id, {
+        status: 'In Progress',
+        updatedByUserId: req.session.userId,
+      });
+
+      // Notify the assigned engineer(s)
+      const assignedIds = Array.isArray(job.assignedToIds) && job.assignedToIds.length > 0
+        ? job.assignedToIds as string[]
+        : job.assignedToId ? [job.assignedToId] : [];
+      for (const engineerId of assignedIds) {
+        notifyUser(engineerId, {
+          type: 'job_unlocked',
+          title: 'Job Unlocked',
+          message: `Job ${job.jobNo || ''} has been unlocked for editing by your manager`,
+          category: 'jobs',
+          jobId: job.id,
+          jobNo: job.jobNo || undefined,
+          timestamp: new Date().toISOString(),
+          linkUrl: `/app/jobs/${job.id}`,
+        });
+      }
+
+      // Audit log
+      try {
+        const { logAuditEvent } = await import('./audit');
+        await logAuditEvent({
+          userId: req.session.userId!,
+          userName: req.session.userName,
+          userRole: req.session.userRole,
+          actionType: 'job_unlocked',
+          entityType: 'job',
+          entityId: job.id,
+          description: `Unlocked job ${job.jobNo} from '${job.status}' back to 'In Progress'`,
+          changesBefore: { status: job.status },
+          changesAfter: { status: 'In Progress' },
+        });
+      } catch (e) { /* audit non-critical */ }
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Error unlocking job:', error);
+      res.status(500).json({ error: "Failed to unlock job" });
     }
   });
 
