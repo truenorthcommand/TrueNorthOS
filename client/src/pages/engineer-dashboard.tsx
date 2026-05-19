@@ -315,8 +315,9 @@ export default function EngineerDashboard() {
 
       {/* State 1: Walkaround Required */}
       {!walkaroundCompleted && (
-        <div className="p-4 flex items-center justify-center min-h-[calc(100vh-80px)]">
-          <Card className="w-full max-w-md text-center shadow-lg border-amber-200 dark:border-amber-800">
+        <div className="p-4 space-y-6">
+          {/* Walkaround Prompt */}
+          <Card className="w-full max-w-md mx-auto text-center shadow-lg border-amber-200 dark:border-amber-800">
             <CardContent className="pt-8 pb-8 px-6">
               <div className="w-20 h-20 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-6">
                 <Car className="h-10 w-10 text-[#E8A54B]" />
@@ -346,6 +347,40 @@ export default function EngineerDashboard() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Quick Actions - Available before walkaround */}
+          <div>
+            <h2 className="text-lg font-bold text-[#0F2B4C] dark:text-white mb-3">Quick Actions</h2>
+            <div className="grid grid-cols-3 gap-3">
+              <Card
+                className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
+                onClick={openReceiptPanel}
+              >
+                <CardContent className="p-4 flex flex-col items-center justify-center text-center h-24">
+                  <Receipt className="h-6 w-6 text-[#E8A54B] mb-2" />
+                  <span className="text-sm font-medium text-[#0F2B4C] dark:text-white">Receipt</span>
+                </CardContent>
+              </Card>
+              <Card
+                className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
+                onClick={() => navigate('/timesheets')}
+              >
+                <CardContent className="p-4 flex flex-col items-center justify-center text-center h-24">
+                  <Clock className="h-6 w-6 text-[#E8A54B] mb-2" />
+                  <span className="text-sm font-medium text-[#0F2B4C] dark:text-white">Timesheets</span>
+                </CardContent>
+              </Card>
+              <Card
+                className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
+                onClick={() => navigate('/jobs')}
+              >
+                <CardContent className="p-4 flex flex-col items-center justify-center text-center h-24">
+                  <Briefcase className="h-6 w-6 text-[#E8A54B] mb-2" />
+                  <span className="text-sm font-medium text-[#0F2B4C] dark:text-white">My Jobs</span>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
       )}
 
