@@ -1132,6 +1132,81 @@ export async function runMigrations() {
     console.error("[Migration] AI Snagging Scanner error:", e.message);
   }
 
+  // === CLIENTS TABLE COLUMNS ===
+  try {
+    await client.query(`
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS city TEXT;
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS county TEXT;
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS contact_name TEXT;
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS notes TEXT;
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS portal_token TEXT;
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS portal_enabled BOOLEAN DEFAULT false;
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS portal_password TEXT;
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS portal_password_set_at TIMESTAMP;
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS password_reset_token TEXT;
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS password_reset_expires TIMESTAMP;
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS updated_by_user_id VARCHAR;
+    `);
+    console.log("[Migration] clients table columns OK");
+  } catch (e: any) {
+    console.error("[Migration] clients columns error:", e.message);
+  }
+
+  // === CLIENT CONTACTS TABLE ===
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS client_contacts (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        client_id VARCHAR NOT NULL,
+        name TEXT NOT NULL,
+        email TEXT,
+        phone TEXT,
+        role TEXT,
+        is_primary BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_client_contacts_client ON client_contacts(client_id);
+    `);
+    console.log("[Migration] client_contacts table OK");
+  } catch (e: any) {
+    console.error("[Migration] client_contacts error:", e.message);
+  }
+
+  // === CLIENT PROPERTIES TABLE ===
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS client_properties (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        client_id VARCHAR NOT NULL,
+        name TEXT NOT NULL,
+        address TEXT NOT NULL,
+        postcode TEXT,
+        city TEXT,
+        county TEXT,
+        latitude DOUBLE PRECISION,
+        longitude DOUBLE PRECISION,
+        contact_name TEXT,
+        contact_phone TEXT,
+        contact_email TEXT,
+        notes TEXT,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_client_properties_client ON client_properties(client_id);
+    `);
+    console.log("[Migration] client_properties table OK");
+  } catch (e: any) {
+    console.error("[Migration] client_properties error:", e.message);
+  }
+
   console.log("[Migration] All migrations completed");
   client.release();
 }
