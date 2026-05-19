@@ -6553,7 +6553,7 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
       const objectPath = `${bucket}/${result.key || result}`;
 
       res.json({
-        url: objectPath,
+        url: `/api/storage/${bucket}/${result.key}`,
         key: result.key || result,
         bucket,
         originalName: file.originalname,
@@ -6645,6 +6645,35 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
   });
 
   // ==================== RECEIPTS ROUTES ====================
+  // Serve files directly from MinIO (for photo/file display in browser)
+  app.get("/api/storage/:bucket/*", async (req, res) => {
+    try {
+      const bucket = req.params.bucket;
+      const key = (req.params as any)[0]; // everything after /:bucket/
+      if (!bucket || !key) {
+        return res.status(400).json({ error: "bucket and key are required" });
+      }
+
+      // Use presigned download URL and redirect to it (works for internal network)
+      // Since browser can't reach internal MinIO, we proxy the file through Express
+      const url = await objectStorage.getPresignedDownloadUrl(bucket as any, key);
+      // Fetch from internal MinIO and pipe to response
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`MinIO returned ${response.status}`);
+      const contentType = response.headers.get('content-type');
+      if (contentType) res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      const arrayBuffer = await response.arrayBuffer();
+      res.send(Buffer.from(arrayBuffer));
+    } catch (error: any) {
+      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+      console.error('Storage serve error:', error);
+      res.status(500).json({ error: 'Failed to serve file' });
+    }
+  });
+
 
   app.get("/api/receipts", requireAuth, async (req, res) => {
     try {
