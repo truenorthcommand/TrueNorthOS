@@ -140,6 +140,10 @@ export const clients = pgTable("clients", {
   phone: text("phone"),
   address: text("address"),
   postcode: text("postcode"),
+  city: text("city"),
+  county: text("county"),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
   contactName: text("contact_name"),
   notes: text("notes"),
   portalToken: text("portal_token"),
@@ -173,6 +177,10 @@ export const clientProperties = pgTable("client_properties", {
   name: text("name").notNull(), // e.g., "Head Office", "Warehouse", "Site A"
   address: text("address").notNull(),
   postcode: text("postcode"),
+  city: text("city"),
+  county: text("county"),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
   contactName: text("contact_name"), // Site-specific contact
   contactPhone: text("contact_phone"),
   contactEmail: text("contact_email"),

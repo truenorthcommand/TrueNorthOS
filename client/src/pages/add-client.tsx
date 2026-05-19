@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { AddressAutocomplete, ParsedAddress } from '@/components/address-autocomplete';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import {
@@ -32,7 +33,11 @@ interface Property {
   id: string;
   name: string;
   address: string;
+  city: string;
+  county: string;
   postcode: string;
+  latitude: number | null;
+  longitude: number | null;
   contactName: string;
   contactPhone: string;
   contactEmail: string;
@@ -53,7 +58,11 @@ interface ClientFormData {
   email: string;
   phone: string;
   address: string;
+  city: string;
+  county: string;
   postcode: string;
+  latitude: number | null;
+  longitude: number | null;
   properties: Property[];
   contacts: Contact[];
   enablePortal: boolean;
@@ -84,7 +93,11 @@ export default function AddClient() {
     email: '',
     phone: '',
     address: '',
+    city: '',
+    county: '',
     postcode: '',
+    latitude: null,
+    longitude: null,
     properties: [],
     contacts: [],
     enablePortal: false,
@@ -97,7 +110,11 @@ export default function AddClient() {
     id: '',
     name: '',
     address: '',
+    city: '',
+    county: '',
     postcode: '',
+    latitude: null,
+    longitude: null,
     contactName: '',
     contactPhone: '',
     contactEmail: '',
@@ -155,7 +172,11 @@ export default function AddClient() {
       id: '',
       name: '',
       address: '',
+      city: '',
+      county: '',
       postcode: '',
+      latitude: null,
+      longitude: null,
       contactName: '',
       contactPhone: '',
       contactEmail: '',
@@ -250,7 +271,11 @@ export default function AddClient() {
         email: formData.email,
         phone: formData.phone,
         address: formData.address,
+        city: formData.city,
+        county: formData.county,
         postcode: formData.postcode,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
         properties: formData.properties.map(({ id, ...rest }) => rest),
         contacts: formData.contacts.map(({ id, ...rest }) => rest),
         enablePortal: formData.enablePortal,
@@ -406,31 +431,44 @@ export default function AddClient() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="address" className="font-medium">
-            Address
-          </Label>
-          <div className="relative">
-            <MapPin className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-            <Input
-              id="address"
-              placeholder="Street address"
-              className="pl-10"
-              value={formData.address}
-              onChange={(e) => setFormData((prev) => ({ ...prev, address: e.target.value }))}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2 sm:w-1/3">
-          <Label htmlFor="postcode" className="font-medium">
-            Postcode *
-          </Label>
-          <Input
-            id="postcode"
-            placeholder="e.g. SW1A 1AA"
-            value={formData.postcode}
-            onChange={(e) => setFormData((prev) => ({ ...prev, postcode: e.target.value }))}
-            className={errors.postcode ? 'border-red-500 focus:ring-red-500' : ''}
+          <AddressAutocomplete
+            label="Client Address"
+            required={false}
+            onAddressChange={(address: ParsedAddress | null) => {
+              if (address) {
+                setFormData((prev) => ({
+                  ...prev,
+                  address: address.street,
+                  city: address.city,
+                  county: address.county,
+                  postcode: address.postcode,
+                  latitude: address.latitude,
+                  longitude: address.longitude,
+                }));
+                setErrors((prev) => ({ ...prev, postcode: '' }));
+              } else {
+                setFormData((prev) => ({
+                  ...prev,
+                  address: '',
+                  city: '',
+                  county: '',
+                  postcode: '',
+                  latitude: null,
+                  longitude: null,
+                }));
+              }
+            }}
+            initialAddress={{
+              street: formData.address,
+              city: formData.city,
+              county: formData.county,
+              postcode: formData.postcode,
+              country: 'United Kingdom',
+              latitude: formData.latitude,
+              longitude: formData.longitude,
+              formatted_address: formData.address,
+            }}
+            showFields={true}
           />
           {errors.postcode && <p className="text-sm text-red-500">{errors.postcode}</p>}
         </div>
@@ -510,23 +548,46 @@ export default function AddClient() {
                 onChange={(e) => setPropertyForm((prev) => ({ ...prev, name: e.target.value }))}
               />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="font-medium">Address</Label>
-                <Input
-                  placeholder="Property address"
-                  value={propertyForm.address}
-                  onChange={(e) => setPropertyForm((prev) => ({ ...prev, address: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="font-medium">Postcode</Label>
-                <Input
-                  placeholder="e.g. SW1A 1AA"
-                  value={propertyForm.postcode}
-                  onChange={(e) => setPropertyForm((prev) => ({ ...prev, postcode: e.target.value }))}
-                />
-              </div>
+            <div className="space-y-2">
+              <AddressAutocomplete
+                label="Property Address *"
+                required
+                onAddressChange={(address: ParsedAddress | null) => {
+                  if (address) {
+                    setPropertyForm((prev) => ({
+                      ...prev,
+                      address: address.street,
+                      city: address.city,
+                      county: address.county,
+                      postcode: address.postcode,
+                      latitude: address.latitude,
+                      longitude: address.longitude,
+                    }));
+                  } else {
+                    setPropertyForm((prev) => ({
+                      ...prev,
+                      address: '',
+                      city: '',
+                      county: '',
+                      postcode: '',
+                      latitude: null,
+                      longitude: null,
+                    }));
+                  }
+                }}
+                initialAddress={{
+                  street: propertyForm.address,
+                  city: propertyForm.city,
+                  county: propertyForm.county,
+                  postcode: propertyForm.postcode,
+                  country: 'United Kingdom',
+                  latitude: propertyForm.latitude,
+                  longitude: propertyForm.longitude,
+                  formatted_address: propertyForm.address,
+                }}
+                showFields={true}
+                compact={false}
+              />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">

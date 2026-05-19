@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { AddressAutocomplete, ParsedAddress } from "@/components/address-autocomplete";
 import { 
   ArrowLeft, Building2, User, MapPin, Phone, Mail, FileText, 
   Home, Plus, Trash2, Edit2, Save, X, Link2, Copy, Check,
@@ -23,7 +24,11 @@ interface ClientProperty {
   clientId: string;
   name: string;
   address: string;
+  city: string | null;
+  county: string | null;
   postcode: string | null;
+  latitude: number | null;
+  longitude: number | null;
   contactName: string | null;
   contactPhone: string | null;
   contactEmail: string | null;
@@ -48,7 +53,11 @@ interface Client {
   email: string | null;
   phone: string | null;
   address: string | null;
+  city: string | null;
+  county: string | null;
   postcode: string | null;
+  latitude: number | null;
+  longitude: number | null;
   notes: string | null;
   portalEnabled: boolean | null;
 }
@@ -76,7 +85,11 @@ export default function ClientDetail() {
   const [newProperty, setNewProperty] = useState({
     name: "",
     address: "",
+    city: "",
+    county: "",
     postcode: "",
+    latitude: null as number | null,
+    longitude: null as number | null,
     contactName: "",
     contactPhone: "",
     contactEmail: "",
@@ -750,32 +763,52 @@ export default function ClientDetail() {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label>Address *</Label>
-                    <Textarea
-                      placeholder="Full property address"
-                      value={editingProperty?.address || newProperty.address}
-                      onChange={(e) => {
-                        if (editingProperty) {
-                          setEditingProperty({ ...editingProperty, address: e.target.value });
+                    <AddressAutocomplete
+                      label="Property Address *"
+                      required
+                      onAddressChange={(address: ParsedAddress | null) => {
+                        if (address) {
+                          const updates = {
+                            address: address.street,
+                            city: address.city,
+                            county: address.county,
+                            postcode: address.postcode,
+                            latitude: address.latitude,
+                            longitude: address.longitude,
+                          };
+                          if (editingProperty) {
+                            setEditingProperty({ ...editingProperty, ...updates });
+                          } else {
+                            setNewProperty({ ...newProperty, ...updates });
+                          }
                         } else {
-                          setNewProperty({ ...newProperty, address: e.target.value });
+                          const clearUpdates = {
+                            address: '',
+                            city: '',
+                            county: '',
+                            postcode: '',
+                            latitude: null,
+                            longitude: null,
+                          };
+                          if (editingProperty) {
+                            setEditingProperty({ ...editingProperty, ...clearUpdates });
+                          } else {
+                            setNewProperty({ ...newProperty, ...clearUpdates });
+                          }
                         }
                       }}
-                      rows={2}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Postcode</Label>
-                    <Input
-                      placeholder="e.g., SW1A 1AA"
-                      value={editingProperty?.postcode || newProperty.postcode}
-                      onChange={(e) => {
-                        if (editingProperty) {
-                          setEditingProperty({ ...editingProperty, postcode: e.target.value });
-                        } else {
-                          setNewProperty({ ...newProperty, postcode: e.target.value });
-                        }
+                      initialAddress={{
+                        street: editingProperty?.address || newProperty.address,
+                        city: editingProperty?.city || newProperty.city || '',
+                        county: editingProperty?.county || newProperty.county || '',
+                        postcode: editingProperty?.postcode || newProperty.postcode || '',
+                        country: 'United Kingdom',
+                        latitude: editingProperty?.latitude || newProperty.latitude,
+                        longitude: editingProperty?.longitude || newProperty.longitude,
+                        formatted_address: editingProperty?.address || newProperty.address,
                       }}
+                      showFields={true}
+                      compact={false}
                     />
                   </div>
                   <div className="border-t pt-4 mt-4">
