@@ -108,6 +108,7 @@ export default function EngineerDashboard() {
   const [elapsed, setElapsed] = useState(0);
   const [showEndDay, setShowEndDay] = useState(false);
   const [startingJob, setStartingJob] = useState<string | null>(null);
+  const [skippingWalkaround, setSkippingWalkaround] = useState(false);
 
   // ── Receipt Panel State ──────────────────────────────────────────
   const [showReceiptPanel, setShowReceiptPanel] = useState(false);
@@ -276,6 +277,25 @@ export default function EngineerDashboard() {
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`, '_blank');
   };
 
+  const handleSkipWalkaround = async () => {
+    setSkippingWalkaround(true);
+    try {
+      const res = await fetch('/api/gps/walkaround-skip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ reason: 'No vehicle today' }),
+      });
+      if (!res.ok) throw new Error('Failed to skip walkaround');
+      queryClient.invalidateQueries({ queryKey: ['/api/gps/walkaround-status'] });
+      toast({ title: 'Day Started', description: 'Walkaround skipped — no vehicle today.' });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to skip walkaround', variant: 'destructive' });
+    } finally {
+      setSkippingWalkaround(false);
+    }
+  };
+
   const walkaroundCompleted = (walkaroundStatus as any)?.completedToday === true;
   const firstName = (user as any)?.firstName || (user as any)?.name?.split(' ')[0] || 'Engineer';
 
@@ -335,6 +355,20 @@ export default function EngineerDashboard() {
                 <Car className="h-5 w-5 mr-2" />
                 Start Walkaround
               </Button>
+              <button
+                onClick={handleSkipWalkaround}
+                disabled={skippingWalkaround}
+                className="w-full mt-3 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-[#0F2B4C] dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-colors disabled:opacity-50"
+              >
+                {skippingWalkaround ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Skipping...
+                  </span>
+                ) : (
+                  'Skip — No Vehicle Today'
+                )}
+              </button>
               <div className="mt-6 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
                 <span className="flex items-center gap-1">
                   <Clock className="h-4 w-4" />
@@ -351,7 +385,7 @@ export default function EngineerDashboard() {
           {/* Quick Actions - Available before walkaround */}
           <div>
             <h2 className="text-lg font-bold text-[#0F2B4C] dark:text-white mb-3">Quick Actions</h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <Card
                 className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
                 onClick={openReceiptPanel}
@@ -370,8 +404,50 @@ export default function EngineerDashboard() {
                   <span className="text-sm font-medium text-[#0F2B4C] dark:text-white">Timesheets</span>
                 </CardContent>
               </Card>
+              <Card
+                className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
+                onClick={() => navigate('/my-jobs')}
+              >
+                <CardContent className="p-4 flex flex-col items-center justify-center text-center h-24">
+                  <Briefcase className="h-6 w-6 text-[#E8A54B] mb-2" />
+                  <span className="text-sm font-medium text-[#0F2B4C] dark:text-white">My Jobs</span>
+                </CardContent>
+              </Card>
             </div>
           </div>
+
+          {/* Today's Jobs Preview */}
+          {todayJobs.length > 0 && (
+            <div>
+              <h2 className="text-lg font-bold text-[#0F2B4C] dark:text-white mb-3">Today's Jobs</h2>
+              <div className="space-y-2">
+                {todayJobs.map((job: any) => (
+                  <Card
+                    key={job.id}
+                    className="cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => navigate(`/jobs/${job.id}`)}
+                  >
+                    <CardContent className="p-3 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                        <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm text-[#0F2B4C] dark:text-white truncate">
+                          {job.nickname || job.description || job.jobNo}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                          {job.customerName || job.client} • {job.siteAddress || job.address || 'No address'}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="shrink-0 text-xs">
+                        {job.session || 'TBC'}
+                      </Badge>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

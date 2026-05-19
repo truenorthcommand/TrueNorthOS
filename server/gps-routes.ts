@@ -93,14 +93,15 @@ router.get('/walkaround-status', async (req: Request, res: Response) => {
     const client = await pool.connect();
     try {
       const result = await client.query(
-        `SELECT id, completed_at FROM walkaround_checks 
-         WHERE user_id = $1 AND DATE(completed_at) = CURRENT_DATE
-         ORDER BY completed_at DESC LIMIT 1`,
+        `SELECT id, completed_at, skipped, skip_reason, created_at FROM walkaround_checks 
+         WHERE user_id = $1 AND (DATE(completed_at) = CURRENT_DATE OR DATE(created_at) = CURRENT_DATE)
+         ORDER BY COALESCE(completed_at, created_at) DESC LIMIT 1`,
         [(req.user as any).id]
       );
 
       res.json({
         completedToday: result.rows.length > 0,
+        skippedToday: result.rows[0]?.skipped === true,
         lastCheck: result.rows[0] || null,
       });
     } finally {
@@ -115,6 +116,32 @@ router.get('/walkaround-status', async (req: Request, res: Response) => {
  * POST /api/gps/walkaround-complete
  * Record walkaround completion
  */
+router.post('/walkaround-skip', async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { reason } = req.body;
+
+    const client = await pool.connect();
+    try {
+      await client.query(
+        `INSERT INTO walkaround_checks (user_id, checks, defects, vehicle_safe, latitude, longitude, completed_at, skipped, skip_reason)
+         VALUES ($1, $2, $3, $4, $5, $6, now(), true, $7)`,
+        [(req.user as any).id, JSON.stringify([]), JSON.stringify([]), true, null, null, reason || 'No vehicle assigned']
+      );
+
+      res.json({ success: true, skipped: true });
+    } finally {
+      client.release();
+    }
+  } catch (error: any) {
+    console.error('Walkaround skip error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.post('/walkaround-complete', async (req: Request, res: Response) => {
   try {
     if (!req.user) {

@@ -387,6 +387,18 @@ export async function loginWithBackupCode(req: Request, res: Response) {
   // Create session
   req.session.userId = user.id;
   
+  // Save session before continuing
+  await new Promise<void>((resolve, reject) => {
+    req.session.save((err) => {
+      if (err) {
+        console.error('[Auth] Session save error (backup code login):', err);
+        reject(err);
+      } else {
+        resolve();
+      }
+    });
+  });
+  
   // Get remaining backup code count
   const remainingCodes = await storage.getUnusedBackupCodeCount(user.id);
   

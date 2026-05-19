@@ -244,7 +244,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {user?.role === 'engineer' && !hasRole(user, 'admin') && !collapsed && (
           <>
             <NavLink href="/my-day" icon={Calendar}>My Day</NavLink>
-            <NavLink href="/jobs" icon={Briefcase}>My Jobs</NavLink>
+            <NavLink href="/my-jobs" icon={Briefcase}>My Jobs</NavLink>
             <NavLink href="/timesheet" icon={Clock}>Timesheets</NavLink>
             <NavLink href="/walkaround" icon={ClipboardCheck}>Walkaround</NavLink>
           </>
@@ -252,7 +252,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {user?.role === 'engineer' && !hasRole(user, 'admin') && collapsed && (
           <>
             <Tooltip><TooltipTrigger asChild><Link href="/my-day"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location === "/my-day" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Calendar className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">My Day</TooltipContent></Tooltip>
-            <Tooltip><TooltipTrigger asChild><Link href="/jobs"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location.startsWith("/jobs") ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Briefcase className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">My Jobs</TooltipContent></Tooltip>
+            <Tooltip><TooltipTrigger asChild><Link href="/my-jobs"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location.startsWith("/my-jobs") ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Briefcase className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">My Jobs</TooltipContent></Tooltip>
             <Tooltip><TooltipTrigger asChild><Link href="/timesheet"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location === "/timesheet" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Clock className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">Timesheets</TooltipContent></Tooltip>
             <Tooltip><TooltipTrigger asChild><Link href="/walkaround"><button className={cn("w-10 h-10 flex items-center justify-center rounded-lg transition-colors", location === "/walkaround" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><ClipboardCheck className="h-5 w-5" /></button></Link></TooltipTrigger><TooltipContent side="right">Walkaround</TooltipContent></Tooltip>
           </>

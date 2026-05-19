@@ -1236,6 +1236,22 @@ export async function runMigrations() {
     console.error("[Migration] client_properties error:", e.message);
   }
 
+  // ── Walkaround checks: add missing columns for GPS routes ──
+  try {
+    await client.query(`
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS defects JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS vehicle_safe BOOLEAN DEFAULT true;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS skipped BOOLEAN DEFAULT false;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS skip_reason TEXT;
+    `);
+    console.log("[Migration] walkaround_checks columns ensured");
+  } catch (e: any) {
+    console.error("[Migration] walkaround_checks columns error:", e.message);
+  }
+
   console.log("[Migration] All migrations completed");
   client.release();
 }
