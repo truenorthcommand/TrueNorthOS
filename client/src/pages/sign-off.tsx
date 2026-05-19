@@ -90,7 +90,15 @@ export default function SignOff() {
     }
   }, [jobId]);
 
-  if (!job) return null;
+  if (!job) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin text-[#E8A54B] mx-auto" />
+        <p className="text-gray-500">Loading job details...</p>
+        <Button variant="outline" onClick={() => window.history.back()}>Go Back</Button>
+      </div>
+    </div>
+  );
 
   const hasPhotos = (job.photos || []).filter(p => !p.source || p.source === 'engineer').length > 0;
   const hasLocation = location !== null;

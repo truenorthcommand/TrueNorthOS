@@ -1252,6 +1252,26 @@ export async function runMigrations() {
     console.error("[Migration] walkaround_checks columns error:", e.message);
   }
 
+  // Engineer day logs table for Begin Day / End Day tracking
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS engineer_day_logs (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        user_id UUID NOT NULL,
+        log_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        start_time TIMESTAMP NOT NULL DEFAULT NOW(),
+        end_time TIMESTAMP,
+        status TEXT DEFAULT 'active',
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_engineer_day_logs_user_date ON engineer_day_logs(user_id, log_date);
+    `);
+    console.log("[Migration] engineer_day_logs table OK");
+  } catch (e: any) {
+    console.error("[Migration] engineer_day_logs error:", e.message);
+  }
+
   console.log("[Migration] All migrations completed");
   client.release();
 }

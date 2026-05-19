@@ -443,12 +443,26 @@ export default function JobDetail() {
       const tempId = `upload_${Date.now()}_${i}`;
       setUploadingPhotos(prev => [...prev, tempId]);
       try {
-        const formDataUpload = new FormData();
-        formDataUpload.append('file', file);
-        const res = await fetch('/api/upload', { method: 'POST', credentials: 'include', body: formDataUpload });
-        if (res.ok) {
-          const { url } = await res.json();
-          await addPhoto(job.id, url, hasRole(user, 'admin') ? 'admin' : 'engineer');
+        // Step 1: Get presigned upload URL from server
+        const presignRes = await fetch('/api/uploads/request-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+        });
+        if (!presignRes.ok) throw new Error('Failed to get upload URL');
+        const { uploadURL, objectPath } = await presignRes.json();
+        
+        // Step 2: Upload file directly to MinIO via presigned URL
+        const uploadRes = await fetch(uploadURL, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type },
+          body: file,
+        });
+        if (uploadRes.ok) {
+          // Step 3: Save photo reference using the object path
+          await addPhoto(job.id, objectPath, hasRole(user, 'admin') ? 'admin' : 'engineer');
+          toast({ title: 'Photo saved', description: file.name });
         }
       } catch (err) {
         toast({ title: 'Photo upload failed', variant: 'destructive' });
@@ -1692,9 +1706,8 @@ export default function JobDetail() {
             {/* Add Note */}
             <button
               onClick={() => {
-                const notesTab = document.querySelector('[value="actions"]') as HTMLElement;
-                if (notesTab) notesTab.click();
-                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                setActiveTab('actions');
+                setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 200);
               }}
               className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-purple-50 text-purple-600 min-w-[60px]"
             >
@@ -1704,7 +1717,20 @@ export default function JobDetail() {
             {/* Start/Complete Job */}
             {job.status === 'Ready' || job.status === 'Draft' ? (
               <button
-                onClick={() => handleStatusChange('In Progress')}
+                onClick={async () => {
+                  try {
+                    const res = await fetch(`/api/jobs/${job.id}/start`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                    });
+                    if (!res.ok) throw new Error('Failed to start job');
+                    await refreshJobs();
+                    toast({ title: 'Job Started', description: 'Timer is now running.' });
+                  } catch (err: any) {
+                    toast({ title: 'Error', description: err.message, variant: 'destructive' });
+                  }
+                }}
                 className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-green-50 text-green-600 min-w-[60px]"
               >
                 <Play className="w-5 h-5" />

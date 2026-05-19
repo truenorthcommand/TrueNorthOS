@@ -1800,6 +1800,96 @@ export async function registerRoutes(
     }
   });
 
+  // Engineer: Start a job (sets status to In Progress and records startedAt)
+  app.post("/api/jobs/:id/start", requireAuth, async (req, res) => {
+    try {
+      const job = await storage.getJob(req.params.id);
+      if (!job) return res.status(404).json({ error: "Job not found" });
+
+      // Verify engineer is assigned
+      const assignedIds = (job.assignedToIds as string[]) || [];
+      const isAssigned = job.assignedToId === req.session.userId || assignedIds.includes(req.session.userId!);
+      const isAdmin = ['admin', 'works_manager', 'surveyor'].includes(req.session.userRole || '');
+      if (!isAssigned && !isAdmin) {
+        return res.status(403).json({ error: "Not assigned to this job" });
+      }
+
+      // Only allow starting from certain statuses
+      const startableStatuses = ['Draft', 'Ready', 'Scheduled', 'Awaiting Signatures'];
+      if (!startableStatuses.includes(job.status || '')) {
+        return res.status(409).json({ error: `Cannot start job with status '${job.status}'` });
+      }
+
+      const updated = await storage.updateJob(req.params.id, {
+        status: 'In Progress',
+        updatedByUserId: req.session.userId,
+      });
+
+      // Notify admins
+      notifyAdmins({
+        type: 'job_status_changed',
+        title: 'Job Started',
+        message: `Job ${job.jobNo || ''} started by engineer`,
+        category: 'jobs',
+        jobId: job.id,
+        jobNo: job.jobNo || undefined,
+        timestamp: new Date().toISOString(),
+        linkUrl: `/app/jobs/${job.id}`,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Error starting job:', error);
+      res.status(500).json({ error: "Failed to start job" });
+    }
+  });
+
+  // Engineer: Begin Day - records start time
+  app.post("/api/engineer/begin-day", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) return res.status(401).json({ error: 'Not authenticated' });
+
+      const today = new Date().toISOString().split('T')[0];
+
+      // Check if already started today
+      const existing = await pool.query(
+        `SELECT id FROM engineer_day_logs WHERE user_id = $1 AND log_date = $2`,
+        [userId, today]
+      );
+
+      if (existing.rows.length > 0) {
+        return res.status(409).json({ error: 'Day already started', id: existing.rows[0].id });
+      }
+
+      const result = await pool.query(
+        `INSERT INTO engineer_day_logs (user_id, log_date, start_time, status)
+         VALUES ($1, $2, NOW(), 'active') RETURNING *`,
+        [userId, today]
+      );
+
+      res.json({ success: true, log: result.rows[0] });
+    } catch (error) {
+      console.error('Error beginning day:', error);
+      res.status(500).json({ error: 'Failed to begin day' });
+    }
+  });
+
+  // Engineer: Get today's day log status
+  app.get("/api/engineer/day-status", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      const today = new Date().toISOString().split('T')[0];
+      const result = await pool.query(
+        `SELECT * FROM engineer_day_logs WHERE user_id = $1 AND log_date = $2`,
+        [userId, today]
+      );
+      res.json({ started: result.rows.length > 0, log: result.rows[0] || null });
+    } catch (error) {
+      res.json({ started: false, log: null });
+    }
+  });
+
   app.delete("/api/jobs/:id", requireAdmin, async (req, res) => {
     try {
       await storage.deleteJob(req.params.id);

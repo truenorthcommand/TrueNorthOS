@@ -109,6 +109,7 @@ export default function EngineerDashboard() {
   const [showEndDay, setShowEndDay] = useState(false);
   const [startingJob, setStartingJob] = useState<string | null>(null);
   const [skippingWalkaround, setSkippingWalkaround] = useState(false);
+  const [beginningDay, setBeginningDay] = useState(false);
 
   // ── Receipt Panel State ──────────────────────────────────────────
   const [showReceiptPanel, setShowReceiptPanel] = useState(false);
@@ -207,6 +208,13 @@ export default function EngineerDashboard() {
     queryKey: ['/api/jobs'],
   });
 
+  const { data: dayStatus, refetch: refetchDayStatus } = useQuery({
+    queryKey: ['/api/engineer/day-status'],
+  });
+
+  const dayStarted = (dayStatus as any)?.started === true;
+  const dayLog = (dayStatus as any)?.log;
+
   const todayJobs = (jobs as any[])?.filter((j: any) => {
     const jobDate = new Date(j.scheduledDate).toDateString();
     const today = new Date().toDateString();
@@ -254,11 +262,10 @@ export default function EngineerDashboard() {
         // GPS not available, continue anyway
       }
 
-      const res = await fetch(`/api/jobs/${jobId}`, {
-        method: 'PUT',
+      const res = await fetch(`/api/jobs/${jobId}/start`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ status: 'In Progress', startedAt: new Date().toISOString() }),
       });
 
       if (!res.ok) throw new Error('Failed to start job');
@@ -293,6 +300,32 @@ export default function EngineerDashboard() {
       toast({ title: 'Error', description: err.message || 'Failed to skip walkaround', variant: 'destructive' });
     } finally {
       setSkippingWalkaround(false);
+    }
+  };
+
+  const handleBeginDay = async () => {
+    setBeginningDay(true);
+    try {
+      const res = await fetch('/api/engineer/begin-day', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 409) {
+          toast({ title: 'Day Already Started', description: 'Your day was already logged.' });
+        } else {
+          throw new Error(data.error || 'Failed to begin day');
+        }
+      } else {
+        toast({ title: 'Day Started! ☀️', description: `Start time recorded at ${format(new Date(), 'HH:mm')}` });
+      }
+      refetchDayStatus();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to begin day', variant: 'destructive' });
+    } finally {
+      setBeginningDay(false);
     }
   };
 
@@ -670,6 +703,28 @@ export default function EngineerDashboard() {
 
           {/* End Day Section */}
           <div className="mt-6">
+            {/* Begin Day Button */}
+            {!dayStarted ? (
+              <Button
+                onClick={handleBeginDay}
+                disabled={beginningDay}
+                className="w-full h-12 mb-3 bg-green-600 hover:bg-green-700 text-white"
+              >
+                {beginningDay ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Sun className="h-4 w-4 mr-2" />
+                )}
+                Begin Day
+              </Button>
+            ) : (
+              <div className="flex items-center justify-center gap-2 mb-3 py-2 px-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <span className="text-sm font-medium text-green-700 dark:text-green-300">
+                  Day started at {dayLog?.start_time ? format(new Date(dayLog.start_time), 'HH:mm') : '--:--'}
+                </span>
+              </div>
+            )}
             {!showEndDay ? (
               <Button
                 onClick={() => setShowEndDay(true)}
