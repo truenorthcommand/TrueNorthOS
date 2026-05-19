@@ -80,7 +80,7 @@ export function UserSecurityManagement({
   const handleUnlockAccount = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/users/${userId}`, {
+      const response = await fetch("/api/users/" + userId, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -135,7 +135,7 @@ export function UserSecurityManagement({
       setShowBackupCodes(true);
       toast({
         title: "Backup Codes Regenerated",
-        description: `New backup codes generated for ${name}",
+        description: `New backup codes generated for ${name}`,
       });
       onUpdate?.();
     } catch (error) {
