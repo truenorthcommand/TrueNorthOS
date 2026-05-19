@@ -86,6 +86,7 @@ import Inspections from "@/pages/inspections";
 import InspectionDetail from "@/pages/inspection-detail";
 import SnaggingSheets from "@/pages/snagging-sheets";
 import SnaggingDetail from "@/pages/snagging-detail";
+import SnagReviewQueue from "@/pages/snag-review-queue";
 import AccountsDashboard from "@/pages/accounts-dashboard";
 import Files from "@/pages/files";
 import PitchInvestor from "@/pages/pitch-investor";
@@ -250,6 +251,7 @@ function AppRoutes() {
         <Route path="/works-manager/jobs" component={withRole(WorksManagerJobs, 'admin', 'works_manager')} />
         <Route path="/works-manager/map" component={withRole(WorksManagerMap, 'admin', 'works_manager')} />
         <Route path="/works-manager/approvals" component={withRole(WorksManagerApprovals, 'admin', 'works_manager')} />
+        <Route path="/snag-review" component={withRole(SnagReviewQueue, 'admin', 'works_manager')} />
         <Route path="/inspections" component={withRole(Inspections, 'admin', 'surveyor', 'works_manager')} />
         <Route path="/inspections/:id" component={withRole(InspectionDetail, 'admin', 'surveyor', 'works_manager')} />
         <Route path="/snagging" component={withRole(SnaggingSheets, 'admin', 'surveyor', 'works_manager')} />

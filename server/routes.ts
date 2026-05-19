@@ -51,6 +51,7 @@ import jobPhasesRoutes from "./job-phases-routes";
 import signoffRoutes from "./signoff-routes";
 import feedbackRoutes from "./feedback-routes";
 import bootstrapRoutes from "./bootstrap-routes";
+import snagScannerRoutes from "./snag-scanner-routes";
 
 function getStripeClient(): Stripe | null {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -7727,6 +7728,8 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
   app.use('/api/jobs', populateUserMiddleware, jobPhasesRoutes);
   app.use('/api/jobs', populateUserMiddleware, signoffRoutes);
 
+  // AI Snagging Scanner
+  app.use('/api/jobs', populateUserMiddleware, snagScannerRoutes);
 
   // Feedback System
   app.use('/api/feedback', populateUserMiddleware, feedbackRoutes);

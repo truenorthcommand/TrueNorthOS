@@ -10,6 +10,7 @@ import { ArrowLeft, Eraser, CheckCircle2, AlertTriangle, Loader2, MapPin, Refres
 import SignatureCanvas from "react-signature-canvas";
 import { useToast } from "@/hooks/use-toast";
 import { reverseGeocode } from "@/components/google-map";
+import SnagScanner from "@/components/snag-scanner";
 
 export default function SignOff() {
   const [match, params] = useRoute("/jobs/:id/sign-off");
@@ -29,6 +30,8 @@ export default function SignOff() {
   const [locationAddress, setLocationAddress] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [snagSignoffLocked, setSnagSignoffLocked] = useState(true); // Start locked until scan completes
+  const [snagRagStatus, setSnagRagStatus] = useState<string | null>(null);
 
   const jobId = params?.id;
   const job = jobId ? getJob(jobId) : undefined;
@@ -104,7 +107,7 @@ export default function SignOff() {
   if (custSigEmpty) validationErrors.push("Customer signature is required");
   
   const hasPreRequisites = hasDescription && hasWorksCompleted && hasPhotos;
-  const canSubmit = validationErrors.length === 0 && !isSubmitting;
+  const canSubmit = validationErrors.length === 0 && !isSubmitting && !snagSignoffLocked;
   
   const checkSignatures = () => {
     setEngSigEmpty(engSigRef.current?.isEmpty() ?? true);
@@ -261,7 +264,30 @@ export default function SignOff() {
           </CardContent>
         </Card>
 
-        <Card className={!hasPreRequisites ? "opacity-50 pointer-events-none" : ""} data-testid="card-engineer-signature">
+        {/* ─── AI Snag Scanner (gates signatures) ─────────────────── */}
+        {hasPreRequisites && (
+          <SnagScanner
+            jobId={job.id}
+            jobNo={job.jobNo}
+            onStatusChange={(ragStatus, locked) => {
+              setSnagRagStatus(ragStatus);
+              setSnagSignoffLocked(locked);
+            }}
+          />
+        )}
+
+        {/* ─── Signatures (locked until snag check passes) ────────── */}
+        {snagSignoffLocked && snagRagStatus && (
+          <Alert className="border-gray-300 bg-gray-50">
+            <AlertTriangle className="h-4 w-4 text-gray-500" />
+            <AlertTitle className="text-gray-700">Signatures Locked</AlertTitle>
+            <AlertDescription className="text-gray-600">
+              Complete the AI Snag Check above to unlock the client signature section.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <Card className={!hasPreRequisites || snagSignoffLocked ? "opacity-50 pointer-events-none" : ""} data-testid="card-engineer-signature">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               Engineer Sign-off
@@ -305,7 +331,7 @@ export default function SignOff() {
           </CardContent>
         </Card>
 
-        <Card className={!hasPreRequisites ? "opacity-50 pointer-events-none" : ""} data-testid="card-customer-signature">
+        <Card className={!hasPreRequisites || snagSignoffLocked ? "opacity-50 pointer-events-none" : ""} data-testid="card-customer-signature">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               Customer Acceptance

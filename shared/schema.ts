@@ -151,6 +151,12 @@ export const jobs = pgTable("jobs", {
   agreedPrice: doublePrecision("agreed_price"),
   vatRate: doublePrecision("vat_rate").default(20),
   priceLocked: boolean("price_locked").default(false),
+  // 🔍 AI Snagging Scanner
+  ragStatus: text("rag_status").default("Green"),
+  signoffLocked: boolean("signoff_locked").default(false),
+  snagOverrideBy: varchar("snag_override_by"),
+  snagOverrideReason: text("snag_override_reason"),
+  snagOverrideAt: timestamp("snag_override_at"),
 });
 
 // Job updates for long-running jobs (2 updates per day max)
@@ -326,6 +332,50 @@ export type Material = {
   id: string;
   name: string;
   quantity: string;
+};
+
+// ==================== AI SNAGGING SCANNER ====================
+
+export const snagScans = pgTable("snag_scans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull(),
+  scannedById: varchar("scanned_by_id"),
+  ragStatus: text("rag_status").notNull(), // Green, Amber, Red
+  imageCount: integer("image_count").default(0),
+  rawAiResponse: jsonb("raw_ai_response"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const aiSnagItems = pgTable("ai_snag_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  scanId: varchar("scan_id").notNull(),
+  jobId: varchar("job_id").notNull(),
+  imageUrl: text("image_url"), // MinIO object key
+  description: text("description").notNull(),
+  priority: text("priority").notNull(), // High, Medium, Low
+  tradeCategory: text("trade_category"),
+  status: text("status").notNull().default("Open"), // Open, Rectified, Overridden
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSnagScanSchema = createInsertSchema(snagScans).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAiSnagItemSchema = createInsertSchema(aiSnagItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSnagScan = z.infer<typeof insertSnagScanSchema>;
+export type SnagScan = typeof snagScans.$inferSelect;
+export type InsertAiSnagItem = z.infer<typeof insertAiSnagItemSchema>;
+export type AiSnagItem = typeof aiSnagItems.$inferSelect;
+
+export type SnagScanWithItems = SnagScan & {
+  items: AiSnagItem[];
+  scannedBy?: Pick<User, 'id' | 'name'> | null;
 };
 
 export type Photo = {

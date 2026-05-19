@@ -1078,6 +1078,60 @@ export async function runMigrations() {
     console.error("[Migration] Security fields error:", e.message);
   }
 
+  // === AI SNAGGING SCANNER TABLES ===
+  try {
+    // Add AI snag fields to jobs table
+    await client.query(`
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS rag_status VARCHAR DEFAULT 'Green';
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS signoff_locked BOOLEAN DEFAULT false;
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS snag_override_by VARCHAR;
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS snag_override_reason TEXT;
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS snag_override_at TIMESTAMP;
+    `);
+    console.log("[Migration] AI Snag fields added to jobs table");
+
+    // Create snag_scans table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS snag_scans (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        job_id VARCHAR NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+        scanned_by_id VARCHAR REFERENCES users(id) ON DELETE SET NULL,
+        rag_status VARCHAR NOT NULL DEFAULT 'Green',
+        image_count INTEGER DEFAULT 0,
+        raw_ai_response JSONB,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_snag_scans_job ON snag_scans(job_id);
+      CREATE INDEX IF NOT EXISTS idx_snag_scans_rag ON snag_scans(rag_status);
+    `);
+    console.log("[Migration] snag_scans table + indexes OK");
+
+    // Create ai_snag_items table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ai_snag_items (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        scan_id UUID NOT NULL REFERENCES snag_scans(id) ON DELETE CASCADE,
+        job_id VARCHAR NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+        image_url TEXT,
+        description TEXT NOT NULL,
+        priority VARCHAR NOT NULL DEFAULT 'Medium',
+        trade_category VARCHAR,
+        status VARCHAR NOT NULL DEFAULT 'Open',
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_ai_snag_items_scan ON ai_snag_items(scan_id);
+      CREATE INDEX IF NOT EXISTS idx_ai_snag_items_job ON ai_snag_items(job_id);
+      CREATE INDEX IF NOT EXISTS idx_ai_snag_items_status ON ai_snag_items(status);
+    `);
+    console.log("[Migration] ai_snag_items table + indexes OK");
+  } catch (e: any) {
+    console.error("[Migration] AI Snagging Scanner error:", e.message);
+  }
+
   console.log("[Migration] All migrations completed");
   client.release();
 }
