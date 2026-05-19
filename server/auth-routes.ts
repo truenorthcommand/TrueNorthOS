@@ -199,13 +199,19 @@ export async function login(req: Request, res: Response) {
     req.session.userId = user.id;
     req.session.requiresOnboarding = true;
     
-    return res.json({
-      requiresOnboarding: true,
-      user: {
-        id: user.id,
-        username: user.username,
-        name: user.name,
-      },
+    return req.session.save((err) => {
+      if (err) {
+        console.error('[Auth] Session save error (onboarding):', err);
+        return res.status(500).json({ error: 'Session error' });
+      }
+      return res.json({
+        requiresOnboarding: true,
+        user: {
+          id: user.id,
+          username: user.username,
+          name: user.name,
+        },
+      });
     });
   }
   
@@ -214,13 +220,19 @@ export async function login(req: Request, res: Response) {
     req.session.userId = user.id;
     req.session.requiresPasswordChange = true;
     
-    return res.json({
-      requiresPasswordChange: true,
-      user: {
-        id: user.id,
-        username: user.username,
-        name: user.name,
-      },
+    return req.session.save((err) => {
+      if (err) {
+        console.error('[Auth] Session save error (password change):', err);
+        return res.status(500).json({ error: 'Session error' });
+      }
+      return res.json({
+        requiresPasswordChange: true,
+        user: {
+          id: user.id,
+          username: user.username,
+          name: user.name,
+        },
+      });
     });
   }
   
@@ -229,14 +241,20 @@ export async function login(req: Request, res: Response) {
     req.session.userId = user.id;
     req.session.requiresPasswordChange = true;
     
-    return res.json({
-      requiresPasswordChange: true,
-      reason: "password_expired",
-      user: {
-        id: user.id,
-        username: user.username,
-        name: user.name,
-      },
+    return req.session.save((err) => {
+      if (err) {
+        console.error('[Auth] Session save error (password expired):', err);
+        return res.status(500).json({ error: 'Session error' });
+      }
+      return res.json({
+        requiresPasswordChange: true,
+        reason: "password_expired",
+        user: {
+          id: user.id,
+          username: user.username,
+          name: user.name,
+        },
+      });
     });
   }
   
@@ -249,16 +267,22 @@ export async function login(req: Request, res: Response) {
     details: { username },
   });
   
-  return res.json({
-    success: true,
-    user: {
-      id: user.id,
-      username: user.username,
-      name: user.name,
-      role: user.role,
-      roles: user.roles,
-      superAdmin: user.superAdmin,
-    },
+  return req.session.save((err) => {
+    if (err) {
+      console.error('[Auth] Session save error (login success):', err);
+      return res.status(500).json({ error: 'Session error' });
+    }
+    return res.json({
+      success: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        role: user.role,
+        roles: user.roles,
+        superAdmin: user.superAdmin,
+      },
+    });
   });
 }
 
