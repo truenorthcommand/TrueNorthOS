@@ -151,9 +151,9 @@ function RoleGuard({ roles, children }: { roles: Role[]; children: React.ReactNo
   if (!isDirector && !hasRole(user, ...roles)) {
     // Redirect engineers to their dashboard
     if (user.role === 'engineer' || (user.roles && user.roles.length === 1 && user.roles[0] === 'engineer')) {
-      setLocation('/app/my-day');
+      setLocation('/my-day');
     } else {
-      setLocation('/app');
+      setLocation('/');
     }
     return null;
   }
