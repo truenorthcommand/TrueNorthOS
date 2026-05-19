@@ -20,6 +20,9 @@ async function ensureWalkaroundColumns() {
       ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS vehicle_safe BOOLEAN DEFAULT true;
       ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
       ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+      ALTER TABLE walkaround_checks ALTER COLUMN vehicle_id DROP NOT NULL;
+      ALTER TABLE walkaround_checks ALTER COLUMN inspector_id DROP NOT NULL;
+      ALTER TABLE walkaround_checks ALTER COLUMN check_type DROP NOT NULL;
     `);
     walkaroundColumnsEnsured = true;
     console.log('[GPS] Walkaround columns ensured');
