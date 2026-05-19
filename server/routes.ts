@@ -3065,6 +3065,7 @@ export async function registerRoutes(
       
       res.json(client);
     } catch (error) {
+      console.error("[ClientCreate] Error creating client:", error);
       res.status(500).json({ error: "Failed to create client" });
     }
   });
