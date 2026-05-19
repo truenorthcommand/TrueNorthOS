@@ -13,6 +13,7 @@ import NotFound from "@/pages/not-found";
 import WorkflowStudio from "@/pages/workflow-studio";
 import WorkflowEditor from "@/pages/workflow-editor";
 import Login from "@/pages/login";
+import Onboarding from "@/pages/onboarding";
 import Dashboard from "@/pages/dashboard";
 import Jobs from "@/pages/jobs";
 import JobDetail from "@/pages/job-detail";
@@ -240,6 +241,7 @@ function Router() {
     <Switch>
       <Route path="/" component={RedirectToLogin} />
       <Route path="/login" component={Login} />
+      <Route path="/onboarding" component={Onboarding} />
       <Route path="/setup" component={Setup} />
       <Route path="/guides" component={UserGuides} />
 

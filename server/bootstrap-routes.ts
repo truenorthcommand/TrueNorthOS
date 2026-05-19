@@ -15,6 +15,7 @@ import { db } from "./db";
 import { users } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { logAuditEvent } from "./audit";
+import { eq } from "drizzle-orm";
 
 const router = Router();
 const SALT_ROUNDS = 12;
@@ -302,6 +303,66 @@ router.get("/status", async (req: Request, res: Response) => {
     console.error("[Bootstrap] Status check failed:", error);
     return res.status(500).json({
       error: "Status check failed",
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/bootstrap/reset-password
+ * 
+ * Resets the APP_USERNAME user's password to match the current APP_PASSWORD env var.
+ * Use when Railway env vars are changed after bootstrap.
+ * Only works for the APP_USERNAME account.
+ */
+router.post("/reset-password", async (req: Request, res: Response) => {
+  try {
+    const appUsername = process.env.APP_USERNAME;
+    const appPassword = process.env.APP_PASSWORD;
+
+    if (!appUsername || !appPassword) {
+      return res.status(400).json({
+        error: "Missing environment variables",
+        message: "APP_USERNAME and APP_PASSWORD must be set in Railway variables.",
+      });
+    }
+
+    // Find the user
+    const [user] = await db.select().from(users).where(
+      eq(users.username, appUsername)
+    ).limit(1);
+
+    if (!user) {
+      return res.status(404).json({
+        error: "User not found",
+        message: "No user found with username: " + appUsername,
+      });
+    }
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(appPassword, SALT_ROUNDS);
+
+    // Update the user's password and reset onboarding flags
+    await db.update(users).set({
+      password: hashedPassword,
+      firstLoginCompleted: false,
+      requirePasswordChange: false,
+      passwordSetAt: new Date(),
+      failedLoginAttempts: 0,
+      accountLockedUntil: null,
+    }).where(eq(users.id, user.id));
+
+    console.log("[Bootstrap] Password reset for user: " + appUsername);
+
+    return res.json({
+      success: true,
+      message: "Password reset successfully for " + appUsername + ". You can now login with the new password.",
+      username: appUsername,
+    });
+  } catch (error: any) {
+    console.error("[Bootstrap] Password reset failed:", error);
+    return res.status(500).json({
+      error: "Password reset failed",
       message: error.message,
     });
   }
