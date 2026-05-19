@@ -660,7 +660,7 @@ export default function JobDetail() {
                   </Button>
                 )}
                 {job.status === 'In Progress' && (
-                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => navigate(`/jobs/${job.id}/complete`)}>
+                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => navigate(`/jobs/${job.id}/report`)}>
                     <CheckCircle2 className="h-4 w-4 mr-1" /> Complete Job
                   </Button>
                 )}
@@ -1733,7 +1733,7 @@ export default function JobDetail() {
               </button>
             ) : job.status === 'In Progress' ? (
               <button
-                onClick={() => handleStatusChange('Awaiting Signatures')}
+                onClick={() => navigate(`/jobs/${job.id}/report`)}
                 className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-emerald-50 text-emerald-600 min-w-[60px]"
               >
                 <CheckCircle2 className="w-5 h-5" />

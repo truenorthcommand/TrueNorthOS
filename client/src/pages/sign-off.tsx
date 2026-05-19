@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from "react";
+import { useQuery } from '@tanstack/react-query';
 import { useRoute, Link, useLocation } from "wouter";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
@@ -35,7 +36,17 @@ export default function SignOff() {
   const [snagRagStatus, setSnagRagStatus] = useState<string | null>(null);
 
   const jobId = params?.id;
-  const job = jobId ? getJob(jobId) : undefined;
+  const { data: fetchedJob, isLoading: jobLoading } = useQuery({
+    queryKey: [`/api/jobs/${jobId}`],
+    queryFn: async () => {
+      const res = await fetch(`/api/jobs`, { credentials: 'include' });
+      const jobs = await res.json();
+      return jobs.find((j: any) => j.id === jobId) || null;
+    },
+    enabled: !!jobId,
+  });
+
+  const job = (jobId ? getJob(jobId) : undefined) || fetchedJob;
 
   const getLocation = async () => {
     setIsGettingLocation(true);
@@ -90,7 +101,7 @@ export default function SignOff() {
     }
   }, [jobId]);
 
-  if (!job) return (
+  if (jobLoading && !job) return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center space-y-4">
         <Loader2 className="h-8 w-8 animate-spin text-[#E8A54B] mx-auto" />

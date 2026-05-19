@@ -27,6 +27,7 @@ import JobCompleteWizard from "@/pages/job-complete-wizard";
 import QuickReceipt from "@/pages/quick-receipt";
 import QuickTimesheet from "@/pages/quick-timesheet";
 import SignOff from "@/pages/sign-off";
+import EngineerReport from "@/pages/engineer-report";
 import Clients from "@/pages/clients";
 import ClientDetail from "@/pages/client-detail";
 import AddClient from "@/pages/add-client";
@@ -188,6 +189,7 @@ function AppRoutes() {
         <Route path="/jobs/:id/edit" component={withRole(EditJob, 'admin', 'surveyor', 'works_manager')} />
         <Route path="/jobs/:id" component={JobDetail} />
         <Route path="/jobs/:id/sign-off" component={SignOff} />
+        <Route path="/jobs/:id/report" component={EngineerReport} />
         <Route path="/jobs/:id/complete" component={JobCompleteWizard} />
         <Route path="/clients" component={withRole(Clients, 'admin', 'surveyor', 'works_manager')} />
         <Route path="/clients/new" component={withRole(AddClient, 'admin', 'surveyor', 'works_manager')} />
