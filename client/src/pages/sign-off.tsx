@@ -30,7 +30,8 @@ export default function SignOff() {
   const [locationAddress, setLocationAddress] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
-  const [snagSignoffLocked, setSnagSignoffLocked] = useState(false); // Unlocked by default, locked only when scan detects issues
+  const [snagScanCompleted, setSnagScanCompleted] = useState(false); // Must complete scan before sign-off
+  const [snagSignoffLocked, setSnagSignoffLocked] = useState(true); // Locked until scan passes
   const [snagRagStatus, setSnagRagStatus] = useState<string | null>(null);
 
   const jobId = params?.id;
@@ -105,9 +106,12 @@ export default function SignOff() {
   if (engSigEmpty) validationErrors.push("Engineer signature is required");
   if (!custName.trim()) validationErrors.push("Customer name is required");
   if (custSigEmpty) validationErrors.push("Customer signature is required");
+  if (!snagScanCompleted) validationErrors.push("AI Snag Check must be completed before sign-off");
+  if (snagScanCompleted && snagSignoffLocked) validationErrors.push("Snag issues must be resolved or overridden");
   
   const hasPreRequisites = hasDescription && hasWorksCompleted && hasPhotos;
-  const canSubmit = validationErrors.length === 0 && !isSubmitting && !snagSignoffLocked;
+  const snagCheckPassed = snagScanCompleted && !snagSignoffLocked;
+  const canSubmit = validationErrors.length === 0 && !isSubmitting && snagCheckPassed;
   
   const checkSignatures = () => {
     setEngSigEmpty(engSigRef.current?.isEmpty() ?? true);
@@ -270,6 +274,7 @@ export default function SignOff() {
             jobId={job.id}
             jobNo={job.jobNo}
             onStatusChange={(ragStatus, locked) => {
+              setSnagScanCompleted(true);
               setSnagRagStatus(ragStatus);
               setSnagSignoffLocked(locked);
             }}
@@ -277,17 +282,28 @@ export default function SignOff() {
         )}
 
         {/* ─── Signatures (locked until snag check passes) ────────── */}
-        {snagSignoffLocked && snagRagStatus && (
-          <Alert className="border-gray-300 bg-gray-50">
-            <AlertTriangle className="h-4 w-4 text-gray-500" />
-            <AlertTitle className="text-gray-700">Signatures Locked</AlertTitle>
-            <AlertDescription className="text-gray-600">
-              Complete the AI Snag Check above to unlock the client signature section.
+        {!snagScanCompleted && hasPreRequisites && (
+          <Alert className="border-indigo-300 bg-indigo-50">
+            <AlertTriangle className="h-4 w-4 text-indigo-600" />
+            <AlertTitle className="text-indigo-800">AI Snag Check Required</AlertTitle>
+            <AlertDescription className="text-indigo-700">
+              Upload photos and complete the AI quality inspection above before signing off.
+              This ensures all work meets quality standards.
             </AlertDescription>
           </Alert>
         )}
 
-        <Card className={!hasPreRequisites || snagSignoffLocked ? "opacity-50 pointer-events-none" : ""} data-testid="card-engineer-signature">
+        {snagScanCompleted && snagSignoffLocked && (
+          <Alert className="border-gray-300 bg-gray-50">
+            <AlertTriangle className="h-4 w-4 text-gray-500" />
+            <AlertTitle className="text-gray-700">Signatures Locked</AlertTitle>
+            <AlertDescription className="text-gray-600">
+              Resolve the detected snag issues or use the override option above to unlock signatures.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <Card className={!hasPreRequisites || !snagCheckPassed ? "opacity-50 pointer-events-none" : ""} data-testid="card-engineer-signature">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               Engineer Sign-off
@@ -331,7 +347,7 @@ export default function SignOff() {
           </CardContent>
         </Card>
 
-        <Card className={!hasPreRequisites || snagSignoffLocked ? "opacity-50 pointer-events-none" : ""} data-testid="card-customer-signature">
+        <Card className={!hasPreRequisites || !snagCheckPassed ? "opacity-50 pointer-events-none" : ""} data-testid="card-customer-signature">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               Customer Acceptance
