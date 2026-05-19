@@ -162,7 +162,7 @@ router.get('/live-positions', async (req: Request, res: Response) => {
           u.current_lat as latitude,
           u.current_lng as longitude,
           u.username as name,
-          u.full_name,
+          u.name as full_name,
           u.last_location_update as last_seen,
           el.accuracy,
           CASE
@@ -262,7 +262,7 @@ router.get('/stats', async (req: Request, res: Response) => {
       const jobsCompleted = await client.query(`
         SELECT COUNT(*) as count FROM jobs
         WHERE status IN ('Signed Off', 'Awaiting Signatures')
-        AND DATE(COALESCE(completed_at, updated_at)) = CURRENT_DATE
+        AND DATE(COALESCE(sign_off_timestamp, updated_at)) = CURRENT_DATE
       `);
 
       // Total jobs today
