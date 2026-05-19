@@ -5,12 +5,14 @@ import crypto from "crypto";
 
 interface AuditEventParams {
   userId: string;
-  userName: string;
+  userName?: string;
   userEmail?: string;
-  userRole: string;
-  actionType: string;
+  userRole?: string;
+  actionType?: string;
+  action?: string;
   actionCategory?: string;
-  entityType: string;
+  entityType?: string;
+  resourceType?: string;
   entityId?: string;
   changesBefore?: any;
   changesAfter?: any;
@@ -119,16 +121,17 @@ export async function logAuditEvent(params: AuditEventParams): Promise<string | 
         : null
     } : null;
     
-    const checksum = generateChecksum(lastLogId, timestamp, params.userId, params.actionType, changesJson);
+    const actionForChecksum = params.actionType || params.action || 'unknown';
+    const checksum = generateChecksum(lastLogId, timestamp, params.userId, actionForChecksum, changesJson);
     
     const logEntry: InsertAuditLog = {
       userId: params.userId,
-      userName: params.userName,
-      userEmail: params.userEmail,
-      userRole: params.userRole,
-      actionType: params.actionType,
-      actionCategory: params.actionCategory,
-      entityType: params.entityType,
+      userName: params.userName || 'System',
+      userEmail: params.userEmail || null,
+      userRole: params.userRole || 'unknown',
+      actionType: params.actionType || params.action || 'unknown',
+      actionCategory: params.actionCategory || null,
+      entityType: params.entityType || params.resourceType || 'system',
       entityId: params.entityId,
       actionDescription: params.description,
       changesJson,
