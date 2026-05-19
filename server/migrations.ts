@@ -946,6 +946,49 @@ export async function runMigrations() {
     console.error("[Migration] Receipt compliance system error:", e.message);
   }
 
+  // ==================== FIX: Google Maps & GPS columns ====================
+  try {
+    // Add missing columns to jobs table for geocoding and scheduling
+    await client.query(`
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS site_address TEXT;
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS site_lat DOUBLE PRECISION;
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS site_lng DOUBLE PRECISION;
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS scheduled_date TIMESTAMP;
+    `);
+    console.log("[Migration] Jobs table: site_address, site_lat, site_lng, scheduled_date columns OK");
+
+    // Backfill scheduled_date from date column where not set
+    await client.query(`
+      UPDATE jobs SET scheduled_date = date WHERE scheduled_date IS NULL AND date IS NOT NULL;
+    `);
+    console.log("[Migration] Jobs table: backfilled scheduled_date from date column");
+
+    // Backfill site_address from address column where not set
+    await client.query(`
+      UPDATE jobs SET site_address = address WHERE site_address IS NULL AND address IS NOT NULL;
+    `);
+    console.log("[Migration] Jobs table: backfilled site_address from address column");
+
+    // Add missing columns to gps_logs table for GPS tracking
+    await client.query(`
+      ALTER TABLE gps_logs ADD COLUMN IF NOT EXISTS job_id VARCHAR;
+      ALTER TABLE gps_logs ADD COLUMN IF NOT EXISTS action TEXT DEFAULT 'check-in';
+      ALTER TABLE gps_logs ADD COLUMN IF NOT EXISTS logged_at TIMESTAMP DEFAULT now();
+    `);
+    console.log("[Migration] gps_logs table: job_id, action, logged_at columns OK");
+
+    // Create indexes for map performance
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_jobs_site_lat ON jobs(site_lat);
+      CREATE INDEX IF NOT EXISTS idx_jobs_scheduled_date ON jobs(scheduled_date);
+      CREATE INDEX IF NOT EXISTS idx_gps_logs_user_logged ON gps_logs(user_id, logged_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_engineer_locations_engineer ON engineer_locations(engineer_id, timestamp DESC);
+    `);
+    console.log("[Migration] Indexes for maps/GPS created OK");
+  } catch (e: any) {
+    console.error("[Migration] Google Maps & GPS columns error:", e.message);
+  }
+
   console.log("[Migration] All migrations completed");
   client.release();
 }

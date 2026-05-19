@@ -113,9 +113,10 @@ function formatAvgJobTime(minutes: number | undefined): string {
 }
 
 function isJobOverdue(job: any): boolean {
-  if (!job.scheduledDate) return false;
+  const jobDate = job.scheduledDate || job.date;
+  if (!jobDate) return false;
   if (job.status === 'Signed Off' || job.status === 'Completed' || job.status === 'In Progress') return false;
-  const scheduled = new Date(job.scheduledDate);
+  const scheduled = new Date(jobDate);
   return scheduled < new Date() && (job.status === 'Ready' || job.status === 'Draft');
 }
 
@@ -359,8 +360,9 @@ export default function MapPage() {
     if (!jobs) return [];
     const todayStr = new Date().toDateString();
     return jobs.filter((j: any) => {
-      if (!j.scheduledDate) return false;
-      return new Date(j.scheduledDate).toDateString() === todayStr;
+      const jobDate = j.scheduledDate || j.date;
+      if (!jobDate) return false;
+      return new Date(jobDate).toDateString() === todayStr;
     });
   }, [jobs]);
 

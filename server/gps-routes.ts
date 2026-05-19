@@ -155,26 +155,44 @@ router.get('/live-positions', async (req: Request, res: Response) => {
 
     const client = await pool.connect();
     try {
+      // Read from users table (updated by location-tracker) + engineer_locations for history
       const result = await client.query(`
-        SELECT DISTINCT ON (g.user_id)
-          g.user_id,
-          g.latitude,
-          g.longitude,
-          g.accuracy,
-          g.action,
-          g.job_id,
-          g.logged_at,
+        SELECT
+          u.id as user_id,
+          u.current_lat as latitude,
+          u.current_lng as longitude,
           u.username as name,
           u.full_name,
+          u.last_location_update as last_seen,
+          el.accuracy,
           CASE
-            WHEN g.logged_at > now() - interval '5 minutes' THEN 'active'
-            WHEN g.logged_at > now() - interval '30 minutes' THEN 'idle'
+            WHEN u.last_location_update > now() - interval '5 minutes' THEN 'active'
+            WHEN u.last_location_update > now() - interval '30 minutes' THEN 'idle'
             ELSE 'offline'
-          END as status
-        FROM gps_logs g
-        JOIN users u ON u.id = g.user_id
+          END as status,
+          (
+            SELECT g.action FROM gps_logs g
+            WHERE g.user_id = u.id
+            ORDER BY g.logged_at DESC NULLS LAST, g.timestamp DESC NULLS LAST
+            LIMIT 1
+          ) as action,
+          (
+            SELECT j.customer_name FROM jobs j
+            JOIN gps_logs g2 ON g2.job_id = j.id
+            WHERE g2.user_id = u.id
+            ORDER BY g2.logged_at DESC NULLS LAST, g2.timestamp DESC NULLS LAST
+            LIMIT 1
+          ) as current_job
+        FROM users u
+        LEFT JOIN LATERAL (
+          SELECT accuracy FROM engineer_locations
+          WHERE engineer_id = u.id
+          ORDER BY timestamp DESC
+          LIMIT 1
+        ) el ON true
         WHERE u.role = 'engineer'
-        ORDER BY g.user_id, g.logged_at DESC
+        AND u.current_lat IS NOT NULL
+        AND u.current_lng IS NOT NULL
       `);
       res.json(result.rows);
     } finally {
@@ -228,10 +246,11 @@ router.get('/stats', async (req: Request, res: Response) => {
     try {
       // Engineers with GPS today
       const activeEngineers = await client.query(`
-        SELECT COUNT(DISTINCT user_id) as count
-        FROM gps_logs
-        WHERE DATE(logged_at) = CURRENT_DATE
-        AND logged_at > now() - interval '30 minutes'
+        SELECT COUNT(*) as count
+        FROM users
+        WHERE role = 'engineer'
+        AND current_lat IS NOT NULL
+        AND last_location_update > now() - interval '30 minutes'
       `);
 
       // Total engineers
@@ -249,7 +268,7 @@ router.get('/stats', async (req: Request, res: Response) => {
       // Total jobs today
       const jobsToday = await client.query(`
         SELECT COUNT(*) as count FROM jobs
-        WHERE DATE(scheduled_date) = CURRENT_DATE
+        WHERE DATE(COALESCE(scheduled_date, date)) = CURRENT_DATE
       `);
 
       // Walkarounds completed today
@@ -259,11 +278,12 @@ router.get('/stats', async (req: Request, res: Response) => {
       `);
 
       res.json({
-        engineersActive: parseInt(activeEngineers.rows[0]?.count || '0'),
-        engineersTotal: parseInt(totalEngineers.rows[0]?.count || '0'),
+        activeEngineers: parseInt(activeEngineers.rows[0]?.count || '0'),
+        totalEngineers: parseInt(totalEngineers.rows[0]?.count || '0'),
         jobsCompleted: parseInt(jobsCompleted.rows[0]?.count || '0'),
-        jobsToday: parseInt(jobsToday.rows[0]?.count || '0'),
+        jobsTotal: parseInt(jobsToday.rows[0]?.count || '0'),
         walkaroundsCompleted: parseInt(walkarounds.rows[0]?.count || '0'),
+        walkaroundsTotal: parseInt(totalEngineers.rows[0]?.count || '0'),
       });
     } finally {
       client.release();
