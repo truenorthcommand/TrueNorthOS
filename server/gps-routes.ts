@@ -172,22 +172,22 @@ router.get('/live-positions', async (req: Request, res: Response) => {
           END as status,
           (
             SELECT g.action FROM gps_logs g
-            WHERE g.user_id = u.id
-            ORDER BY g.logged_at DESC NULLS LAST, g.timestamp DESC NULLS LAST
+            WHERE g.user_id = u.id AND g.action IS NOT NULL
+            ORDER BY g.logged_at DESC NULLS LAST
             LIMIT 1
           ) as action,
           (
             SELECT j.customer_name FROM jobs j
-            JOIN gps_logs g2 ON g2.job_id = j.id
-            WHERE g2.user_id = u.id
-            ORDER BY g2.logged_at DESC NULLS LAST, g2.timestamp DESC NULLS LAST
+            WHERE j.assigned_to_id = u.id
+            AND j.status IN ('In Progress', 'Ready')
+            ORDER BY COALESCE(j.scheduled_date, j.date) DESC NULLS LAST
             LIMIT 1
           ) as current_job
         FROM users u
         LEFT JOIN LATERAL (
           SELECT accuracy FROM engineer_locations
           WHERE engineer_id = u.id
-          ORDER BY timestamp DESC
+          ORDER BY "timestamp" DESC NULLS LAST
           LIMIT 1
         ) el ON true
         WHERE u.role = 'engineer'
