@@ -1034,7 +1034,8 @@ export default function Staff() {
               <div className="space-y-2">
                 <Label>Username (for login)</Label>
                 <Input
-                  placeholder="johnsmith"
+                  placeholder="johnsmith" 
+                  autoComplete="off"
                   value={newStaff.username}
                   onChange={(e) => setNewStaff({ ...newStaff, username: e.target.value.toLowerCase().replace(/\s/g, '') })}
                   data-testid="input-staff-username"
@@ -1046,6 +1047,7 @@ export default function Staff() {
                   <Input
                     type={showPassword ? "text" : "password"}
                     placeholder="Min 6 characters"
+                    autoComplete="new-password"
                     value={newStaff.password}
                     onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
                     data-testid="input-staff-password"
@@ -1413,6 +1415,7 @@ export default function Staff() {
                 <Label htmlFor="edit-username">Username</Label>
                 <Input
                   id="edit-username"
+                  autoComplete="off"
                   value={editForm.username}
                   onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
                   required
@@ -1425,6 +1428,7 @@ export default function Staff() {
                   <Input
                     id="edit-password"
                     type={showEditPassword ? "text" : "password"}
+                    autoComplete="new-password"
                     value={editForm.password}
                     onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
                     placeholder="Enter new password..."
