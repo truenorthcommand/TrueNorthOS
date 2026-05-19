@@ -1173,6 +1173,16 @@ export async function runMigrations() {
       CREATE INDEX IF NOT EXISTS idx_client_contacts_client ON client_contacts(client_id);
     `);
     console.log("[Migration] client_contacts table OK");
+    // Ensure all columns exist (table may have been created earlier with fewer columns)
+    await client.query(`
+      ALTER TABLE client_contacts ADD COLUMN IF NOT EXISTS name TEXT;
+      ALTER TABLE client_contacts ADD COLUMN IF NOT EXISTS email TEXT;
+      ALTER TABLE client_contacts ADD COLUMN IF NOT EXISTS phone TEXT;
+      ALTER TABLE client_contacts ADD COLUMN IF NOT EXISTS role TEXT;
+      ALTER TABLE client_contacts ADD COLUMN IF NOT EXISTS is_primary BOOLEAN DEFAULT false;
+      ALTER TABLE client_contacts ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+      ALTER TABLE client_contacts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
+    `);
   } catch (e: any) {
     console.error("[Migration] client_contacts error:", e.message);
   }
@@ -1203,6 +1213,25 @@ export async function runMigrations() {
       CREATE INDEX IF NOT EXISTS idx_client_properties_client ON client_properties(client_id);
     `);
     console.log("[Migration] client_properties table OK");
+    // Ensure all columns exist (table may have been created earlier with fewer columns)
+    await client.query(`
+      ALTER TABLE client_properties ADD COLUMN IF NOT EXISTS name TEXT;
+      ALTER TABLE client_properties ADD COLUMN IF NOT EXISTS address TEXT;
+      ALTER TABLE client_properties ADD COLUMN IF NOT EXISTS postcode TEXT;
+      ALTER TABLE client_properties ADD COLUMN IF NOT EXISTS city TEXT;
+      ALTER TABLE client_properties ADD COLUMN IF NOT EXISTS county TEXT;
+      ALTER TABLE client_properties ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+      ALTER TABLE client_properties ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+      ALTER TABLE client_properties ADD COLUMN IF NOT EXISTS contact_name TEXT;
+      ALTER TABLE client_properties ADD COLUMN IF NOT EXISTS contact_phone TEXT;
+      ALTER TABLE client_properties ADD COLUMN IF NOT EXISTS contact_email TEXT;
+      ALTER TABLE client_properties ADD COLUMN IF NOT EXISTS notes TEXT;
+      ALTER TABLE client_properties ADD COLUMN IF NOT EXISTS is_default BOOLEAN DEFAULT false;
+      ALTER TABLE client_properties ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+      ALTER TABLE client_properties ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+      ALTER TABLE client_properties ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
+    `);
+    console.log("[Migration] client_properties columns ensured");
   } catch (e: any) {
     console.error("[Migration] client_properties error:", e.message);
   }
