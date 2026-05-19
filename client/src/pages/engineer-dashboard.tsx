@@ -4,12 +4,29 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
+import { ReceiptPhotoCapture } from '@/components/receipt-photo-capture';
 import {
-  Calendar, Clock, MapPin, Navigation, Play, CheckCircle2, Car, Sun, Moon,
-  Briefcase, Receipt, ClipboardCheck, AlertTriangle, Loader2, Timer
+  Calendar, Clock, MapPin, Navigation, Play, CheckCircle2, Car, Sun, Moon, X,
+  Briefcase, Receipt, ClipboardCheck, AlertTriangle, Loader2, Timer, Camera,
+  ArrowRight, ArrowLeft, Fuel, Sparkles, Package, MoreHorizontal, FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
+
+// ── Receipt Categories ──────────────────────────────────────────────
+type ReceiptCategory = 'fuel' | 'cleaning' | 'office_supplies' | 'consumables' | 'other';
+const RECEIPT_CATEGORIES: { value: ReceiptCategory; label: string; emoji: string; icon: React.ReactNode }[] = [
+  { value: 'fuel', label: 'Fuel', emoji: '⛽', icon: <Fuel className="h-4 w-4" /> },
+  { value: 'cleaning', label: 'Cleaning', emoji: '🧹', icon: <Sparkles className="h-4 w-4" /> },
+  { value: 'office_supplies', label: 'Office Supplies', emoji: '📎', icon: <Package className="h-4 w-4" /> },
+  { value: 'consumables', label: 'Consumables', emoji: '📦', icon: <Receipt className="h-4 w-4" /> },
+  { value: 'other', label: 'Other', emoji: '📋', icon: <MoreHorizontal className="h-4 w-4" /> },
+];
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -91,6 +108,72 @@ export default function EngineerDashboard() {
   const [elapsed, setElapsed] = useState(0);
   const [showEndDay, setShowEndDay] = useState(false);
   const [startingJob, setStartingJob] = useState<string | null>(null);
+
+  // ── Receipt Panel State ──────────────────────────────────────────
+  const [showReceiptPanel, setShowReceiptPanel] = useState(false);
+  const [receiptStep, setReceiptStep] = useState(1);
+  const [receiptPhoto, setReceiptPhoto] = useState('');
+  const [receiptCategory, setReceiptCategory] = useState<ReceiptCategory>('fuel');
+  const [receiptDescription, setReceiptDescription] = useState('');
+  const [receiptNotes, setReceiptNotes] = useState('');
+  const [receiptDate, setReceiptDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [receiptSubmitting, setReceiptSubmitting] = useState(false);
+  const [receiptResult, setReceiptResult] = useState<{ status: string; id?: string } | null>(null);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+
+  const resetReceiptPanel = () => {
+    setReceiptStep(1);
+    setReceiptPhoto('');
+    setReceiptCategory('fuel');
+    setReceiptDescription('');
+    setReceiptNotes('');
+    setReceiptDate(format(new Date(), 'yyyy-MM-dd'));
+    setReceiptSubmitting(false);
+    setReceiptResult(null);
+    setReceiptError(null);
+  };
+
+  const openReceiptPanel = () => {
+    resetReceiptPanel();
+    setShowReceiptPanel(true);
+  };
+
+  const closeReceiptPanel = () => {
+    setShowReceiptPanel(false);
+    setTimeout(resetReceiptPanel, 300);
+  };
+
+  const handleReceiptSubmit = async () => {
+    if (!receiptPhoto) return;
+    setReceiptSubmitting(true);
+    setReceiptError(null);
+    try {
+      const res = await apiRequest('POST', '/api/receipts', {
+        type: 'general',
+        category: receiptCategory,
+        description: receiptDescription || null,
+        notes: receiptNotes || null,
+        date: receiptDate,
+        receiptImageUrl: receiptPhoto,
+      });
+      const data = await res.json();
+      setReceiptResult({ status: data.status || 'pending', id: data.id });
+      setReceiptStep(4);
+      toast({
+        title: 'Receipt submitted!',
+        description: data.status === 'clean'
+          ? 'AI verification passed — no issues.'
+          : data.status === 'flagged'
+          ? 'Some items flagged for review.'
+          : 'Receipt is being processed.',
+      });
+    } catch (err: any) {
+      setReceiptError(err.message || 'Failed to submit receipt');
+      toast({ title: 'Submission failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setReceiptSubmitting(false);
+    }
+  };
 
   const toggleDarkMode = () => {
     const newMode = !darkMode;
@@ -463,7 +546,7 @@ export default function EngineerDashboard() {
               </Card>
               <Card
                 className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
-                onClick={() => navigate('/receipt/new')}
+                onClick={openReceiptPanel}
               >
                 <CardContent className="p-4 flex flex-col items-center justify-center text-center h-24">
                   <Receipt className="h-6 w-6 text-[#E8A54B] mb-2" />
@@ -559,6 +642,310 @@ export default function EngineerDashboard() {
           </div>
         </div>
       )}
+
+      {/* ── Receipt Upload Panel (Slide-up Overlay) ──────────────────── */}
+      {showReceiptPanel && (
+        <div className="fixed inset-0 z-50 flex flex-col">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={closeReceiptPanel}
+          />
+
+          {/* Panel */}
+          <div className="relative mt-auto bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl max-h-[92vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
+            {/* Panel Header */}
+            <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 rounded-t-2xl px-4 py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Receipt className="h-5 w-5 text-[#E8A54B]" />
+                  <h2 className="text-lg font-bold text-[#0F2B4C] dark:text-white">Upload Receipt</h2>
+                </div>
+                <button
+                  onClick={closeReceiptPanel}
+                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+              {/* Step Indicator */}
+              {receiptStep < 4 && (
+                <div className="flex items-center justify-center gap-2 mt-3">
+                  {[1, 2, 3].map((s) => (
+                    <div
+                      key={s}
+                      className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                        s === receiptStep
+                          ? 'bg-[#E8A54B] scale-125 ring-2 ring-[#E8A54B]/30'
+                          : s < receiptStep
+                          ? 'bg-[#0F2B4C]'
+                          : 'bg-gray-300 dark:bg-gray-600'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Panel Content */}
+            <div className="p-4 pb-8">
+              {/* Step 1: Camera */}
+              {receiptStep === 1 && (
+                <div className="flex flex-col items-center gap-5">
+                  <div className="text-center">
+                    <Camera className="w-10 h-10 text-[#0F2B4C] dark:text-white mx-auto mb-2" />
+                    <h3 className="text-base font-semibold text-[#0F2B4C] dark:text-white">Capture Your Receipt</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Take a clear photo for AI verification</p>
+                  </div>
+                  <div className="w-full max-w-sm">
+                    <ReceiptPhotoCapture
+                      value={receiptPhoto}
+                      onChange={setReceiptPhoto}
+                      label=""
+                    />
+                  </div>
+                  <Button
+                    onClick={() => setReceiptStep(2)}
+                    disabled={!receiptPhoto}
+                    className="w-full max-w-sm h-12 bg-[#0F2B4C] hover:bg-[#1a3d66] text-white text-base"
+                  >
+                    Continue
+                    <ArrowRight className="w-5 h-5 ml-2" />
+                  </Button>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    {receiptPhoto ? '✓ Photo captured' : 'Photo required to continue'}
+                  </p>
+                </div>
+              )}
+
+              {/* Step 2: Details */}
+              {receiptStep === 2 && (
+                <div className="flex flex-col gap-4">
+                  <div className="text-center mb-1">
+                    <FileText className="w-8 h-8 text-[#0F2B4C] dark:text-white mx-auto mb-1" />
+                    <h3 className="text-base font-semibold text-[#0F2B4C] dark:text-white">Receipt Details</h3>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-[#0F2B4C] dark:text-gray-300">Category</Label>
+                    <Select value={receiptCategory} onValueChange={(v) => setReceiptCategory(v as ReceiptCategory)}>
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {RECEIPT_CATEGORIES.map((c) => (
+                          <SelectItem key={c.value} value={c.value}>
+                            <span className="flex items-center gap-2">
+                              <span>{c.emoji}</span>
+                              <span>{c.label}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-[#0F2B4C] dark:text-gray-300">Description</Label>
+                    <Input
+                      placeholder="e.g. Diesel for company van"
+                      value={receiptDescription}
+                      onChange={(e) => setReceiptDescription(e.target.value)}
+                      className="h-12"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-[#0F2B4C] dark:text-gray-300">Notes (optional)</Label>
+                    <Textarea
+                      rows={2}
+                      placeholder="Any additional details..."
+                      value={receiptNotes}
+                      onChange={(e) => setReceiptNotes(e.target.value)}
+                      className="resize-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-[#0F2B4C] dark:text-gray-300">Date</Label>
+                    <Input
+                      type="date"
+                      value={receiptDate}
+                      onChange={(e) => setReceiptDate(e.target.value)}
+                      className="h-12"
+                    />
+                  </div>
+
+                  <div className="flex gap-3 mt-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => setReceiptStep(1)}
+                      className="flex-1 h-12 border-[#0F2B4C] text-[#0F2B4C] dark:border-gray-500 dark:text-gray-300"
+                    >
+                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      Back
+                    </Button>
+                    <Button
+                      onClick={() => setReceiptStep(3)}
+                      disabled={!receiptCategory || !receiptDate}
+                      className="flex-1 h-12 bg-[#0F2B4C] hover:bg-[#1a3d66] text-white"
+                    >
+                      Review
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Review & Submit */}
+              {receiptStep === 3 && !receiptSubmitting && (
+                <div className="flex flex-col gap-4">
+                  <div className="text-center mb-1">
+                    <CheckCircle2 className="w-8 h-8 text-green-500 mx-auto mb-1" />
+                    <h3 className="text-base font-semibold text-[#0F2B4C] dark:text-white">Confirm & Submit</h3>
+                  </div>
+
+                  {receiptPhoto && (
+                    <div className="flex justify-center">
+                      <img
+                        src={receiptPhoto}
+                        alt="Receipt"
+                        className="max-h-[100px] object-cover rounded-lg border-2 border-[#E8A54B]/30 shadow-sm"
+                      />
+                    </div>
+                  )}
+
+                  <Card className="border-2 border-gray-100 dark:border-gray-700">
+                    <CardContent className="p-4 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">Category</span>
+                        <Badge className="bg-[#0F2B4C]/10 text-[#0F2B4C] dark:bg-gray-700 dark:text-gray-200">
+                          {RECEIPT_CATEGORIES.find(c => c.value === receiptCategory)?.emoji}{' '}
+                          {RECEIPT_CATEGORIES.find(c => c.value === receiptCategory)?.label}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">Date</span>
+                        <span className="text-sm font-medium dark:text-white">
+                          {receiptDate ? format(new Date(receiptDate), 'dd MMM yyyy') : ''}
+                        </span>
+                      </div>
+                      {receiptDescription && (
+                        <div className="flex justify-between items-start">
+                          <span className="text-sm text-gray-500 dark:text-gray-400">Description</span>
+                          <span className="text-sm font-medium text-right max-w-[60%] dark:text-white">{receiptDescription}</span>
+                        </div>
+                      )}
+                      {receiptNotes && (
+                        <div className="flex justify-between items-start">
+                          <span className="text-sm text-gray-500 dark:text-gray-400">Notes</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-300 text-right max-w-[60%]">{receiptNotes}</span>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {receiptError && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-center">
+                      <p className="text-sm text-red-600 dark:text-red-400">{receiptError}</p>
+                    </div>
+                  )}
+
+                  <Button
+                    onClick={handleReceiptSubmit}
+                    className="w-full h-14 bg-[#E8A54B] hover:bg-[#d4953f] text-white text-lg font-semibold rounded-xl shadow-lg"
+                  >
+                    <Receipt className="w-5 h-5 mr-2" />
+                    Submit Receipt
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setReceiptStep(2)}
+                    className="w-full h-11 border-[#0F2B4C] text-[#0F2B4C] dark:border-gray-500 dark:text-gray-300"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back to Edit
+                  </Button>
+                </div>
+              )}
+
+              {/* Step 3: Submitting Animation */}
+              {receiptStep === 3 && receiptSubmitting && (
+                <div className="flex flex-col items-center gap-6 py-8">
+                  <div className="relative">
+                    <div className="w-24 h-24 rounded-full bg-[#0F2B4C]/5 dark:bg-[#0F2B4C]/20 flex items-center justify-center">
+                      <Loader2 className="w-14 h-14 text-[#E8A54B] animate-spin" />
+                    </div>
+                    <div className="absolute inset-0 rounded-full border-4 border-[#E8A54B]/20 animate-pulse" />
+                  </div>
+                  <div className="text-center">
+                    <h3 className="text-lg font-semibold text-[#0F2B4C] dark:text-white">Scanning Receipt</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">AI is verifying your receipt...</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">This usually takes a few seconds</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 4: Result */}
+              {receiptStep === 4 && receiptResult && (
+                <div className="flex flex-col items-center gap-5">
+                  {receiptResult.status === 'clean' ? (
+                    <>
+                      <div className="w-20 h-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                        <CheckCircle2 className="w-12 h-12 text-green-500" />
+                      </div>
+                      <div className="text-center">
+                        <h3 className="text-xl font-bold text-green-700 dark:text-green-400">Receipt Clean</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">AI verification passed — no issues detected.</p>
+                      </div>
+                    </>
+                  ) : receiptResult.status === 'flagged' ? (
+                    <>
+                      <div className="w-20 h-20 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                        <AlertTriangle className="w-12 h-12 text-amber-500" />
+                      </div>
+                      <div className="text-center">
+                        <h3 className="text-xl font-bold text-amber-700 dark:text-amber-400">Receipt Flagged</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Some items flagged for review by admin.</p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                        <Receipt className="w-12 h-12 text-blue-500" />
+                      </div>
+                      <div className="text-center">
+                        <h3 className="text-xl font-bold text-blue-700 dark:text-blue-400">Processing</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Your receipt is being processed.</p>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="w-full max-w-sm space-y-3 mt-4">
+                    <Button
+                      onClick={() => {
+                        resetReceiptPanel();
+                      }}
+                      className="w-full h-12 bg-[#E8A54B] hover:bg-[#d4953f] text-white font-semibold"
+                    >
+                      <Camera className="w-4 h-4 mr-2" />
+                      Submit Another Receipt
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={closeReceiptPanel}
+                      className="w-full h-12 border-[#0F2B4C] text-[#0F2B4C] dark:border-gray-500 dark:text-gray-300"
+                    >
+                      Done
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
