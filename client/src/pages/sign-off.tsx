@@ -30,7 +30,7 @@ export default function SignOff() {
   const [locationAddress, setLocationAddress] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
-  const [snagSignoffLocked, setSnagSignoffLocked] = useState(true); // Start locked until scan completes
+  const [snagSignoffLocked, setSnagSignoffLocked] = useState(false); // Unlocked by default, locked only when scan detects issues
   const [snagRagStatus, setSnagRagStatus] = useState<string | null>(null);
 
   const jobId = params?.id;
