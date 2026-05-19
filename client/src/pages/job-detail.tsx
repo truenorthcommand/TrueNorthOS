@@ -1559,7 +1559,6 @@ export default function JobDetail() {
           <TabsTrigger value="receipts">Receipts</TabsTrigger>
           <TabsTrigger value="photos">Photos & Files</TabsTrigger>
           <TabsTrigger value="actions">Actions</TabsTrigger>
-          <TabsTrigger value="signoff">Sign-Off</TabsTrigger>
           {!isEngineer && <TabsTrigger value="visits">Visits</TabsTrigger>}
           {!isEngineer && <TabsTrigger value="activity">Activity</TabsTrigger>}
         </TabsList>
@@ -1571,7 +1570,6 @@ export default function JobDetail() {
         <TabsContent value="receipts">{renderTabReceipts()}</TabsContent>
         <TabsContent value="photos">{renderTabPhotos()}</TabsContent>
         <TabsContent value="actions">{renderTabActions()}</TabsContent>
-        <TabsContent value="signoff">{renderTabSignOff()}</TabsContent>
         {!isEngineer && <TabsContent value="visits">{renderTabVisits()}</TabsContent>}
         {!isEngineer && <TabsContent value="activity">{renderTabActivity()}</TabsContent>}
       </Tabs>
@@ -1738,14 +1736,6 @@ export default function JobDetail() {
               >
                 <CheckCircle2 className="w-5 h-5" />
                 <span className="text-[10px] font-medium">Complete</span>
-              </button>
-            ) : job.status === 'Awaiting Signatures' ? (
-              <button
-                onClick={() => navigate(`/jobs/${job.id}/sign-off`)}
-                className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-orange-50 text-orange-600 min-w-[60px]"
-              >
-                <ClipboardCheck className="w-5 h-5" />
-                <span className="text-[10px] font-medium">Sign Off</span>
               </button>
             ) : null}
             {/* Edit Report for Awaiting Signatures */}

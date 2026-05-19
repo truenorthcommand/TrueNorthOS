@@ -281,10 +281,10 @@ export default function TodayPage() {
                       Details
                     </Button>
                   </Link>
-                  <Link href={`/sign-off?jobId=${job.id}`}>
-                    <Button variant="outline" size="sm" data-testid={`button-signoff-${job.id}`}>
+                  <Link href={`/jobs/${job.id}/report`}>
+                    <Button variant="outline" size="sm" data-testid={`button-report-${job.id}`}>
                       <Wrench className="h-4 w-4 mr-1" />
-                      Sign Off
+                      Complete
                     </Button>
                   </Link>
                 </div>

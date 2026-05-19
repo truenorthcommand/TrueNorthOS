@@ -75,8 +75,8 @@ export default function EngineerReport() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: 'Report Submitted', description: 'Job moved to Awaiting Signatures.' });
-      setLocation(`/jobs/${jobId}/sign-off`);
+      toast({ title: 'Report Submitted', description: 'Job completed successfully.' });
+      setLocation('/my-day');
     },
     onError: (err: any) => {
       toast({ title: 'Error', description: err.message || 'Failed to submit report', variant: 'destructive' });

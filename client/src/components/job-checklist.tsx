@@ -296,9 +296,9 @@ export function JobChecklist({
                 Blocked
               </Button>
             ) : nextAction.canProceedToSignOff ? (
-              <Link href={`/jobs/${job.id}/sign-off`}>
-                <Button size="sm" data-testid="button-go-signoff">
-                  Sign Off
+              <Link href={`/jobs/${job.id}/report`}>
+                <Button size="sm" data-testid="button-go-report">
+                  Complete Job
                   <ArrowRight className="h-4 w-4 ml-1" />
                 </Button>
               </Link>
