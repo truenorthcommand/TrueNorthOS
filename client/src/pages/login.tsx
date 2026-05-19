@@ -100,10 +100,11 @@ export default function Login() {
         localStorage.setItem('truenorth_user', JSON.stringify(data.user));
         
         // Redirect based on role
+        // Use window.location.href for full page reload so AuthProvider re-initializes
         if (data.user.role === 'engineer' && !data.user.superAdmin) {
-          setLocation('/app/my-day');
+          window.location.href = '/app/my-day';
         } else {
-          setLocation('/app');
+          window.location.href = '/app';
         }
       }
     } catch (error) {

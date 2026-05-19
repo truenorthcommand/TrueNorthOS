@@ -1653,6 +1653,14 @@ export default function JobDetail() {
       {/* Quick Actions Sticky Bar - Mobile */}
       {job && job.status !== 'Signed Off' && job.status !== 'Cancelled' && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-50 px-2 py-3 md:hidden safe-area-bottom">
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            id="mobile-photo-input"
+            onChange={handlePhotoUpload}
+          />
           <div className="flex items-center justify-around gap-1 max-w-md mx-auto">
             {/* Navigate */}
             {(job.siteAddress || job.sitePostcode) && (
@@ -1670,8 +1678,11 @@ export default function JobDetail() {
             {/* Take Photo */}
             <button
               onClick={() => {
-                const input = document.querySelector('input[type="file"][accept*="image"]') as HTMLInputElement;
-                if (input) input.click();
+                const input = document.getElementById('mobile-photo-input') as HTMLInputElement;
+                if (input) {
+                  input.value = '';
+                  input.click();
+                }
               }}
               className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-amber-50 text-amber-600 min-w-[60px]"
             >

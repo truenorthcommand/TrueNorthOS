@@ -716,18 +716,36 @@ export type Vehicle = typeof vehicles.$inferSelect;
 // Fleet Maintenance - Walkaround Checks
 export const walkaroundChecks = pgTable("walkaround_checks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  vehicleId: varchar("vehicle_id").notNull(),
-  checkType: text("check_type").notNull(), // pre, post
+  userId: varchar("user_id"),
+  vehicleId: varchar("vehicle_id"),
+  checkType: text("check_type"), // pre, post
   odometer: integer("odometer"),
-  inspectorId: varchar("inspector_id").notNull(),
+  inspectorId: varchar("inspector_id"),
   overallStatus: text("overall_status").notNull().default("pass"), // pass, fail
   vehicleSafeToOperate: boolean("vehicle_safe_to_operate").default(true),
+  vehicleSafe: boolean("vehicle_safe").default(true),
   notes: text("notes"),
+  fleetNumber: text("fleet_number"),
+  registration: text("registration"),
+  mileage: integer("mileage"),
+  status: text("status").default("pending"),
+  checks: jsonb("checks").default(sql`'[]'::jsonb`),
+  defects: jsonb("defects").default(sql`'[]'::jsonb`),
+  photos: jsonb("photos").default(sql`'[]'::jsonb`),
+  signature: text("signature"),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
+  completedAt: timestamp("completed_at"),
+  submittedAt: timestamp("submitted_at"),
+  skipped: boolean("skipped").default(false),
+  skipReason: text("skip_reason"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const insertWalkaroundCheckSchema = createInsertSchema(walkaroundChecks, {
   createdAt: z.coerce.date().optional(),
+  completedAt: z.coerce.date().optional(),
+  submittedAt: z.coerce.date().optional(),
 }).omit({
   id: true,
 });
