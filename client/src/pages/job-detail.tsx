@@ -443,26 +443,21 @@ export default function JobDetail() {
       const tempId = `upload_${Date.now()}_${i}`;
       setUploadingPhotos(prev => [...prev, tempId]);
       try {
-        // Step 1: Get presigned upload URL from server
-        const presignRes = await fetch('/api/uploads/request-url', {
+        // Upload file to server (server uploads to MinIO internally)
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch('/api/upload', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+          body: formData,
         });
-        if (!presignRes.ok) throw new Error('Failed to get upload URL');
-        const { uploadURL, objectPath } = await presignRes.json();
-        
-        // Step 2: Upload file directly to MinIO via presigned URL
-        const uploadRes = await fetch(uploadURL, {
-          method: 'PUT',
-          headers: { 'Content-Type': file.type },
-          body: file,
-        });
-        if (uploadRes.ok) {
-          // Step 3: Save photo reference using the object path
-          await addPhoto(job.id, objectPath, hasRole(user, 'admin') ? 'admin' : 'engineer');
+        if (res.ok) {
+          const { url } = await res.json();
+          await addPhoto(job.id, url, hasRole(user, 'admin') ? 'admin' : 'engineer');
           toast({ title: 'Photo saved', description: file.name });
+        } else {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Upload failed');
         }
       } catch (err) {
         toast({ title: 'Photo upload failed', variant: 'destructive' });

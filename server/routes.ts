@@ -6519,7 +6519,54 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
   // ==================== FILE UPLOAD ROUTES (MinIO) ====================
 
-  // Presigned URL for client-side direct upload
+  // Server-side file upload (handles multipart form data, uploads to MinIO internally)
+  // This avoids presigned URL issues where MinIO is on an internal Railway network
+  const multer = (await import('multer')).default;
+  const uploadMiddleware = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
+  });
+
+  app.post("/api/upload", requireAuth, uploadMiddleware.single('file'), async (req: any, res) => {
+    try {
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ error: "No file provided" });
+      }
+
+      // Determine bucket based on content type
+      let bucket: string = objectStorage.BUCKETS.FILES;
+      let prefix = "file";
+      if (file.mimetype.startsWith("image/")) {
+        bucket = objectStorage.BUCKETS.PHOTOS;
+        prefix = "photo";
+      }
+
+      // Upload to MinIO server-side
+      const result = await objectStorage.uploadFile(
+        bucket as any,
+        `${prefix}/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${crypto.randomUUID()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
+        file.buffer,
+        file.mimetype
+      );
+
+      const objectPath = `${bucket}/${result.key || result}`;
+
+      res.json({
+        url: objectPath,
+        key: result.key || result,
+        bucket,
+        originalName: file.originalname,
+        size: file.size,
+        contentType: file.mimetype,
+      });
+    } catch (error) {
+      console.error("File upload error:", error);
+      res.status(500).json({ error: "Failed to upload file" });
+    }
+  });
+
+  // Presigned URL for client-side direct upload (works only when MinIO is publicly accessible)
   app.post("/api/uploads/request-url", requireAuth, async (req, res) => {
     try {
       const { name, size, contentType } = req.body;
