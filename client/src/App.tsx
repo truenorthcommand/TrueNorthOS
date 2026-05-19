@@ -143,7 +143,11 @@ function RoleGuard({ roles, children }: { roles: Role[]; children: React.ReactNo
   
   if (!user) return null;
   
-  if (!hasRole(user, ...roles)) {
+  // Directors have full access to all areas (like admin)
+  const userRoles = user.roles || [user.role];
+  const isDirector = userRoles.includes('director');
+  
+  if (!isDirector && !hasRole(user, ...roles)) {
     // Redirect engineers to their dashboard
     if (user.role === 'engineer' || (user.roles && user.roles.length === 1 && user.roles[0] === 'engineer')) {
       setLocation('/app/my-day');
