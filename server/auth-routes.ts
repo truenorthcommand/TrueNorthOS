@@ -199,19 +199,24 @@ export async function login(req: Request, res: Response) {
     req.session.userId = user.id;
     req.session.requiresOnboarding = true;
     
-    return req.session.save((err) => {
-      if (err) {
-        console.error('[Auth] Session save error (onboarding):', err);
-        return res.status(500).json({ error: 'Session error' });
-      }
-      return res.json({
-        requiresOnboarding: true,
-        user: {
-          id: user.id,
-          username: user.username,
-          name: user.name,
-        },
+    await new Promise<void>((resolve, reject) => {
+      req.session.save((err) => {
+        if (err) {
+          console.error('[Auth] Session save error (onboarding):', err);
+          reject(err);
+        } else {
+          resolve();
+        }
       });
+    });
+    
+    return res.json({
+      requiresOnboarding: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+      },
     });
   }
   
@@ -220,19 +225,24 @@ export async function login(req: Request, res: Response) {
     req.session.userId = user.id;
     req.session.requiresPasswordChange = true;
     
-    return req.session.save((err) => {
-      if (err) {
-        console.error('[Auth] Session save error (password change):', err);
-        return res.status(500).json({ error: 'Session error' });
-      }
-      return res.json({
-        requiresPasswordChange: true,
-        user: {
-          id: user.id,
-          username: user.username,
-          name: user.name,
-        },
+    await new Promise<void>((resolve, reject) => {
+      req.session.save((err) => {
+        if (err) {
+          console.error('[Auth] Session save error (password change):', err);
+          reject(err);
+        } else {
+          resolve();
+        }
       });
+    });
+    
+    return res.json({
+      requiresPasswordChange: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+      },
     });
   }
   
@@ -241,25 +251,43 @@ export async function login(req: Request, res: Response) {
     req.session.userId = user.id;
     req.session.requiresPasswordChange = true;
     
-    return req.session.save((err) => {
-      if (err) {
-        console.error('[Auth] Session save error (password expired):', err);
-        return res.status(500).json({ error: 'Session error' });
-      }
-      return res.json({
-        requiresPasswordChange: true,
-        reason: "password_expired",
-        user: {
-          id: user.id,
-          username: user.username,
-          name: user.name,
-        },
+    await new Promise<void>((resolve, reject) => {
+      req.session.save((err) => {
+        if (err) {
+          console.error('[Auth] Session save error (password expired):', err);
+          reject(err);
+        } else {
+          resolve();
+        }
       });
+    });
+    
+    return res.json({
+      requiresPasswordChange: true,
+      reason: "password_expired",
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+      },
     });
   }
   
   // Successful login - create session
   req.session.userId = user.id;
+  
+  // Save session before sending response
+  await new Promise<void>((resolve, reject) => {
+    req.session.save((err) => {
+      if (err) {
+        console.error('[Auth] Session save error (login success):', err);
+        reject(err);
+      } else {
+        resolve();
+      }
+    });
+  });
+  
   await logAuditEvent({
     userId: user.id,
     action: "login.success",
@@ -267,22 +295,16 @@ export async function login(req: Request, res: Response) {
     details: { username },
   });
   
-  return req.session.save((err) => {
-    if (err) {
-      console.error('[Auth] Session save error (login success):', err);
-      return res.status(500).json({ error: 'Session error' });
-    }
-    return res.json({
-      success: true,
-      user: {
-        id: user.id,
-        username: user.username,
-        name: user.name,
-        role: user.role,
-        roles: user.roles,
-        superAdmin: user.superAdmin,
-      },
-    });
+  return res.json({
+    success: true,
+    user: {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      role: user.role,
+      roles: user.roles,
+      superAdmin: user.superAdmin,
+    },
   });
 }
 
