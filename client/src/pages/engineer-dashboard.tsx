@@ -549,7 +549,8 @@ export default function EngineerDashboard() {
                 return (
                   <Card
                     key={job.id}
-                    className={`border-l-4 ${getPriorityColor(job.priority)} ${job.status === 'Completed' ? 'opacity-60' : ''}`}
+                    className={`border-l-4 ${getPriorityColor(job.priority)} ${job.status === 'Completed' ? 'opacity-60' : ''} cursor-pointer hover:shadow-md transition-shadow`}
+                    onClick={() => navigate(`/jobs/${job.id}`)}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between mb-2">
@@ -584,7 +585,7 @@ export default function EngineerDashboard() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleNavigate(job.siteAddress || job.address)}
+                            onClick={(e) => { e.stopPropagation(); handleNavigate(job.siteAddress || job.address); }}
                             className="h-10 flex-1"
                           >
                             <Navigation className="h-4 w-4 mr-1" />
@@ -594,7 +595,7 @@ export default function EngineerDashboard() {
                         {job.status !== 'Completed' && job.status !== 'In Progress' && (
                           <Button
                             size="sm"
-                            onClick={() => handleStartJob(String(job.id))}
+                            onClick={(e) => { e.stopPropagation(); handleStartJob(String(job.id)); }}
                             disabled={isStarting || !!activeJob}
                             className="h-10 flex-1 bg-[#0F2B4C] hover:bg-[#1a3d66] text-white"
                           >
@@ -609,7 +610,7 @@ export default function EngineerDashboard() {
                         {job.status === 'In Progress' && (
                           <Button
                             size="sm"
-                            onClick={() => navigate(`/jobs/${job.id}/complete`)}
+                            onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${job.id}/complete`); }}
                             className="h-10 flex-1 bg-green-600 hover:bg-green-700 text-white"
                           >
                             <CheckCircle2 className="h-4 w-4 mr-1" />
@@ -639,7 +640,7 @@ export default function EngineerDashboard() {
               </Card>
               <Card
                 className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
-                onClick={() => navigate('/timesheets')}
+                onClick={() => navigate('/timesheet')}
               >
                 <CardContent className="p-4 flex flex-col items-center justify-center text-center h-24">
                   <Clock className="h-6 w-6 text-[#E8A54B] mb-2" />
@@ -657,7 +658,7 @@ export default function EngineerDashboard() {
               </Card>
               <Card
                 className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
-                onClick={() => navigate('/jobs')}
+                onClick={() => navigate('/my-jobs')}
               >
                 <CardContent className="p-4 flex flex-col items-center justify-center text-center h-24">
                   <Briefcase className="h-6 w-6 text-[#E8A54B] mb-2" />

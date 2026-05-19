@@ -1544,27 +1544,27 @@ export default function JobDetail() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full overflow-x-auto flex justify-start mb-4">
           <TabsTrigger value="details">Details</TabsTrigger>
-          <TabsTrigger value="phases">Phases</TabsTrigger>
-          <TabsTrigger value="schedule">Schedule</TabsTrigger>
+          {!isEngineer && <TabsTrigger value="phases">Phases</TabsTrigger>}
+          {!isEngineer && <TabsTrigger value="schedule">Schedule</TabsTrigger>}
           <TabsTrigger value="materials">Materials</TabsTrigger>
           <TabsTrigger value="receipts">Receipts</TabsTrigger>
           <TabsTrigger value="photos">Photos & Files</TabsTrigger>
           <TabsTrigger value="actions">Actions</TabsTrigger>
           <TabsTrigger value="signoff">Sign-Off</TabsTrigger>
-          <TabsTrigger value="visits">Visits</TabsTrigger>
-          <TabsTrigger value="activity">Activity</TabsTrigger>
+          {!isEngineer && <TabsTrigger value="visits">Visits</TabsTrigger>}
+          {!isEngineer && <TabsTrigger value="activity">Activity</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="details">{renderTabDetails()}</TabsContent>
-        <TabsContent value="phases"><JobPhases jobId={parseInt(params?.id || '0')} /></TabsContent>
-        <TabsContent value="schedule">{renderTabSchedule()}</TabsContent>
+        {!isEngineer && <TabsContent value="phases"><JobPhases jobId={parseInt(params?.id || '0')} /></TabsContent>}
+        {!isEngineer && <TabsContent value="schedule">{renderTabSchedule()}</TabsContent>}
         <TabsContent value="materials">{renderTabMaterials()}</TabsContent>
         <TabsContent value="receipts">{renderTabReceipts()}</TabsContent>
         <TabsContent value="photos">{renderTabPhotos()}</TabsContent>
         <TabsContent value="actions">{renderTabActions()}</TabsContent>
         <TabsContent value="signoff">{renderTabSignOff()}</TabsContent>
-        <TabsContent value="visits">{renderTabVisits()}</TabsContent>
-        <TabsContent value="activity">{renderTabActivity()}</TabsContent>
+        {!isEngineer && <TabsContent value="visits">{renderTabVisits()}</TabsContent>}
+        {!isEngineer && <TabsContent value="activity">{renderTabActivity()}</TabsContent>}
       </Tabs>
 
       {/* Delete Confirmation Dialog */}
@@ -1652,7 +1652,7 @@ export default function JobDetail() {
 
       {/* Quick Actions Sticky Bar - Mobile */}
       {job && job.status !== 'Signed Off' && job.status !== 'Cancelled' && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-50 px-2 py-3 md:hidden safe-area-bottom">
+        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t shadow-lg z-[60] px-2 py-3 md:hidden safe-area-bottom">
           <input
             type="file"
             accept="image/*"
