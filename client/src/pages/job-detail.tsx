@@ -1739,7 +1739,25 @@ export default function JobDetail() {
                 <CheckCircle2 className="w-5 h-5" />
                 <span className="text-[10px] font-medium">Complete</span>
               </button>
+            ) : job.status === 'Awaiting Signatures' ? (
+              <button
+                onClick={() => navigate(`/jobs/${job.id}/sign-off`)}
+                className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-orange-50 text-orange-600 min-w-[60px]"
+              >
+                <ClipboardCheck className="w-5 h-5" />
+                <span className="text-[10px] font-medium">Sign Off</span>
+              </button>
             ) : null}
+            {/* Edit Report for Awaiting Signatures */}
+            {job.status === 'Awaiting Signatures' && (
+              <button
+                onClick={() => navigate(`/jobs/${job.id}/report`)}
+                className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-blue-50 text-blue-600 min-w-[60px]"
+              >
+                <FileText className="w-5 h-5" />
+                <span className="text-[10px] font-medium">Report</span>
+              </button>
+            )}
             {/* Timer indicator */}
             {job.status === 'In Progress' && (
               <div className="flex flex-col items-center gap-1 px-3 py-2 text-blue-600 min-w-[60px]">

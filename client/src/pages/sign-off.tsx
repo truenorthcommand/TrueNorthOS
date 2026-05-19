@@ -39,9 +39,9 @@ export default function SignOff() {
   const { data: fetchedJob, isLoading: jobLoading } = useQuery({
     queryKey: [`/api/jobs/${jobId}`],
     queryFn: async () => {
-      const res = await fetch(`/api/jobs`, { credentials: 'include' });
-      const jobs = await res.json();
-      return jobs.find((j: any) => j.id === jobId) || null;
+      const res = await fetch(`/api/jobs/${jobId}`, { credentials: 'include' });
+      if (!res.ok) return null;
+      return res.json();
     },
     enabled: !!jobId,
   });
@@ -111,7 +111,20 @@ export default function SignOff() {
     </div>
   );
 
-  const hasPhotos = (job.photos || []).filter(p => !p.source || p.source === 'engineer').length > 0;
+  if (!job && !jobLoading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center space-y-4">
+        <AlertTriangle className="h-8 w-8 text-amber-500 mx-auto" />
+        <p className="text-gray-700 font-medium">Job not found</p>
+        <p className="text-gray-500 text-sm">This job may have been removed or you may not have access.</p>
+        <Button variant="outline" onClick={() => window.history.back()}>Go Back</Button>
+      </div>
+    </div>
+  );
+
+  if (!job) return null;
+
+  const hasPhotos = (job.photos || []).filter((p: any) => !p.source || p.source === 'engineer').length > 0;
   const hasLocation = location !== null;
   const hasDescription = job.description && job.description.trim().length > 0;
   const hasWorksCompleted = job.worksCompleted && job.worksCompleted.trim().length > 0;

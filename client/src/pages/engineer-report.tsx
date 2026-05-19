@@ -36,9 +36,9 @@ export default function EngineerReport() {
   const { data: job, isLoading: jobLoading } = useQuery({
     queryKey: [`/api/jobs/${jobId}`],
     queryFn: async () => {
-      const res = await fetch(`/api/jobs`, { credentials: 'include' });
-      const jobs = await res.json();
-      return jobs.find((j: any) => j.id === jobId) || null;
+      const res = await fetch(`/api/jobs/${jobId}`, { credentials: 'include' });
+      if (!res.ok) return null;
+      return res.json();
     },
     enabled: !!jobId,
   });
