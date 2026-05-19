@@ -4,6 +4,32 @@ import { geocodeAddress, getDistanceMatrix } from "./geocoding";
 
 const router = Router();
 
+// ── Self-healing: ensure walkaround_checks has all needed columns ──
+let walkaroundColumnsEnsured = false;
+async function ensureWalkaroundColumns() {
+  if (walkaroundColumnsEnsured) return;
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS user_id VARCHAR;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS skipped BOOLEAN DEFAULT false;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS skip_reason TEXT;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS checks JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS defects JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS vehicle_safe BOOLEAN DEFAULT true;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+    `);
+    walkaroundColumnsEnsured = true;
+    console.log('[GPS] Walkaround columns ensured');
+  } catch (e: any) {
+    console.error('[GPS] Failed to ensure walkaround columns:', e.message);
+  } finally {
+    client.release();
+  }
+}
+
 /**
  * POST /api/gps/log
  * Log engineer GPS location (on job start/complete)
@@ -90,6 +116,7 @@ router.get('/walkaround-status', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
+    await ensureWalkaroundColumns();
     const client = await pool.connect();
     try {
       const result = await client.query(
@@ -124,6 +151,7 @@ router.post('/walkaround-skip', async (req: Request, res: Response) => {
 
     const { reason } = req.body;
 
+    await ensureWalkaroundColumns();
     const client = await pool.connect();
     try {
       await client.query(
@@ -148,6 +176,7 @@ router.post('/walkaround-complete', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
+    await ensureWalkaroundColumns();
     const { checks, defects, vehicleSafe, latitude, longitude } = req.body;
 
     const client = await pool.connect();
