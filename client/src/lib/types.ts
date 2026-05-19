@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'engineer' | 'surveyor' | 'fleet_manager' | 'works_manager';
+export type Role = 'admin' | 'engineer' | 'surveyor' | 'fleet_manager' | 'works_manager' | 'director' | 'accounts';
 
 export type Skill = {
   id: string;

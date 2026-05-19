@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { hasRole, Role } from "@/lib/types";
 import { StoreProvider } from "@/lib/store";
 import { ThemeProvider } from "@/lib/theme";
 import { GoogleMapsProvider } from "@/components/google-maps-provider";
@@ -135,6 +136,37 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Role-based route guard - redirects unauthorized users to their appropriate dashboard
+function RoleGuard({ roles, children }: { roles: Role[]; children: React.ReactNode }) {
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
+  
+  if (!user) return null;
+  
+  if (!hasRole(user, ...roles)) {
+    // Redirect engineers to their dashboard
+    if (user.role === 'engineer' || (user.roles && user.roles.length === 1 && user.roles[0] === 'engineer')) {
+      setLocation('/app/my-day');
+    } else {
+      setLocation('/app');
+    }
+    return null;
+  }
+  
+  return <>{children}</>;
+}
+
+// HOC to wrap a component with role protection
+function withRole(Component: React.ComponentType<any>, ...roles: Role[]) {
+  return function RoleProtectedRoute(props: any) {
+    return (
+      <RoleGuard roles={roles}>
+        <Component {...props} />
+      </RoleGuard>
+    );
+  };
+}
+
 function AppRoutes() {
   return (
     <AuthGate>
@@ -144,87 +176,87 @@ function AppRoutes() {
         <Route path="/walkaround" component={WalkaroundWizard} />
         <Route path="/receipt/new" component={QuickReceipt} />
         <Route path="/timesheet" component={QuickTimesheet} />
-        <Route path="/jobs" component={Jobs} />
-        <Route path="/jobs/new" component={CreateJob} />
-        <Route path="/jobs/:id/edit" component={EditJob} />
+        <Route path="/jobs" component={withRole(Jobs, 'admin', 'surveyor', 'works_manager')} />
+        <Route path="/jobs/new" component={withRole(CreateJob, 'admin', 'surveyor', 'works_manager')} />
+        <Route path="/jobs/:id/edit" component={withRole(EditJob, 'admin', 'surveyor', 'works_manager')} />
         <Route path="/jobs/:id" component={JobDetail} />
         <Route path="/jobs/:id/sign-off" component={SignOff} />
         <Route path="/jobs/:id/complete" component={JobCompleteWizard} />
-        <Route path="/clients" component={Clients} />
-        <Route path="/clients/new" component={AddClient} />
-        <Route path="/clients/:id" component={ClientDetail} />
-        <Route path="/create-job-sheet" component={Clients} />
-        <Route path="/engineers" component={Engineers} />
-        <Route path="/completed-jobs" component={CompletedJobs} />
-        <Route path="/staff" component={Staff} />
-        <Route path="/calendar" component={CalendarPage} />
-        <Route path="/schedule/calendar" component={CalendarPage} />
-        <Route path="/schedule/planner" component={PlannerPage} />
-        <Route path="/map" component={MapPage} />
-        <Route path="/today" component={Today} />
-        <Route path="/time-logs" component={TimeLogs} />
-        <Route path="/timesheets" component={Timesheets} />
-        <Route path="/receipts" component={Receipts} />
-        <Route path="/flagged-receipts" component={FlaggedReceipts} />
-        <Route path="/material-profiles" component={MaterialProfiles} />
-        <Route path="/vendor-rules" component={VendorRules} />
-        <Route path="/deduction-ledger" component={DeductionLedger} />
-        <Route path="/payments" component={Payments} />
-        <Route path="/analytics" component={Analytics} />
-        <Route path="/directors" component={DirectorsSuite} />
-        <Route path="/subscription" component={Subscription} />
-        <Route path="/referrals" component={Referrals} />
+        <Route path="/clients" component={withRole(Clients, 'admin', 'surveyor', 'works_manager')} />
+        <Route path="/clients/new" component={withRole(AddClient, 'admin', 'surveyor', 'works_manager')} />
+        <Route path="/clients/:id" component={withRole(ClientDetail, 'admin', 'surveyor', 'works_manager')} />
+        <Route path="/create-job-sheet" component={withRole(Clients, 'admin', 'surveyor', 'works_manager')} />
+        <Route path="/engineers" component={withRole(Engineers, 'admin', 'works_manager')} />
+        <Route path="/completed-jobs" component={withRole(CompletedJobs, 'admin', 'surveyor', 'works_manager')} />
+        <Route path="/staff" component={withRole(Staff, 'admin')} />
+        <Route path="/calendar" component={withRole(CalendarPage, 'admin', 'surveyor', 'works_manager')} />
+        <Route path="/schedule/calendar" component={withRole(CalendarPage, 'admin', 'surveyor', 'works_manager')} />
+        <Route path="/schedule/planner" component={withRole(PlannerPage, 'admin', 'surveyor', 'works_manager')} />
+        <Route path="/map" component={withRole(MapPage, 'admin', 'surveyor', 'works_manager')} />
+        <Route path="/today" component={withRole(Today, 'admin', 'surveyor', 'works_manager')} />
+        <Route path="/time-logs" component={withRole(TimeLogs, 'admin', 'accounts')} />
+        <Route path="/timesheets" component={withRole(Timesheets, 'admin', 'accounts')} />
+        <Route path="/receipts" component={withRole(Receipts, 'admin', 'accounts')} />
+        <Route path="/flagged-receipts" component={withRole(FlaggedReceipts, 'admin', 'accounts')} />
+        <Route path="/material-profiles" component={withRole(MaterialProfiles, 'admin')} />
+        <Route path="/vendor-rules" component={withRole(VendorRules, 'admin')} />
+        <Route path="/deduction-ledger" component={withRole(DeductionLedger, 'admin', 'accounts')} />
+        <Route path="/payments" component={withRole(Payments, 'admin', 'accounts')} />
+        <Route path="/analytics" component={withRole(Analytics, 'admin', 'director')} />
+        <Route path="/directors" component={withRole(DirectorsSuite, 'admin', 'director')} />
+        <Route path="/subscription" component={withRole(Subscription, 'admin')} />
+        <Route path="/referrals" component={withRole(Referrals, 'admin')} />
         <Route path="/notifications" component={NotificationsPage} />
-        <Route path="/workflows" component={Workflows} />
-        <Route path="/exceptions" component={Exceptions} />
-        <Route path="/assets" component={Assets} />
-        <Route path="/assets/new" component={AssetForm} />
-        <Route path="/assets/:id" component={AssetDetail} />
-        <Route path="/assets/:id/edit" component={AssetForm} />
-        <Route path="/quotes" component={Quotes} />
-        <Route path="/quotes/new" component={CreateQuote} />
-        <Route path="/quotes/:id" component={QuoteDetail} />
-        <Route path="/surveys" component={Surveys} />
-        <Route path="/surveys/:id" component={SurveyWizard} />
-        <Route path="/resource-planner" component={ResourcePlanner} />
-        <Route path="/invoices" component={Invoices} />
-        <Route path="/invoices/:id" component={InvoiceDetail} />
-        <Route path="/settings" component={Settings} />
-        <Route path="/integrations" component={Integrations} />
-        <Route path="/intelligence" component={PropertyIntelligence} />
-        <Route path="/security" component={Security} />
+        <Route path="/workflows" component={withRole(Workflows, 'admin')} />
+        <Route path="/exceptions" component={withRole(Exceptions, 'admin', 'works_manager')} />
+        <Route path="/assets" component={withRole(Assets, 'admin', 'works_manager')} />
+        <Route path="/assets/new" component={withRole(AssetForm, 'admin', 'works_manager')} />
+        <Route path="/assets/:id" component={withRole(AssetDetail, 'admin', 'works_manager')} />
+        <Route path="/assets/:id/edit" component={withRole(AssetForm, 'admin', 'works_manager')} />
+        <Route path="/quotes" component={withRole(Quotes, 'admin', 'surveyor')} />
+        <Route path="/quotes/new" component={withRole(CreateQuote, 'admin', 'surveyor')} />
+        <Route path="/quotes/:id" component={withRole(QuoteDetail, 'admin', 'surveyor')} />
+        <Route path="/surveys" component={withRole(Surveys, 'admin', 'surveyor')} />
+        <Route path="/surveys/:id" component={withRole(SurveyWizard, 'admin', 'surveyor')} />
+        <Route path="/resource-planner" component={withRole(ResourcePlanner, 'admin', 'works_manager')} />
+        <Route path="/invoices" component={withRole(Invoices, 'admin', 'accounts')} />
+        <Route path="/invoices/:id" component={withRole(InvoiceDetail, 'admin', 'accounts')} />
+        <Route path="/settings" component={withRole(Settings, 'admin')} />
+        <Route path="/integrations" component={withRole(Integrations, 'admin')} />
+        <Route path="/intelligence" component={withRole(PropertyIntelligence, 'admin', 'surveyor')} />
+        <Route path="/security" component={withRole(Security, 'admin')} />
         <Route path="/messages" component={Messages} />
-        <Route path="/fleet" component={Fleet} />
-        <Route path="/fleet/vehicles" component={FleetVehicles} />
-        <Route path="/fleet/vehicles/:id" component={VehicleDetail} />
+        <Route path="/fleet" component={withRole(Fleet, 'admin', 'fleet_manager')} />
+        <Route path="/fleet/vehicles" component={withRole(FleetVehicles, 'admin', 'fleet_manager')} />
+        <Route path="/fleet/vehicles/:id" component={withRole(VehicleDetail, 'admin', 'fleet_manager')} />
         <Route path="/fleet/walkaround" component={WalkaroundCheck} />
         <Route path="/fleet/report-defect" component={ReportDefect} />
         <Route path="/fleet/defects/:id" component={DefectDetail} />
-        <Route path="/ai-advisors" component={AiAdvisors} />
-        <Route path="/ai-tools" component={AITools} />
+        <Route path="/ai-advisors" component={withRole(AiAdvisors, 'admin')} />
+        <Route path="/ai-tools" component={withRole(AITools, 'admin')} />
         <Route path="/voice-notes" component={VoiceNotes} />
         <Route path="/files" component={Files} />
         <Route path="/document-scanner" component={DocumentScanner} />
         <Route path="/scan" component={ScanPage} />
         <Route path="/user-guide" component={UserGuide} />
-        <Route path="/admin/advisors" component={AdminAdvisors} />
-        <Route path="/admin/merchants" component={AdminMerchants} />
-        <Route path="/admin/feedback" component={AdminFeedback} />
-        <Route path="/works-manager" component={WorksManagerDashboard} />
-        <Route path="/works-manager/jobs" component={WorksManagerJobs} />
-        <Route path="/works-manager/map" component={WorksManagerMap} />
-        <Route path="/works-manager/approvals" component={WorksManagerApprovals} />
-        <Route path="/inspections" component={Inspections} />
-        <Route path="/inspections/:id" component={InspectionDetail} />
-        <Route path="/snagging" component={SnaggingSheets} />
-        <Route path="/snagging/:id" component={SnaggingDetail} />
-        <Route path="/accounts" component={AccountsDashboard} />
-        <Route path="/forms/templates" component={FormTemplates} />
-        <Route path="/forms/builder/:id" component={FormBuilder} />
+        <Route path="/admin/advisors" component={withRole(AdminAdvisors, 'admin')} />
+        <Route path="/admin/merchants" component={withRole(AdminMerchants, 'admin')} />
+        <Route path="/admin/feedback" component={withRole(AdminFeedback, 'admin')} />
+        <Route path="/works-manager" component={withRole(WorksManagerDashboard, 'admin', 'works_manager')} />
+        <Route path="/works-manager/jobs" component={withRole(WorksManagerJobs, 'admin', 'works_manager')} />
+        <Route path="/works-manager/map" component={withRole(WorksManagerMap, 'admin', 'works_manager')} />
+        <Route path="/works-manager/approvals" component={withRole(WorksManagerApprovals, 'admin', 'works_manager')} />
+        <Route path="/inspections" component={withRole(Inspections, 'admin', 'surveyor', 'works_manager')} />
+        <Route path="/inspections/:id" component={withRole(InspectionDetail, 'admin', 'surveyor', 'works_manager')} />
+        <Route path="/snagging" component={withRole(SnaggingSheets, 'admin', 'surveyor', 'works_manager')} />
+        <Route path="/snagging/:id" component={withRole(SnaggingDetail, 'admin', 'surveyor', 'works_manager')} />
+        <Route path="/accounts" component={withRole(AccountsDashboard, 'admin', 'accounts')} />
+        <Route path="/forms/templates" component={withRole(FormTemplates, 'admin')} />
+        <Route path="/forms/builder/:id" component={withRole(FormBuilder, 'admin')} />
         <Route path="/forms/fill/:versionId" component={FormFill} />
-        <Route path="/forms/submissions" component={FormSubmissions} />
-        <Route path="/system/workflows" component={WorkflowStudio} />
-        <Route path="/system/workflows/:id" component={WorkflowEditor} />
+        <Route path="/forms/submissions" component={withRole(FormSubmissions, 'admin', 'works_manager')} />
+        <Route path="/system/workflows" component={withRole(WorkflowStudio, 'admin')} />
+        <Route path="/system/workflows/:id" component={withRole(WorkflowEditor, 'admin')} />
         <Route component={NotFound} />
       </Switch>
     </AuthGate>
