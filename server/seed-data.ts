@@ -18,17 +18,100 @@ export async function seedDatabase(): Promise<{ message: string; counts: Record<
     }
 
     // ============================================================
-    // SEED USERS (Engineers + Admin)
+    // SEED USERS (superadmin + Engineers)
     // ============================================================
-    const hashedPassword = await bcrypt.hash("engineer123", 10);
-    const adminPassword = await bcrypt.hash("admin123", 10);
+    const hashedPassword = await bcrypt.hash("engineer123", 12);
+    
+    // Use environment variables for superadmin credentials
+    const superadminUsername = process.env.APP_USERNAME || "superadmin";
+    const superadminPassword = process.env.APP_PASSWORD || "admin123";
+    const superadminPasswordHash = await bcrypt.hash(superadminPassword, 12);
+    
+    const now = new Date();
+    const passwordExpiry = new Date();
+    passwordExpiry.setDate(passwordExpiry.getDate() + 90); // 90 days
 
     const seedUsers = [
-      { username: "admin", password: adminPassword, name: "James Harrison", email: "james@adaptservicesgroup.co.uk", role: "admin", roles: ["admin", "director"], superAdmin: true },
-      { username: "john.smith", password: hashedPassword, name: "John Smith", email: "john@adaptservicesgroup.co.uk", role: "engineer", roles: ["engineer"], superAdmin: false },
-      { username: "sarah.williams", password: hashedPassword, name: "Sarah Williams", email: "sarah@adaptservicesgroup.co.uk", role: "engineer", roles: ["engineer"], superAdmin: false },
-      { username: "mike.johnson", password: hashedPassword, name: "Mike Johnson", email: "mike@adaptservicesgroup.co.uk", role: "engineer", roles: ["engineer"], superAdmin: false },
-      { username: "emma.brown", password: hashedPassword, name: "Emma Brown", email: "emma@adaptservicesgroup.co.uk", role: "engineer", roles: ["engineer", "surveyor"], superAdmin: false },
+      { 
+        username: superadminUsername,
+        password: superadminPasswordHash,
+        name: "System Administrator",
+        email: process.env.ADMIN_EMAIL || "admin@adaptservicesgroup.co.uk",
+        role: "admin",
+        roles: ["admin", "director"],
+        superAdmin: true,
+        
+        // Security fields for closed-loop auth
+        twoFactorSecret: null,
+        twoFactorEnabled: false,
+        firstLoginCompleted: false,
+        requirePasswordChange: true,
+        passwordSetAt: now,
+        passwordExpiresAt: passwordExpiry,
+        accountCreatedBy: null,
+        lastPasswordResetBy: null,
+        lastPasswordResetAt: null,
+        failedLoginAttempts: 0,
+        accountLockedUntil: null,
+        lastLoginAt: null,
+        lastLoginIp: null,
+        gdprConsentDate: null,
+        gdprConsentVersion: null,
+        deletionRequestedAt: null,
+        status: "active",
+      },
+      { 
+        username: "john.smith",
+        password: hashedPassword,
+        name: "John Smith",
+        email: "john@adaptservicesgroup.co.uk",
+        role: "engineer",
+        roles: ["engineer"],
+        superAdmin: false,
+        firstLoginCompleted: true,
+        requirePasswordChange: false,
+        twoFactorEnabled: false,
+        passwordSetAt: now,
+      },
+      { 
+        username: "sarah.williams",
+        password: hashedPassword,
+        name: "Sarah Williams",
+        email: "sarah@adaptservicesgroup.co.uk",
+        role: "engineer",
+        roles: ["engineer"],
+        superAdmin: false,
+        firstLoginCompleted: true,
+        requirePasswordChange: false,
+        twoFactorEnabled: false,
+        passwordSetAt: now,
+      },
+      { 
+        username: "mike.johnson",
+        password: hashedPassword,
+        name: "Mike Johnson",
+        email: "mike@adaptservicesgroup.co.uk",
+        role: "engineer",
+        roles: ["engineer"],
+        superAdmin: false,
+        firstLoginCompleted: true,
+        requirePasswordChange: false,
+        twoFactorEnabled: false,
+        passwordSetAt: now,
+      },
+      { 
+        username: "emma.brown",
+        password: hashedPassword,
+        name: "Emma Brown",
+        email: "emma@adaptservicesgroup.co.uk",
+        role: "engineer",
+        roles: ["engineer", "surveyor"],
+        superAdmin: false,
+        firstLoginCompleted: true,
+        requirePasswordChange: false,
+        twoFactorEnabled: false,
+        passwordSetAt: now,
+      },
     ];
 
     const insertedUsers = await db.insert(users).values(seedUsers).returning();

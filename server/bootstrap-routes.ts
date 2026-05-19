@@ -20,6 +20,134 @@ const router = Router();
 const SALT_ROUNDS = 12;
 
 /**
+ * POST /api/bootstrap-seed
+ * 
+ * Quick superadmin account creation ONLY (no clients, jobs, etc.)
+ * Allows user to login immediately and then manually seed data via UI.
+ * 
+ * This bypasses CSP issues and provides a simpler bootstrap workflow.
+ */
+router.post("/seed", async (req: Request, res: Response) => {
+  try {
+    console.log("[Bootstrap-Seed] Received quick seed request from:", req.ip);
+
+    // 1. Check if ANY users exist
+    const existingUsers = await db.select().from(users).limit(1);
+    
+    if (existingUsers.length > 0) {
+      console.log("[Bootstrap-Seed] REJECTED - Users already exist");
+      return res.status(409).json({
+        error: "Database already initialized",
+        message: "Cannot bootstrap when users already exist."
+      });
+    }
+
+    // 2. Get credentials from environment
+    const username = process.env.APP_USERNAME;
+    const password = process.env.APP_PASSWORD;
+
+    if (!username || !password) {
+      console.error("[Bootstrap-Seed] FAILED - Missing environment variables");
+      return res.status(500).json({
+        error: "Server misconfiguration",
+        message: "APP_USERNAME and APP_PASSWORD must be set"
+      });
+    }
+
+    console.log(`[Bootstrap-Seed] Creating quick superadmin account: ${username}`);
+
+    // 3. Hash password
+    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+    // 4. Create ONLY superadmin (no seed data)
+    const now = new Date();
+    const passwordExpiry = new Date();
+    passwordExpiry.setDate(passwordExpiry.getDate() + 90);
+
+    const [admin] = await db.insert(users).values({
+      username,
+      password: hashedPassword,
+      name: "System Administrator",
+      email: process.env.ADMIN_EMAIL || null,
+      phone: null,
+      role: "admin",
+      roles: ["admin", "director"],
+      superAdmin: true,
+      
+      // Security fields
+      twoFactorSecret: null,
+      twoFactorEnabled: false,
+      firstLoginCompleted: false,
+      requirePasswordChange: true,
+      passwordSetAt: now,
+      passwordExpiresAt: passwordExpiry,
+      accountCreatedBy: null,
+      lastPasswordResetBy: null,
+      lastPasswordResetAt: null,
+      failedLoginAttempts: 0,
+      accountLockedUntil: null,
+      lastLoginAt: null,
+      lastLoginIp: null,
+      gdprConsentDate: null,
+      gdprConsentVersion: null,
+      deletionRequestedAt: null,
+      status: "active",
+    }).returning();
+
+    console.log("[Bootstrap-Seed] ✅ Quick superadmin account created:", admin.id);
+
+    // 5. Log audit event
+    try {
+      await logAuditEvent({
+        userId: admin.id,
+        action: "system.bootstrap.seed",
+        resourceType: "user",
+        resourceId: admin.id,
+        details: {
+          username: admin.username,
+          requestIp: req.ip,
+          timestamp: now.toISOString(),
+        },
+      });
+    } catch (auditError) {
+      console.error("[Bootstrap-Seed] Audit log failed (non-critical):", auditError);
+    }
+
+    return res.json({
+      success: true,
+      message: "superadmin account created - ready to login!",
+      account: {
+        username: admin.username,
+        name: admin.name,
+        superAdmin: admin.superAdmin,
+        userId: admin.id,
+      },
+      loginInstructions: [
+        "1. Go to: https://adaptservicesgroup.app/login",
+        `2. Login with username: ${username}`,
+        "3. You'll be prompted to:",
+        "   - Change your password",
+        "   - Set up 2FA (scan QR code)",
+        "   - Save backup codes",
+        "4. After onboarding, you can seed demo data via Settings > Database Seeding",
+      ],
+      security: {
+        passwordChangeRequired: true,
+        twoFactorRequired: true,
+        firstLoginPending: true,
+      },
+    });
+
+  } catch (error: any) {
+    console.error("[Bootstrap-Seed] FATAL ERROR:", error);
+    return res.status(500).json({
+      error: "Bootstrap seed failed",
+      message: error.message || "An unexpected error occurred",
+    });
+  }
+});
+
+/**
  * POST /api/bootstrap
  * 
  * Creates the initial superadmin account for TrueNorthOS.
