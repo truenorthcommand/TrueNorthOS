@@ -152,10 +152,10 @@ export default function CreateJob() {
   const fetchClientProperties = useCallback(async (clientId: number) => {
     setLoadingProperties(true);
     try {
-      const res = await fetch(`/api/clients/${clientId}`, { credentials: 'include' });
+      const res = await fetch(`/api/clients/${clientId}/properties`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
-        setClientProperties(data.properties || []);
+        setClientProperties(data || []);
       }
     } catch (err) {
       console.error('Failed to fetch properties:', err);
