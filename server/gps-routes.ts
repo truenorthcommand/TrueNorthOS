@@ -274,7 +274,7 @@ router.get('/stats', async (req: Request, res: Response) => {
       // Walkarounds completed today
       const walkarounds = await client.query(`
         SELECT COUNT(*) as count FROM walkaround_checks
-        WHERE DATE(COALESCE(submitted_at, created_at)) = CURRENT_DATE
+        WHERE DATE(created_at) = CURRENT_DATE
       `);
 
       res.json({
