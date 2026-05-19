@@ -30,16 +30,48 @@ export const users = pgTable("users", {
   lastLocationUpdate: timestamp("last_location_update"),
   licencePhotoUrl: text("licence_photo_url"),
   licenceUploadedAt: timestamp("licence_uploaded_at"),
+  
+  // 🔐 Two-Factor Authentication
   twoFactorSecret: text("two_factor_secret"),
   twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
+  
+  // 🆕 First Login & Password Management
+  firstLoginCompleted: boolean("first_login_completed").notNull().default(false),
+  passwordSetAt: timestamp("password_set_at"),
+  passwordExpiresAt: timestamp("password_expires_at"),
+  requirePasswordChange: boolean("require_password_change").notNull().default(true),
+  
+  // 🆕 Account Lifecycle Tracking
+  accountCreatedBy: varchar("account_created_by"),
+  lastPasswordResetBy: varchar("last_password_reset_by"),
+  lastPasswordResetAt: timestamp("last_password_reset_at"),
+  
+  // 🆕 Security: Failed Login Tracking
+  failedLoginAttempts: integer("failed_login_attempts").default(0),
+  accountLockedUntil: timestamp("account_locked_until"),
+  lastLoginAt: timestamp("last_login_at"),
+  lastLoginIp: text("last_login_ip"),
+  
+  // 🔒 GDPR Compliance
   gdprConsentDate: timestamp("gdpr_consent_date"),
   gdprConsentVersion: text("gdpr_consent_version"),
   deletionRequestedAt: timestamp("deletion_requested_at"),
+  
   workingAtHeight: boolean("working_at_height").notNull().default(false),
   negativeSkillIds: jsonb("negative_skill_ids").default([]),
-  googleId: text("google_id"),
   profileImageUrl: text("profile_image_url"),
   inviteToken: text("invite_token"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// 🔐 Backup codes for 2FA recovery
+export const backupCodes = pgTable("backup_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  codeHash: text("code_hash").notNull(),
+  used: boolean("used").notNull().default(false),
+  usedAt: timestamp("used_at"),
+  usedFromIp: text("used_from_ip"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -8,6 +8,7 @@ import { StoreProvider } from "@/lib/store";
 import { ThemeProvider } from "@/lib/theme";
 import { GoogleMapsProvider } from "@/components/google-maps-provider";
 import { useVersionCheck } from "@/hooks/use-version-check";
+import { SessionTimeoutWarning } from "@/components/session-timeout-warning";
 import NotFound from "@/pages/not-found";
 import WorkflowStudio from "@/pages/workflow-studio";
 import WorkflowEditor from "@/pages/workflow-editor";
@@ -276,6 +277,7 @@ function App() {
               <TooltipProvider>
                 <LocationTracker />
                 <Toaster />
+                <SessionTimeoutWarning />
                 <CookieConsent />
                 <Router />
               </TooltipProvider>

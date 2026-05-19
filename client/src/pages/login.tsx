@@ -1,239 +1,329 @@
 import { useState } from "react";
-import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, AlertCircle, Shield, ChevronDown } from "lucide-react";
+import { Loader2, AlertCircle, Shield, User, Lock, Key } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
-  const { login } = useAuth();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
-  // Google OAuth state
-  const [googleLoading, setGoogleLoading] = useState(false);
-
-  // Password fallback state
-  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  // Form state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [totpToken, setTotpToken] = useState("");
-  const [requires2FA, setRequires2FA] = useState(false);
+  const [totpCode, setTotpCode] = useState("");
+  const [backupCode, setBackupCode] = useState("");
+  
+  // UI state
+  const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
+  const [useBackupCode, setUseBackupCode] = useState(false);
 
-  // Check URL for OAuth error
-  const urlParams = new URLSearchParams(window.location.search);
-  const oauthError = urlParams.get("error");
-
-  const handleGoogleLogin = () => {
-    setGoogleLoading(true);
-    window.location.href = "/api/oauth/google";
-  };
-
-  const handlePasswordLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    const result = await login(username, password, requires2FA ? totpToken : undefined);
+    try {
+      const endpoint = useBackupCode ? "/api/auth/login-backup-code" : "/api/auth/login";
+      const body = useBackupCode
+        ? { username, password, backupCode }
+        : { username, password, totpCode: requiresTwoFactor ? totpCode : undefined };
 
-    if (result.success) {
-      // Redirect based on user role
-      try {
-        const stored = localStorage.getItem('truenorth_user');
-        const userData = stored ? JSON.parse(stored) : null;
-        if (userData?.role === 'engineer' && !userData?.superAdmin) {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 423) {
+          // Account locked
+          setError(`Account locked. Try again in ${data.remainingMinutes} minutes.`);
+        } else if (data.remainingAttempts !== undefined) {
+          setError(`Invalid credentials. ${data.remainingAttempts} attempts remaining.`);
+        } else {
+          setError(data.error || "Login failed");
+        }
+        setLoading(false);
+        return;
+      }
+
+      // Handle 2FA requirement
+      if (data.requiresTwoFactor) {
+        setRequiresTwoFactor(true);
+        setLoading(false);
+        return;
+      }
+
+      // Handle onboarding requirement
+      if (data.requiresOnboarding) {
+        toast({
+          title: "Welcome!",
+          description: "Please complete your account setup.",
+        });
+        setLocation("/onboarding");
+        return;
+      }
+
+      // Handle password change requirement
+      if (data.requiresPasswordChange) {
+        toast({
+          title: "Password Change Required",
+          description: data.reason === "password_expired" 
+            ? "Your password has expired. Please set a new one."
+            : "Please change your temporary password.",
+        });
+        setLocation("/change-password");
+        return;
+      }
+
+      // Show warning if backup codes are low
+      if (data.warning) {
+        toast({
+          title: "Warning",
+          description: data.warning,
+          variant: "destructive",
+        });
+      }
+
+      // Successful login - save user data and redirect
+      if (data.user) {
+        localStorage.setItem('truenorth_user', JSON.stringify(data.user));
+        
+        // Redirect based on role
+        if (data.user.role === 'engineer' && !data.user.superAdmin) {
           setLocation('/app/my-day');
         } else {
           setLocation('/app');
         }
-      } catch {
-        setLocation('/app');
       }
-    } else if (result.requiresTwoFactor) {
-      setRequires2FA(true);
-      setTotpToken("");
-    } else {
-      setError(result.error || "Invalid username or password");
+    } catch (error) {
+      console.error("Login error:", error);
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleBack = () => {
-    setRequires2FA(false);
-    setTotpToken("");
-    setPassword("");
+    setRequiresTwoFactor(false);
+    setUseBackupCode(false);
+    setTotpCode("");
+    setBackupCode("");
     setError("");
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+      <Card className="w-full max-w-md shadow-xl">
+        <CardHeader className="text-center space-y-2">
           <div className="flex justify-center mb-4">
             <img
               src="/logo-truenorth-os.png"
-              alt="Adapt Services Group"
-              className="h-24 w-auto object-contain"
+              alt="TrueNorthOS"
+              className="h-20 w-auto object-contain"
             />
           </div>
-          <CardTitle className="text-2xl font-bold">Adapt Services Group</CardTitle>
-          <CardDescription>
-            {requires2FA
+          <CardTitle className="text-2xl font-bold text-slate-900">
+            Adapt Services Group
+          </CardTitle>
+          <CardDescription className="text-slate-600">
+            {requiresTwoFactor
               ? "Enter your authentication code"
               : "Professional Field Service Management"}
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-4">
-          {/* OAuth error alert */}
-          {oauthError && (
-            <Alert variant="destructive">
+        <CardContent>
+          {/* Error alert */}
+          {error && (
+            <Alert variant="destructive" className="mb-4">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                {oauthError === "oauth_failed"
-                  ? "Google sign-in failed. Please try again or contact your administrator."
-                  : oauthError === "user_not_found"
-                  ? "Your Google account is not linked to an Adapt Services Group account. Contact your administrator for access."
-                  : "An authentication error occurred. Please try again."}
-              </AlertDescription>
+              <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
-          {/* ── Primary: Google Sign-In ─────────────────────────────────── */}
-          {!requires2FA && (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full h-12 text-base flex items-center justify-center gap-3 border-gray-300 hover:bg-gray-50"
-              onClick={handleGoogleLogin}
-              disabled={googleLoading}
-              data-testid="button-google-login"
-            >
-              {googleLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <svg className="h-5 w-5 flex-shrink-0" viewBox="0 0 24 24">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                </svg>
-              )}
-              <span className="font-medium text-gray-700">
-                {googleLoading ? "Redirecting…" : "Sign in with Google"}
-              </span>
-            </Button>
-          )}
-
-          {/* ── 2FA Step (shown after password login requires it) ────────── */}
-          {requires2FA && (
-            <form onSubmit={handlePasswordLogin} className="space-y-4">
-              <div className="flex items-center justify-center mb-2">
-                <div className="p-3 bg-primary/10 rounded-full">
-                  <Shield className="h-8 w-8 text-primary" />
-                </div>
-              </div>
-              <p className="text-center text-sm text-muted-foreground">
-                Open your authenticator app and enter the 6-digit code
-              </p>
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+          <form onSubmit={handleLogin} className="space-y-4">
+            {/* Username field */}
+            {!requiresTwoFactor && (
               <div className="space-y-2">
-                <Label htmlFor="totp">Authentication Code</Label>
+                <Label htmlFor="username" className="flex items-center gap-2 text-slate-700">
+                  <User className="w-4 h-4" />
+                  Username
+                </Label>
                 <Input
-                  id="totp"
+                  id="username"
                   type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={6}
-                  value={totpToken}
-                  onChange={(e) => setTotpToken(e.target.value.replace(/\D/g, ""))}
-                  placeholder="000000"
-                  className="text-center text-2xl tracking-widest font-mono"
-                  autoFocus
+                  placeholder="sarah.jones"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   required
-                  data-testid="input-totp"
+                  disabled={loading}
+                  autoComplete="username"
+                  className="h-11"
                 />
               </div>
-              <Button type="submit" className="w-full h-11" disabled={loading} data-testid="button-verify">
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Verify
-              </Button>
-              <Button type="button" variant="ghost" className="w-full" onClick={handleBack} data-testid="button-back">
-                Back to login
-              </Button>
-            </form>
-          )}
+            )}
 
-          {/* ── Admin Fallback: Username/Password ───────────────────────── */}
-          {!requires2FA && (
-            <div className="pt-2">
-              <button
-                type="button"
-                className="w-full flex items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
-                onClick={() => setShowPasswordForm((v) => !v)}
-                data-testid="button-toggle-password"
-              >
-                <span>Admin / Password Sign-in</span>
-                <ChevronDown
-                  className={`h-3 w-3 transition-transform ${showPasswordForm ? "rotate-180" : ""}`}
+            {/* Password field */}
+            {!requiresTwoFactor && (
+              <div className="space-y-2">
+                <Label htmlFor="password" className="flex items-center gap-2 text-slate-700">
+                  <Lock className="w-4 h-4" />
+                  Password
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                  autoComplete="current-password"
+                  className="h-11"
                 />
-              </button>
+              </div>
+            )}
 
-              {showPasswordForm && (
-                <form onSubmit={handlePasswordLogin} className="space-y-4 mt-4 pt-4 border-t">
-                  {error && (
-                    <Alert variant="destructive">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  )}
-                  <div className="space-y-2">
-                    <Label htmlFor="username">Username</Label>
-                    <Input
-                      id="username"
-                      type="text"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      placeholder="Enter your username"
-                      required
-                      data-testid="input-username"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Enter your password"
-                      required
-                      data-testid="input-password"
-                    />
-                  </div>
-                  <Button type="submit" className="w-full h-11" disabled={loading} data-testid="button-login">
-                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Sign In
-                  </Button>
-                </form>
+            {/* 2FA or Backup Code input */}
+            {requiresTwoFactor && (
+              <div className="space-y-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-blue-800">
+                    Logged in as <strong>{username}</strong>
+                  </p>
+                </div>
+
+                {!useBackupCode ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="totpCode" className="flex items-center gap-2 text-slate-700">
+                        <Shield className="w-4 h-4" />
+                        Authentication Code
+                      </Label>
+                      <Input
+                        id="totpCode"
+                        type="text"
+                        placeholder="000000"
+                        value={totpCode}
+                        onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                        maxLength={6}
+                        required
+                        disabled={loading}
+                        autoComplete="one-time-code"
+                        autoFocus
+                        className="h-11 text-center text-2xl tracking-widest"
+                      />
+                      <p className="text-xs text-slate-600">
+                        Enter the 6-digit code from your authenticator app
+                      </p>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="link"
+                      onClick={() => setUseBackupCode(true)}
+                      className="w-full text-sm text-slate-600 hover:text-slate-900"
+                    >
+                      Lost your phone? Use a backup code instead
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="backupCode" className="flex items-center gap-2 text-slate-700">
+                        <Key className="w-4 h-4" />
+                        Backup Code
+                      </Label>
+                      <Input
+                        id="backupCode"
+                        type="text"
+                        placeholder="A3K9-7M2P"
+                        value={backupCode}
+                        onChange={(e) => setBackupCode(e.target.value.toUpperCase())}
+                        maxLength={9}
+                        required
+                        disabled={loading}
+                        autoFocus
+                        className="h-11 text-center text-xl font-mono tracking-wider"
+                      />
+                      <p className="text-xs text-slate-600">
+                        Enter one of your backup codes (8 characters)
+                      </p>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="link"
+                      onClick={() => setUseBackupCode(false)}
+                      className="w-full text-sm text-slate-600 hover:text-slate-900"
+                    >
+                      Use authenticator app instead
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <div className="space-y-2 pt-2">
+              {requiresTwoFactor && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleBack}
+                  disabled={loading}
+                  className="w-full h-11"
+                >
+                  Back to Login
+                </Button>
               )}
+
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full h-11 bg-blue-600 hover:bg-blue-700"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing in...
+                  </>
+                ) : requiresTwoFactor ? (
+                  "Verify & Sign In"
+                ) : (
+                  "Sign In"
+                )}
+              </Button>
+            </div>
+          </form>
+
+          {/* Help text */}
+          {!requiresTwoFactor && (
+            <div className="mt-6 text-center space-y-1">
+              <p className="text-sm text-slate-600">Forgot your password?</p>
+              <p className="text-sm text-slate-800 font-medium">
+                Contact your system administrator for assistance.
+              </p>
             </div>
           )}
 
-          {/* Powered By footer */}
-          <p className="text-center text-xs text-muted-foreground pt-2">
-            Powered By{" "}
-            <a href="https://truenorthos.co.uk/" target="_blank" rel="noopener noreferrer" className="font-semibold text-foreground hover:underline">TrueNorthOS</a>
-          </p>
+          {/* Footer */}
+          <div className="mt-6 pt-6 border-t border-slate-200 text-center">
+            <p className="text-xs text-slate-500">
+              Powered by <span className="font-semibold">TrueNorthOS</span>
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>

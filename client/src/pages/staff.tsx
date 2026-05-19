@@ -12,6 +12,7 @@ import { Plus, Trash2, User, Shield, Wrench, AlertCircle, Eye, EyeOff, Lock, Key
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { UserSecurityManagement } from "@/components/user-security-management";
 
 type Role = 'admin' | 'engineer' | 'surveyor' | 'fleet_manager' | 'works_manager' | 'accounts' | 'director';
 type Skill = { id: string; name: string; category: string; icon?: string; };
@@ -38,6 +39,10 @@ interface StaffMember {
   workingAtHeight?: boolean;
   negativeSkillIds?: string[];
   hasDirectorsSuite?: boolean;
+  twoFactorEnabled?: boolean;
+  lastLoginAt?: Date | null;
+  failedLoginAttempts?: number;
+  accountLockedUntil?: Date | null;
 }
 
 interface WorksManager {
@@ -1810,6 +1815,22 @@ export default function Staff() {
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">Assign a company vehicle to this staff member</p>
               </div>
+
+              {/* Security Management Section - For Admins */}
+              {editingStaff && (user?.superAdmin || (user?.roles as string[])?.includes('admin')) && (
+                <div className="border-t pt-4 mt-6">
+                  <UserSecurityManagement
+                    userId={editingStaff.id}
+                    username={editingStaff.username}
+                    name={editingStaff.name}
+                    twoFactorEnabled={editingStaff.twoFactorEnabled}
+                    lastLoginAt={editingStaff.lastLoginAt}
+                    failedLoginAttempts={editingStaff.failedLoginAttempts}
+                    accountLockedUntil={editingStaff.accountLockedUntil}
+                    onUpdate={fetchStaff}
+                  />
+                </div>
+              )}
 
               <DialogFooter className="mt-6">
                 <Button type="button" variant="outline" onClick={() => setEditingStaff(null)}>

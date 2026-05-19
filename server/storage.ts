@@ -58,7 +58,8 @@ import {
   type AssetHistory, type InsertAssetHistory,
   type BlogPost, type InsertBlogPost,
   type Feedback, type InsertFeedback,
-  users, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, clientContacts, clientProperties, jobUpdates,
+  type BackupCode, type InsertBackupCode,
+  users, backupCodes, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, clientContacts, clientProperties, jobUpdates,
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
   timesheets, receipts, receiptLineItems, deductions, materialProfiles, vendorRules, archivedExpenses, payments,
@@ -82,10 +83,17 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   deleteUser(id: string): Promise<void>;
-  updateUser(id: string, updates: Partial<{ name: string; email: string | null; phone: string | null; tabletNumber: string | null; username: string; password: string; role: string; roles: string[]; superAdmin: boolean; twoFactorSecret: string | null; twoFactorEnabled: boolean; gdprConsentDate: Date | null; gdprConsentVersion: string | null; deletionRequestedAt: Date | null; status: string; workingAtHeight: boolean; negativeSkillIds: string[] }>): Promise<User | undefined>;
+  updateUser(id: string, updates: Partial<{ name: string; email: string | null; phone: string | null; tabletNumber: string | null; username: string; password: string; role: string; roles: string[]; superAdmin: boolean; twoFactorSecret: string | null; twoFactorEnabled: boolean; firstLoginCompleted: boolean; passwordSetAt: Date | null; passwordExpiresAt: Date | null; requirePasswordChange: boolean; accountCreatedBy: string | null; lastPasswordResetBy: string | null; lastPasswordResetAt: Date | null; failedLoginAttempts: number; accountLockedUntil: Date | null; lastLoginAt: Date | null; lastLoginIp: string | null; gdprConsentDate: Date | null; gdprConsentVersion: string | null; deletionRequestedAt: Date | null; status: string; workingAtHeight: boolean; negativeSkillIds: string[] }>): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
   getAllEngineers(): Promise<User[]>;
   updateEngineerLocation(id: string, lat: number, lng: number): Promise<User | undefined>;
+  
+  // Backup Codes for 2FA Recovery
+  getBackupCodes(userId: string): Promise<BackupCode[]>;
+  createBackupCode(backupCode: InsertBackupCode): Promise<BackupCode>;
+  markBackupCodeUsed(codeId: string, updates: { usedAt: Date; usedFromIp: string }): Promise<void>;
+  deleteBackupCodes(userId: string): Promise<void>;
+  getUnusedBackupCodeCount(userId: string): Promise<number>;
   
   getJob(id: string): Promise<Job | undefined>;
   getAllJobs(): Promise<Job[]>;
@@ -492,7 +500,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(users).where(eq(users.id, id));
   }
 
-  async updateUser(id: string, updates: Partial<{ name: string; email: string | null; phone: string | null; tabletNumber: string | null; username: string; password: string; role: string; roles: string[]; superAdmin: boolean; twoFactorSecret: string | null; twoFactorEnabled: boolean; gdprConsentDate: Date | null; gdprConsentVersion: string | null; deletionRequestedAt: Date | null; status: string; workingAtHeight: boolean; negativeSkillIds: string[] }>): Promise<User | undefined> {
+  async updateUser(id: string, updates: Partial<{ name: string; email: string | null; phone: string | null; tabletNumber: string | null; username: string; password: string; role: string; roles: string[]; superAdmin: boolean; twoFactorSecret: string | null; twoFactorEnabled: boolean; firstLoginCompleted: boolean; passwordSetAt: Date | null; passwordExpiresAt: Date | null; requirePasswordChange: boolean; accountCreatedBy: string | null; lastPasswordResetBy: string | null; lastPasswordResetAt: Date | null; failedLoginAttempts: number; accountLockedUntil: Date | null; lastLoginAt: Date | null; lastLoginIp: string | null; gdprConsentDate: Date | null; gdprConsentVersion: string | null; deletionRequestedAt: Date | null; status: string; workingAtHeight: boolean; negativeSkillIds: string[] }>): Promise<User | undefined> {
     const [user] = await db.update(users).set(updates).where(eq(users.id, id)).returning();
     return user;
   }
@@ -516,6 +524,35 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return user;
+  }
+
+  // Backup Codes for 2FA Recovery
+  async getBackupCodes(userId: string): Promise<BackupCode[]> {
+    return db.select().from(backupCodes).where(eq(backupCodes.userId, userId));
+  }
+
+  async createBackupCode(backupCode: InsertBackupCode): Promise<BackupCode> {
+    const [code] = await db.insert(backupCodes).values(backupCode).returning();
+    return code;
+  }
+
+  async markBackupCodeUsed(codeId: string, updates: { usedAt: Date; usedFromIp: string }): Promise<void> {
+    await db
+      .update(backupCodes)
+      .set({ used: true, usedAt: updates.usedAt, usedFromIp: updates.usedFromIp })
+      .where(eq(backupCodes.id, codeId));
+  }
+
+  async deleteBackupCodes(userId: string): Promise<void> {
+    await db.delete(backupCodes).where(eq(backupCodes.userId, userId));
+  }
+
+  async getUnusedBackupCodeCount(userId: string): Promise<number> {
+    const codes = await db
+      .select()
+      .from(backupCodes)
+      .where(and(eq(backupCodes.userId, userId), eq(backupCodes.used, false)));
+    return codes.length;
   }
 
   async getJob(id: string): Promise<Job | undefined> {

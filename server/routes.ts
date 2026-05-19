@@ -19,7 +19,21 @@ import { registerAiRoutes } from "./ai-service";
 import { registerSupportChatRoutes } from "./support-chat";
 import { registerPublicChatbotRoutes } from "./public-chatbot";
 import { insertFileSchema } from "@shared/schema";
-import { setupGoogleAuth } from "./google-auth";
+// import { setupGoogleAuth } from "./google-auth"; // REMOVED: Google OAuth replaced with closed-loop authentication
+import { 
+  adminCreateAccount,
+  login,
+  loginWithBackupCode,
+  completeOnboarding,
+  verify2FASetup,
+  generateBackupCodes,
+  completeOnboardingFinal,
+  adminResetPassword,
+  regenerateBackupCodes,
+  logout,
+  checkSessionTimeout,
+  extendSession
+} from "./auth-routes";
 import { registerInviteRoutes } from "./invite";
 import { generateFormPdf } from "./form-pdf";
 import { emitEvent } from "./events";
@@ -150,8 +164,27 @@ export async function registerRoutes(
   // Use shared session middleware (also used by WebSocket notifications)
   app.use(sessionMiddleware);
   
-  // Setup Google OAuth 2.0 authentication
-  await setupGoogleAuth(app);
+  // ==================== CLOSED-LOOP AUTHENTICATION ROUTES ====================
+  // Admin-provisioned accounts with mandatory 2FA and backup codes
+  // No third-party OAuth dependencies for maximum security and GDPR compliance
+  
+  // User Login & Session Management
+  app.post("/api/auth/login", login);
+  app.post("/api/auth/login-backup-code", loginWithBackupCode);
+  app.post("/api/auth/logout", logout);
+  app.get("/api/auth/session-timeout", checkSessionTimeout);
+  app.post("/api/auth/extend-session", extendSession);
+  
+  // First-Time Onboarding Flow
+  app.post("/api/auth/onboarding", completeOnboarding); // Step 1: Change password + generate 2FA
+  app.post("/api/auth/verify-2fa-setup", verify2FASetup); // Step 2: Verify 2FA code
+  app.post("/api/auth/generate-backup-codes", generateBackupCodes); // Step 3: Generate backup codes
+  app.post("/api/auth/complete-onboarding", completeOnboardingFinal); // Step 4: Mark onboarding complete
+  
+  // Admin User Management
+  app.post("/api/auth/admin/create-account", adminCreateAccount);
+  app.post("/api/auth/admin/reset-password", adminResetPassword);
+  app.post("/api/auth/regenerate-backup-codes", regenerateBackupCodes);
 
   // Register invite-based onboarding routes (/invite/:token and /api/users/invite)
   registerInviteRoutes(app);
