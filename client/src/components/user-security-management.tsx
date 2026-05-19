@@ -96,7 +96,7 @@ export function UserSecurityManagement({
 
       toast({
         title: "Account Unlocked",
-        description: `${name}'s account has been unlocked",
+        description: `${name}'s account has been unlocked`,
       });
       onUpdate?.();
     } catch (error) {
