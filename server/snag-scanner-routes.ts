@@ -584,12 +584,13 @@ router.post(
 
 /**
  * GET /api/jobs/:jobId/snag-images/:key(*)
- * Proxy endpoint to get a fresh presigned URL for a snag image.
+ * Proxy endpoint to get a fresh presigned URL for a snag image.  
  * Used by admin UI to display uploaded photos.
  */
-router.get("/:jobId/snag-images/:key(*)", requireAuth, async (req: Request, res: Response) => {
+router.get("/:jobId/snag-images/*", requireAuth, async (req: Request, res: Response) => {
   try {
-    const { key } = req.params;
+    // Extract the key from the wildcard path (everything after /snag-images/)
+    const key = req.params[0];
     const presignedUrl = await getPresignedDownloadUrl(BUCKETS.SNAGS, key);
     res.json({ presignedUrl });
   } catch (error: any) {
