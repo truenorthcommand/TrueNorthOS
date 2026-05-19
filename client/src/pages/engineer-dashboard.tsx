@@ -351,7 +351,7 @@ export default function EngineerDashboard() {
           {/* Quick Actions - Available before walkaround */}
           <div>
             <h2 className="text-lg font-bold text-[#0F2B4C] dark:text-white mb-3">Quick Actions</h2>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <Card
                 className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
                 onClick={openReceiptPanel}
@@ -368,15 +368,6 @@ export default function EngineerDashboard() {
                 <CardContent className="p-4 flex flex-col items-center justify-center text-center h-24">
                   <Clock className="h-6 w-6 text-[#E8A54B] mb-2" />
                   <span className="text-sm font-medium text-[#0F2B4C] dark:text-white">Timesheets</span>
-                </CardContent>
-              </Card>
-              <Card
-                className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
-                onClick={() => navigate('/jobs')}
-              >
-                <CardContent className="p-4 flex flex-col items-center justify-center text-center h-24">
-                  <Briefcase className="h-6 w-6 text-[#E8A54B] mb-2" />
-                  <span className="text-sm font-medium text-[#0F2B4C] dark:text-white">My Jobs</span>
                 </CardContent>
               </Card>
             </div>
