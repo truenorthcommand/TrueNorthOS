@@ -193,7 +193,9 @@ export async function login(req: Request, res: Response) {
   });
   
   // Check if first login onboarding required
-  if (!user.firstLoginCompleted) {
+  // Also force onboarding if 2FA is not set up (e.g., migration marked firstLoginCompleted=true
+  // but user never completed security setup)
+  if (!user.firstLoginCompleted || !user.twoFactorEnabled) {
     req.session.userId = user.id;
     req.session.requiresOnboarding = true;
     
