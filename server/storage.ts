@@ -16,6 +16,14 @@ import {
   type Message, type InsertMessage,
   type ConversationWithDetails, type MessageWithSender,
   type Vehicle, type InsertVehicle,
+  type VehicleEquipment, type InsertVehicleEquipment,
+  type VehicleAssignment, type InsertVehicleAssignment,
+  type MotRecord, type InsertMotRecord,
+  type InsuranceRecord, type InsertInsuranceRecord,
+  type RoadTaxRecord, type InsertRoadTaxRecord,
+  type ServiceRecord, type InsertServiceRecord,
+  type FuelRecord, type InsertFuelRecord,
+  type Reminder, type InsertReminder,
   type WalkaroundCheck, type InsertWalkaroundCheck,
   type CheckItem, type InsertCheckItem,
   type Defect, type InsertDefect,
@@ -62,6 +70,7 @@ import {
   users, backupCodes, jobs, engineerLocations, aiAdvisors, timeLogs, quotes, invoices, companySettings, clients, clientContacts, clientProperties, jobUpdates,
   conversations, conversationMembers, messages,
   vehicles, walkaroundChecks, checkItems, defects, defectUpdates,
+  vehicleEquipment, vehicleAssignments, motRecords, insuranceRecords, roadTaxRecords, serviceRecords, fuelRecords, reminders,
   timesheets, receipts, receiptLineItems, deductions, materialProfiles, vendorRules, archivedExpenses, payments,
   skills, subSkills, userSkills,
   inspections, inspectionItems, snaggingSheets, snagItems,
@@ -1300,6 +1309,244 @@ export class DatabaseStorage implements IStorage {
       .where(eq(vehicles.id, vehicleId))
       .returning();
     return updated;
+  }
+
+  // ============================================
+  // COMPREHENSIVE FLEET MANAGEMENT METHODS
+  // ============================================
+
+  // Vehicle Equipment Management
+  async getVehicleEquipment(vehicleId: string): Promise<VehicleEquipment[]> {
+    return db.select().from(vehicleEquipment).where(eq(vehicleEquipment.vehicleId, vehicleId));
+  }
+
+  async createVehicleEquipment(equipment: InsertVehicleEquipment): Promise<VehicleEquipment> {
+    const [created] = await db.insert(vehicleEquipment).values(equipment).returning();
+    return created;
+  }
+
+  async updateVehicleEquipment(id: string, updates: Partial<VehicleEquipment>): Promise<VehicleEquipment | undefined> {
+    const [updated] = await db.update(vehicleEquipment)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(vehicleEquipment.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteVehicleEquipment(id: string): Promise<void> {
+    await db.delete(vehicleEquipment).where(eq(vehicleEquipment.id, id));
+  }
+
+  // Vehicle Assignment History
+  async getVehicleAssignments(vehicleId: string): Promise<VehicleAssignment[]> {
+    return db.select()
+      .from(vehicleAssignments)
+      .where(eq(vehicleAssignments.vehicleId, vehicleId))
+      .orderBy(desc(vehicleAssignments.assignedDate));
+  }
+
+  async getCurrentAssignments(): Promise<VehicleAssignment[]> {
+    return db.select()
+      .from(vehicleAssignments)
+      .where(isNull(vehicleAssignments.returnedDate))
+      .orderBy(desc(vehicleAssignments.assignedDate));
+  }
+
+  async createVehicleAssignment(assignment: InsertVehicleAssignment): Promise<VehicleAssignment> {
+    const [created] = await db.insert(vehicleAssignments).values(assignment).returning();
+    return created;
+  }
+
+  async returnVehicleAssignment(assignmentId: string, returnedMileage: number, notes?: string): Promise<VehicleAssignment | undefined> {
+    const [updated] = await db.update(vehicleAssignments)
+      .set({ 
+        returnedDate: new Date(), 
+        returnedMileage,
+        notes: notes ? notes : undefined
+      })
+      .where(eq(vehicleAssignments.id, assignmentId))
+      .returning();
+    return updated;
+  }
+
+  // MOT Records
+  async getMotRecords(vehicleId: string): Promise<MotRecord[]> {
+    return db.select()
+      .from(motRecords)
+      .where(eq(motRecords.vehicleId, vehicleId))
+      .orderBy(desc(motRecords.testDate));
+  }
+
+  async getLatestMotRecord(vehicleId: string): Promise<MotRecord | undefined> {
+    const [record] = await db.select()
+      .from(motRecords)
+      .where(eq(motRecords.vehicleId, vehicleId))
+      .orderBy(desc(motRecords.testDate))
+      .limit(1);
+    return record;
+  }
+
+  async createMotRecord(record: InsertMotRecord): Promise<MotRecord> {
+    const [created] = await db.insert(motRecords).values(record).returning();
+    return created;
+  }
+
+  // Insurance Records
+  async getInsuranceRecords(vehicleId: string): Promise<InsuranceRecord[]> {
+    return db.select()
+      .from(insuranceRecords)
+      .where(eq(insuranceRecords.vehicleId, vehicleId))
+      .orderBy(desc(insuranceRecords.startDate));
+  }
+
+  async getLatestInsuranceRecord(vehicleId: string): Promise<InsuranceRecord | undefined> {
+    const [record] = await db.select()
+      .from(insuranceRecords)
+      .where(eq(insuranceRecords.vehicleId, vehicleId))
+      .orderBy(desc(insuranceRecords.startDate))
+      .limit(1);
+    return record;
+  }
+
+  async createInsuranceRecord(record: InsertInsuranceRecord): Promise<InsuranceRecord> {
+    const [created] = await db.insert(insuranceRecords).values(record).returning();
+    return created;
+  }
+
+  // Road Tax Records
+  async getRoadTaxRecords(vehicleId: string): Promise<RoadTaxRecord[]> {
+    return db.select()
+      .from(roadTaxRecords)
+      .where(eq(roadTaxRecords.vehicleId, vehicleId))
+      .orderBy(desc(roadTaxRecords.startDate));
+  }
+
+  async getLatestRoadTaxRecord(vehicleId: string): Promise<RoadTaxRecord | undefined> {
+    const [record] = await db.select()
+      .from(roadTaxRecords)
+      .where(eq(roadTaxRecords.vehicleId, vehicleId))
+      .orderBy(desc(roadTaxRecords.startDate))
+      .limit(1);
+    return record;
+  }
+
+  async createRoadTaxRecord(record: InsertRoadTaxRecord): Promise<RoadTaxRecord> {
+    const [created] = await db.insert(roadTaxRecords).values(record).returning();
+    return created;
+  }
+
+  // Service Records
+  async getServiceRecords(vehicleId: string): Promise<ServiceRecord[]> {
+    return db.select()
+      .from(serviceRecords)
+      .where(eq(serviceRecords.vehicleId, vehicleId))
+      .orderBy(desc(serviceRecords.serviceDate));
+  }
+
+  async getLatestServiceRecord(vehicleId: string): Promise<ServiceRecord | undefined> {
+    const [record] = await db.select()
+      .from(serviceRecords)
+      .where(eq(serviceRecords.vehicleId, vehicleId))
+      .orderBy(desc(serviceRecords.serviceDate))
+      .limit(1);
+    return record;
+  }
+
+  async createServiceRecord(record: InsertServiceRecord): Promise<ServiceRecord> {
+    const [created] = await db.insert(serviceRecords).values(record).returning();
+    return created;
+  }
+
+  // Fuel Records
+  async getFuelRecords(vehicleId: string, limit: number = 50): Promise<FuelRecord[]> {
+    return db.select()
+      .from(fuelRecords)
+      .where(eq(fuelRecords.vehicleId, vehicleId))
+      .orderBy(desc(fuelRecords.date))
+      .limit(limit);
+  }
+
+  async createFuelRecord(record: InsertFuelRecord): Promise<FuelRecord> {
+    const [created] = await db.insert(fuelRecords).values(record).returning();
+    return created;
+  }
+
+  // Reminders
+  async getUpcomingReminders(days: number = 60): Promise<Reminder[]> {
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + days);
+    
+    return db.select()
+      .from(reminders)
+      .where(
+        and(
+          eq(reminders.status, 'pending'),
+          lte(reminders.reminderDate, futureDate)
+        )
+      )
+      .orderBy(asc(reminders.reminderDate));
+  }
+
+  async getVehicleReminders(vehicleId: string): Promise<Reminder[]> {
+    return db.select()
+      .from(reminders)
+      .where(eq(reminders.vehicleId, vehicleId))
+      .orderBy(asc(reminders.reminderDate));
+  }
+
+  async markReminderSent(reminderId: string, notifiedUsers: string[]): Promise<Reminder | undefined> {
+    const [updated] = await db.update(reminders)
+      .set({ 
+        status: 'sent',
+        notifiedUsers: JSON.stringify(notifiedUsers),
+        updatedAt: new Date()
+      })
+      .where(eq(reminders.id, reminderId))
+      .returning();
+    return updated;
+  }
+
+  async markReminderCompleted(reminderId: string): Promise<Reminder | undefined> {
+    const [updated] = await db.update(reminders)
+      .set({ status: 'completed', updatedAt: new Date() })
+      .where(eq(reminders.id, reminderId))
+      .returning();
+    return updated;
+  }
+
+  // Fleet Dashboard Stats
+  async getFleetDashboardStats() {
+    const vehicleCounts = await db.select({
+      status: vehicles.status,
+      count: sql<number>`count(*)`
+    })
+    .from(vehicles)
+    .groupBy(vehicles.status);
+
+    const next30Days = new Date();
+    next30Days.setDate(next30Days.getDate() + 30);
+
+    const upcomingReminders = await db.select({
+      reminderType: reminders.reminderType,
+      count: sql<number>`count(*)`
+    })
+    .from(reminders)
+    .where(
+      and(
+        eq(reminders.status, 'pending'),
+        lte(reminders.reminderDate, next30Days)
+      )
+    )
+    .groupBy(reminders.reminderType);
+
+    const currentAssignments = await this.getCurrentAssignments();
+
+    return {
+      vehicleCounts,
+      upcomingReminders,
+      currentAssignments,
+      totalVehicles: vehicleCounts.reduce((sum, vc) => sum + Number(vc.count), 0)
+    };
   }
 
   async getWalkaroundCheck(id: string): Promise<WalkaroundCheck | undefined> {

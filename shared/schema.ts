@@ -2538,7 +2538,6 @@ export const feedback = pgTable("feedback", {
 export const insertFeedbackSchema = createInsertSchema(feedback).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
 export type Feedback = typeof feedback.$inferSelect;
-
 // ============================================================
 // PROPERTY INTELLIGENCE SYSTEM
 // ============================================================
@@ -2591,3 +2590,170 @@ export type KnowledgeChunk = typeof knowledgeChunks.$inferSelect;
 export const insertIntelligenceConversationSchema = createInsertSchema(intelligenceConversations).omit({ id: true, createdAt: true });
 export type InsertIntelligenceConversation = z.infer<typeof insertIntelligenceConversationSchema>;
 export type IntelligenceConversation = typeof intelligenceConversations.$inferSelect;
+
+/**
+ * Vehicle equipment tracking for vans (roof racks, ladders, misc)
+ */
+export const vehicleEquipment = pgTable("vehicle_equipment", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vehicleId: varchar("vehicle_id").notNull(),
+  equipmentType: text("equipment_type").notNull(),
+  description: text("description").notNull(),
+  serialNumber: text("serial_number"),
+  condition: text("condition").notNull().default("good"),
+  purchaseDate: timestamp("purchase_date"),
+  purchaseCost: doublePrecision("purchase_cost"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertVehicleEquipmentSchema = createInsertSchema(vehicleEquipment).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertVehicleEquipment = z.infer<typeof insertVehicleEquipmentSchema>;
+export type VehicleEquipment = typeof vehicleEquipment.$inferSelect;
+
+/**
+ * Vehicle assignment tracking - who has which vehicle
+ */
+export const vehicleAssignments = pgTable("vehicle_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vehicleId: varchar("vehicle_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  assignedDate: timestamp("assigned_date").defaultNow().notNull(),
+  returnedDate: timestamp("returned_date"),
+  assignedMileage: integer("assigned_mileage").notNull(),
+  returnedMileage: integer("returned_mileage"),
+  purpose: text("purpose"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertVehicleAssignmentSchema = createInsertSchema(vehicleAssignments).omit({ id: true, createdAt: true });
+export type InsertVehicleAssignment = z.infer<typeof insertVehicleAssignmentSchema>;
+export type VehicleAssignment = typeof vehicleAssignments.$inferSelect;
+
+/**
+ * MOT records and tracking
+ */
+export const motRecords = pgTable("mot_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vehicleId: varchar("vehicle_id").notNull(),
+  testDate: timestamp("test_date").notNull(),
+  expiryDate: timestamp("expiry_date").notNull(),
+  testCenter: text("test_center"),
+  result: text("result").notNull(),
+  mileage: integer("mileage").notNull(),
+  cost: doublePrecision("cost"),
+  advisoryItems: text("advisory_items"),
+  certificateNumber: text("certificate_number"),
+  reminderSent: boolean("reminder_sent").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMotRecordSchema = createInsertSchema(motRecords).omit({ id: true, createdAt: true });
+export type InsertMotRecord = z.infer<typeof insertMotRecordSchema>;
+export type MotRecord = typeof motRecords.$inferSelect;
+
+/**
+ * Insurance records and tracking
+ */
+export const insuranceRecords = pgTable("insurance_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vehicleId: varchar("vehicle_id").notNull(),
+  provider: text("provider").notNull(),
+  policyNumber: text("policy_number").notNull(),
+  startDate: timestamp("start_date").notNull(),
+  expiryDate: timestamp("expiry_date").notNull(),
+  coverageType: text("coverage_type").notNull(),
+  premium: doublePrecision("premium").notNull(),
+  excessAmount: doublePrecision("excess_amount"),
+  namedDrivers: text("named_drivers"),
+  reminderSent: boolean("reminder_sent").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInsuranceRecordSchema = createInsertSchema(insuranceRecords).omit({ id: true, createdAt: true });
+export type InsertInsuranceRecord = z.infer<typeof insertInsuranceRecordSchema>;
+export type InsuranceRecord = typeof insuranceRecords.$inferSelect;
+
+/**
+ * Road tax records and tracking
+ */
+export const roadTaxRecords = pgTable("road_tax_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vehicleId: varchar("vehicle_id").notNull(),
+  startDate: timestamp("start_date").notNull(),
+  expiryDate: timestamp("expiry_date").notNull(),
+  amount: doublePrecision("amount").notNull(),
+  paymentReference: text("payment_reference"),
+  taxBand: text("tax_band"),
+  reminderSent: boolean("reminder_sent").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertRoadTaxRecordSchema = createInsertSchema(roadTaxRecords).omit({ id: true, createdAt: true });
+export type InsertRoadTaxRecord = z.infer<typeof insertRoadTaxRecordSchema>;
+export type RoadTaxRecord = typeof roadTaxRecords.$inferSelect;
+
+/**
+ * Service and maintenance records
+ */
+export const serviceRecords = pgTable("service_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vehicleId: varchar("vehicle_id").notNull(),
+  serviceDate: timestamp("service_date").notNull(),
+  serviceType: text("service_type").notNull(),
+  mileage: integer("mileage").notNull(),
+  serviceCenter: text("service_center"),
+  cost: doublePrecision("cost").notNull(),
+  workDescription: text("work_description").notNull(),
+  partsReplaced: text("parts_replaced"),
+  nextServiceDue: timestamp("next_service_due"),
+  nextServiceMileage: integer("next_service_mileage"),
+  invoiceNumber: text("invoice_number"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertServiceRecordSchema = createInsertSchema(serviceRecords).omit({ id: true, createdAt: true });
+export type InsertServiceRecord = z.infer<typeof insertServiceRecordSchema>;
+export type ServiceRecord = typeof serviceRecords.$inferSelect;
+
+/**
+ * Fuel records for cost tracking
+ */
+export const fuelRecords = pgTable("fuel_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vehicleId: varchar("vehicle_id").notNull(),
+  date: timestamp("date").defaultNow().notNull(),
+  liters: doublePrecision("liters").notNull(),
+  cost: doublePrecision("cost").notNull(),
+  pricePerLiter: doublePrecision("price_per_liter").notNull(),
+  mileage: integer("mileage").notNull(),
+  fuelStation: text("fuel_station"),
+  receiptPhoto: text("receipt_photo"),
+  userId: varchar("user_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFuelRecordSchema = createInsertSchema(fuelRecords).omit({ id: true, createdAt: true });
+export type InsertFuelRecord = z.infer<typeof insertFuelRecordSchema>;
+export type FuelRecord = typeof fuelRecords.$inferSelect;
+
+/**
+ * Automated reminder system for expiring documents
+ */
+export const reminders = pgTable("reminders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vehicleId: varchar("vehicle_id").notNull(),
+  reminderType: text("reminder_type").notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  reminderDate: timestamp("reminder_date").notNull(),
+  status: text("status").notNull().default("pending"),
+  notifiedUsers: jsonb("notified_users").default([]),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertReminderSchema = createInsertSchema(reminders).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertReminder = z.infer<typeof insertReminderSchema>;
+export type Reminder = typeof reminders.$inferSelect;

@@ -9,7 +9,7 @@ import QRCode from "qrcode";
 import Stripe from "stripe";
 import { storage } from "./storage";
 import { pool } from "./db";
-import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalkaroundCheckSchema, insertCheckItemSchema, insertDefectSchema, insertDefectUpdateSchema, insertTimesheetSchema, insertReceiptSchema, insertReceiptLineItemSchema, insertDeductionSchema, insertMaterialProfileSchema, insertVendorRuleSchema, insertPaymentSchema, insertFeedbackSchema } from "@shared/schema";
+import { insertJobSchema, insertAiAdvisorSchema, insertVehicleSchema, insertWalkaroundCheckSchema, insertCheckItemSchema, insertDefectSchema, insertDefectUpdateSchema, insertTimesheetSchema, insertReceiptSchema, insertReceiptLineItemSchema, insertDeductionSchema, insertMaterialProfileSchema, insertVendorRuleSchema, insertExpenseSchema, insertPaymentSchema, insertBlogPostSchema, insertFeedbackSchema, insertVehicleEquipmentSchema, insertVehicleAssignmentSchema, insertMotRecordSchema, insertInsuranceRecordSchema, insertRoadTaxRecordSchema, insertServiceRecordSchema, insertFuelRecordSchema, insertReminderSchema } from "@shared/schema";
 import { z } from "zod";
 import { notifyAdmins, notifyUser } from "./notifications";
 import * as objectStorage from "./services/object-storage";
@@ -5989,6 +5989,316 @@ Return ONLY valid JSON, nothing else.`;
     } catch (error) {
       console.error("Get defect history error:", error);
       res.status(500).json({ error: "Failed to get defect history" });
+    }
+  });
+
+  // ============================================
+  // COMPREHENSIVE FLEET MANAGEMENT API ROUTES
+  // ============================================
+
+  // Vehicle Equipment Management
+  app.get("/api/fleet/vehicles/:vehicleId/equipment", requireAuth, async (req, res) => {
+    try {
+      const equipment = await storage.getVehicleEquipment(req.params.vehicleId);
+      res.json(equipment);
+    } catch (error) {
+      console.error("Get vehicle equipment error:", error);
+      res.status(500).json({ error: "Failed to get vehicle equipment" });
+    }
+  });
+
+  app.post("/api/fleet/vehicles/:vehicleId/equipment", requireAdmin, async (req, res) => {
+    try {
+      const parsed = insertVehicleEquipmentSchema.parse({ ...req.body, vehicleId: req.params.vehicleId });
+      const equipment = await storage.createVehicleEquipment(parsed);
+      res.status(201).json(equipment);
+    } catch (error: any) {
+      console.error("Create vehicle equipment error:", error);
+      res.status(400).json({ error: error.message || "Failed to create equipment" });
+    }
+  });
+
+  app.patch("/api/fleet/equipment/:id", requireAdmin, async (req, res) => {
+    try {
+      const equipment = await storage.updateVehicleEquipment(req.params.id, req.body);
+      if (!equipment) {
+        return res.status(404).json({ error: "Equipment not found" });
+      }
+      res.json(equipment);
+    } catch (error) {
+      console.error("Update vehicle equipment error:", error);
+      res.status(500).json({ error: "Failed to update equipment" });
+    }
+  });
+
+  app.delete("/api/fleet/equipment/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteVehicleEquipment(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Delete vehicle equipment error:", error);
+      res.status(500).json({ error: "Failed to delete equipment" });
+    }
+  });
+
+  // Vehicle Assignment History
+  app.get("/api/fleet/vehicles/:vehicleId/assignments", requireAuth, async (req, res) => {
+    try {
+      const assignments = await storage.getVehicleAssignments(req.params.vehicleId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Get vehicle assignments error:", error);
+      res.status(500).json({ error: "Failed to get assignments" });
+    }
+  });
+
+  app.get("/api/fleet/assignments/current", requireAuth, async (req, res) => {
+    try {
+      const assignments = await storage.getCurrentAssignments();
+      res.json(assignments);
+    } catch (error) {
+      console.error("Get current assignments error:", error);
+      res.status(500).json({ error: "Failed to get current assignments" });
+    }
+  });
+
+  app.post("/api/fleet/vehicles/:vehicleId/assignments", requireAdmin, async (req, res) => {
+    try {
+      const parsed = insertVehicleAssignmentSchema.parse({ ...req.body, vehicleId: req.params.vehicleId });
+      const assignment = await storage.createVehicleAssignment(parsed);
+      res.status(201).json(assignment);
+    } catch (error: any) {
+      console.error("Create vehicle assignment error:", error);
+      res.status(400).json({ error: error.message || "Failed to create assignment" });
+    }
+  });
+
+  app.put("/api/fleet/assignments/:id/return", requireAuth, async (req, res) => {
+    try {
+      const { returnedMileage, notes } = req.body;
+      const assignment = await storage.returnVehicleAssignment(req.params.id, returnedMileage, notes);
+      if (!assignment) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      res.json(assignment);
+    } catch (error) {
+      console.error("Return vehicle assignment error:", error);
+      res.status(500).json({ error: "Failed to return vehicle" });
+    }
+  });
+
+  // MOT Records
+  app.get("/api/fleet/vehicles/:vehicleId/mot", requireAuth, async (req, res) => {
+    try {
+      const records = await storage.getMotRecords(req.params.vehicleId);
+      res.json(records);
+    } catch (error) {
+      console.error("Get MOT records error:", error);
+      res.status(500).json({ error: "Failed to get MOT records" });
+    }
+  });
+
+  app.get("/api/fleet/vehicles/:vehicleId/mot/latest", requireAuth, async (req, res) => {
+    try {
+      const record = await storage.getLatestMotRecord(req.params.vehicleId);
+      res.json(record || null);
+    } catch (error) {
+      console.error("Get latest MOT record error:", error);
+      res.status(500).json({ error: "Failed to get latest MOT record" });
+    }
+  });
+
+  app.post("/api/fleet/vehicles/:vehicleId/mot", requireAdmin, async (req, res) => {
+    try {
+      const parsed = insertMotRecordSchema.parse({ ...req.body, vehicleId: req.params.vehicleId });
+      const record = await storage.createMotRecord(parsed);
+      res.status(201).json(record);
+    } catch (error: any) {
+      console.error("Create MOT record error:", error);
+      res.status(400).json({ error: error.message || "Failed to create MOT record" });
+    }
+  });
+
+  // Insurance Records
+  app.get("/api/fleet/vehicles/:vehicleId/insurance", requireAuth, async (req, res) => {
+    try {
+      const records = await storage.getInsuranceRecords(req.params.vehicleId);
+      res.json(records);
+    } catch (error) {
+      console.error("Get insurance records error:", error);
+      res.status(500).json({ error: "Failed to get insurance records" });
+    }
+  });
+
+  app.get("/api/fleet/vehicles/:vehicleId/insurance/latest", requireAuth, async (req, res) => {
+    try {
+      const record = await storage.getLatestInsuranceRecord(req.params.vehicleId);
+      res.json(record || null);
+    } catch (error) {
+      console.error("Get latest insurance record error:", error);
+      res.status(500).json({ error: "Failed to get latest insurance record" });
+    }
+  });
+
+  app.post("/api/fleet/vehicles/:vehicleId/insurance", requireAdmin, async (req, res) => {
+    try {
+      const parsed = insertInsuranceRecordSchema.parse({ ...req.body, vehicleId: req.params.vehicleId });
+      const record = await storage.createInsuranceRecord(parsed);
+      res.status(201).json(record);
+    } catch (error: any) {
+      console.error("Create insurance record error:", error);
+      res.status(400).json({ error: error.message || "Failed to create insurance record" });
+    }
+  });
+
+  // Road Tax Records
+  app.get("/api/fleet/vehicles/:vehicleId/tax", requireAuth, async (req, res) => {
+    try {
+      const records = await storage.getRoadTaxRecords(req.params.vehicleId);
+      res.json(records);
+    } catch (error) {
+      console.error("Get road tax records error:", error);
+      res.status(500).json({ error: "Failed to get road tax records" });
+    }
+  });
+
+  app.get("/api/fleet/vehicles/:vehicleId/tax/latest", requireAuth, async (req, res) => {
+    try {
+      const record = await storage.getLatestRoadTaxRecord(req.params.vehicleId);
+      res.json(record || null);
+    } catch (error) {
+      console.error("Get latest road tax record error:", error);
+      res.status(500).json({ error: "Failed to get latest road tax record" });
+    }
+  });
+
+  app.post("/api/fleet/vehicles/:vehicleId/tax", requireAdmin, async (req, res) => {
+    try {
+      const parsed = insertRoadTaxRecordSchema.parse({ ...req.body, vehicleId: req.params.vehicleId });
+      const record = await storage.createRoadTaxRecord(parsed);
+      res.status(201).json(record);
+    } catch (error: any) {
+      console.error("Create road tax record error:", error);
+      res.status(400).json({ error: error.message || "Failed to create road tax record" });
+    }
+  });
+
+  // Service Records
+  app.get("/api/fleet/vehicles/:vehicleId/services", requireAuth, async (req, res) => {
+    try {
+      const records = await storage.getServiceRecords(req.params.vehicleId);
+      res.json(records);
+    } catch (error) {
+      console.error("Get service records error:", error);
+      res.status(500).json({ error: "Failed to get service records" });
+    }
+  });
+
+  app.get("/api/fleet/vehicles/:vehicleId/services/latest", requireAuth, async (req, res) => {
+    try {
+      const record = await storage.getLatestServiceRecord(req.params.vehicleId);
+      res.json(record || null);
+    } catch (error) {
+      console.error("Get latest service record error:", error);
+      res.status(500).json({ error: "Failed to get latest service record" });
+    }
+  });
+
+  app.post("/api/fleet/vehicles/:vehicleId/services", requireAuth, async (req, res) => {
+    try {
+      const parsed = insertServiceRecordSchema.parse({ ...req.body, vehicleId: req.params.vehicleId });
+      const record = await storage.createServiceRecord(parsed);
+      res.status(201).json(record);
+    } catch (error: any) {
+      console.error("Create service record error:", error);
+      res.status(400).json({ error: error.message || "Failed to create service record" });
+    }
+  });
+
+  // Fuel Records
+  app.get("/api/fleet/vehicles/:vehicleId/fuel", requireAuth, async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const records = await storage.getFuelRecords(req.params.vehicleId, limit);
+      res.json(records);
+    } catch (error) {
+      console.error("Get fuel records error:", error);
+      res.status(500).json({ error: "Failed to get fuel records" });
+    }
+  });
+
+  app.post("/api/fleet/vehicles/:vehicleId/fuel", requireAuth, async (req, res) => {
+    try {
+      const parsed = insertFuelRecordSchema.parse({ 
+        ...req.body, 
+        vehicleId: req.params.vehicleId,
+        userId: req.session.userId 
+      });
+      const record = await storage.createFuelRecord(parsed);
+      res.status(201).json(record);
+    } catch (error: any) {
+      console.error("Create fuel record error:", error);
+      res.status(400).json({ error: error.message || "Failed to create fuel record" });
+    }
+  });
+
+  // Reminders
+  app.get("/api/fleet/reminders", requireAuth, async (req, res) => {
+    try {
+      const days = req.query.days ? parseInt(req.query.days as string) : 60;
+      const reminders = await storage.getUpcomingReminders(days);
+      res.json(reminders);
+    } catch (error) {
+      console.error("Get upcoming reminders error:", error);
+      res.status(500).json({ error: "Failed to get reminders" });
+    }
+  });
+
+  app.get("/api/fleet/vehicles/:vehicleId/reminders", requireAuth, async (req, res) => {
+    try {
+      const reminders = await storage.getVehicleReminders(req.params.vehicleId);
+      res.json(reminders);
+    } catch (error) {
+      console.error("Get vehicle reminders error:", error);
+      res.status(500).json({ error: "Failed to get vehicle reminders" });
+    }
+  });
+
+  app.patch("/api/fleet/reminders/:id/sent", requireAdmin, async (req, res) => {
+    try {
+      const { notifiedUsers } = req.body;
+      const reminder = await storage.markReminderSent(req.params.id, notifiedUsers || []);
+      if (!reminder) {
+        return res.status(404).json({ error: "Reminder not found" });
+      }
+      res.json(reminder);
+    } catch (error) {
+      console.error("Mark reminder sent error:", error);
+      res.status(500).json({ error: "Failed to mark reminder as sent" });
+    }
+  });
+
+  app.patch("/api/fleet/reminders/:id/completed", requireAuth, async (req, res) => {
+    try {
+      const reminder = await storage.markReminderCompleted(req.params.id);
+      if (!reminder) {
+        return res.status(404).json({ error: "Reminder not found" });
+      }
+      res.json(reminder);
+    } catch (error) {
+      console.error("Mark reminder completed error:", error);
+      res.status(500).json({ error: "Failed to mark reminder as completed" });
+    }
+  });
+
+  // Enhanced Fleet Dashboard
+  app.get("/api/fleet/dashboard", requireAuth, async (req, res) => {
+    try {
+      const stats = await storage.getFleetDashboardStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Get fleet dashboard stats error:", error);
+      res.status(500).json({ error: "Failed to get fleet dashboard stats" });
     }
   });
 
