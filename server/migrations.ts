@@ -1239,11 +1239,21 @@ export async function runMigrations() {
   // ── Walkaround checks: add missing columns for GPS routes ──
   try {
     await client.query(`
-      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP;
-      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS defects JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS check_type TEXT;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS odometer INTEGER;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS inspector_id VARCHAR;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS overall_status TEXT DEFAULT 'pass';
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS vehicle_safe_to_operate BOOLEAN DEFAULT true;
       ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS vehicle_safe BOOLEAN DEFAULT true;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS fleet_number TEXT;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS registration TEXT;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS mileage INTEGER;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS defects JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS signature TEXT;
       ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
       ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP;
+      ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMP;
       ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS skipped BOOLEAN DEFAULT false;
       ALTER TABLE walkaround_checks ADD COLUMN IF NOT EXISTS skip_reason TEXT;
     `);
