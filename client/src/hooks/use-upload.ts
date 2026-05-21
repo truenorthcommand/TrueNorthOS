@@ -117,14 +117,39 @@ export function useUpload(options: UseUploadOptions = {}) {
       setProgress(0);
 
       try {
+        // Validate file type
+        const allowedTypes = [
+          'image/jpeg',
+          'image/png',
+          'image/webp',
+          'application/pdf'
+        ];
+        if (!allowedTypes.includes(file.type)) {
+          throw new Error(
+            `Invalid file type. Allowed: JPEG, PNG, WebP, PDF. Got: ${file.type || 'unknown'}`
+          );
+        }
+
+        // Validate file size
+        const isImage = file.type.startsWith('image/');
+        const maxSize = isImage ? 10 * 1024 * 1024 : 25 * 1024 * 1024; // 10MB images, 25MB documents
+        if (file.size > maxSize) {
+          const maxSizeMB = (maxSize / (1024 * 1024)).toFixed(0);
+          const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+          throw new Error(
+            `File too large. Maximum ${maxSizeMB}MB for ${isImage ? 'images' : 'documents'}. Your file: ${fileSizeMB}MB`
+          );
+        }
+
         // Step 1: Request presigned URL (send metadata as JSON)
-        setProgress(10);
+        setProgress(25);
         const uploadResponse = await requestUploadUrl(file);
 
         // Step 2: Upload file directly to presigned URL
-        setProgress(30);
+        setProgress(50);
         await uploadToPresignedUrl(file, uploadResponse.uploadURL);
 
+        // Step 3: Complete
         setProgress(100);
         options.onSuccess?.(uploadResponse);
         return uploadResponse;

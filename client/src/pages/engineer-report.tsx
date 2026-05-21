@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,7 @@ export default function EngineerReport() {
   const [match, params] = useRoute("/jobs/:id/report");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const jobId = params?.id;
 
@@ -75,6 +76,8 @@ export default function EngineerReport() {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/jobs/${jobId}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
       toast({ title: 'Report Submitted', description: 'Job completed successfully.' });
       setLocation('/my-day');
     },

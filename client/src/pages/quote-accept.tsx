@@ -4,10 +4,12 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 import { CheckCircle, XCircle, Clock, FileText, Loader2, AlertTriangle } from 'lucide-react';
 
 export default function QuoteAccept() {
   const { token } = useParams<{ token: string }>();
+  const { toast } = useToast();
   const [showRejectForm, setShowRejectForm] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [actionComplete, setActionComplete] = useState<'accepted' | 'rejected' | null>(null);
@@ -34,7 +36,14 @@ export default function QuoteAccept() {
       }
       return res.json();
     },
-    onSuccess: () => setActionComplete('accepted')
+    onSuccess: () => setActionComplete('accepted'),
+    onError: (error: Error) => {
+      toast({
+        title: 'Error accepting quote',
+        description: error.message || 'Failed to accept quote. Please try again.',
+        variant: 'destructive'
+      });
+    }
   });
 
   const rejectMutation = useMutation({
@@ -50,7 +59,14 @@ export default function QuoteAccept() {
       }
       return res.json();
     },
-    onSuccess: () => setActionComplete('rejected')
+    onSuccess: () => setActionComplete('rejected'),
+    onError: (error: Error) => {
+      toast({
+        title: 'Error submitting feedback',
+        description: error.message || 'Failed to submit feedback. Please try again.',
+        variant: 'destructive'
+      });
+    }
   });
 
   if (isLoading) {
