@@ -12,6 +12,19 @@ import crypto from "crypto";
 
 // ─── S3 Client Configuration (MinIO-compatible) ─────────────────────────
 
+// Validate required S3 environment variables in production
+if (process.env.NODE_ENV === "production") {
+  const requiredVars = ["S3_ENDPOINT", "S3_ACCESS_KEY", "S3_SECRET_KEY"];
+  const missing = requiredVars.filter(varName => !process.env[varName]);
+  
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required object storage environment variables: ${missing.join(", ")}. ` +
+      "Application cannot start without proper S3/MinIO configuration."
+    );
+  }
+}
+
 const s3Client = new S3Client({
   endpoint: process.env.S3_ENDPOINT || "http://localhost:9000",
   region: process.env.S3_REGION || "us-east-1",

@@ -7,11 +7,21 @@ import { storage } from "./storage";
 import { ensureSessionTable } from "./session";
 import { runMigrations } from "./migrations";
 import { testConnection as testObjectStorage } from "./services/object-storage";
+import { pool } from "./db";
 import path from "path";
 import fs from "fs";
 
 const app = express();
 app.set('trust proxy', 1);
+
+// Health endpoint for Railway/container orchestration (unauthenticated, before all middleware)
+app.get('/health', (_req: Request, res: Response) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Serve PWA files - use client/public in dev, dist/public in prod
 const cwd = process.cwd();
@@ -596,6 +606,26 @@ app.use((req, res, next) => {
     await setupVite(httpServer, app);
   }
 
+  // Validate required environment variables before starting server
+  const requiredEnvVars = [
+    "DATABASE_URL",
+    "SESSION_SECRET",
+    "S3_ENDPOINT",
+    "S3_ACCESS_KEY",
+    "S3_SECRET_KEY"
+  ];
+  
+  const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+  
+  if (missingVars.length > 0) {
+    console.error("[STARTUP ERROR] Missing required environment variables:");
+    missingVars.forEach(varName => console.error(`  - ${varName}`));
+    console.error("\nApplication cannot start. Please configure all required environment variables.");
+    process.exit(1);
+  }
+  
+  log("Environment validation passed");
+
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
@@ -612,3 +642,66 @@ app.use((req, res, next) => {
     },
   );
 })();
+
+// ─── Graceful Shutdown Handlers ─────────────────────────────────────────
+
+let isShuttingDown = false;
+
+async function gracefulShutdown(signal: string) {
+  if (isShuttingDown) {
+    log(`Already shutting down, ignoring ${signal}`);
+    return;
+  }
+  
+  isShuttingDown = true;
+  log(`Received ${signal}, starting graceful shutdown...`);
+  
+  // Set a hard timeout for shutdown
+  const shutdownTimeout = setTimeout(() => {
+    log('Shutdown timeout exceeded, forcing exit');
+    process.exit(1);
+  }, 30000); // 30 second timeout
+  
+  try {
+    // Stop accepting new connections
+    httpServer.close(() => {
+      log('HTTP server closed');
+    });
+    
+    // Give existing requests time to complete (up to 30s total with the timeout above)
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    
+    // Close database pool
+    try {
+      await pool.end();
+      log('Database pool closed');
+    } catch (error) {
+      log(`Error closing database pool: ${error}`);
+    }
+    
+    clearTimeout(shutdownTimeout);
+    log('Graceful shutdown complete');
+    process.exit(0);
+  } catch (error) {
+    log(`Error during shutdown: ${error}`);
+    clearTimeout(shutdownTimeout);
+    process.exit(1);
+  }
+}
+
+// Handle termination signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handle uncaught errors
+process.on('uncaughtException', (error: Error) => {
+  console.error('[FATAL] Uncaught Exception:', error);
+  console.error(error.stack);
+  gracefulShutdown('uncaughtException');
+});
+
+process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+  console.error('[FATAL] Unhandled Rejection at:', promise);
+  console.error('Reason:', reason);
+  gracefulShutdown('unhandledRejection');
+});

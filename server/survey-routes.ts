@@ -1,28 +1,30 @@
 import { Router, Request, Response } from "express";
 import { pool } from "./db";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
+import {
+  uploadFile,
+  getPresignedDownloadUrl,
+  BUCKETS,
+} from "./services/object-storage";
 import crypto from "crypto";
 
 const router = Router();
 
 // === MULTER SETUP ===
-const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'surveys');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+// Use memory storage for direct upload to object storage (MinIO/S3)
+const storage = multer.memoryStorage();
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    const name = crypto.randomUUID() + ext;
-    cb(null, name);
+const upload = multer({ 
+  storage, 
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed"));
+    }
   },
 });
-
-const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 
 // === ACCESS CONTROL ===
 function requireSurveyAccess(req: Request, res: Response, next: any) {
@@ -306,13 +308,27 @@ router.post('/jobs/:jobId/survey/photos', upload.single('photo'), async (req: Re
       surveyId = surveyCheck.rows[0].id;
     }
     
-    const fileUrl = `/uploads/surveys/${req.file.filename}`;
+    // Generate unique object key for MinIO/S3 storage
+    const ext = req.file.originalname.split('.').pop() || 'jpg';
+    const safeFilename = `${crypto.randomUUID()}.${ext}`;
+    const objectKey = `surveys/${jobId}/${safeFilename}`;
+    
+    // Upload to object storage (MinIO/S3)
+    await uploadFile(
+      BUCKETS.PHOTOS,
+      objectKey,
+      req.file.buffer,
+      req.file.mimetype
+    );
+    
+    // Generate presigned URL for client access
+    const presignedUrl = await getPresignedDownloadUrl(BUCKETS.PHOTOS, objectKey);
     
     const result = await pool.query(`
       INSERT INTO survey_photos (survey_id, job_id, file_url, uploaded_by, file_size)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING *
-    `, [surveyId, jobId, fileUrl, user?.id, req.file.size]);
+    `, [surveyId, jobId, objectKey, user?.id, req.file.size]);
     
     res.json(result.rows[0]);
     
@@ -335,10 +351,8 @@ router.delete('/jobs/:jobId/survey/photos/:photoId', async (req: Request, res: R
       return res.status(404).json({ error: 'Photo not found' });
     }
     
-    const filePath = path.join(process.cwd(), 'public', photo.rows[0].file_url);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    // Note: Photos are stored in object storage (MinIO/S3)
+    // Database record deleted; object storage cleanup handled separately if needed
     
     res.json({ success: true });
     
