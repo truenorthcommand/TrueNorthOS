@@ -356,31 +356,36 @@ Return a JSON object with:
 
 Return ONLY valid JSON. Use null for fields not found.`;
 
-  const response = await openai!.chat.completions.create({
-    model: "openai/gpt-4o-vision-preview",
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: prompt },
-          {
-            type: "image_url",
-            image_url: {
-              url: imageBase64.startsWith("data:") ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`
-            }
-          }
-        ]
-      }
-    ]
-  });
-
-  const text = response.choices[0].message.content || "";
-  const jsonStr = cleanupJsonResponse(text);
-  
   try {
-    return JSON.parse(jsonStr);
-  } catch {
-    throw new Error("Failed to parse receipt data: " + text);
+    const response = await openai!.chat.completions.create({
+      model: "openai/gpt-4o-vision-preview",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            {
+              type: "image_url",
+              image_url: {
+                url: imageBase64.startsWith("data:") ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`
+              }
+            }
+          ]
+        }
+      ]
+    });
+
+    const text = response.choices[0].message.content || "";
+    const jsonStr = cleanupJsonResponse(text);
+    
+    try {
+      return JSON.parse(jsonStr);
+    } catch {
+      throw new Error("Failed to parse receipt data: " + text);
+    }
+  } catch (error) {
+    console.error('[ai-service.ts] scanReceipt failed:', error instanceof Error ? error.message : String(error));
+    throw new Error(`Failed to scan receipt: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -400,31 +405,36 @@ Return a JSON object with:
 Consider UK building standards, Gas Safe regulations, and BS 7671 where applicable.
 Return ONLY valid JSON.`;
 
-  const response = await openai!.chat.completions.create({
-    model: "openai/gpt-4o-vision-preview",
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: prompt },
-          {
-            type: "image_url",
-            image_url: {
-              url: imageBase64.startsWith("data:") ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`
-            }
-          }
-        ]
-      }
-    ]
-  });
-
-  const text = response.choices[0].message.content || "";
-  const jsonStr = cleanupJsonResponse(text);
-  
   try {
-    return JSON.parse(jsonStr);
-  } catch {
-    throw new Error("Failed to analyze site photo: " + text);
+    const response = await openai!.chat.completions.create({
+      model: "openai/gpt-4o-vision-preview",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            {
+              type: "image_url",
+              image_url: {
+                url: imageBase64.startsWith("data:") ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`
+              }
+            }
+          ]
+        }
+      ]
+    });
+
+    const text = response.choices[0].message.content || "";
+    const jsonStr = cleanupJsonResponse(text);
+    
+    try {
+      return JSON.parse(jsonStr);
+    } catch {
+      throw new Error("Failed to analyze site photo: " + text);
+    }
+  } catch (error) {
+    console.error('[ai-service.ts] analyzeSitePhoto failed:', error instanceof Error ? error.message : String(error));
+    throw new Error(`Failed to analyze site photo: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -452,18 +462,23 @@ Return a JSON object with:
 Use UK English spelling. Be professional but concise.
 Return ONLY valid JSON.`;
 
-  const response = await openai!.chat.completions.create({
-    model: "openai/gpt-4o-mini",
-    messages: [{ role: "user", content: prompt }]
-  });
-
-  const text = response.choices[0].message.content || "";
-  const jsonStr = cleanupJsonResponse(text);
-  
   try {
-    return JSON.parse(jsonStr);
-  } catch {
-    throw new Error("Failed to generate job summary: " + text);
+    const response = await openai!.chat.completions.create({
+      model: "openai/gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }]
+    });
+
+    const text = response.choices[0].message.content || "";
+    const jsonStr = cleanupJsonResponse(text);
+    
+    try {
+      return JSON.parse(jsonStr);
+    } catch {
+      throw new Error("Failed to generate job summary: " + text);
+    }
+  } catch (error) {
+    console.error('[ai-service.ts] generateJobSummary failed:', error instanceof Error ? error.message : String(error));
+    throw new Error(`Failed to generate job summary: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -491,18 +506,23 @@ Return a JSON object with:
 Use UK English. Be professional and reassuring. Mention relevant standards/regulations where appropriate.
 Return ONLY valid JSON.`;
 
-  const response = await openai!.chat.completions.create({
-    model: "openai/gpt-4o-mini",
-    messages: [{ role: "user", content: prompt }]
-  });
-
-  const text = response.choices[0].message.content || "";
-  const jsonStr = cleanupJsonResponse(text);
-  
   try {
-    return JSON.parse(jsonStr);
-  } catch {
-    throw new Error("Failed to generate quote description: " + text);
+    const response = await openai!.chat.completions.create({
+      model: "openai/gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }]
+    });
+
+    const text = response.choices[0].message.content || "";
+    const jsonStr = cleanupJsonResponse(text);
+    
+    try {
+      return JSON.parse(jsonStr);
+    } catch {
+      throw new Error("Failed to generate quote description: " + text);
+    }
+  } catch (error) {
+    console.error('[ai-service.ts] generateQuoteDescription failed:', error instanceof Error ? error.message : String(error));
+    throw new Error(`Failed to generate quote description: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -523,18 +543,23 @@ Return a JSON object with:
 Use UK English. Be professional but approachable. Include placeholders like [Customer Name] where appropriate.
 Return ONLY valid JSON.`;
 
-  const response = await openai!.chat.completions.create({
-    model: "openai/gpt-4o-mini",
-    messages: [{ role: "user", content: prompt }]
-  });
-
-  const text = response.choices[0].message.content || "";
-  const jsonStr = cleanupJsonResponse(text);
-  
   try {
-    return JSON.parse(jsonStr);
-  } catch {
-    throw new Error("Failed to generate customer message: " + text);
+    const response = await openai!.chat.completions.create({
+      model: "openai/gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }]
+    });
+
+    const text = response.choices[0].message.content || "";
+    const jsonStr = cleanupJsonResponse(text);
+    
+    try {
+      return JSON.parse(jsonStr);
+    } catch {
+      throw new Error("Failed to generate customer message: " + text);
+    }
+  } catch (error) {
+    console.error('[ai-service.ts] generateCustomerMessage failed:', error instanceof Error ? error.message : String(error));
+    throw new Error(`Failed to generate customer message: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -556,18 +581,23 @@ Return a JSON object with:
 Focus on UK safety standards and regulations relevant to trades/building work.
 Return ONLY valid JSON.`;
 
-  const response = await openai!.chat.completions.create({
-    model: "openai/gpt-4o-mini",
-    messages: [{ role: "user", content: prompt }]
-  });
-
-  const text = response.choices[0].message.content || "";
-  const jsonStr = cleanupJsonResponse(text);
-  
   try {
-    return JSON.parse(jsonStr);
-  } catch {
-    throw new Error("Failed to generate inspection report: " + text);
+    const response = await openai!.chat.completions.create({
+      model: "openai/gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }]
+    });
+
+    const text = response.choices[0].message.content || "";
+    const jsonStr = cleanupJsonResponse(text);
+    
+    try {
+      return JSON.parse(jsonStr);
+    } catch {
+      throw new Error("Failed to generate inspection report: " + text);
+    }
+  } catch (error) {
+    console.error('[ai-service.ts] generateInspectionReport failed:', error instanceof Error ? error.message : String(error));
+    throw new Error(`Failed to generate inspection report: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 

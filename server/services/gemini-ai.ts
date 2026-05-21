@@ -1,12 +1,23 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY!,
-  httpOptions: {
-    apiVersion: "",
-    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL!,
-  },
-});
+// Lazy initialization to prevent startup crash when API key is missing
+let ai: GoogleGenAI | null = null;
+
+function getGeminiClient(): GoogleGenAI {
+  if (!ai) {
+    if (!process.env.AI_INTEGRATIONS_GEMINI_API_KEY) {
+      throw new Error('Gemini API key not configured. Please set AI_INTEGRATIONS_GEMINI_API_KEY environment variable.');
+    }
+    ai = new GoogleGenAI({
+      apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+      httpOptions: {
+        apiVersion: "",
+        baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL || '',
+      },
+    });
+  }
+  return ai;
+}
 
 interface ReceiptData {
   vendorName: string | null;
@@ -150,24 +161,30 @@ Return a JSON object with:
 
 Return ONLY valid JSON. Use null for fields not found.`;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { text: prompt },
-          { inlineData: { mimeType: "image/jpeg", data: imageBase64.replace(/^data:image\/\w+;base64,/, "") } }
-        ]
-      }
-    ],
-  });
+  try {
+    const client = getGeminiClient();
+    const response = await client.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType: "image/jpeg", data: imageBase64.replace(/^data:image\/\w+;base64,/, "") } }
+          ]
+        }
+      ],
+    });
 
-  const text = response.text || "";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Failed to parse receipt data");
-  
-  return JSON.parse(jsonMatch[0]);
+    const text = response.text || "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("Failed to parse receipt data");
+    
+    return JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    console.error('[gemini-ai.ts] scanReceipt failed:', error instanceof Error ? error.message : String(error));
+    throw new Error(`Failed to scan receipt: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 export async function analyzeSitePhoto(imageBase64: string, jobContext?: string): Promise<SitePhotoAnalysis> {
@@ -184,24 +201,30 @@ Return a JSON object with:
 Consider UK building standards, Gas Safe regulations, and BS 7671 where applicable.
 Return ONLY valid JSON.`;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { text: prompt },
-          { inlineData: { mimeType: "image/jpeg", data: imageBase64.replace(/^data:image\/\w+;base64,/, "") } }
-        ]
-      }
-    ],
-  });
+  try {
+    const client = getGeminiClient();
+    const response = await client.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType: "image/jpeg", data: imageBase64.replace(/^data:image\/\w+;base64,/, "") } }
+          ]
+        }
+      ],
+    });
 
-  const text = response.text || "";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Failed to analyze site photo");
-  
-  return JSON.parse(jsonMatch[0]);
+    const text = response.text || "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("Failed to analyze site photo");
+    
+    return JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    console.error('[gemini-ai.ts] analyzeSitePhoto failed:', error instanceof Error ? error.message : String(error));
+    throw new Error(`Failed to analyze site photo: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 export async function generateJobSummary(engineerNotes: string, jobDetails: any): Promise<JobSummary> {
@@ -226,16 +249,22 @@ Return a JSON object with:
 Use UK English spelling. Be professional but concise.
 Return ONLY valid JSON.`;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-  });
+  try {
+    const client = getGeminiClient();
+    const response = await client.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
 
-  const text = response.text || "";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Failed to generate job summary");
-  
-  return JSON.parse(jsonMatch[0]);
+    const text = response.text || "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("Failed to generate job summary");
+    
+    return JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    console.error('[gemini-ai.ts] generateJobSummary failed:', error instanceof Error ? error.message : String(error));
+    throw new Error(`Failed to generate job summary: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 export async function generateQuoteDescription(jobDetails: any, services: string[]): Promise<QuoteDescription> {
@@ -260,16 +289,22 @@ Return a JSON object with:
 Use UK English. Be professional and reassuring. Mention relevant standards/regulations where appropriate.
 Return ONLY valid JSON.`;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-  });
+  try {
+    const client = getGeminiClient();
+    const response = await client.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
 
-  const text = response.text || "";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Failed to generate quote description");
-  
-  return JSON.parse(jsonMatch[0]);
+    const text = response.text || "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("Failed to generate quote description");
+    
+    return JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    console.error('[gemini-ai.ts] generateQuoteDescription failed:', error instanceof Error ? error.message : String(error));
+    throw new Error(`Failed to generate quote description: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 export async function generateCustomerMessage(
@@ -298,16 +333,22 @@ Return a JSON object with:
 Keep it concise but complete. Include a call to action where appropriate.
 Return ONLY valid JSON.`;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-  });
+  try {
+    const client = getGeminiClient();
+    const response = await client.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
 
-  const text = response.text || "";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Failed to generate customer message");
-  
-  return JSON.parse(jsonMatch[0]);
+    const text = response.text || "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("Failed to generate customer message");
+    
+    return JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    console.error('[gemini-ai.ts] generateCustomerMessage failed:', error instanceof Error ? error.message : String(error));
+    throw new Error(`Failed to generate customer message: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 export async function generateInspectionReport(checklistData: any[], inspectionType: string): Promise<InspectionReport> {
@@ -328,16 +369,22 @@ Return a JSON object with:
 Reference UK standards where appropriate (Gas Safe, BS 7671, Part P, etc).
 Return ONLY valid JSON.`;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-  });
+  try {
+    const client = getGeminiClient();
+    const response = await client.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
 
-  const text = response.text || "";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Failed to generate inspection report");
-  
-  return JSON.parse(jsonMatch[0]);
+    const text = response.text || "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("Failed to generate inspection report");
+    
+    return JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    console.error('[gemini-ai.ts] generateInspectionReport failed:', error instanceof Error ? error.message : String(error));
+    throw new Error(`Failed to generate inspection report: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 export async function transcribeVoiceNote(audioBase64: string, mimeType: string = "audio/webm"): Promise<VoiceTranscription> {
@@ -352,46 +399,58 @@ Return a JSON object with:
 Use UK English spelling. Preserve any technical terms accurately.
 Return ONLY valid JSON.`;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { text: prompt },
-          { inlineData: { mimeType, data: audioBase64.replace(/^data:audio\/\w+;base64,/, "") } }
-        ]
-      }
-    ],
-  });
+  try {
+    const client = getGeminiClient();
+    const response = await client.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType, data: audioBase64.replace(/^data:audio\/\w+;base64,/, "") } }
+          ]
+        }
+      ],
+    });
 
-  const text = response.text || "";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Failed to transcribe voice note");
-  
-  return JSON.parse(jsonMatch[0]);
+    const text = response.text || "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("Failed to transcribe voice note");
+    
+    return JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    console.error('[gemini-ai.ts] transcribeVoiceNote failed:', error instanceof Error ? error.message : String(error));
+    throw new Error(`Failed to transcribe voice note: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 export async function generateImage(prompt: string): Promise<string> {
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-image",
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    config: {
-      responseModalities: [Modality.TEXT, Modality.IMAGE],
-    },
-  });
+  try {
+    const client = getGeminiClient();
+    const response = await client.models.generateContent({
+      model: "gemini-2.5-flash-image",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        responseModalities: [Modality.TEXT, Modality.IMAGE],
+      },
+    });
 
-  const candidate = response.candidates?.[0];
-  const imagePart = candidate?.content?.parts?.find(
-    (part: any) => part.inlineData
-  );
+    const candidate = response.candidates?.[0];
+    const imagePart = candidate?.content?.parts?.find(
+      (part: any) => part.inlineData
+    );
 
-  if (!imagePart?.inlineData?.data) {
-    throw new Error("No image data in response");
+    if (!imagePart?.inlineData?.data) {
+      throw new Error("No image data in response");
+    }
+
+    const mimeType = imagePart.inlineData.mimeType || "image/png";
+    return `data:${mimeType};base64,${imagePart.inlineData.data}`;
+  } catch (error) {
+    console.error('[gemini-ai.ts] generateImage failed:', error instanceof Error ? error.message : String(error));
+    throw new Error(`Failed to generate image: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-
-  const mimeType = imagePart.inlineData.mimeType || "image/png";
-  return `data:${mimeType};base64,${imagePart.inlineData.data}`;
 }
 
 // === Receipt Validation Functions ===
@@ -460,7 +519,8 @@ RESPONSE FORMAT — Return ONLY a valid JSON object:
 Return ONLY valid JSON. No markdown, no explanation outside the JSON.`;
 
   try {
-    const response = await ai.models.generateContent({
+    const client = getGeminiClient();
+    const response = await client.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
       config: {
@@ -563,7 +623,8 @@ RESPONSE FORMAT — Return ONLY a valid JSON object:
 Return ONLY valid JSON. No markdown, no explanation outside the JSON.`;
 
   try {
-    const response = await ai.models.generateContent({
+    const client = getGeminiClient();
+    const response = await client.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
       config: {

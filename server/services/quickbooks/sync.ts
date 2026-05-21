@@ -86,6 +86,18 @@ export async function syncInvoiceToQuickBooks(invoiceId: string): Promise<{ qbIn
     });
   }
 
+  // Check for existing invoice by DocNumber to ensure idempotency (prevent duplicates from retries)
+  const existingInvoices = await qboPromise(qbo, 'findInvoices', {
+    DocNumber: invoice.invoiceNo,
+    fetchAll: true,
+  }).catch(() => ({ QueryResponse: { Invoice: [] } }));
+
+  const existingInvoice = existingInvoices?.QueryResponse?.Invoice?.[0];
+  if (existingInvoice) {
+    console.log(`[QuickBooks sync] Invoice ${invoice.invoiceNo} already exists in QuickBooks (ID: ${existingInvoice.Id}). Skipping creation.`);
+    return { qbInvoiceId: existingInvoice.Id };
+  }
+
   const qbInvoice: any = {
     DocNumber: invoice.invoiceNo,
     CustomerRef: { value: qbCustomer.Id },

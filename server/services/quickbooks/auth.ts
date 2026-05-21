@@ -2,6 +2,7 @@
 import QuickBooks from 'node-quickbooks';
 import { db } from '../../db';
 import { sql } from 'drizzle-orm';
+import { withRetry } from '../../globalAssistant/retry';
 
 export interface QuickBooksTokens {
   accessToken: string;
@@ -43,35 +44,38 @@ export async function exchangeCodeForTokens(code: string, realmId: string): Prom
 
   const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
-  const res = await fetch('https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer', {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${basic}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Accept: 'application/json',
-    },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: redirectUri,
-    }),
-  });
+  // Wrap token exchange in retry logic to handle transient network failures
+  return withRetry(async () => {
+    const res = await fetch('https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer', {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${basic}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+      }),
+    });
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`QuickBooks token exchange failed: ${err}`);
-  }
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`QuickBooks token exchange failed: ${err}`);
+    }
 
-  const data = await res.json();
-  const tokens: QuickBooksTokens = {
-    accessToken: data.access_token,
-    refreshToken: data.refresh_token,
-    realmId,
-    expiresAt: Date.now() + data.expires_in * 1000,
-  };
+    const data = await res.json();
+    const tokens: QuickBooksTokens = {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      realmId,
+      expiresAt: Date.now() + data.expires_in * 1000,
+    };
 
-  await storeTokens(tokens);
-  return tokens;
+    await storeTokens(tokens);
+    return tokens;
+  }, { maxRetries: 3, baseDelayMs: 1000, maxDelayMs: 10000 });
 }
 
 async function refreshAccessToken(tokens: QuickBooksTokens): Promise<QuickBooksTokens> {
@@ -79,34 +83,37 @@ async function refreshAccessToken(tokens: QuickBooksTokens): Promise<QuickBooksT
   const clientSecret = process.env.QUICKBOOKS_CLIENT_SECRET!;
   const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
-  const res = await fetch('https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer', {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${basic}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Accept: 'application/json',
-    },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: tokens.refreshToken,
-    }),
-  });
+  // Wrap token refresh in retry logic to handle transient network failures
+  return withRetry(async () => {
+    const res = await fetch('https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer', {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${basic}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: tokens.refreshToken,
+      }),
+    });
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`QuickBooks token refresh failed: ${err}`);
-  }
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`QuickBooks token refresh failed: ${err}`);
+    }
 
-  const data = await res.json();
-  const refreshed: QuickBooksTokens = {
-    accessToken: data.access_token,
-    refreshToken: data.refresh_token,
-    realmId: tokens.realmId,
-    expiresAt: Date.now() + data.expires_in * 1000,
-  };
+    const data = await res.json();
+    const refreshed: QuickBooksTokens = {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      realmId: tokens.realmId,
+      expiresAt: Date.now() + data.expires_in * 1000,
+    };
 
-  await storeTokens(refreshed);
-  return refreshed;
+    await storeTokens(refreshed);
+    return refreshed;
+  }, { maxRetries: 3, baseDelayMs: 1000, maxDelayMs: 10000 });
 }
 
 async function storeTokens(tokens: QuickBooksTokens): Promise<void> {
