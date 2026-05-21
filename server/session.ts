@@ -52,13 +52,19 @@ export async function ensureSessionTable() {
   }
 }
 
+// SECURITY: Validate SESSION_SECRET is set - no fallback allowed
+if (!process.env.SESSION_SECRET) {
+  console.error("[Session] FATAL: SESSION_SECRET environment variable is required");
+  process.exit(1);
+}
+
 export const sessionMiddleware = session({
   store: new PgSession({
     pool: pool as any,
     tableName: "session",
     createTableIfMissing: true,
   }),
-  secret: process.env.SESSION_SECRET || "truenorthos-change-this-in-production",
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   proxy: isProduction, // Trust reverse proxy (Coolify/nginx) in production

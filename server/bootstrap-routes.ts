@@ -314,9 +314,23 @@ router.get("/status", async (req: Request, res: Response) => {
  * Resets the APP_USERNAME user's password to match the current APP_PASSWORD env var.
  * Use when Railway env vars are changed after bootstrap.
  * Only works for the APP_USERNAME account.
+ * SECURITY: Requires super admin authentication to prevent unauthorized password resets.
  */
 router.post("/reset-password", async (req: Request, res: Response) => {
   try {
+    // SECURITY: Require super admin authentication
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    
+    const user = await db.select().from(users).where(
+      eq(users.id, req.session.userId)
+    ).limit(1);
+    
+    if (!user[0] || !user[0].superAdmin) {
+      return res.status(403).json({ error: "Super admin access required" });
+    }
+    
     const appUsername = process.env.APP_USERNAME;
     const appPassword = process.env.APP_PASSWORD;
 
@@ -327,12 +341,12 @@ router.post("/reset-password", async (req: Request, res: Response) => {
       });
     }
 
-    // Find the user
-    const [user] = await db.select().from(users).where(
+    // Find the target user to reset
+    const [targetUser] = await db.select().from(users).where(
       eq(users.username, appUsername)
     ).limit(1);
 
-    if (!user) {
+    if (!targetUser) {
       return res.status(404).json({
         error: "User not found",
         message: "No user found with username: " + appUsername,
@@ -350,7 +364,7 @@ router.post("/reset-password", async (req: Request, res: Response) => {
       passwordSetAt: new Date(),
       failedLoginAttempts: 0,
       accountLockedUntil: null,
-    }).where(eq(users.id, user.id));
+    }).where(eq(users.id, targetUser.id));
 
     console.log("[Bootstrap] Password reset for user: " + appUsername);
 

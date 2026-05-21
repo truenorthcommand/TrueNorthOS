@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { isValidUKPostcode, formatPostcode } from './validate-postcode';
 import bcrypt from "bcrypt";
+import rateLimit from "express-rate-limit";
 import crypto from "crypto";
 import OpenAI from "openai";
 import { TOTP, Secret } from "otpauth";
@@ -155,6 +156,33 @@ const requireDirectorsSuite = async (req: Request, res: Response, next: NextFunc
   return res.status(403).json({ error: "Directors Suite access required" });
 };
 
+// ==================== RATE LIMITERS ====================
+// Protect authentication endpoints from brute force attacks
+
+const loginRateLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5, // 5 attempts per minute per IP
+  message: { error: "Too many login attempts, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const twoFactorRateLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 3, // 3 attempts per minute
+  message: { error: "Too many 2FA verification attempts, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const passwordResetRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3, // 3 requests per hour per IP
+  message: { error: "Too many password reset requests, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -171,21 +199,21 @@ export async function registerRoutes(
   // No third-party OAuth dependencies for maximum security and GDPR compliance
   
   // User Login & Session Management
-  app.post("/api/auth/login", login);
-  app.post("/api/auth/login-backup-code", loginWithBackupCode);
+  app.post("/api/auth/login", loginRateLimiter, login);
+  app.post("/api/auth/login-backup-code", loginRateLimiter, loginWithBackupCode);
   app.post("/api/auth/logout", logout);
   app.get("/api/auth/session-timeout", checkSessionTimeout);
   app.post("/api/auth/extend-session", extendSession);
   
   // First-Time Onboarding Flow
   app.post("/api/auth/onboarding", completeOnboarding); // Step 1: Change password + generate 2FA
-  app.post("/api/auth/verify-2fa-setup", verify2FASetup); // Step 2: Verify 2FA code
+  app.post("/api/auth/verify-2fa-setup", twoFactorRateLimiter, verify2FASetup); // Step 2: Verify 2FA code
   app.post("/api/auth/generate-backup-codes", generateBackupCodes); // Step 3: Generate backup codes
   app.post("/api/auth/complete-onboarding", completeOnboardingFinal); // Step 4: Mark onboarding complete
   
   // Admin User Management
   app.post("/api/auth/admin/create-account", adminCreateAccount);
-  app.post("/api/auth/admin/reset-password", adminResetPassword);
+  app.post("/api/auth/admin/reset-password", passwordResetRateLimiter, adminResetPassword);
   app.post("/api/auth/regenerate-backup-codes", regenerateBackupCodes);
 
   // Register invite-based onboarding routes (/invite/:token and /api/users/invite)
@@ -207,9 +235,10 @@ export async function registerRoutes(
     });
   });
 
-  // ==================== DIAGNOSTIC ENDPOINT (PUBLIC) ====================
+  // ==================== DIAGNOSTIC ENDPOINT (SUPER ADMIN ONLY) ====================
   // Used to verify database connectivity and basic data in production
-  app.get("/api/diagnostics", async (req, res) => {
+  // SECURITY: Requires super admin access to prevent information disclosure
+  app.get("/api/diagnostics", requireSuperAdmin, async (req, res) => {
     try {
       const allUsers = await storage.getAllUsers();
       const allJobs = await storage.getAllJobs();
@@ -249,133 +278,7 @@ export async function registerRoutes(
   });
 
   // ==================== AUTH ROUTES (PUBLIC) ====================
-
-  app.post("/api/auth/login", async (req, res) => {
-    try {
-      const { username, password, totpToken } = req.body;
-      const user = await storage.getUserByUsername(username);
-      const ipAddress = getClientIp(req);
-      const userAgent = getUserAgent(req);
-      
-      if (!user) {
-        await logFailedAction({
-          attemptedEmail: username,
-          actionAttempted: "login",
-          failureReason: "User not found",
-          ipAddress,
-          userAgent,
-        });
-        return res.status(401).json({ error: "Invalid credentials" });
-      }
-
-      // Check if password is hashed (starts with $2b$) or plain text (legacy)
-      let isValidPassword = false;
-      if (user.password.startsWith('$2b$')) {
-        isValidPassword = await bcrypt.compare(password, user.password);
-      } else {
-        // Legacy plain-text password - for demo accounts
-        isValidPassword = user.password === password;
-      }
-
-      if (!isValidPassword) {
-        await logFailedAction({
-          userId: user.id,
-          attemptedEmail: username,
-          actionAttempted: "login",
-          failureReason: "Invalid password",
-          ipAddress,
-          userAgent,
-        });
-        return res.status(401).json({ error: "Invalid credentials" });
-      }
-
-      // Check if 2FA is enabled
-      if (user.twoFactorEnabled && user.twoFactorSecret) {
-        if (!totpToken) {
-          return res.status(200).json({ 
-            requiresTwoFactor: true,
-            message: "Two-factor authentication required" 
-          });
-        }
-
-        // Verify TOTP token using the stored base32 secret
-        let totp: TOTP;
-        try {
-          totp = new TOTP({
-            secret: Secret.fromBase32(user.twoFactorSecret),
-            algorithm: 'SHA1',
-            digits: 6,
-            period: 30,
-          });
-        } catch (secretError) {
-          console.error('Invalid 2FA secret format:', secretError);
-          return res.status(500).json({ error: "Two-factor authentication configuration error. Please contact support." });
-        }
-
-        const delta = totp.validate({ token: totpToken, window: 2 });
-        if (delta === null) {
-          await logFailedAction({
-            userId: user.id,
-            attemptedEmail: username,
-            actionAttempted: "login_2fa",
-            failureReason: "Invalid 2FA code",
-            ipAddress,
-            userAgent,
-          });
-          return res.status(401).json({ error: "Invalid authentication code" });
-        }
-      }
-
-      req.session.userId = user.id;
-      req.session.userRole = user.role;
-
-      const userRoles = (user.roles as string[]) || [user.role];
-      
-      // Log successful login
-      const sessionId = req.sessionID;
-      await createUserSession({
-        sessionId,
-        userId: user.id,
-        ipAddress,
-        deviceInfo: userAgent,
-      });
-      
-      await logAuditEvent({
-        userId: user.id,
-        userName: user.name,
-        userEmail: user.email || undefined,
-        userRole: user.role,
-        actionType: "login",
-        actionCategory: "auth",
-        entityType: "user",
-        entityId: user.id,
-        description: `User ${user.name} logged in successfully`,
-        severity: "info",
-        ipAddress,
-        userAgent,
-        sessionId,
-      });
-      
-      req.session.save((saveErr) => {
-        if (saveErr) {
-          console.error('Session save error:', saveErr);
-          return res.status(500).json({ error: "Session save failed" });
-        }
-        res.json({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          roles: userRoles,
-          username: user.username,
-          superAdmin: user.superAdmin,
-          twoFactorEnabled: user.twoFactorEnabled,
-        });
-      });
-    } catch (error) {
-      res.status(500).json({ error: "Login failed" });
-    }
-  });
+  // SECURITY: Duplicate login route removed - using imported login function with rate limiting
 
   app.post("/api/auth/logout", async (req, res) => {
     const userId = req.session.userId;
@@ -525,7 +428,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/auth/2fa/verify", requireAuth, async (req, res) => {
+  app.post("/api/auth/2fa/verify", twoFactorRateLimiter, requireAuth, async (req, res) => {
     try {
       const { token } = req.body;
       const user = await storage.getUser(req.session.userId!);
@@ -856,8 +759,14 @@ export async function registerRoutes(
     }
   });
   
-  // Emergency password reset for admin - resets to default password
+  // Emergency password reset for admin - DEVELOPMENT ONLY
+  // SECURITY: Disabled in production to prevent admin takeover
   app.post("/api/setup/reset-admin", async (req, res) => {
+    // Block in production environment
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(404).json({ error: "Not found" });
+    }
+    
     try {
       const { username, newPassword, setupKey } = req.body;
       
@@ -7019,7 +6928,8 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
 
   // ==================== RECEIPTS ROUTES ====================
   // Serve files directly from MinIO (for photo/file display in browser)
-  app.get("/api/storage/:bucket/*", async (req, res) => {
+  // SECURITY: Requires authentication to prevent unauthorized file access
+  app.get("/api/storage/:bucket/*", requireAuth, async (req, res) => {
     try {
       const bucket = req.params.bucket;
       const key = (req.params as any)[0]; // everything after /:bucket/
@@ -7854,7 +7764,7 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
   });
 
   // Portal forgot password
-  app.post("/api/portal/:token/forgot-password", async (req, res) => {
+  app.post("/api/portal/:token/forgot-password", passwordResetRateLimiter, async (req, res) => {
     try {
       const client = await storage.getClientByPortalToken(req.params.token);
       if (!client) {
@@ -8122,42 +8032,44 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
   });
 
   app.post("/api/stripe/webhook", async (req, res) => {
-    const stripe = getStripeClient();
-    if (!stripe) {
-      return res.status(500).json({ error: "Stripe is not configured" });
-    }
-
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    if (!webhookSecret) {
-      console.warn("Stripe webhook secret not configured");
-      return res.status(400).json({ error: "Webhook secret not configured" });
-    }
-
-    const signature = req.headers["stripe-signature"] as string | undefined;
-    if (!signature) {
-      return res.status(400).json({ error: "Missing Stripe signature header" });
-    }
-
-    const rawBody = (req as Request & { rawBody?: unknown }).rawBody;
-    if (!rawBody || !(rawBody instanceof Buffer)) {
-      return res.status(400).json({ error: "Raw request body is required for signature verification" });
-    }
-
-    let event: Stripe.Event;
+    // SECURITY: Wrap entire handler in try/catch to return 500 on DB failure
     try {
-      event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unknown error";
-      console.error("Stripe webhook signature verification failed:", message);
-      return res.status(400).json({ error: `Webhook Error: ${message}` });
-    }
+      const stripe = getStripeClient();
+      if (!stripe) {
+        return res.status(500).json({ error: "Stripe is not configured" });
+      }
 
-    if (event.type === "payment_intent.succeeded") {
-      const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      const invoiceId = paymentIntent.metadata.invoiceId;
+      const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+      if (!webhookSecret) {
+        console.warn("Stripe webhook secret not configured");
+        return res.status(400).json({ error: "Webhook secret not configured" });
+      }
 
-      if (invoiceId) {
-        try {
+      const signature = req.headers["stripe-signature"] as string | undefined;
+      if (!signature) {
+        return res.status(400).json({ error: "Missing Stripe signature header" });
+      }
+
+      const rawBody = (req as Request & { rawBody?: unknown }).rawBody;
+      if (!rawBody || !(rawBody instanceof Buffer)) {
+        return res.status(400).json({ error: "Raw request body is required for signature verification" });
+      }
+
+      let event: Stripe.Event;
+      try {
+        event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        console.error("Stripe webhook signature verification failed:", message);
+        return res.status(400).json({ error: `Webhook Error: ${message}` });
+      }
+
+      if (event.type === "payment_intent.succeeded") {
+        const paymentIntent = event.data.object as Stripe.PaymentIntent;
+        const invoiceId = paymentIntent.metadata.invoiceId;
+
+        if (invoiceId) {
+          // SECURITY: DB write must succeed or return 500 so Stripe retries
           const existingPayment = await storage.getPaymentByStripeIntentId(paymentIntent.id);
           if (existingPayment) {
             console.log(`Payment for intent ${paymentIntent.id} already recorded, skipping`);
@@ -8209,13 +8121,16 @@ Always embeds safety disclaimers about competence, live work, and notifiable tas
           }
 
           console.log(`Payment recorded for invoice ${invoiceId}`);
-        } catch (error) {
-          console.error("Error recording payment:", error);
         }
       }
-    }
 
-    res.json({ received: true });
+      // SECURITY: Return 200 ONLY in final success path
+      return res.json({ received: true });
+    } catch (error) {
+      // SECURITY: Return 500 on any DB failure so Stripe retries
+      console.error("Stripe webhook processing failed:", error);
+      return res.status(500).json({ error: "Webhook processing failed" });
+    }
   });
 
   app.get("/api/stripe/config", async (req, res) => {
@@ -11402,16 +11317,28 @@ Be concise and practical. Focus on real issues that affect the business.`;
             entityInfo,
           });
           
-          // Store PDF on local disk
+          // SECURITY: Upload PDF directly to MinIO (Railway ephemeral filesystem fix)
           const { randomUUID } = await import('crypto');
-          const fs = await import('fs');
-          const path = await import('path');
           const sanitizedName = templateName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
           const fileName = `${sanitizedName}_${submission.id}.pdf`;
-          const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'forms');
-          await fs.promises.mkdir(uploadsDir, { recursive: true });
-          await fs.promises.writeFile(path.join(uploadsDir, fileName), pdfBuffer);
-          const objectPath = `/uploads/forms/${fileName}`;
+          const uuid = randomUUID();
+          const minioKey = `forms/${uuid}-${fileName}`;
+          
+          // Upload buffer directly to MinIO
+          await objectStorage.uploadFile(
+            objectStorage.BUCKETS.FILES,
+            minioKey,
+            pdfBuffer,
+            "application/pdf"
+          );
+          
+          // Generate presigned URL for file access
+          const presignedUrl = await objectStorage.getPresignedDownloadUrl(
+            objectStorage.BUCKETS.FILES,
+            minioKey
+          );
+          
+          const objectPath = presignedUrl;
           
           // Create file record if entity is a job
           if (submission.entityType === "job" && submission.entityId) {

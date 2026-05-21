@@ -549,7 +549,12 @@ app.use((req, res, next) => {
       
       if (superAdmins.length === 0) {
         log("No super admin found. Creating default super admin...");
-        const hashedPassword = bcrypt.hashSync("TrueNorth2024!", 10);
+        // SECURITY: Use APP_PASSWORD from environment, never hardcode passwords
+        const appPassword = process.env.APP_PASSWORD;
+        if (!appPassword) {
+          throw new Error("APP_PASSWORD environment variable is required for super admin creation");
+        }
+        const hashedPassword = bcrypt.hashSync(appPassword, 12); // Use cost factor 12 for security
         
         await storage.createUser({
           username: "superadmin",
