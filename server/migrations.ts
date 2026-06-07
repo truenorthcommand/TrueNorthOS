@@ -13,6 +13,8 @@ export async function runMigrations() {
       ALTER TABLE quotes ADD COLUMN IF NOT EXISTS payment_terms text DEFAULT 'Net 30';
       ALTER TABLE quotes ADD COLUMN IF NOT EXISTS custom_payment_terms text;
       ALTER TABLE quotes ADD COLUMN IF NOT EXISTS markup_percentage double precision DEFAULT 0;
+      ALTER TABLE quotes ADD COLUMN IF NOT EXISTS client_address text;
+      ALTER TABLE quotes ADD COLUMN IF NOT EXISTS client_postcode text;
     `);
 
     // Create quote_templates table

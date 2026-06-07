@@ -161,6 +161,8 @@ export default function CreateQuote() {
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [clientAddress, setClientAddress] = useState('');
+  const [clientPostcode, setClientPostcode] = useState('');
   const [siteAddress, setSiteAddress] = useState('');
   const [sitePostcode, setSitePostcode] = useState('');
   const [loadingClients, setLoadingClients] = useState(false);
@@ -394,6 +396,8 @@ export default function CreateQuote() {
         customerName,
         customerEmail,
         customerPhone,
+        clientAddress,
+        clientPostcode,
         siteAddress,
         sitePostcode,
         reference,
@@ -866,6 +870,27 @@ export default function CreateQuote() {
               value={reference}
               onChange={(e) => setReference(e.target.value)}
               placeholder="PO number or job ref"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label>Client Address</Label>
+            <Textarea
+              rows={2}
+              className="resize-y"
+              value={clientAddress}
+              onChange={(e) => setClientAddress(e.target.value)}
+              placeholder="Client's business/billing address"
+            />
+          </div>
+          <div>
+            <Label>Client Postcode</Label>
+            <Input
+              value={clientPostcode}
+              onChange={(e) => setClientPostcode(e.target.value)}
+              placeholder="AB1 2CD"
             />
           </div>
         </div>

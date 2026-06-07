@@ -473,6 +473,8 @@ export const quotes = pgTable("quotes", {
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email"),
   customerPhone: text("customer_phone"),
+  clientAddress: text("client_address"),
+  clientPostcode: text("client_postcode"),
   siteAddress: text("site_address"),
   sitePostcode: text("site_postcode"),
   reference: text("reference"),

@@ -54,6 +54,8 @@ type Quote = {
   customerName: string;
   customerEmail?: string;
   customerPhone?: string;
+  clientAddress?: string;
+  clientPostcode?: string;
   siteAddress: string;
   sitePostcode?: string;
   reference?: string;
@@ -161,6 +163,8 @@ export default function QuoteDetail() {
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [clientAddress, setClientAddress] = useState('');
+  const [clientPostcode, setClientPostcode] = useState('');
   const [siteAddress, setSiteAddress] = useState('');
   const [sitePostcode, setSitePostcode] = useState('');
   const [quoteDate, setQuoteDate] = useState('');
@@ -188,6 +192,8 @@ export default function QuoteDetail() {
         setCustomerName(data.customerName || '');
         setCustomerEmail(data.customerEmail || '');
         setCustomerPhone(data.customerPhone || '');
+        setClientAddress(data.clientAddress || '');
+        setClientPostcode(data.clientPostcode || '');
         setSiteAddress(data.siteAddress || '');
         setSitePostcode(data.sitePostcode || '');
         setQuoteDate(data.quoteDate ? data.quoteDate.split('T')[0] : (data.createdAt ? data.createdAt.split('T')[0] : ''));
@@ -295,6 +301,8 @@ export default function QuoteDetail() {
         customerName,
         customerEmail,
         customerPhone,
+        clientAddress,
+        clientPostcode,
         siteAddress,
         sitePostcode,
         reference,
@@ -397,13 +405,13 @@ export default function QuoteDetail() {
       const wrappedName = doc.splitTextToSize(customerName || 'N/A', rightColMaxW);
       doc.text(wrappedName, rightColX, rightY);
       rightY += wrappedName.length * 5;
-      if (siteAddress) {
-        const wrappedAddr = doc.splitTextToSize(siteAddress, rightColMaxW);
+      if (clientAddress) {
+        const wrappedAddr = doc.splitTextToSize(clientAddress, rightColMaxW);
         doc.text(wrappedAddr, rightColX, rightY);
         rightY += wrappedAddr.length * 5;
       }
-      if (sitePostcode) {
-        doc.text(sitePostcode, rightColX, rightY);
+      if (clientPostcode) {
+        doc.text(clientPostcode, rightColX, rightY);
         rightY += 5;
       }
 
