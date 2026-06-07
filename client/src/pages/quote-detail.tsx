@@ -680,6 +680,24 @@ export default function QuoteDetail() {
                 placeholder="Job/PO reference"
               />
             </div>
+            <div>
+              <Label>Client Address</Label>
+              <Textarea
+                rows={2}
+                className="resize-y"
+                value={clientAddress}
+                onChange={(e) => setClientAddress(e.target.value)}
+                placeholder="Client's business/billing address"
+              />
+            </div>
+            <div>
+              <Label>Client Postcode</Label>
+              <Input
+                value={clientPostcode}
+                onChange={(e) => setClientPostcode(e.target.value)}
+                placeholder="Client postcode"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -1134,6 +1152,8 @@ export default function QuoteDetail() {
               <p className="font-medium">{customerName}</p>
               {customerEmail && <p className="text-sm text-gray-600">{customerEmail}</p>}
               {customerPhone && <p className="text-sm text-gray-600">{customerPhone}</p>}
+              {clientAddress && <p className="text-sm text-gray-600 mt-1">{clientAddress}</p>}
+              {clientPostcode && <p className="text-sm text-gray-600">{clientPostcode}</p>}
             </div>
             <div>
               <h3 className="text-xs font-semibold uppercase text-gray-500 mb-2">Site</h3>

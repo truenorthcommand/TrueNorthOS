@@ -502,13 +502,13 @@ export default function CreateQuote() {
         const wrappedName = doc.splitTextToSize(customerName || 'N/A', rightColMaxW);
         doc.text(wrappedName, rightColX, rightY);
         rightY += wrappedName.length * 5;
-        if (siteAddress) {
-          const wrappedAddr = doc.splitTextToSize(siteAddress, rightColMaxW);
+        if (clientAddress) {
+          const wrappedAddr = doc.splitTextToSize(clientAddress, rightColMaxW);
           doc.text(wrappedAddr, rightColX, rightY);
           rightY += wrappedAddr.length * 5;
         }
-        if (sitePostcode) {
-          doc.text(sitePostcode, rightColX, rightY);
+        if (clientPostcode) {
+          doc.text(clientPostcode, rightColX, rightY);
           rightY += 5;
         }
         
@@ -1357,6 +1357,8 @@ export default function CreateQuote() {
               <p className="font-medium">{customerName}</p>
               {customerEmail && <p className="text-sm text-gray-600">{customerEmail}</p>}
               {customerPhone && <p className="text-sm text-gray-600">{customerPhone}</p>}
+              {clientAddress && <p className="text-sm text-gray-600 mt-1">{clientAddress}</p>}
+              {clientPostcode && <p className="text-sm text-gray-600">{clientPostcode}</p>}
             </div>
             <div>
               <h3 className="text-xs font-semibold uppercase text-gray-500 mb-2">Site</h3>
