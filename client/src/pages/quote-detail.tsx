@@ -392,6 +392,21 @@ export default function QuoteDetail() {
       const wrappedPaymentTerms = doc.splitTextToSize(paymentTermsText, 80);
       doc.text(wrappedPaymentTerms, 14, leftY);
       leftY += wrappedPaymentTerms.length * 5;
+      if (siteAddress) {
+        leftY += 3;
+        doc.setFontSize(10);
+        doc.setTextColor(15, 43, 76);
+        doc.text('SITE ADDRESS:', 14, leftY);
+        leftY += 5;
+        doc.setTextColor(0);
+        const wrappedSiteAddr = doc.splitTextToSize(siteAddress, 80);
+        doc.text(wrappedSiteAddr, 14, leftY);
+        leftY += wrappedSiteAddr.length * 5;
+        if (sitePostcode) {
+          doc.text(sitePostcode, 14, leftY);
+          leftY += 5;
+        }
+      }
 
       // Client info (right)
       const rightColX = pageWidth - 80;

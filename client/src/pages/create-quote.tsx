@@ -489,6 +489,22 @@ export default function CreateQuote() {
         const paymentTermsText = `Payment Terms: ${paymentTerms === 'Custom' ? customPaymentTerms : paymentTerms}`;
         const wrappedPayTerms = doc.splitTextToSize(paymentTermsText, 80);
         doc.text(wrappedPayTerms, 14, 72);
+        let leftY = 72 + wrappedPayTerms.length * 5;
+        if (siteAddress) {
+          leftY += 3;
+          doc.setFontSize(10);
+          doc.setTextColor(15, 43, 76);
+          doc.text('SITE ADDRESS:', 14, leftY);
+          leftY += 5;
+          doc.setTextColor(0);
+          const wrappedSiteAddr = doc.splitTextToSize(siteAddress, 80);
+          doc.text(wrappedSiteAddr, 14, leftY);
+          leftY += wrappedSiteAddr.length * 5;
+          if (sitePostcode) {
+            doc.text(sitePostcode, 14, leftY);
+            leftY += 5;
+          }
+        }
         
         // Client info (right)
         const rightColX = pageWidth - 80;
@@ -513,7 +529,7 @@ export default function CreateQuote() {
         }
         
         // Line items table header
-        let y = Math.max(85, rightY + 10);
+        let y = Math.max(85, Math.max(leftY || 85, rightY) + 10);
         doc.setFillColor(15, 43, 76);
         doc.rect(14, y - 5, pageWidth - 28, 8, 'F');
         doc.setTextColor(255);
