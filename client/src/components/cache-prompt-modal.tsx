@@ -4,12 +4,10 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { RefreshCw } from "lucide-react";
 
 const STORAGE_KEY = "lastCachePromptDate";
@@ -30,7 +28,6 @@ function markPromptShown(): void {
 
 export function CachePromptModal() {
   const [open, setOpen] = useState(false);
-  const [dontShowAgain, setDontShowAgain] = useState(false);
   const [location] = useLocation();
 
   useEffect(() => {
@@ -43,16 +40,10 @@ export function CachePromptModal() {
   useEffect(() => {
     // Auto-dismiss if user navigates to settings
     if (location === "/settings" && open) {
-      handleDismiss();
+      markPromptShown();
+      setOpen(false);
     }
   }, [location, open]);
-
-  const handleDismiss = () => {
-    if (dontShowAgain) {
-      markPromptShown();
-    }
-    setOpen(false);
-  };
 
   const handleGoToSettings = () => {
     markPromptShown();
@@ -60,14 +51,13 @@ export function CachePromptModal() {
     window.location.href = "/settings";
   };
 
-  const handleRemindLater = () => {
-    // Don't mark as shown, will show again next login
-    setOpen(false);
-  };
-
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={open} onOpenChange={() => {}}>
+      <DialogContent 
+        className="sm:max-w-md"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <RefreshCw className="h-5 w-5 text-primary" />
@@ -78,7 +68,7 @@ export function CachePromptModal() {
               Hey! 👋 TrueNorthOS has been updated with new features and improvements.
             </p>
             <p>
-              For the best experience, please clear your app cache:
+              <strong>Please clear your app cache to continue:</strong>
             </p>
             <ol className="list-decimal list-inside space-y-1 ml-2">
               <li>Open Settings ⚙️</li>
@@ -87,7 +77,7 @@ export function CachePromptModal() {
             </ol>
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="flex-col sm:flex-col gap-3">
+        <div className="flex flex-col gap-3 mt-4">
           <Button
             onClick={handleGoToSettings}
             className="w-full"
@@ -95,27 +85,7 @@ export function CachePromptModal() {
           >
             Go to Settings
           </Button>
-          <Button
-            onClick={handleRemindLater}
-            variant="outline"
-            className="w-full"
-          >
-            Remind Me Later
-          </Button>
-          <div className="flex items-center gap-2 pt-2">
-            <Checkbox
-              id="dont-show"
-              checked={dontShowAgain}
-              onCheckedChange={(checked) => setDontShowAgain(checked === true)}
-            />
-            <label
-              htmlFor="dont-show"
-              className="text-sm text-muted-foreground cursor-pointer"
-            >
-              Don't show again today
-            </label>
-          </div>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
