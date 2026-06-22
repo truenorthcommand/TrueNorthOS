@@ -3028,9 +3028,24 @@ export async function registerRoutes(
   app.get("/api/clients", requireAdmin, async (req, res) => {
     try {
       const allClients = await storage.getAllClients();
+      const searchTerm = req.query.search as string;
+      
+      // Filter clients if search term provided
+      let filteredClients = allClients;
+      if (searchTerm && searchTerm.length > 0) {
+        const lowerSearch = searchTerm.toLowerCase();
+        filteredClients = allClients.filter(client => 
+          client.name?.toLowerCase().includes(lowerSearch) ||
+          client.email?.toLowerCase().includes(lowerSearch) ||
+          client.phone?.toLowerCase().includes(lowerSearch) ||
+          client.address?.toLowerCase().includes(lowerSearch) ||
+          client.contactName?.toLowerCase().includes(lowerSearch)
+        );
+      }
+      
       // Prevent caching to ensure fresh data
       res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
-      res.json(allClients);
+      res.json(filteredClients);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch clients" });
     }
