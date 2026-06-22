@@ -24,6 +24,7 @@ type CompanySettings = {
   bankSortCode: string;
   bankAccountNumber: string;
   vatNumber: string;
+  companyNumber: string;
   defaultVatRate: number;
   defaultPaymentTerms: number;
   quoteTerms: string;
@@ -86,6 +87,7 @@ export default function Settings() {
     bankSortCode: "",
     bankAccountNumber: "",
     vatNumber: "",
+    companyNumber: "",
     defaultVatRate: 20,
     defaultPaymentTerms: 30,
     quoteTerms: "",
@@ -161,6 +163,7 @@ export default function Settings() {
             bankSortCode: data.bankSortCode || "",
             bankAccountNumber: data.bankAccountNumber || "",
             vatNumber: data.vatNumber || "",
+            companyNumber: data.companyNumber || "",
             defaultVatRate: data.defaultVatRate || 20,
             defaultPaymentTerms: data.defaultPaymentTerms || 30,
             quoteTerms: data.quoteTerms || "",
@@ -475,6 +478,14 @@ export default function Settings() {
                 value={settings.vatNumber}
                 onChange={(e) => setSettings({ ...settings, vatNumber: e.target.value })}
                 placeholder="GB123456789"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Company Registration Number</Label>
+              <Input
+                value={settings.companyNumber}
+                onChange={(e) => setSettings({ ...settings, companyNumber: e.target.value })}
+                placeholder="12345678"
               />
             </div>
             <div className="space-y-2">

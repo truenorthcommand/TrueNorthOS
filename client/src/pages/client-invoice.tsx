@@ -45,6 +45,7 @@ type CompanySettings = {
   bankSortCode: string | null;
   bankAccountNumber: string | null;
   vatNumber: string | null;
+  companyNumber: string | null;
 };
 
 function PaymentForm({ invoiceId, onSuccess }: { invoiceId: string; onSuccess: () => void }) {
@@ -453,11 +454,14 @@ export default function ClientInvoice() {
           </Card>
         ) : null}
 
-        {company?.vatNumber && (
-          <p className="text-center text-sm text-muted-foreground">
-            VAT Registration: {company.vatNumber}
-          </p>
-        )}
+        <div className="text-center text-sm text-muted-foreground space-y-1">
+          {company?.companyNumber && (
+            <p>Company Registration No: {company.companyNumber}</p>
+          )}
+          {company?.vatNumber && (
+            <p>VAT Registration No: {company.vatNumber}</p>
+          )}
+        </div>
       </div>
     </div>
   );

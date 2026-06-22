@@ -47,6 +47,7 @@ type CompanySettings = {
   companyPhone: string | null;
   companyEmail: string | null;
   vatNumber: string | null;
+  companyNumber: string | null;
 };
 
 export default function ClientQuote() {
@@ -337,11 +338,14 @@ export default function ClientQuote() {
           </Card>
         )}
 
-        {company?.vatNumber && (
-          <p className="text-center text-sm text-muted-foreground">
-            VAT Registration: {company.vatNumber}
-          </p>
-        )}
+        <div className="text-center text-sm text-muted-foreground space-y-1">
+          {company?.companyNumber && (
+            <p>Company Registration No: {company.companyNumber}</p>
+          )}
+          {company?.vatNumber && (
+            <p>VAT Registration No: {company.vatNumber}</p>
+          )}
+        </div>
       </div>
 
       <Dialog open={showDeclineDialog} onOpenChange={setShowDeclineDialog}>
