@@ -3612,7 +3612,12 @@ export async function registerRoutes(
   app.get("/api/company-settings", requireAdmin, async (req, res) => {
     try {
       const settings = await storage.getCompanySettings();
-      res.json(settings || {});
+      // Hardcode company registration number
+      const settingsWithCompanyNumber = {
+        ...(settings || {}),
+        companyNumber: '17042975'
+      };
+      res.json(settingsWithCompanyNumber);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch company settings" });
     }

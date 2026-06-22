@@ -611,6 +611,7 @@ export const companySettings = pgTable("company_settings", {
   bankSortCode: text("bank_sort_code"),
   bankAccountNumber: text("bank_account_number"),
   vatNumber: text("vat_number"),
+  companyNumber: text("company_number"),
   defaultVatRate: doublePrecision("default_vat_rate").default(20),
   defaultPaymentTerms: integer("default_payment_terms").default(30),
   quoteTerms: text("quote_terms"),
