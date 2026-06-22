@@ -47,6 +47,8 @@ const PAC_STYLES = `
   margin-top: 4px;
   background: hsl(var(--popover));
   color: hsl(var(--popover-foreground));
+  min-width: 400px;
+  max-width: 600px;
 }
 .pac-container .pac-item {
   padding: 8px 12px;
@@ -54,6 +56,9 @@ const PAC_STYLES = `
   border-top: 1px solid hsl(var(--border));
   font-size: 0.875rem;
   line-height: 1.25rem;
+  white-space: normal;
+  word-wrap: break-word;
+  min-height: auto;
 }
 .pac-container .pac-item:first-child {
   border-top: none;
@@ -67,6 +72,8 @@ const PAC_STYLES = `
 .pac-container .pac-item .pac-item-query {
   font-weight: 500;
   color: hsl(var(--foreground));
+  display: block;
+  width: 100%;
 }
 .pac-container .pac-item .pac-matched {
   font-weight: 600;
