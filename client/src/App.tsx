@@ -113,6 +113,7 @@ import QuoteAccept from "@/pages/quote-accept";
 import { Layout } from "@/components/layout";
 import { LocationTracker } from "@/components/location-tracker";
 import { CookieConsent } from "@/components/cookie-consent";
+import { CachePromptModal } from "@/components/cache-prompt-modal";
 import { Loader2 } from "lucide-react";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
@@ -321,6 +322,7 @@ function App() {
                 <Toaster />
                 <SessionTimeoutWarning />
                 <CookieConsent />
+                <CachePromptModal />
                 <Router />
               </TooltipProvider>
             </StoreProvider>
