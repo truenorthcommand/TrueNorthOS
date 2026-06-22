@@ -17,6 +17,17 @@ export async function runMigrations() {
       ALTER TABLE quotes ADD COLUMN IF NOT EXISTS client_postcode text;
     `);
 
+    // Add company number to company_settings
+    try {
+      await client.query(`
+        ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS company_number text;
+      `);
+      console.log('[Migration] company_settings company_number column added/verified OK');
+    } catch (error) {
+      console.error('[Migration] Error adding company_number column:', error);
+      throw error;
+    }
+
     // Create quote_templates table
     await client.query(`
       CREATE TABLE IF NOT EXISTS quote_templates (
