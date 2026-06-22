@@ -822,12 +822,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertCompanySettings(settings: InsertCompanySettings): Promise<CompanySettings> {
+    console.log('[Storage] Upserting company settings with data:', JSON.stringify(settings, null, 2));
+    
     const existing = await this.getCompanySettings();
     if (existing) {
-      const [updated] = await db.update(companySettings).set({ ...settings, updatedAt: new Date() }).where(eq(companySettings.id, existing.id)).returning();
+      console.log('[Storage] Updating existing settings, ID:', existing.id);
+      
+      // Explicitly include companyNumber in the update
+      const updateData = {
+        ...settings,
+        companyNumber: settings.companyNumber ?? existing.companyNumber,
+        updatedAt: new Date()
+      };
+      
+      console.log('[Storage] Update data being sent to DB:', JSON.stringify(updateData, null, 2));
+      
+      const [updated] = await db
+        .update(companySettings)
+        .set(updateData)
+        .where(eq(companySettings.id, existing.id))
+        .returning();
+      
+      console.log('[Storage] Updated settings from DB:', JSON.stringify(updated, null, 2));
       return updated;
     }
+    
+    console.log('[Storage] Creating new settings record');
     const [created] = await db.insert(companySettings).values(settings).returning();
+    console.log('[Storage] Created settings from DB:', JSON.stringify(created, null, 2));
     return created;
   }
 

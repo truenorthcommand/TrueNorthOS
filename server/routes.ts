@@ -3620,10 +3620,24 @@ export async function registerRoutes(
 
   app.put("/api/company-settings", requireAdmin, async (req, res) => {
     try {
-      const settings = await storage.upsertCompanySettings(req.body);
+      console.log('[Company Settings] Incoming request body:', JSON.stringify(req.body, null, 2));
+      
+      // Explicitly ensure companyNumber is included
+      const settingsData = {
+        ...req.body,
+        companyNumber: req.body.companyNumber || null,
+      };
+      
+      console.log('[Company Settings] Processed settings data:', JSON.stringify(settingsData, null, 2));
+      
+      const settings = await storage.upsertCompanySettings(settingsData);
+      
+      console.log('[Company Settings] Saved settings:', JSON.stringify(settings, null, 2));
+      
       res.json(settings);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to update company settings" });
+    } catch (error: any) {
+      console.error('[Company Settings] Save error:', error);
+      res.status(500).json({ error: "Failed to update company settings", details: error.message });
     }
   });
 
