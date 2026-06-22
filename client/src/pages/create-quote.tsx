@@ -54,6 +54,8 @@ type Client = {
   name: string;
   email: string;
   phone: string;
+  address: string;
+  postcode: string;
 };
 
 type Property = {
@@ -303,6 +305,8 @@ export default function CreateQuote() {
     setCustomerName(client.name);
     setCustomerEmail(client.email || '');
     setCustomerPhone(client.phone || '');
+    setClientAddress(client.address || '');
+    setClientPostcode(client.postcode || '');
     setClientSearch(client.name);
     setShowClientDropdown(false);
   };
