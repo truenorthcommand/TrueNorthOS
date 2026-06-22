@@ -442,7 +442,7 @@ export default function CreateQuote() {
     if (data?.id) {
       try {
         // Fetch company settings for footer
-        const settingsResponse = await fetch('/api/settings');
+        const settingsResponse = await fetch('/api/company-settings');
         const companySettings = await settingsResponse.json();
         
         const { jsPDF } = await import('jspdf');
