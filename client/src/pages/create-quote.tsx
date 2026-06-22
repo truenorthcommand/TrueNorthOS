@@ -441,6 +441,10 @@ export default function CreateQuote() {
     const data = await handleSave('Draft');
     if (data?.id) {
       try {
+        // Fetch company settings for footer
+        const settingsResponse = await fetch('/api/settings');
+        const companySettings = await settingsResponse.json();
+        
         const { jsPDF } = await import('jspdf');
         const doc = new jsPDF();
         const pageWidth = doc.internal.pageSize.getWidth();
@@ -652,9 +656,32 @@ export default function CreateQuote() {
           doc.setPage(i);
           doc.setFontSize(7);
           doc.setTextColor(150);
+          
+          // Company address line
           doc.text(
-            `Adapt Services Group | Unit 2 Meadow View Industrial Estate, Ruckinge, Ashford, Kent, TN26 2NR | Page ${i} of ${totalPages}`,
-            pageWidth / 2, pageHeight - 8, { align: 'center' }
+            `Adapt Services Group | Unit 2 Meadow View Industrial Estate, Ruckinge, Ashford, Kent, TN26 2NR`,
+            pageWidth / 2, pageHeight - 12, { align: 'center' }
+          );
+          
+          // Registration and VAT numbers line
+          const regVatParts = [];
+          if (companySettings.companyNumber) {
+            regVatParts.push(`Company Registration No: ${companySettings.companyNumber}`);
+          }
+          if (companySettings.vatNumber) {
+            regVatParts.push(`VAT Registration No: ${companySettings.vatNumber}`);
+          }
+          if (regVatParts.length > 0) {
+            doc.text(
+              regVatParts.join(' | '),
+              pageWidth / 2, pageHeight - 8, { align: 'center' }
+            );
+          }
+          
+          // Page number
+          doc.text(
+            `Page ${i} of ${totalPages}`,
+            pageWidth / 2, pageHeight - 4, { align: 'center' }
           );
         }
         
