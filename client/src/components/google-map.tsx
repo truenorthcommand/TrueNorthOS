@@ -154,7 +154,7 @@ export function GoogleMap({
         streetViewControl={false}
         fullscreenControl={true}
         zoomControl={true}
-        mapId="truenorth-main-map"
+        mapId="reactpms-main-map"
         style={{ width: '100%', height: '100%' }}
       >
         <MapBoundsUpdater markers={markers} userLocation={showUserLocation ? userLocation : null} />

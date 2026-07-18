@@ -23,12 +23,12 @@ export default function PitchOnePager() {
                   <span className="text-3xl font-bold text-[#0F2B4C]">TN</span>
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold">TrueNorth Trade OS</h1>
+                  <h1 className="text-3xl font-bold">React Property Maintenance Trade OS</h1>
                   <p className="text-blue-200">AI-Powered Field Service Platform for UK Trade Businesses</p>
                 </div>
               </div>
               <div className="text-right text-sm">
-                <p className="text-blue-200">info@truenorthoperationsgroup.com</p>
+                <p className="text-blue-200">info@reactpmsoperationsgroup.com</p>
                 <p className="text-blue-200">Ashford, Kent, TN26 2NR</p>
               </div>
             </div>
@@ -175,7 +175,7 @@ export default function PitchOnePager() {
             <div className="flex items-center gap-6 text-sm text-gray-600">
               <div className="flex items-center gap-2">
                 <Mail className="w-4 h-4" />
-                <span>info@truenorthoperationsgroup.com</span>
+                <span>info@reactpmsoperationsgroup.com</span>
               </div>
               <div className="flex items-center gap-2">
                 <Building className="w-4 h-4" />

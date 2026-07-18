@@ -5,14 +5,14 @@ import { Button } from "@/components/ui/button";
 const slides = [
   {
     id: 1,
-    title: "TrueNorth Trade OS",
+    title: "React Property Maintenance Trade OS",
     subtitle: "The AI-Powered Field Service Platform for UK Trade Businesses",
     content: (
       <div className="flex flex-col items-center justify-center h-full text-center">
         <div className="w-32 h-32 bg-white rounded-2xl flex items-center justify-center mb-8 shadow-lg">
           <span className="text-6xl font-bold text-[#0F2B4C]">TN</span>
         </div>
-        <h1 className="text-5xl font-bold text-white mb-4">TrueNorth Trade OS</h1>
+        <h1 className="text-5xl font-bold text-white mb-4">React Property Maintenance Trade OS</h1>
         <p className="text-2xl text-blue-100 mb-8">The AI-Powered Field Service Platform for UK Trade Businesses</p>
         <div className="flex gap-4 text-blue-200">
           <span className="px-4 py-2 bg-white/10 rounded-full">Plumbing</span>
@@ -281,7 +281,7 @@ const slides = [
               <tr className="border-b-2 border-gray-200">
                 <th className="text-left py-3 px-4">Feature</th>
                 <th className="text-center py-3 px-4 bg-green-50">
-                  <span className="font-bold text-green-700">TrueNorth</span>
+                  <span className="font-bold text-green-700">React Property Maintenance</span>
                   <br /><span className="text-sm text-gray-500">£99/user</span>
                 </th>
                 <th className="text-center py-3 px-4">
@@ -310,7 +310,7 @@ const slides = [
           </table>
         </div>
         <div className="mt-4 p-4 bg-green-50 rounded-xl text-center">
-          <p className="text-lg font-semibold text-green-800">TrueNorth: ServiceTitan features + unique AI capabilities at 50% of the cost</p>
+          <p className="text-lg font-semibold text-green-800">React Property Maintenance: ServiceTitan features + unique AI capabilities at 50% of the cost</p>
         </div>
       </div>
     ),
@@ -569,7 +569,7 @@ const slides = [
           </div>
         </div>
         <div className="space-y-2 text-blue-100">
-          <p className="text-lg">info@truenorthoperationsgroup.com</p>
+          <p className="text-lg">info@reactpmsoperationsgroup.com</p>
           <p className="text-sm">Unit 2 Meadow View Industrial Estate, Ashford, Kent, TN26 2NR</p>
         </div>
       </div>

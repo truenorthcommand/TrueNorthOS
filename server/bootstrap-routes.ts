@@ -151,7 +151,7 @@ router.post("/seed", async (req: Request, res: Response) => {
 /**
  * POST /api/bootstrap
  * 
- * Creates the initial superadmin account for TrueNorthOS.
+ * Creates the initial superadmin account for ReactPMS.
  * Only works if the users table is completely empty.
  * 
  * No authentication required, but fails if any users exist.

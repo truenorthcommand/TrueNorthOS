@@ -1,12 +1,12 @@
 /**
- * TrueNorthOS — Google OAuth 2.0 Authentication
+ * ReactPMS — Google OAuth 2.0 Authentication
  *
  * Standard, VPS-deployable Google OAuth flow using passport-google-oauth20.
  *
  * Required env vars:
  *   GOOGLE_CLIENT_ID      — from Google Cloud Console
  *   GOOGLE_CLIENT_SECRET  — from Google Cloud Console
- *   APP_URL               — public base URL e.g. https://erp.truenorthops.co.uk
+ *   APP_URL               — public base URL e.g. https://erp.reactpmsops.co.uk
  *
  * Flow:
  *   GET /api/oauth/google        → redirects to Google consent screen
@@ -110,7 +110,7 @@ export async function setupGoogleAuth(app: Express) {
 }
 
 /**
- * requireAuth middleware — checks TrueNorthOS session.
+ * requireAuth middleware — checks ReactPMS session.
  * Provider-agnostic: works for both Google OAuth and username/password logins.
  */
 export const isAuthenticated: RequestHandler = (req, res, next) => {

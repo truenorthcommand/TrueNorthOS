@@ -33,7 +33,7 @@ export function getOAuthUri(): string {
   return (
     `https://appcenter.intuit.com/connect/oauth2?` +
     `client_id=${clientId}&response_type=code&scope=${scope}` +
-    `&redirect_uri=${encodeURIComponent(redirectUri!)}&state=truenorth`
+    `&redirect_uri=${encodeURIComponent(redirectUri!)}&state=reactpms`
   );
 }
 

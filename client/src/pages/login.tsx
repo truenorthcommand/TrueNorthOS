@@ -97,7 +97,7 @@ export default function Login() {
 
       // Successful login - save user data and redirect
       if (data.user) {
-        localStorage.setItem('truenorth_user', JSON.stringify(data.user));
+        localStorage.setItem('reactpms_user', JSON.stringify(data.user));
         
         // Redirect based on role
         // Use window.location.href for full page reload so AuthProvider re-initializes
@@ -129,13 +129,13 @@ export default function Login() {
         <CardHeader className="text-center space-y-2">
           <div className="flex justify-center mb-4">
             <img
-              src="/logo-truenorth-os.png"
-              alt="TrueNorthOS"
+              src="/logo-pms.png"
+              alt="ReactPMS"
               className="h-20 w-auto object-contain"
             />
           </div>
           <CardTitle className="text-2xl font-bold text-slate-900">
-            Adapt Services Group
+            React Property Maintenance
           </CardTitle>
           <CardDescription className="text-slate-600">
             {requiresTwoFactor
@@ -322,7 +322,7 @@ export default function Login() {
           {/* Footer */}
           <div className="mt-6 pt-6 border-t border-slate-200 text-center">
             <p className="text-xs text-slate-500">
-              Powered by <span className="font-semibold">TrueNorthOS</span>
+              Powered by <span className="font-semibold">ReactPMS</span>
             </p>
           </div>
         </CardContent>

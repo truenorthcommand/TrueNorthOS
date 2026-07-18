@@ -1,6 +1,6 @@
-const CACHE_NAME = 'truenorth-fieldview-v9';
-const API_CACHE_NAME = 'truenorth-api-cache-v2';
-const OFFLINE_QUEUE_NAME = 'truenorth-offline-queue';
+const CACHE_NAME = 'reactpms-fieldview-v9';
+const API_CACHE_NAME = 'reactpms-api-cache-v2';
+const OFFLINE_QUEUE_NAME = 'reactpms-offline-queue';
 
 const STATIC_ASSETS = [
   '/manifest.json',
@@ -216,7 +216,7 @@ async function handleMutatingRequest(request) {
 
 function openOfflineDB() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('TrueNorthOffline', 1);
+    const request = indexedDB.open('React Property MaintenanceOffline', 1);
     
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);

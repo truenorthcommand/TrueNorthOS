@@ -1,4 +1,4 @@
-# TrueNorth OS — End-to-End Workflow Specification
+# React PMS — End-to-End Workflow Specification
 
 **Status:** APPROVED  
 **Version:** 1.0  
@@ -9,7 +9,7 @@
 
 ## Overview
 
-This document defines the complete business workflow from initial customer enquiry through to payment receipt. Every feature, automation, and UI in TrueNorth OS should align to this pipeline.
+This document defines the complete business workflow from initial customer enquiry through to payment receipt. Every feature, automation, and UI in React PMS should align to this pipeline.
 
 ---
 
@@ -530,4 +530,4 @@ Final step — money received, everyone happy.
 
 ---
 
-*This document is the source of truth for TrueNorth OS workflow. All features should reference this spec.*
+*This document is the source of truth for React PMS workflow. All features should reference this spec.*

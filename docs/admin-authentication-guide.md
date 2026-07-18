@@ -1,4 +1,4 @@
-# TrueNorthOS Admin Authentication Guide
+# ReactPMS Admin Authentication Guide
 
 ## 🔐 Closed-Loop Authentication System - Admin Training Manual
 
@@ -27,7 +27,7 @@
 
 ### What Changed?
 
-TrueNorthOS has transitioned from **Google OAuth** to a **closed-loop authentication system**. This means:
+ReactPMS has transitioned from **Google OAuth** to a **closed-loop authentication system**. This means:
 
 ❌ **OLD SYSTEM:**
 - Users logged in with Google accounts
@@ -86,7 +86,7 @@ As an administrator, you are now responsible for:
 
 #### 1. Navigate to Staff Management
 
-1. Log into TrueNorthOS
+1. Log into ReactPMS
 2. Click **"Staff"** in the main navigation
 3. Click **"Add New User"** button
 
@@ -130,7 +130,7 @@ Welcome2026!
 Inform the user:
 
 ```
-"I've created your TrueNorthOS account.
+"I've created your ReactPMS account.
 
 Username: sarah.jones
 Temporary Password: [give password verbally]
@@ -434,7 +434,7 @@ If they already completed onboarding:
 
 "The codes change every 30 seconds. Wait for a new code to appear, then enter it quickly.
 
-Make sure you're looking at the code for 'TrueNorthOS - [your username]'."
+Make sure you're looking at the code for 'ReactPMS - [your username]'."
 
 ---
 
@@ -477,7 +477,7 @@ Make sure you're looking at the code for 'TrueNorthOS - [your username]'."
 - Use a password manager (LastPass, 1Password, Bitwarden)
 
 ❌ **DON'T:**
-- Use common words: `password`, `admin`, `TrueNorth`
+- Use common words: `password`, `admin`, `React Property Maintenance`
 - Use personal info: birthdays, names, addresses
 - Reuse passwords across sites
 - Share passwords with colleagues
@@ -734,4 +734,4 @@ A: Yes. Every login, logout, password reset, and failed attempt is logged with t
 
 **END OF ADMIN AUTHENTICATION GUIDE**
 
-*This document is confidential and intended for TrueNorthOS administrators only.*
+*This document is confidential and intended for ReactPMS administrators only.*

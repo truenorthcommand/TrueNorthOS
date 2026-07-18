@@ -1,8 +1,9 @@
 {
-  "name": "rest-express",
+  "name": "react-property-maintenance-pms",
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
+  "description": "React Property Maintenance Solutions Ltd - Property Management System",
   "scripts": {
     "dev:client": "vite dev --port 5000",
     "dev": "NODE_ENV=development tsx server/index.ts",

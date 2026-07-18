@@ -10,7 +10,7 @@ const slides = [
         <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-lg">
           <span className="text-5xl font-bold text-[#0F2B4C]">TN</span>
         </div>
-        <h1 className="text-5xl font-bold text-white mb-4">TrueNorth Trade OS</h1>
+        <h1 className="text-5xl font-bold text-white mb-4">React Property Maintenance Trade OS</h1>
         <p className="text-2xl text-blue-100 mb-6">Stop Drowning in Paperwork. Start Growing Your Business.</p>
         <p className="text-lg text-blue-200 max-w-2xl">The all-in-one platform that replaces your job sheets, fleet tracking, invoicing, and 5 other systems — with AI that actually helps your engineers.</p>
       </div>
@@ -198,7 +198,7 @@ const slides = [
     content: (
       <div className="h-full flex flex-col">
         <h2 className="text-4xl font-bold text-[#0F2B4C] mb-2 text-center">The Numbers Don't Lie</h2>
-        <p className="text-xl text-gray-600 mb-6 text-center">What TrueNorth saves a 31-person company every year</p>
+        <p className="text-xl text-gray-600 mb-6 text-center">What React Property Maintenance saves a 31-person company every year</p>
         <div className="grid grid-cols-3 gap-6 flex-1">
           <div className="bg-blue-50 rounded-2xl p-6 flex flex-col">
             <h3 className="text-lg font-semibold text-blue-800 mb-4">Time Saved Per Week</h3>
@@ -413,7 +413,7 @@ const slides = [
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2 text-white">
             <Mail className="w-5 h-5" />
-            <span className="text-lg">info@truenorthoperationsgroup.com</span>
+            <span className="text-lg">info@reactpmsoperationsgroup.com</span>
           </div>
           <div className="flex items-center gap-2 text-white">
             <MapPin className="w-5 h-5" />

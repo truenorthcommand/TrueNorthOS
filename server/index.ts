@@ -570,7 +570,7 @@ app.use((req, res, next) => {
           username: "superadmin",
           password: hashedPassword,
           name: "Super Admin",
-          email: "admin@truenorth.com",
+          email: "admin@reactpms.com",
           role: "super_admin",
           status: "active",
           superAdmin: true,

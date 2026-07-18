@@ -228,7 +228,7 @@ export async function getFile(
 export async function testConnection(): Promise<boolean> {
   const testBucket = BUCKETS.RECEIPTS;
   const testKey = "_connection_test/ping.txt";
-  const testBody = `TrueNorthOS MinIO connection test - ${new Date().toISOString()}`;
+  const testBody = `ReactPMS MinIO connection test - ${new Date().toISOString()}`;
 
   try {
     console.log(`[ObjectStorage] Testing connection to ${process.env.S3_ENDPOINT || "http://localhost:9000"}...`);

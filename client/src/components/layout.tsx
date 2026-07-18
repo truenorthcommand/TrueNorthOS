@@ -220,7 +220,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {!collapsed && (
           <>
             <img 
-              src="/logo-truenorth-os.png" 
+              src="/logo-pms.png" 
               alt="Adapt Services Group" 
               className="w-full max-w-[170px] h-auto object-contain mx-auto"
             />
@@ -229,7 +229,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         )}
         {collapsed && (
           <img 
-            src="/logo-truenorth-os.png" 
+            src="/logo-pms.png" 
             alt="Adapt Services Group" 
             className="w-10 h-10 object-cover mx-auto"
           />
@@ -415,13 +415,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
           )}
         </MenuGroup>
 
-        {/* Fleet Section - All users see it, fleet managers & admins see all */}
+        {/* Fleet Section - Disabled for React Property Maintenance */}
+        {false && (
         <MenuGroup title="Fleet" icon={Truck} section="fleet">
           <NavLink href="/fleet" icon={ClipboardCheck}>Dashboard</NavLink>
           <NavLink href="/fleet/vehicles" icon={Truck}>Vehicles</NavLink>
           <NavLink href="/fleet/walkaround" icon={ClipboardCheck}>Walkaround Check</NavLink>
           <NavLink href="/fleet/report-defect" icon={AlertTriangle}>Report Defect</NavLink>
         </MenuGroup>
+        )}
 
         {/* Assets Section - Equipment, tools, and parts tracking */}
         <MenuGroup title="Assets" icon={Package} section="assets">
@@ -686,8 +688,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </Sheet>
             
             <img 
-              src="/logo-truenorth-os.png" 
-              alt="TrueNorth OS" 
+              src="/logo-pms.png" 
+              alt="React Property Maintenance" 
               className="h-10 max-w-[140px] w-auto object-contain"
             />
 

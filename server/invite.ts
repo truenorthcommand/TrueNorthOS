@@ -1,5 +1,5 @@
 /**
- * TrueNorthOS — Invite Token System
+ * ReactPMS — Invite Token System
  *
  * Enables admin-controlled onboarding for Google OAuth users.
  *

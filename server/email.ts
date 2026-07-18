@@ -9,8 +9,8 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-const FROM_NAME = process.env.COMPANY_NAME || 'TrueNorth OS';
-const FROM_EMAIL = process.env.GMAIL_USER || 'noreply@truenorth.com';
+const FROM_NAME = process.env.COMPANY_NAME || 'React PMS';
+const FROM_EMAIL = process.env.GMAIL_USER || 'noreply@reactpms.com';
 
 /**
  * Send a generic email via Gmail SMTP

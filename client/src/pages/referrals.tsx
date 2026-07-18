@@ -105,7 +105,7 @@ export default function ReferralsPage() {
     if (!qrDataUrl) return;
     const a = document.createElement("a");
     a.href = qrDataUrl;
-    a.download = "truenorth-referral-qr.png";
+    a.download = "reactpms-referral-qr.png";
     a.click();
     toast({ title: "QR Downloaded", description: "Your QR code has been saved." });
   };
@@ -140,7 +140,7 @@ export default function ReferralsPage() {
       <div>
         <h2 className="text-2xl font-bold" data-testid="text-page-title">Referral Dashboard</h2>
         <p className="text-muted-foreground mt-1">
-          Earn discounts by referring other trade businesses to TrueNorth OS. Each qualified referral gives you 5% off your subscription.
+          Earn discounts by referring other trade businesses to React PMS. Each qualified referral gives you 5% off your subscription.
         </p>
       </div>
 

@@ -1,78 +1,51 @@
-export type TrueNorthCodeType = 'job' | 'client' | 'asset';
+export type PMSCodeType = 'job' | 'client' | 'asset';
 
-export interface ParsedTrueNorthCode {
-  type: TrueNorthCodeType;
+export interface ParsedPMSCode {
+  type: PMSCodeType;
   id: string;
 }
 
-export function generateTrueNorthCode(type: TrueNorthCodeType, id: string): string {
-  return `TRUENORTH:${type}:${id}`;
+export function generatePMSCode(type: PMSCodeType, id: string): string {
+  return `REACTPMS:${type}:${id}`;
 }
 
-export function parseTrueNorthCode(code: string): ParsedTrueNorthCode | null {
+export function parsePMSCode(code: string): ParsedPMSCode | null {
   if (!code || typeof code !== 'string') return null;
   
   const parts = code.split(':');
   if (parts.length !== 3) return null;
-  if (parts[0] !== 'TRUENORTH' && parts[0] !== 'PROMAIN') return null;
+  if (parts[0] !== 'REACTPMS' && parts[0] !== 'PROMAIN') return null;
   
-  const type = parts[1] as TrueNorthCodeType;
+  const type = parts[1] as PMSCodeType;
   if (!['job', 'client', 'asset'].includes(type)) return null;
   
-  const id = parts[2];
-  if (!id) return null;
-  
-  return { type, id };
-}
-
-export interface ScanHistoryItem {
-  code: string;
-  timestamp: string;
-  type: 'truenorth' | 'barcode' | 'unknown';
-  parsedType?: TrueNorthCodeType;
-  parsedId?: string;
-}
-
-const SCAN_HISTORY_KEY = 'truenorthScanHistory';
-const MAX_HISTORY_ITEMS = 5;
-
-export function getScanHistory(): ScanHistoryItem[] {
-  try {
-    const stored = localStorage.getItem(SCAN_HISTORY_KEY);
-    if (!stored) return [];
-    return JSON.parse(stored);
-  } catch {
-    return [];
-  }
-}
-
-export function addToScanHistory(code: string): ScanHistoryItem[] {
-  const parsed = parseTrueNorthCode(code);
-  
-  const newItem: ScanHistoryItem = {
-    code,
-    timestamp: new Date().toISOString(),
-    type: parsed ? 'truenorth' : /^\d+$/.test(code) ? 'barcode' : 'unknown',
-    parsedType: parsed?.type,
-    parsedId: parsed?.id,
+  return {
+    type,
+    id: parts[2]
   };
-  
-  let history = getScanHistory();
-  history = history.filter(item => item.code !== code);
-  history.unshift(newItem);
-  history = history.slice(0, MAX_HISTORY_ITEMS);
-  
-  try {
-    localStorage.setItem(SCAN_HISTORY_KEY, JSON.stringify(history));
-  } catch {
-  }
-  
-  return history;
 }
 
-export function clearScanHistory(): void {
+// Helper to generate QR code data URL (requires qrcode library)
+export async function generateQRCodeDataURL(text: string): Promise<string> {
   try {
-    localStorage.removeItem(SCAN_HISTORY_KEY);
-  } catch {
+    const QRCode = (await import('qrcode')).default;
+    return await QRCode.toDataURL(text, {
+      width: 300,
+      margin: 2,
+      color: {
+        dark: '#144f63',
+        light: '#ffffff'
+      }
+    });
+  } catch (error) {
+    console.error('Failed to generate QR code:', error);
+    throw error;
   }
+}
+
+// Helper to get the full URL for a QR code
+export function getQRCodeURL(type: PMSCodeType, id: string): string {
+  const code = generatePMSCode(type, id);
+  const baseURL = window.location.origin;
+  return `${baseURL}/scan?code=${encodeURIComponent(code)}`;
 }

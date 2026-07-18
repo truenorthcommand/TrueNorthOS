@@ -86,10 +86,10 @@ const DEFAULT_TERMS = `Terms & Conditions
 2. Payment terms are as stated above from the date of invoice.
 3. Any additional work not included in this quotation will be charged separately.
 4. All prices are subject to VAT at the applicable rate.
-5. Adapt Services Group reserves the right to amend pricing if the scope of work changes.
+5. React Property Maintenance reserves the right to amend pricing if the scope of work changes.
 6. Work will be scheduled upon acceptance of this quotation.
 7. Cancellation within 48 hours of scheduled work may incur a cancellation fee.
-8. All materials remain the property of Adapt Services Group until paid in full.
+8. All materials remain the property of React Property Maintenance until paid in full.
 9. A warranty period of 12 months applies to all workmanship from completion date.
 10. Access to the property must be provided at the agreed time. Failed access visits may be charged.`;
 
@@ -464,13 +464,13 @@ export default function CreateQuote() {
           // Fallback if logo fails to load
           doc.setFontSize(14);
           doc.setTextColor(15, 43, 76);
-          doc.text('Adapt Services Group', 14, 20);
+          doc.text('React Property Maintenance', 14, 20);
         }
         
         // Company address (right side)
         doc.setFontSize(9);
         doc.setTextColor(80);
-        doc.text('Adapt Services Group', pageWidth - 14, 12, { align: 'right' });
+        doc.text('React Property Maintenance', pageWidth - 14, 12, { align: 'right' });
         doc.text('Unit 2 Meadow View Industrial Estate', pageWidth - 14, 17, { align: 'right' });
         doc.text('Ruckinge, Ashford, Kent', pageWidth - 14, 22, { align: 'right' });
         doc.text('TN26 2NR', pageWidth - 14, 27, { align: 'right' });
@@ -659,7 +659,7 @@ export default function CreateQuote() {
           
           // Company address line
           doc.text(
-            `Adapt Services Group | Unit 2 Meadow View Industrial Estate, Ruckinge, Ashford, Kent, TN26 2NR`,
+            `React Property Maintenance | Suite 135, 7-8 New Road Avenue, Chatham, Kent, ME4 6BB`,
             pageWidth / 2, pageHeight - 12, { align: 'center' }
           );
           
@@ -1387,7 +1387,7 @@ export default function CreateQuote() {
           {/* Header */}
           <div className="flex justify-between items-start mb-6 pb-4 border-b">
             <div>
-              <h2 className="text-2xl font-bold text-[#0F2B4C]">Adapt Services Group</h2>
+              <h2 className="text-2xl font-bold text-[#0F2B4C]">React Property Maintenance</h2>
               <p className="text-sm text-gray-500 mt-1">Professional Services Quotation</p>
             </div>
             <div className="text-right">

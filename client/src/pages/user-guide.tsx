@@ -162,7 +162,7 @@ export default function UserGuide() {
           </div>
           <div>
             <h1 className="text-2xl font-bold">User Guide</h1>
-            <p className="text-muted-foreground">Get help and guidance for TrueNorth OS</p>
+            <p className="text-muted-foreground">Get help and guidance for React PMS</p>
           </div>
         </div>
 
@@ -175,7 +175,7 @@ export default function UserGuide() {
                   <CardTitle className="text-lg">Ask the Guide Assistant</CardTitle>
                 </div>
                 <CardDescription>
-                  Ask any question about using TrueNorth OS
+                  Ask any question about using React PMS
                 </CardDescription>
               </CardHeader>
               
@@ -188,7 +188,7 @@ export default function UserGuide() {
                       </div>
                       <h3 className="font-semibold text-lg mb-2">How can I help you today?</h3>
                       <p className="text-muted-foreground text-sm mb-6 max-w-md">
-                        I'm your guide to TrueNorth OS. Ask me anything about managing jobs, 
+                        I'm your guide to React PMS. Ask me anything about managing jobs, 
                         managing receipts, using AI advisors, fleet management, and more.
                       </p>
                       <div className="flex flex-wrap gap-2 justify-center max-w-lg">

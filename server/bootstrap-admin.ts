@@ -1,7 +1,7 @@
 /**
  * Bootstrap Script: Create Initial Admin Account
  * 
- * Creates the first superadmin account for TrueNorthOS closed-loop authentication.
+ * Creates the first superadmin account for ReactPMS closed-loop authentication.
  * Run this ONCE after deploying the application with no existing users.
  * 
  * Usage:
@@ -22,7 +22,7 @@ import { sql } from "drizzle-orm";
 const SALT_ROUNDS = 12;
 
 async function bootstrapAdmin() {
-  console.log("\n🔐 TrueNorthOS Admin Bootstrap\n");
+  console.log("\n🔐 ReactPMS Admin Bootstrap\n");
   console.log("═══════════════════════════════════════════════════════\n");
 
   try {

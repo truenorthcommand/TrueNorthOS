@@ -1,5 +1,5 @@
 /**
- * TrueNorthOS — Session Middleware
+ * ReactPMS — Session Middleware
  *
  * Provider-agnostic Postgres-backed session store.
  * Works with both Google OAuth and username/password login flows.

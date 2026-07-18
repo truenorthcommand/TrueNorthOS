@@ -28,7 +28,7 @@ class OfflineFormsDB extends Dexie {
   submissions!: Table<OfflineFormSubmission>;
 
   constructor() {
-    super("TrueNorthOfflineForms");
+    super("React Property MaintenanceOfflineForms");
     this.version(1).stores({
       drafts: "++id, [versionId+entityType+entityId]",
       submissions: "++id, status, [versionId+entityType+entityId]",

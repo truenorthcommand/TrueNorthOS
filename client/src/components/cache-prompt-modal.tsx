@@ -65,7 +65,7 @@ export function CachePromptModal() {
           </DialogTitle>
           <DialogDescription className="text-base space-y-3 pt-2">
             <p>
-              Hey! 👋 TrueNorthOS has been updated with new features and improvements.
+              Hey! 👋 ReactPMS has been updated with new features and improvements.
             </p>
             <p>
               <strong>Please clear your app cache to continue:</strong>

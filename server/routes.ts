@@ -402,7 +402,7 @@ export async function registerRoutes(
 
       // Create TOTP instance
       const totp = new TOTP({
-        issuer: 'TrueNorth Field View',
+        issuer: 'React Property Maintenance Field View',
         label: user.username,
         algorithm: 'SHA1',
         digits: 6,
@@ -3692,9 +3692,9 @@ export async function registerRoutes(
           description: "Professional UK refurbishment snagging agent. Assesses photos and videos of refurbishment works to identify snags and produce contractor-ready snag lists.",
           icon: "ClipboardCheck",
           category: "quality",
-          systemPrompt: `You are Snagging Pro, a professional UK refurbishment snagging agent acting for TrueNorth OS. You behave as an experienced UK Site Manager or Clerk of Works.
+          systemPrompt: `You are Snagging Pro, a professional UK refurbishment snagging agent acting for React PMS. You behave as an experienced UK Site Manager or Clerk of Works.
 
-Your purpose is to assess uploaded photos and videos of refurbishment works, identify snags relating only to new works and their interfaces, and produce fair, evidence-based, contractor-ready snag lists that protect TrueNorth OS' professional reputation.
+Your purpose is to assess uploaded photos and videos of refurbishment works, identify snags relating only to new works and their interfaces, and produce fair, evidence-based, contractor-ready snag lists that protect React PMS' professional reputation.
 
 You always assess all uploaded media and never refuse to review available photos or videos.
 
@@ -4393,11 +4393,11 @@ Respond with a JSON object:
         return res.status(400).json({ error: "Question is required" });
       }
 
-      const systemPrompt = `You are the official User Guide Assistant for TrueNorth Field View - a Field Service ERP Suite for UK field engineers and tradespeople. You ONLY answer questions about this application. If asked about anything unrelated to TrueNorth Field View, politely redirect the user to ask about the app.
+      const systemPrompt = `You are the official User Guide Assistant for React Property Maintenance Field View - a Field Service ERP Suite for UK field engineers and tradespeople. You ONLY answer questions about this application. If asked about anything unrelated to React Property Maintenance Field View, politely redirect the user to ask about the app.
 
-## About TrueNorth Field View
+## About React Property Maintenance Field View
 
-TrueNorth Field View is a "business in a box" platform that enables field service companies to manage all aspects of their operation digitally. It includes six integrated modules:
+React Property Maintenance Field View is a "business in a box" platform that enables field service companies to manage all aspects of their operation digitally. It includes six integrated modules:
 
 ### 1. Operations Module
 - **Job Management**: Create, assign, and track jobs through their full lifecycle (Pending → In Progress → Completed → Signed Off)
@@ -4494,8 +4494,8 @@ TrueNorth Field View is a "business in a box" platform that enables field servic
 5. Get expert guidance and recommendations
 
 ## Important Rules
-1. ONLY answer questions about TrueNorth Field View
-2. If asked about general trade advice, coding, weather, or anything unrelated, politely say: "I can only help with questions about TrueNorth Field View. Is there something about the app I can help you with?"
+1. ONLY answer questions about React Property Maintenance Field View
+2. If asked about general trade advice, coding, weather, or anything unrelated, politely say: "I can only help with questions about React Property Maintenance Field View. Is there something about the app I can help you with?"
 3. Be helpful, concise, and practical
 4. Reference specific features and navigation paths
 5. If you don't know something about the app, say so rather than making it up`;
@@ -5051,7 +5051,7 @@ ${jobUpdates.map((u: any) => `- ${new Date(u.workDate).toLocaleDateString('en-GB
         generatedAt: new Date().toISOString(),
         aiPowered,
         company: {
-          name: companySettings?.companyName || 'TrueNorth Field Services',
+          name: companySettings?.companyName || 'React Property Maintenance Field Services',
           address: companySettings?.companyAddress || '',
           phone: companySettings?.companyPhone || '',
           email: companySettings?.companyEmail || '',
@@ -6253,7 +6253,7 @@ Return ONLY valid JSON, nothing else.`;
       return res.status(403).send("Not available in production");
     }
     const key = req.query.key;
-    if (key !== "TrueNorth2024Reset") {
+    if (key !== "React Property Maintenance2024Reset") {
       return res.status(403).send("Access denied");
     }
     try {
@@ -6414,9 +6414,9 @@ Return ONLY valid JSON, nothing else.`;
           description: "Professional UK refurbishment snagging agent. Assesses photos and videos of refurbishment works to identify snags and produce contractor-ready snag lists.",
           icon: "ClipboardCheck",
           category: "quality",
-          systemPrompt: `You are Snagging Pro, a professional UK refurbishment snagging agent acting for TrueNorth OS. You behave as an experienced UK Site Manager or Clerk of Works.
+          systemPrompt: `You are Snagging Pro, a professional UK refurbishment snagging agent acting for React PMS. You behave as an experienced UK Site Manager or Clerk of Works.
 
-Your purpose is to assess uploaded photos and videos of refurbishment works, identify snags relating only to new works and their interfaces, and produce fair, evidence-based, contractor-ready snag lists that protect TrueNorth OS' professional reputation.
+Your purpose is to assess uploaded photos and videos of refurbishment works, identify snags relating only to new works and their interfaces, and produce fair, evidence-based, contractor-ready snag lists that protect React PMS' professional reputation.
 
 You always assess all uploaded media and never refuse to review available photos or videos.
 
@@ -9933,7 +9933,7 @@ ${invoice.customerEmail ? `Email: ${invoice.customerEmail}` : ''}`
         }
       }
 
-      const systemPrompt = `You are a database analyst for TrueNorth Trade OS, a field service management application for UK trade businesses.
+      const systemPrompt = `You are a database analyst for React Property Maintenance Trade OS, a field service management application for UK trade businesses.
 
 The application includes these core modules:
 - Jobs: Work orders assigned to engineers
@@ -12244,7 +12244,7 @@ Be concise and practical. Focus on real issues that affect the business.`;
 
   // ==================== EXTERNAL INTAKE (WEBHOOK API) ====================
   // Protected by Bearer token only — no session required.
-  // Used by external sites (e.g. ASG Website) to push leads directly into TrueNorthOS.
+  // Used by external sites (e.g. ASG Website) to push leads directly into ReactPMS.
 
   const requireWebhookSecret = (req: any, res: any, next: any) => {
     const expectedSecret = process.env.INBOUND_WEBHOOK_SECRET;
@@ -12281,7 +12281,7 @@ Be concise and practical. Focus on real issues that affect the business.`;
         return res.status(400).json({ error: "urgency must be 'high' or 'normal'." });
       }
 
-      // 2. CRM: Find or create the client record (TrueNorth Source of Truth)
+      // 2. CRM: Find or create the client record (React Property Maintenance Source of Truth)
       const client = await storage.findOrCreateClient({
         name: customerName,
         email: contactEmail,

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-const VERSION_KEY = 'truenorth_app_version';
+const VERSION_KEY = 'reactpms_app_version';
 
 export function useVersionCheck() {
   useEffect(() => {

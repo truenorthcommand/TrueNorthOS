@@ -1,4 +1,4 @@
--- Fleet Management System Comprehensive Migration for TrueNorthOS
+-- Fleet Management System Comprehensive Migration for ReactPMS
 -- PostgreSQL version
 -- Created: 2026-05-20
 -- Description: Complete fleet management with vehicle tracking, equipment, MOT, insurance, tax, service records, and automated reminders

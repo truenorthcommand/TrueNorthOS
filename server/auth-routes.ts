@@ -1,5 +1,5 @@
 /**
- * TrueNorthOS — Closed-Loop Authentication System
+ * ReactPMS — Closed-Loop Authentication System
  * 
  * Admin-provisioned accounts with mandatory 2FA and backup codes.
  * No third-party OAuth dependencies.
@@ -451,7 +451,7 @@ export async function completeOnboarding(req: Request, res: Response) {
   
   // Generate 2FA secret
   const secret = new TOTP({
-    issuer: "TrueNorthOS",
+    issuer: "ReactPMS",
     label: user.username,
     algorithm: "SHA1",
     digits: 6,

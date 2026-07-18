@@ -193,7 +193,7 @@ async function sendNotificationEmail(userId: string, title: string, message: str
     if (!user?.email) return false;
 
     const companyResult = await pool.query(`SELECT company_name FROM company_settings LIMIT 1`);
-    const companyName = companyResult.rows[0]?.company_name || 'TrueNorth OS';
+    const companyName = companyResult.rows[0]?.company_name || 'React PMS';
 
     const linkHtml = linkUrl 
       ? `<p><a href="${linkUrl}" style="display: inline-block; background-color: #0F2B4C; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; margin: 10px 0;">View Details</a></p>`

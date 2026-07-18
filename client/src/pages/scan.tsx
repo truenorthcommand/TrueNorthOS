@@ -23,7 +23,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Scanner } from "@/components/scanner";
 import {
-  parseTrueNorthCode,
+  parsePMSCode,
   getScanHistory,
   addToScanHistory,
   clearScanHistory,
@@ -33,7 +33,7 @@ import { format } from "date-fns";
 
 interface ScanResult {
   code: string;
-  type: 'truenorth' | 'jobNo' | 'notFound';
+  type: 'reactpms' | 'jobNo' | 'notFound';
   resourceType?: 'job' | 'client' | 'asset';
   resourceId?: string;
   job?: any;
@@ -57,12 +57,12 @@ export default function ScanPage() {
     const updatedHistory = addToScanHistory(code);
     setHistory(updatedHistory);
 
-    const parsed = parseTrueNorthCode(code);
+    const parsed = parsePMSCode(code);
     
     if (parsed) {
       setScanResult({
         code,
-        type: 'truenorth',
+        type: 'reactpms',
         resourceType: parsed.type,
         resourceId: parsed.id,
       });
@@ -70,7 +70,7 @@ export default function ScanPage() {
       
       toast({
         title: "Code Recognized",
-        description: `TrueNorth OS ${parsed.type} code detected`,
+        description: `React PMS ${parsed.type} code detected`,
       });
       return;
     }
@@ -257,7 +257,7 @@ export default function ScanPage() {
               <p className="font-mono text-sm break-all mt-1">{scanResult.code}</p>
             </div>
 
-            {scanResult.type === 'truenorth' && (
+            {scanResult.type === 'reactpms' && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Badge className={getTypeBadgeColor(scanResult.resourceType)}>

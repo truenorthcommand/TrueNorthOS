@@ -119,17 +119,17 @@ export default function Onboarding() {
   };
 
   const handleDownloadBackupCodes = () => {
-    const userData = localStorage.getItem('truenorth_user');
+    const userData = localStorage.getItem('reactpms_user');
     const user = userData ? JSON.parse(userData) : null;
     const username = user?.username || 'user';
 
-    const text = `TrueNorthOS Backup Codes\n\nUsername: ${username}\nGenerated: ${new Date().toLocaleDateString()}\n\n${backupCodes.map((code, i) => `${i + 1}. ${code}`).join('\n')}\n\n⚠️ IMPORTANT:\n- Each code can only be used once\n- Store these codes in a secure location\n- Do not share these codes with anyone\n- You can regenerate new codes from your settings`;
+    const text = `ReactPMS Backup Codes\n\nUsername: ${username}\nGenerated: ${new Date().toLocaleDateString()}\n\n${backupCodes.map((code, i) => `${i + 1}. ${code}`).join('\n')}\n\n⚠️ IMPORTANT:\n- Each code can only be used once\n- Store these codes in a secure location\n- Do not share these codes with anyone\n- You can regenerate new codes from your settings`;
 
     const blob = new Blob([text], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `truenorthos-backup-codes-${username}.txt`;
+    a.download = `reactpms-backup-codes-${username}.txt`;
     a.click();
     URL.revokeObjectURL(url);
 
@@ -141,7 +141,7 @@ export default function Onboarding() {
   };
 
   const handlePrintBackupCodes = () => {
-    const userData = localStorage.getItem('truenorth_user');
+    const userData = localStorage.getItem('reactpms_user');
     const user = userData ? JSON.parse(userData) : null;
     const username = user?.username || 'user';
 
@@ -150,7 +150,7 @@ export default function Onboarding() {
       printWindow.document.write(`
         <html>
           <head>
-            <title>TrueNorthOS Backup Codes</title>
+            <title>ReactPMS Backup Codes</title>
             <style>
               body { font-family: Arial, sans-serif; padding: 40px; }
               h1 { color: #1a73e8; }
@@ -159,7 +159,7 @@ export default function Onboarding() {
             </style>
           </head>
           <body>
-            <h1>TrueNorthOS Backup Codes</h1>
+            <h1>ReactPMS Backup Codes</h1>
             <p><strong>Username:</strong> ${username}</p>
             <p><strong>Generated:</strong> ${new Date().toLocaleDateString()}</p>
             <div>
@@ -210,7 +210,7 @@ export default function Onboarding() {
 
       // Save user data and redirect
       if (data.user) {
-        localStorage.setItem('truenorth_user', JSON.stringify(data.user));
+        localStorage.setItem('reactpms_user', JSON.stringify(data.user));
         
         // Redirect based on role
         if (data.user.role === 'engineer' && !data.user.superAdmin) {
@@ -234,7 +234,7 @@ export default function Onboarding() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       <Card className="w-full max-w-2xl shadow-xl">
         <CardHeader>
-          <CardTitle className="text-2xl">Welcome to TrueNorthOS</CardTitle>
+          <CardTitle className="text-2xl">Welcome to ReactPMS</CardTitle>
           <CardDescription>
             Let's secure your account in a few quick steps
           </CardDescription>

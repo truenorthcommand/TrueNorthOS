@@ -49,8 +49,8 @@ const openai = process.env.OPENROUTER_API_KEY
       baseURL: "https://openrouter.ai/api/v1",
       apiKey: process.env.OPENROUTER_API_KEY,
       defaultHeaders: {
-        "HTTP-Referer": process.env.OPENROUTER_REFERER || "https://truenorthos.co.uk",
-        "X-Title": "TrueNorthOS",
+        "HTTP-Referer": process.env.OPENROUTER_REFERER || "https://reactpms.co.uk",
+        "X-Title": "ReactPMS",
       },
     })
   : null;

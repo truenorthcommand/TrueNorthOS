@@ -119,7 +119,7 @@ export default function SetupPage() {
             <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
               <Settings className="h-8 w-8 text-primary" />
             </div>
-            <CardTitle className="text-2xl">TrueNorth OS Setup</CardTitle>
+            <CardTitle className="text-2xl">React PMS Setup</CardTitle>
             <p className="text-xs text-muted-foreground mb-2">Built For Trades By Trades</p>
             <CardDescription>
               Choose how to set up your admin access

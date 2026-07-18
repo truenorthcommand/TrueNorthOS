@@ -1,4 +1,4 @@
-# TrueNorthOS — Development Update
+# ReactPMS — Development Update
 
 **Date:** 11th May 2026
 **Session:** Platform cleanup, architecture improvements & new feature development

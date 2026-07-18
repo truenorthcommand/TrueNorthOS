@@ -29,7 +29,7 @@ export function useSessionTimeout() {
     }
 
     // Clear local storage
-    localStorage.removeItem('truenorth_user');
+    localStorage.removeItem('reactpms_user');
     isAuthenticatedRef.current = false;
 
     toast({

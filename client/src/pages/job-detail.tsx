@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { ActionPriority, JobUpdate, Photo, hasRole } from '@/lib/types';
 import { useUpload } from '@/hooks/use-upload';
-import { generateTrueNorthCode } from '@/lib/qr-utils';
+import { generatePMSCode } from '@/lib/qr-utils';
 import { JobChecklist } from '@/components/job-checklist';
 import { JobPhases } from '@/components/job-phases';
 import type { FileWithRelations } from '@shared/schema';
@@ -555,7 +555,7 @@ export default function JobDetail() {
 
   const handleGenerateQR = async () => {
     if (!job) return;
-    const code = generateTrueNorthCode('job', job.id);
+    const code = generatePMSCode('job', job.id);
     const url = await QRCode.toDataURL(code, { width: 256, margin: 2 });
     setQrCodeDataUrl(url);
     setQrDialogOpen(true);

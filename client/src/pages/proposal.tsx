@@ -45,7 +45,7 @@ export default function Proposal() {
         {/* Header */}
         <div className="text-center mb-12 pb-8 border-b-4 border-primary">
           <h1 className="text-4xl font-bold text-slate-900 mb-2">Commercial Proposal</h1>
-          <h2 className="text-2xl text-primary font-semibold mb-4">TrueNorth OS</h2>
+          <h2 className="text-2xl text-primary font-semibold mb-4">React PMS</h2>
           <p className="text-lg text-slate-600">Field Service ERP Platform</p>
           <p className="text-sm text-slate-500 mt-4">Built For Trades By Trades</p>
         </div>
@@ -75,13 +75,13 @@ export default function Proposal() {
           <Card>
             <CardContent className="pt-6">
               <p className="text-slate-700 leading-relaxed mb-4">
-                TrueNorth OS is a comprehensive Field Service ERP platform designed specifically for UK field service 
+                React PMS is a comprehensive Field Service ERP platform designed specifically for UK field service 
                 companies. Built to replace fragmented tools and manual processes, this all-in-one solution enables your 
                 team to manage jobs, quotes, invoices, timesheets, fleet, and workforce from a single integrated platform.
               </p>
               <p className="text-slate-700 leading-relaxed">
                 With built-in AI-powered automation, UK compliance features (HMRC, VAT, Gas Safe, BS 7671), and real-time 
-                GPS tracking, TrueNorth OS positions your business at the forefront of field service technology 
+                GPS tracking, React PMS positions your business at the forefront of field service technology 
                 while reducing administrative overhead by up to 40%.
               </p>
             </CardContent>
@@ -215,7 +215,7 @@ export default function Proposal() {
                   <thead>
                     <tr className="border-b">
                       <th className="text-left py-2 font-semibold">Feature Area</th>
-                      <th className="text-center py-2 font-semibold text-primary">TrueNorth OS</th>
+                      <th className="text-center py-2 font-semibold text-primary">React PMS</th>
                       <th className="text-center py-2 font-semibold">ServiceTitan</th>
                       <th className="text-center py-2 font-semibold">Simpro</th>
                       <th className="text-center py-2 font-semibold">Jobber</th>
@@ -380,7 +380,7 @@ export default function Proposal() {
           <div className="grid grid-cols-2 gap-8">
             <Card>
               <CardContent className="pt-6">
-                <p className="font-semibold mb-4">For TrueNorth Operations Group:</p>
+                <p className="font-semibold mb-4">For React Property Maintenance Operations Group:</p>
                 <div className="border-b border-slate-300 h-16 mb-2"></div>
                 <p className="text-sm text-slate-600">Signature</p>
                 <div className="mt-4">
@@ -405,9 +405,9 @@ export default function Proposal() {
 
         {/* Footer */}
         <div className="text-center text-sm text-slate-500 border-t pt-8">
-          <p className="font-semibold">TrueNorth Operations Group</p>
+          <p className="font-semibold">React Property Maintenance Operations Group</p>
           <p>Professional Field Service Solutions</p>
-          <p className="mt-2">info@truenorthoperationsgroup.com</p>
+          <p className="mt-2">info@reactpmsoperationsgroup.com</p>
           <p>Unit 2 Meadow View Industrial Estate, Ashford, Kent, TN26 2NR</p>
         </div>
       </div>
