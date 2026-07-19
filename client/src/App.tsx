@@ -8,7 +8,7 @@ import { hasRole, Role } from "@/lib/types";
 import { StoreProvider } from "@/lib/store";
 import { ThemeProvider } from "@/lib/theme";
 import { GoogleMapsProvider } from "@/components/google-maps-provider";
-import { useVersionCheck } from "@/hooks/use-version-check";
+// import { useVersionCheck } from "@/hooks/use-version-check";
 import { SessionTimeoutWarning } from "@/components/session-timeout-warning";
 import NotFound from "@/pages/not-found";
 import WorkflowStudio from "@/pages/workflow-studio";
@@ -309,7 +309,7 @@ function Router() {
 }
 
 function App() {
-  useVersionCheck();
+  // useVersionCheck(); // Disabled: no longer forcing refresh on version change
   
   return (
     <QueryClientProvider client={queryClient}>
